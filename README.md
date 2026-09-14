@@ -2,6 +2,11 @@
 
 Seguimiento de ventas de ornamentos de Navidad personalizados: pedidos, agenda de pintura, pagos (Stripe / efectivo) e inventario.
 
+## Contexto para agentes
+
+Lee primero **[docs/project-context.md](docs/project-context.md)** (producto, stack, flujos y decisiones).
+También: [docs/sprint-plan.md](docs/sprint-plan.md) · [índice docs/](docs/README.md).
+
 ## Contexto
 
 Proyecto operativo para la temporada de mercados navideños 2026 (Viena). Stack previsto:
@@ -22,4 +27,4 @@ El desarrollo de la aplicación empieza tras el Sprint 1 (concepto y mockups en 
 
 ## Estado actual
 
-Repositorio inicial. Sin aplicación compilable todavía. Próximo foco: identidad, flujos y prototipo navegable (Sprint 1).
+Repositorio inicial con documentación de contexto. Sin aplicación compilable todavía. Próximo foco: identidad, flujos y prototipo navegable (Sprint 1).
