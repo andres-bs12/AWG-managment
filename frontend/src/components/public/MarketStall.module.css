@@ -1,0 +1,62 @@
+.root {
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 18px 24px rgba(10, 16, 28, 0.35));
+}
+
+.wreath {
+  transform-origin: 160px 168px;
+  animation: sway 4.5s ease-in-out infinite;
+}
+
+.star {
+  animation: twinkle 2.2s ease-in-out infinite;
+}
+
+.banner {
+  transform-origin: 160px 92px;
+  animation: sway 5.2s ease-in-out infinite reverse;
+}
+
+.roofSnow {
+  animation: sparkle 3.4s ease-in-out infinite;
+}
+
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(-1.4deg);
+  }
+  50% {
+    transform: rotate(1.6deg);
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes sparkle {
+  0%,
+  100% {
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wreath,
+  .star,
+  .banner,
+  .roofSnow {
+    animation: none;
+  }
+}

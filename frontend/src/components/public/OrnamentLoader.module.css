@@ -1,0 +1,63 @@
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 64px;
+}
+
+.ornament {
+  width: 36px;
+  height: 40px;
+  border-radius: 50% 50% 48% 48%;
+  background: radial-gradient(circle at 30% 30%, #e8d36a, #c45c4a);
+  position: relative;
+  animation: spin 2.4s linear infinite;
+}
+
+.ornament::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translateX(-50%);
+  background: #c0c6cc;
+  border-radius: 2px;
+}
+
+.brush {
+  width: 8px;
+  height: 34px;
+  border-radius: 4px;
+  background: linear-gradient(#c47a3a, #8b4a22);
+  transform-origin: 50% 100%;
+  animation: paint 1.4s ease-in-out infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes paint {
+  0%,
+  100% {
+    transform: rotate(-18deg);
+  }
+  50% {
+    transform: rotate(18deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ornament,
+  .brush {
+    animation: none;
+  }
+}

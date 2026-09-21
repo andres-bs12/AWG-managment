@@ -1,0 +1,174 @@
+.shell {
+  min-height: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  /** Never clip: if a short window cannot fit the scene, let it scroll instead of hiding CTAs. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--sky-top);
+  color: var(--snow);
+}
+
+/** Routes with a reading panel on top: the scene stays, the drama goes down. */
+.quiet .main {
+  padding-bottom: 8px;
+}
+
+.top {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  text-shadow: 0 2px 10px rgba(8, 16, 34, 0.45);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.lang {
+  display: flex;
+  gap: 6px;
+}
+
+/**
+ * Fixed square-ish boxes with no padding asymmetry and no letter-spacing, so the active pill is
+ * perfectly centred on both labels and both options are exactly the same size.
+ */
+.lang button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 36px;
+  padding: 0;
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: rgba(238, 244, 248, 0.7);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.lang button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.lang button[data-on='true'] {
+  border-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.lang button:focus-visible {
+  box-shadow: var(--focus);
+}
+
+.main {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/**
+ * One single line, always. `nowrap` plus an ellipsising note is what guarantees the footer never
+ * steals a second line from the hero on short phones, whatever the language's word length.
+ */
+.footer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 4px 16px 8px;
+  text-align: center;
+  color: var(--public-muted);
+  font-size: var(--fs-small);
+}
+
+.note {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  color: var(--public-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.social:hover {
+  background: rgba(255, 255, 255, 0.5);
+  text-decoration: underline;
+}
+
+.socialIcon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+/**
+ * Phones: the link collapses to its glyph so note + link fit one line even in German. The label is
+ * clipped rather than `display: none`, so the link keeps its accessible name.
+ */
+@media (max-width: 519px) {
+  .footer {
+    gap: 6px;
+    padding: 0 10px 4px;
+    font-size: 0.72rem;
+  }
+
+  .social {
+    min-height: 30px;
+    padding: 0 6px;
+  }
+
+  .socialLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/** Short windows: the chrome gives its padding back to the hero. */
+@media (max-height: 700px) {
+  .top {
+    padding: 4px 10px;
+  }
+}

@@ -1,0 +1,261 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(10, 18, 36, 0.62);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.22s ease both;
+}
+
+.card {
+  position: relative;
+  width: min(420px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: 46px 22px 24px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f9ff 100%);
+  color: var(--public-ink);
+  box-shadow: 0 26px 60px rgba(8, 16, 34, 0.42);
+  text-align: center;
+  animation: popIn 0.34s var(--pop-ease) both;
+}
+
+.ribbon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  border-radius: 24px 24px 0 0;
+  background: linear-gradient(90deg, var(--green) 0%, var(--green-deep) 100%);
+  overflow: hidden;
+}
+
+.ribbonArt {
+  position: absolute;
+  left: 50%;
+  bottom: -18px;
+  width: 260px;
+  transform: translateX(-50%);
+  animation: ribbonSway 5s ease-in-out infinite;
+}
+
+.close {
+  position: absolute;
+  top: 38px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(21, 32, 51, 0.06);
+  color: var(--public-ink);
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.close:hover {
+  background: rgba(21, 32, 51, 0.12);
+}
+
+.ornament {
+  position: relative;
+  width: 56px;
+  height: 66px;
+  margin: 6px auto 8px;
+  animation: ornSwing 3.8s ease-in-out infinite;
+  transform-origin: 50% 0;
+}
+
+.ornamentCap {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%);
+  border-radius: 3px;
+  background: #b9c3cd;
+}
+
+.ornamentBody {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #ff8d82 0%, var(--berry) 46%, var(--berry-deep) 100%);
+  box-shadow: inset -4px -5px 8px rgba(0, 0, 0, 0.18), 0 6px 14px rgba(224, 71, 63, 0.3);
+}
+
+.ornamentBody::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 11px;
+  width: 12px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 5vw, 1.7rem);
+}
+
+.hint {
+  margin: 8px auto 0;
+  max-width: 34ch;
+  color: var(--public-muted);
+  font-size: var(--fs-small);
+}
+
+.form {
+  margin-top: 18px;
+  text-align: left;
+}
+
+.label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 650;
+  font-size: var(--fs-small);
+}
+
+.input {
+  width: 100%;
+  min-height: var(--touch-lg);
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 2px solid #cdd9e6;
+  background: #fff;
+  color: var(--public-ink);
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.input::placeholder {
+  color: #9fb0c4;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.input:focus-visible {
+  border-color: var(--green);
+  box-shadow: 0 0 0 4px rgba(47, 174, 106, 0.28);
+}
+
+.error {
+  margin-top: 8px;
+  color: var(--berry-deep);
+  font-size: var(--fs-small);
+  font-weight: 650;
+  animation: shake 0.32s ease both;
+}
+
+.submit {
+  margin-top: 16px;
+  background: var(--green);
+}
+
+.submit:hover:not(:disabled) {
+  background: var(--green-deep);
+}
+
+.cancel {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  min-height: var(--touch);
+  border: 0;
+  background: transparent;
+  color: var(--public-muted);
+  font-weight: 650;
+  border-radius: var(--radius-pill);
+}
+
+.cancel:hover {
+  color: var(--public-ink);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ornSwing {
+  0%,
+  100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+
+@keyframes ribbonSway {
+  0%,
+  100% {
+    transform: translateX(calc(-50% - 6px));
+  }
+  50% {
+    transform: translateX(calc(-50% + 6px));
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .card,
+  .ornament,
+  .ribbonArt,
+  .error {
+    animation: none;
+  }
+}

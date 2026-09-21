@@ -1,0 +1,345 @@
+.wrap {
+  position: relative;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+}
+
+.halo {
+  position: absolute;
+  inset: 4% -6% 10%;
+  background: radial-gradient(52% 46% at 50% 56%, rgba(255, 214, 140, 0.4) 0%, transparent 68%);
+  filter: blur(8px);
+  animation: haloBreathe 6.5s ease-in-out infinite;
+  z-index: -1;
+}
+
+.svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/** Only the building casts a shadow — shadowing the whole SVG made the snow look like a pasted card. */
+.cabin {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 10px 16px rgba(14, 24, 48, 0.3));
+  animation: float 7s ease-in-out infinite;
+}
+
+.star {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: starPulse 3.4s ease-in-out infinite;
+}
+
+.lampGlow {
+  animation: lampFlicker 4.2s ease-in-out infinite;
+}
+
+.lantern {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: swing 4.6s ease-in-out infinite;
+}
+
+.bunting {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: buntingSway 5.6s ease-in-out infinite;
+}
+
+/**
+ * `transform-box: fill-box` is load-bearing: without it the scale in `bulbGlow` resolves against the
+ * view box origin and flings each bulb away from the garland, which looked like loose dots under the stall.
+ */
+.bulbs circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bulbGlow 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.bulbs circle:nth-child(1) {
+  animation-delay: 0s;
+}
+.bulbs circle:nth-child(2) {
+  animation-delay: 0.3s;
+}
+.bulbs circle:nth-child(3) {
+  animation-delay: 0.6s;
+}
+.bulbs circle:nth-child(4) {
+  animation-delay: 0.9s;
+}
+.bulbs circle:nth-child(5) {
+  animation-delay: 1.2s;
+}
+.bulbs circle:nth-child(6) {
+  animation-delay: 1.5s;
+}
+.bulbs circle:nth-child(7) {
+  animation-delay: 1.8s;
+}
+
+.orn1,
+.orn2,
+.orn3 {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: ornBob 3.6s ease-in-out infinite;
+}
+
+.orn2 {
+  animation-delay: 0.5s;
+  animation-duration: 4.1s;
+}
+
+.orn3 {
+  animation-delay: 1s;
+  animation-duration: 3.2s;
+}
+
+.wreath {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: swing 6.8s ease-in-out infinite;
+}
+
+.brushJar {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: jarTilt 5.4s ease-in-out infinite;
+}
+
+.pineLeft,
+.pineRight {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: pineSway 8s ease-in-out infinite alternate;
+}
+
+.pineRight {
+  animation-duration: 9.5s;
+  animation-delay: -2s;
+}
+
+.gifts {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: giftsPop 9s ease-in-out infinite;
+}
+
+.smoke {
+  filter: blur(3px);
+}
+
+.puff1,
+.puff2,
+.puff3,
+.puff4 {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: rise 6s linear infinite;
+}
+
+.puff2 {
+  animation-delay: 1.5s;
+}
+
+.puff3 {
+  animation-delay: 3s;
+}
+
+.puff4 {
+  animation-delay: 4.5s;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(-0.25deg);
+  }
+}
+
+@keyframes haloBreathe {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes starPulse {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 3px rgba(255, 209, 102, 0.7));
+  }
+  50% {
+    transform: scale(1.13) rotate(6deg);
+    filter: drop-shadow(0 0 14px rgba(255, 209, 102, 0.95));
+  }
+}
+
+@keyframes lampFlicker {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  42% {
+    opacity: 1;
+  }
+  48% {
+    opacity: 0.84;
+  }
+  70% {
+    opacity: 0.96;
+  }
+}
+
+@keyframes swing {
+  0%,
+  100% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}
+
+@keyframes buntingSway {
+  0%,
+  100% {
+    transform: rotate(-0.8deg) translateY(0);
+  }
+  50% {
+    transform: rotate(0.8deg) translateY(1.5px);
+  }
+}
+
+@keyframes bulbGlow {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.88);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes ornBob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(3deg);
+  }
+}
+
+@keyframes jarTilt {
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes pineSway {
+  from {
+    transform: rotate(-1.2deg);
+  }
+  to {
+    transform: rotate(1.2deg);
+  }
+}
+
+@keyframes giftsPop {
+  0%,
+  88%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  93% {
+    transform: translateY(-4px) scale(1.04);
+  }
+}
+
+/** Peaks at 0.55: below ~0.3 the puffs simply disappear against the night sky. */
+@keyframes rise {
+  0% {
+    opacity: 0;
+    transform: translate(0, 2px) scale(0.35);
+  }
+  18% {
+    opacity: 0.55;
+    transform: translate(-4px, -14px) scale(0.85);
+  }
+  55% {
+    opacity: 0.34;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-24px, -70px) scale(2.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cabin,
+  .halo,
+  .star,
+  .lampGlow,
+  .lantern,
+  .bunting,
+  .bulbs circle,
+  .orn1,
+  .orn2,
+  .orn3,
+  .wreath,
+  .brushJar,
+  .pineLeft,
+  .pineRight,
+  .gifts,
+  .puff1,
+  .puff2,
+  .puff3,
+  .puff4 {
+    animation: none;
+  }
+
+  /** Frozen, the four puffs are parked apart so they still read as a plume, not one blob. */
+  .puff1 {
+    opacity: 0.42;
+    transform: translate(-2px, -8px) scale(0.9);
+  }
+
+  .puff2 {
+    opacity: 0.32;
+    transform: translate(-8px, -24px) scale(1.3);
+  }
+
+  .puff3 {
+    opacity: 0.22;
+    transform: translate(-15px, -42px) scale(1.7);
+  }
+
+  .puff4 {
+    opacity: 0.13;
+    transform: translate(-21px, -58px) scale(2.1);
+  }
+}

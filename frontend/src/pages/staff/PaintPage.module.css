@@ -1,0 +1,47 @@
+.page {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: #141210;
+  overscroll-behavior: none;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--staff-surface);
+  color: var(--staff-ink);
+  border-bottom: 1px solid var(--staff-line);
+}
+
+.who {
+  min-width: 0;
+}
+
+.who h1 {
+  font-size: 1.1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  color: var(--staff-muted);
+  font-size: var(--fs-small);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.message {
+  padding: 24px;
+  color: #f7f3ea;
+}

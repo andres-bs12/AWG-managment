@@ -1,0 +1,40 @@
+.layer {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.flake {
+  position: absolute;
+  top: -8%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  animation: fall linear infinite;
+}
+
+.low .flake {
+  opacity: 0.35;
+}
+
+@keyframes fall {
+  from {
+    transform: translate3d(0, -10vh, 0);
+  }
+  to {
+    transform: translate3d(12px, 110vh, 0);
+  }
+}
+
+/**
+ * The snow stops falling but stays snow: each flake parks at its own height instead of collapsing
+ * into an invisible pile above the top edge.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .flake {
+    animation: none;
+    transform: translate3d(0, var(--drop, 40vh), 0);
+  }
+}

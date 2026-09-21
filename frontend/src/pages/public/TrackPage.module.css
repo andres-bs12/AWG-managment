@@ -1,0 +1,396 @@
+.page {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 16px 24px;
+}
+
+.card {
+  width: min(460px, 100%);
+  margin: 12px auto 0;
+  padding: 20px 20px 24px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  color: var(--public-ink);
+  box-shadow: 0 20px 48px rgba(12, 22, 44, 0.24);
+  text-align: center;
+  animation: cardIn 0.5s var(--pop-ease) both;
+}
+
+.art {
+  margin: 0 auto 10px;
+}
+
+.artSmall {
+  width: min(190px, 52vw);
+  margin: 0 auto 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-small);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.chip::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: blink 1.8s ease-in-out infinite;
+}
+
+.chipWork {
+  background: rgba(224, 168, 60, 0.18);
+  color: #8a5b12;
+}
+
+.chipReady {
+  background: rgba(47, 174, 106, 0.18);
+  color: var(--green-deep);
+}
+
+.title {
+  margin-top: 10px;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 5.4vw, 1.8rem);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.sub {
+  margin: 8px auto 0;
+  max-width: 36ch;
+  color: var(--public-muted);
+  font-size: var(--fs-small);
+}
+
+/**
+ * Reading order at a glance: done steps are muted grey with a tick, the current step is the only
+ * green (and the only bold) one, and everything ahead is a hollow outline.
+ */
+.steps {
+  --progress: 0%;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps::before,
+.steps::after {
+  content: '';
+  position: absolute;
+  top: 9px;
+  left: 16.6%;
+  height: 4px;
+  border-radius: 4px;
+}
+
+.steps::before {
+  right: 16.6%;
+  background: #e4eaf2;
+}
+
+/** The travelled part of the rail: grey like the past steps, so only "now" pops. */
+.steps::after {
+  width: calc((100% - 33.2%) * var(--progress) / 100%);
+  background: #c2cddb;
+}
+
+.steps li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+
+.stepDot {
+  position: relative;
+  z-index: 1;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #d7e0ea;
+  box-shadow: 0 0 0 3px #fff;
+}
+
+.steps li[data-state='past'] .stepDot {
+  background: #c2cddb;
+  border-color: #c2cddb;
+}
+
+/** A white tick marks the steps already behind you. */
+.steps li[data-state='past'] .stepDot::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 5px;
+  width: 6px;
+  height: 3px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg);
+}
+
+.steps li[data-state='now'] .stepDot {
+  background: var(--green-bright);
+  border-color: var(--green-deep);
+  box-shadow: 0 0 0 3px #fff, 0 0 0 6px rgba(47, 174, 106, 0.22);
+  animation: pop 2.4s ease-in-out infinite;
+}
+
+.stepLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #93a1b3;
+}
+
+.steps li[data-state='past'] .stepLabel {
+  color: #93a1b3;
+}
+
+.steps li[data-state='now'] .stepLabel {
+  color: var(--green-deep);
+  font-weight: 800;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 14px;
+  border-radius: 16px;
+  background: #f2f7fd;
+  text-align: left;
+}
+
+.facts dt {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--public-muted);
+}
+
+.facts dd {
+  margin: 2px 0 0;
+  font-weight: 650;
+}
+
+.whenExtra {
+  display: block;
+  margin-top: 2px;
+  color: var(--public-muted);
+  font-size: var(--fs-small);
+  font-weight: 600;
+}
+
+.code {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.includes {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #dfe7f1;
+  text-align: left;
+}
+
+.includesTitle {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--public-muted);
+}
+
+.items {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.items li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid #edf2f8;
+  font-weight: 650;
+}
+
+.items li:last-child {
+  border-bottom: 0;
+}
+
+.itemDot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #ff8d82, var(--berry));
+}
+
+.address {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px dashed #d7e1ec;
+  text-align: left;
+}
+
+.saved {
+  margin-bottom: 10px;
+  color: var(--green-deep);
+  font-size: var(--fs-small);
+  font-weight: 650;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 18px;
+}
+
+.homeBtn {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.another {
+  width: 100%;
+  min-height: var(--touch);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--public-muted);
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-color: #c9d3e0;
+}
+
+.another:hover {
+  color: var(--public-ink);
+}
+
+.openBtn {
+  margin-top: 18px;
+  background: linear-gradient(180deg, var(--green-bright) 0%, var(--green) 62%, var(--green-deep) 100%);
+  box-shadow: 0 10px 24px rgba(12, 74, 48, 0.32);
+}
+
+@media (min-width: 520px) {
+  .facts {
+    grid-template-columns: auto 1fr;
+    gap: 10px 20px;
+  }
+
+  .stepLabel {
+    font-size: 0.8rem;
+  }
+}
+
+/** Wide screens: illustration on the left, order details on the right. */
+@media (min-width: 860px) {
+  .card {
+    width: min(780px, 100%);
+    /** auto margins centre the card without clipping it when it is taller than the viewport */
+    margin-block: auto;
+    display: grid;
+    grid-template-columns: 290px minmax(0, 1fr);
+    align-items: center;
+    column-gap: 32px;
+    padding: 30px 32px;
+    text-align: left;
+  }
+
+  .art,
+  .artSmall {
+    width: 100%;
+    margin: 0;
+  }
+
+  .chip {
+    justify-self: start;
+  }
+
+  .title {
+    margin-top: 6px;
+  }
+
+  .sub {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .actions {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .another {
+    width: auto;
+    padding: 0 4px;
+  }
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes pop {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.22);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .chip::before,
+  .steps li[data-state='now'] .stepDot {
+    animation: none;
+  }
+}

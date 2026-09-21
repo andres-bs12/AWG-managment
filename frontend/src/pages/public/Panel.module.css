@@ -1,0 +1,27 @@
+.panel {
+  width: min(440px, 92vw);
+  margin: 24px auto 48px;
+  padding: 24px 20px 28px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--public-ink);
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.12);
+}
+
+.panel h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.15;
+  margin-bottom: 8px;
+}
+
+.lead {
+  color: var(--public-muted);
+  margin-bottom: 20px;
+}
+
+.actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}

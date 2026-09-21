@@ -1,0 +1,438 @@
+.backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sky {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    var(--sky-top) 0%,
+    var(--sky-mid) 32%,
+    var(--sky-low) 50%,
+    var(--sky-horizon) 60%
+  );
+}
+
+.auroraA,
+.auroraB {
+  position: absolute;
+  left: -20%;
+  width: 140%;
+  filter: blur(26px);
+  opacity: 0.85;
+}
+
+.auroraA {
+  top: -6%;
+  height: 46%;
+  background: radial-gradient(60% 70% at 24% 60%, var(--aurora-a) 0%, transparent 70%),
+    radial-gradient(50% 60% at 62% 40%, var(--aurora-b) 0%, transparent 72%);
+  animation: auroraDrift 22s ease-in-out infinite alternate;
+}
+
+.auroraB {
+  top: 6%;
+  height: 40%;
+  background: radial-gradient(45% 60% at 78% 50%, var(--aurora-a) 0%, transparent 70%),
+    radial-gradient(40% 50% at 40% 30%, var(--aurora-b) 0%, transparent 74%);
+  animation: auroraDrift 31s ease-in-out -8s infinite alternate-reverse;
+}
+
+.stars {
+  position: absolute;
+  inset: 0 0 42% 0;
+}
+
+.star {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.9);
+  animation: twinkle ease-in-out infinite alternate;
+}
+
+/**
+ * The 52px floor is load-bearing, not decoration: the header band is 44–56px tall and its language
+ * toggle is white text on transparent, so a pure percentage `top` slides the pale disc underneath
+ * the toggle on any short window (568, 640 and 390-tall landscape all did) and kills its contrast.
+ */
+.moon {
+  position: absolute;
+  top: max(8%, 52px);
+  right: 12%;
+  width: clamp(54px, 9vw, 96px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.moon::before {
+  content: '';
+  position: absolute;
+  inset: -70%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 246, 216, 0.34) 0%, transparent 62%);
+  animation: moonPulse 7s ease-in-out infinite;
+}
+
+.moonBody {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 32%, #fffdf2 0%, var(--moon) 58%, #ecd9a6 100%);
+  box-shadow: inset -6px -6px 0 rgba(0, 0, 0, 0.05);
+}
+
+.ridgeFar,
+.ridgeNear,
+.pinesBack,
+.village {
+  position: absolute;
+  left: -4%;
+  width: 108%;
+}
+
+.ridgeFar {
+  bottom: 39%;
+  height: clamp(90px, 20vh, 220px);
+  fill: var(--ridge-far);
+}
+
+.ridgeNear {
+  bottom: 37%;
+  height: clamp(70px, 15vh, 170px);
+  fill: var(--ridge-near);
+}
+
+.pinesBack {
+  bottom: 36.5%;
+  height: clamp(56px, 12vh, 132px);
+}
+
+.pineGroup {
+  transform-origin: 50% 100%;
+  animation: sway 11s ease-in-out infinite alternate;
+}
+
+/** The denser "life" layer only shows from tablet up; phones keep the simple scene. */
+.village,
+.walkers,
+.farSleigh {
+  display: none;
+}
+
+/** Sits just high enough that the booth roofs and the wheel clear the snow field's crest. */
+.village {
+  bottom: 41.4%;
+  height: clamp(56px, 11vh, 124px);
+  color: #1a2747;
+}
+
+.villageBody {
+  fill: #1a2747;
+  opacity: 0.8;
+}
+
+.wheel {
+  color: #1a2747;
+  opacity: 0.66;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: wheelTurn 48s linear infinite;
+}
+
+.villageLights {
+  fill: var(--gold);
+  animation: windowGlow 7s ease-in-out infinite alternate;
+}
+
+.farSleigh {
+  position: absolute;
+  top: 13%;
+  left: 0;
+  width: clamp(70px, 7vw, 108px);
+  color: #0d1730;
+  opacity: 0.3;
+  animation: crossSky 46s linear infinite;
+}
+
+.farSleighArt {
+  width: 100%;
+  height: auto;
+  display: block;
+  animation: skyBob 3.6s ease-in-out infinite;
+}
+
+.walkers {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 30%;
+  height: 40px;
+}
+
+.walkA,
+.walkB {
+  position: absolute;
+  bottom: 0;
+  width: clamp(34px, 3.2vw, 50px);
+  color: #2c3d6b;
+  opacity: 0.46;
+}
+
+.walkA {
+  animation: strollRight 58s linear infinite;
+}
+
+.walkB {
+  bottom: 46%;
+  width: clamp(38px, 3.6vw, 58px);
+  opacity: 0.36;
+  animation: strollLeft 74s linear -14s infinite;
+}
+
+.bob,
+.bobSlow {
+  display: block;
+  animation: stepBob 0.72s ease-in-out infinite;
+}
+
+.bobSlow {
+  animation-duration: 0.95s;
+}
+
+.walkerArt {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.field {
+  position: absolute;
+  left: -6%;
+  right: -6%;
+  bottom: 0;
+  height: 42%;
+  background: linear-gradient(180deg, #fbfdff 0%, #e6f0fb 46%, var(--snow-shade) 100%);
+  border-top-left-radius: 58% 26%;
+  border-top-right-radius: 58% 26%;
+  box-shadow: 0 -8px 30px rgba(120, 160, 210, 0.35);
+}
+
+.drift,
+.driftTwo {
+  position: absolute;
+  inset: 0;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+
+.drift {
+  background: radial-gradient(60% 40% at 18% 0%, rgba(255, 255, 255, 0.95) 0%, transparent 60%),
+    radial-gradient(50% 36% at 84% 6%, rgba(255, 255, 255, 0.9) 0%, transparent 60%);
+}
+
+.driftTwo {
+  background: radial-gradient(30% 22% at 50% 96%, rgba(174, 203, 232, 0.5) 0%, transparent 70%);
+  animation: shimmer 9s ease-in-out infinite alternate;
+}
+
+.calm .auroraA,
+.calm .auroraB {
+  opacity: 0.4;
+}
+
+.calm .field {
+  height: 54%;
+}
+
+.calm .ridgeFar {
+  bottom: 50%;
+}
+
+.calm .ridgeNear {
+  bottom: 48%;
+}
+
+.calm .pinesBack {
+  bottom: 47.5%;
+}
+
+/** Reading routes stay quiet: no village, no strollers, no sky traffic. */
+.calm .village,
+.calm .walkers,
+.calm .farSleigh {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .village,
+  .walkers,
+  .farSleigh {
+    display: block;
+  }
+}
+
+/**
+ * Short narrow phones: the header owns the top band and the centred wordmark owns the middle of the
+ * sky, so the only free patch left is the right margin strip beside the title. The moon shrinks into
+ * it — which is why it must not grow back into the toggle's corner.
+ */
+@media (max-height: 700px) and (max-width: 559px) {
+  .moon {
+    right: 2%;
+    width: clamp(30px, 10vw, 44px);
+  }
+}
+
+@keyframes auroraDrift {
+  from {
+    transform: translate3d(-4%, 0, 0) scaleY(1);
+    opacity: 0.55;
+  }
+  to {
+    transform: translate3d(5%, 2%, 0) scaleY(1.14);
+    opacity: 0.95;
+  }
+}
+
+@keyframes twinkle {
+  from {
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes moonPulse {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes sway {
+  from {
+    transform: skewX(-0.7deg);
+  }
+  to {
+    transform: skewX(0.7deg);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes wheelTurn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes windowGlow {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 0.9;
+  }
+}
+
+@keyframes crossSky {
+  0% {
+    transform: translateX(-14vw) translateY(4vh);
+  }
+  100% {
+    transform: translateX(114vw) translateY(-3vh);
+  }
+}
+
+@keyframes skyBob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(1.5deg);
+  }
+}
+
+@keyframes strollRight {
+  from {
+    transform: translateX(-8vw);
+  }
+  to {
+    transform: translateX(108vw);
+  }
+}
+
+@keyframes strollLeft {
+  from {
+    transform: translateX(108vw) scaleX(-1);
+  }
+  to {
+    transform: translateX(-10vw) scaleX(-1);
+  }
+}
+
+@keyframes stepBob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auroraA,
+  .auroraB,
+  .star,
+  .moon::before,
+  .pineGroup,
+  .driftTwo,
+  .wheel,
+  .villageLights,
+  .farSleighArt,
+  .bob,
+  .bobSlow {
+    animation: none;
+  }
+
+  /** Park the travelling pieces somewhere believable instead of freezing them off-screen. */
+  .farSleigh {
+    animation: none;
+    transform: translateX(62vw);
+  }
+
+  .walkA {
+    animation: none;
+    transform: translateX(22vw);
+  }
+
+  .walkB {
+    animation: none;
+    transform: translateX(74vw) scaleX(-1);
+  }
+}

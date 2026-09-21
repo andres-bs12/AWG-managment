@@ -1,0 +1,39 @@
+flowchart TD
+  START([Staff: Nueva venta]) --> ENTRY{¿Cómo entra?}
+
+  ENTRY -->|Navbar| NAV{Tipo de producto}
+  ENTRY -->|Calendario| CAL[Elegir hueco de pintura<br/>arrastrando en agenda]
+
+  NAV -->|Ya terminado / finished| FIN[Agregar ítem finished<br/>sin ocupar agenda]
+  NAV -->|Custom a pintar| PICK[Paso 1: Pickup hora<br/>o Delivery día]
+
+  PICK --> SLOT{¿Hay hueco de pintura<br/>antes de la entrega?}
+  SLOT -->|Sí| AUTO[Sistema coloca time_block<br/>automático]
+  SLOT -->|No| BLOCK[No se puede · mover<br/>bloques a mano y reintentar]
+  BLOCK --> PICK
+
+  CAL --> ITEMS
+  AUTO --> ITEMS
+  FIN --> ITEMS
+
+  ITEMS[Pedido: 1..N ítems<br/>custom y/o finished<br/>name acordado en puesto] --> MORE{¿Más ítems?}
+  MORE -->|Sí| NAV2{Otro ítem}
+  NAV2 -->|Custom| PICK
+  NAV2 -->|Finished| FIN
+  MORE -->|No| QR[Generar QR / link del form]
+
+  QR --> FORM[Cliente en móvil:<br/>fotos · perrito · contacto]
+  FORM --> PAY[Staff en ficha del pedido:<br/>No pagado / 50% / Pagado<br/>Efectivo o Stripe]
+  PAY --> WORK[Pintura / preparación<br/>según agenda]
+  WORK --> READY{Entrega}
+  READY -->|Mercado| PU[Listo · cliente viene<br/>Track + email]
+  READY -->|Domicilio| HOME[Día mié/vie · dirección<br/>Track si cambia dirección]
+  PU --> DONE([Pedido entregado])
+  HOME --> DONE
+
+  style START fill:#1e3a5f,stroke:#0f172a,color:#fff
+  style DONE fill:#14532d,stroke:#052e16,color:#fff
+  style BLOCK fill:#7f1d1d,stroke:#450a0a,color:#fff
+  style PAY fill:#713f12,stroke:#422006,color:#fff
+  style QR fill:#312e81,stroke:#1e1b4b,color:#fff
+  style FORM fill:#312e81,stroke:#1e1b4b,color:#fff

@@ -1,0 +1,2311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>AWG · Agenda → Slot → Sale flow mock</title>
+  <style>
+    :root {
+      --bg: #f3f3f1;
+      --surface: #fff;
+      --ink: #1a1a1a;
+      --muted: #6b6b6b;
+      --line: #e2e2de;
+      --soft: #ecece8;
+      --accent: #2c2c2c;
+      --slot: #dfe8f5;
+      --slot-border: #7a9cc4;
+      --slot-fill: #b8cce4;
+      --ok: #2f6b4f;
+      --warn: #9a6b2f;
+      --danger: #9a3b3b;
+      --hour-h: 56px;
+      --font: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+    button, input, select { font: inherit; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .brand { font-weight: 700; letter-spacing: 0.04em; }
+    .nav { display: flex; gap: 18px; color: var(--muted); font-size: 14px; }
+    .nav a { color: inherit; text-decoration: none; cursor: pointer; }
+    .nav a.active { color: var(--ink); font-weight: 600; }
+    .btn {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn.ghost {
+      background: var(--soft);
+      color: var(--ink);
+    }
+    .btn.sm { padding: 8px 12px; font-size: 13px; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 80px; }
+    h1 { margin: 0 0 8px; font-size: 34px; letter-spacing: -0.02em; }
+    .sub { color: var(--muted); margin: 0 0 24px; max-width: 60ch; line-height: 1.45; }
+    .hint {
+      background: #fff8e8;
+      border: 1px solid #efd9a8;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      line-height: 1.45;
+      color: #5c4a22;
+    }
+    .screen { display: none; }
+    .screen.on { display: block; }
+    .cols {
+      display: grid;
+      grid-template-columns: 1.4fr 0.9fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 920px) {
+      .cols { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px;
+    }
+    .panel h2 { margin: 0 0 12px; font-size: 16px; }
+    .day-head, .cal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .day-head strong, .cal-day-label { font-size: 18px; }
+    .cal-nav { display: flex; gap: 6px; flex-shrink: 0; }
+    .cal {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      user-select: none;
+    }
+    .hours, .grid {
+      display: grid;
+      grid-auto-rows: var(--hour-h);
+    }
+    .hours {
+      background: #fafaf8;
+      border-right: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .hours div {
+      padding: 6px 8px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .grid {
+      position: relative;
+      background:
+        linear-gradient(to bottom, transparent calc(var(--hour-h) - 1px), var(--line) var(--hour-h));
+      background-size: 100% var(--hour-h);
+      min-height: calc(var(--hour-h) * 8);
+      cursor: crosshair;
+    }
+    .existing {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      line-height: 1.25;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 2;
+      transition: box-shadow 0.2s ease, outline 0.2s ease;
+    }
+    .existing.has-slack {
+      border: 1px solid var(--slot-border);
+      background: linear-gradient(180deg, #e8f0fa, var(--slot));
+    }
+    .existing.at-limit {
+      border: 1px solid #d4a574;
+      background: linear-gradient(180deg, #fff0e0, #f5dcc4);
+    }
+    .existing.at-limit .slot-head .delivery {
+      color: #8a4a1a;
+    }
+    .existing.focused {
+      outline: 2px solid var(--slot-border);
+      box-shadow: 0 0 0 3px rgba(122, 156, 196, 0.35);
+      z-index: 6;
+    }
+    .existing.at-limit.focused {
+      outline-color: #d4a574;
+      box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.35);
+    }
+    .existing.done {
+      border-color: #8aab8a;
+      background: linear-gradient(180deg, #ecf2ec, #d8e8d8);
+    }
+    .existing.done .meta {
+      color: #5a735a;
+    }
+    .existing.done.focused {
+      outline-color: #8aab8a;
+      box-shadow: 0 0 0 3px rgba(138, 171, 138, 0.35);
+    }
+    .slot-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+    .slot-head b {
+      flex: 1;
+      min-width: 0;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .slot-head .delivery {
+      flex-shrink: 0;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink);
+      white-space: nowrap;
+      line-height: 1.2;
+      text-align: right;
+    }
+    .existing .meta,
+    .draft .meta,
+    .order-block .meta,
+    .drag-preview .meta {
+      color: var(--muted);
+      margin-top: 2px;
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    .draft, .order-block, .drag-preview {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      border-radius: 8px;
+      border: 1.5px solid var(--slot-border);
+      background: var(--slot);
+      padding: 6px 10px;
+      font-size: 12px;
+      line-height: 1.25;
+      overflow: hidden;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+      z-index: 3;
+    }
+    .order-block {
+      cursor: pointer;
+      background: linear-gradient(180deg, #e8f0fa, var(--slot));
+    }
+    .order-block:hover { outline: 2px solid var(--slot-border); }
+    .order-block .meta { color: var(--muted); margin-top: 2px; }
+    .draft {
+      background: rgba(184, 204, 228, 0.85);
+      border-style: dashed;
+      pointer-events: auto;
+      overflow: hidden;
+      padding: 0;
+    }
+    .draft-swipe-track {
+      display: flex;
+      height: 100%;
+      width: calc(100% + 64px);
+      transform: translateX(0);
+      transition: transform 0.2s ease;
+      touch-action: pan-y;
+    }
+    .draft.open .draft-swipe-track,
+    .swipe-row.open .swipe-track {
+      transform: translateX(-64px);
+    }
+    .draft-swipe-content {
+      flex: 0 0 100%;
+      padding: 6px 10px;
+      min-width: 0;
+    }
+    .draft-swipe-delete,
+    .swipe-delete {
+      flex: 0 0 64px;
+      border: 0;
+      background: var(--danger);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+    .swipe-row {
+      overflow: hidden;
+      border-radius: 12px;
+    }
+    .swipe-track {
+      display: flex;
+      width: calc(100% + 64px);
+      transform: translateX(0);
+      transition: transform 0.2s ease;
+      touch-action: pan-y;
+    }
+    .swipe-content {
+      flex: 0 0 100%;
+      min-width: 0;
+    }
+    .swipe-content.card {
+      border-radius: 12px;
+    }
+    .card.draft-card {
+      border-style: dashed;
+      border-color: var(--slot-border);
+      background: rgba(184, 204, 228, 0.35);
+    }
+    .ctx-menu {
+      position: fixed;
+      z-index: 60;
+      min-width: 140px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      padding: 4px;
+      display: none;
+    }
+    .ctx-menu.on { display: block; }
+    .ctx-menu button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font: inherit;
+      color: var(--danger);
+      font-weight: 600;
+    }
+    .ctx-menu button:hover { background: #fdf0f0; }
+    .drag-preview {
+      background: rgba(184, 204, 228, 0.7);
+      border-style: dashed;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .now-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 0;
+      border-top: 2px solid #c44;
+      padding: 0;
+      z-index: 4;
+      pointer-events: none;
+    }
+    .now-line .now-label,
+    .now-label {
+      position: absolute;
+      right: 8px;
+      top: -10px;
+      background: #c44;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .swatch {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      vertical-align: -1px;
+      margin-right: 6px;
+      border: 1px solid var(--line);
+    }
+    .swatch-at-limit {
+      background: linear-gradient(180deg, #fff0e0, #f5dcc4);
+      border-color: #d4a574;
+    }
+    .swatch-has-slack {
+      background: linear-gradient(180deg, #e8f0fa, var(--slot));
+      border-color: var(--slot-border);
+    }
+    .swatch-draft {
+      background: var(--slot);
+      border-color: var(--slot-border);
+    }
+    .swatch-done {
+      background: linear-gradient(180deg, #ecf2ec, #d8e8d8);
+      border-color: #8aab8a;
+    }
+    .cal-legend {
+      margin-top: 12px;
+    }
+    .list { display: grid; gap: 10px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: #fafaf8;
+    }
+    .card.side-card {
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .card.side-card:hover {
+      border-color: var(--slot-border);
+      background: #fff;
+    }
+    .card.side-card .multi-badge {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #2a3f55;
+      background: #eef4fb;
+      border-radius: 999px;
+      padding: 2px 8px;
+    }
+    .slot-pick {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: #fafaf8;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      font: inherit;
+      color: inherit;
+    }
+    .slot-pick:hover {
+      border-color: var(--slot-border);
+      background: #fff;
+    }
+    .slot-pick b { display: block; margin-bottom: 4px; }
+    .card .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: baseline;
+    }
+    .muted { color: var(--muted); font-size: 13px; }
+    .tiny { font-size: 12px; color: var(--muted); }
+    .steps {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 0 0 20px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .steps .on { color: var(--ink); font-weight: 700; }
+    .field { display: grid; gap: 6px; margin-bottom: 12px; }
+    .field label { font-size: 13px; color: var(--muted); }
+    .field input, .field select {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #fff;
+    }
+    .ornament {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+      background: #fff;
+    }
+    .ornament h3 { margin: 0 0 10px; font-size: 15px; }
+    .ornament-finished {
+      border-color: #c8d8c8;
+      background: linear-gradient(180deg, #fafcf9, #f3f8f3);
+    }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--ink);
+    }
+    .checkbox-row input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+      cursor: pointer;
+    }
+    .checkbox-row input[type="checkbox"]:disabled { cursor: not-allowed; }
+    .ornament-name-note { margin: 6px 0 0; }
+    .name-on-back-input {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .name-on-back-input[hidden] { display: none; }
+    .block-links { margin-top: 4px; }
+    .block-link-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 8px;
+      padding: 10px 12px;
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      background: #fafaf8;
+    }
+    .block-link-row { font-size: 13px; }
+    .pickup-time-field[hidden],
+    .market-day-field[hidden],
+    .delivery-day-field[hidden] { display: none; }
+    .delivery-fields { margin-top: 4px; }
+    .delivery-summary-line { margin: 10px 0 0; }
+    .reserved-box {
+      border: 1px solid var(--slot-border);
+      background: var(--slot);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    .capacity {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 8px 0 14px;
+      font-size: 13px;
+    }
+    .bar {
+      flex: 1;
+      height: 8px;
+      background: var(--soft);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .bar > span {
+      display: block;
+      height: 100%;
+      background: var(--slot-border);
+      width: 0%;
+      transition: width 0.2s ease;
+    }
+    .bar.warn > span { background: var(--warn); }
+    .bar.full > span { background: var(--danger); }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      background: var(--ink);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 50;
+    }
+    .toast.on { opacity: 1; }
+    .modal-back {
+      position: fixed;
+      inset: 0;
+      background: rgba(20,20,20,0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 40;
+      padding: 20px;
+    }
+    .modal-back.on { display: flex; }
+    .modal {
+      width: min(420px, 100%);
+      background: #fff;
+      border-radius: 16px;
+      padding: 18px;
+      border: 1px solid var(--line);
+    }
+    .modal h3 { margin: 0 0 8px; }
+    .modal p { margin: 0 0 14px; color: var(--muted); font-size: 14px; line-height: 1.4; }
+    .pill {
+      display: inline-block;
+      background: var(--soft);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .ok { color: var(--ok); font-weight: 600; }
+    .err { color: var(--danger); font-weight: 600; }
+    .pick-mode-banner {
+      display: none;
+      background: #eef4fb;
+      border: 1px solid var(--slot-border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      color: #2a3f55;
+    }
+    .pick-mode-banner.on { display: block; }
+    .staff-actions { margin-top: 14px; }
+    .qr-stub {
+      width: 160px;
+      height: 160px;
+      margin: 0 auto 14px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(90deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%),
+        linear-gradient(#1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%);
+      background-size: 16px 16px;
+      background-color: #fff;
+      box-shadow: inset 0 0 0 12px #fff, inset 0 0 0 14px #1a1a1a;
+    }
+    .qr-link {
+      text-align: center;
+      font-size: 13px;
+      word-break: break-all;
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-family: ui-monospace, "Cascadia Code", monospace;
+    }
+    .qr-modal { width: min(360px, 100%); }
+    .customer-form-cols { max-width: 920px; }
+    .form-section { margin-bottom: 16px; }
+    .form-section h2 { margin: 0 0 14px; font-size: 16px; }
+    .form-actions { margin-top: 8px; }
+    .customer-summary { border-color: var(--slot-border); background: #f7fafd; }
+    .form-aside h2 { margin-bottom: 12px; }
+    .form-aside-stack { display: flex; flex-direction: column; gap: 14px; }
+    .form-aside-label {
+      margin: 0 0 6px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .form-aside-body { font-size: 14px; line-height: 1.45; }
+    .form-aside-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .form-aside-row .val { text-align: right; font-weight: 500; max-width: 58%; word-break: break-word; }
+    .form-aside-placeholder { color: var(--muted); font-weight: 400; }
+    .form-aside-extra {
+      font-size: 13px;
+      padding: 8px 10px;
+      background: #f7fafd;
+      border-radius: 8px;
+      border: 1px solid var(--slot-border);
+    }
+    .form-aside-delivery-list {
+      margin: 6px 0 0;
+      padding-left: 18px;
+      font-size: 13px;
+    }
+    .form-aside-delivery-list li { margin-bottom: 3px; }
+    .order-detail-header { margin-bottom: 20px; }
+    .order-detail-header h1 { margin-bottom: 4px; }
+    .order-summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 720px) {
+      .order-summary-grid { grid-template-columns: 1fr; }
+    }
+    .order-summary-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      background: #fafaf8;
+    }
+    .order-summary-card h2 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .order-summary-card .val {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+    .order-summary-card .contact-lines {
+      display: grid;
+      gap: 6px;
+      font-size: 14px;
+    }
+    .order-summary-card .contact-lines .label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      margin-right: 6px;
+    }
+    .order-delivery-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .order-items-panel h2 { margin-bottom: 12px; }
+    .order-items-list { display: grid; gap: 10px; }
+    .order-item-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .order-item-row:hover {
+      border-color: var(--slot-border);
+      box-shadow: 0 2px 8px rgba(122, 156, 196, 0.15);
+    }
+    .order-item-thumb {
+      width: 52px;
+      height: 52px;
+      border-radius: 10px;
+      object-fit: cover;
+      flex-shrink: 0;
+      border: 1px solid var(--line);
+      background: var(--soft);
+    }
+    .order-item-thumb.placeholder {
+      display: block;
+      background: linear-gradient(135deg, #ecece8, #dfe8f5);
+    }
+    .order-item-body {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .order-item-body b { font-size: 15px; }
+    .order-item-body .muted { font-size: 13px; }
+    .order-item-photo-count {
+      font-size: 11px;
+      font-weight: 600;
+      color: #2a3f55;
+      margin-top: 2px;
+    }
+    .order-item-action {
+      flex-shrink: 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--slot-border);
+    }
+    .side-actions { margin-bottom: 12px; }
+    .side-actions .btn { width: 100%; }
+    .deliveries-header { margin-bottom: 20px; }
+    .deliveries-header h1 { margin-bottom: 4px; }
+    .deliveries-panel { width: 100%; }
+    .deliveries-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .deliveries-toolbar input[type="search"] {
+      flex: 1;
+      min-width: 180px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #fff;
+    }
+    .deliveries-filters {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .filter-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    .filter-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      min-width: 52px;
+      flex-shrink: 0;
+    }
+    .filter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .filter-chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 12px;
+      background: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+    }
+    .filter-chip:hover {
+      border-color: var(--slot-border);
+      color: var(--ink);
+    }
+    .filter-chip.on {
+      background: var(--slot);
+      border-color: var(--slot-border);
+      color: var(--ink);
+    }
+    .deliveries-list { display: grid; gap: 10px; width: 100%; }
+
+    /* Delivery cards — grid: thumb 48 | body | pickup clock RIGHT ~88 */
+    .dlv-card {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      overflow: hidden;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .dlv-card:hover {
+      border-color: var(--slot-border);
+      box-shadow: 0 2px 8px rgba(122, 156, 196, 0.12);
+    }
+    .dlv-main {
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr) 118px;
+      gap: 12px;
+      align-items: center;
+      justify-items: stretch;
+      width: 100%;
+      margin: 0;
+      padding: 14px 16px;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+      color: inherit;
+      box-sizing: border-box;
+    }
+    /* Multi: stack full-width rows; each .dlv-line / .delivery-ornament-row mirrors unitary */
+    .dlv-main--multi {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      gap: 0;
+      padding: 0;
+      grid-template-columns: none;
+    }
+    .dlv-head {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: flex-start;
+      gap: 2px;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 16px 6px;
+      text-align: left;
+    }
+    .dlv-lines {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+      width: 100%;
+    }
+    .dlv-line,
+    .delivery-ornament-row {
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr) 118px;
+      gap: 12px;
+      align-items: center;
+      justify-items: stretch;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      margin: 0;
+      padding: 14px 16px;
+      text-align: left;
+      min-height: 0;
+    }
+    .dlv-line + .dlv-line,
+    .delivery-ornament-row + .delivery-ornament-row {
+      border-top: 1px solid var(--line);
+    }
+    /* Fixed thumb cell — kills giant Unsplash intrinsics */
+    .dlv-thumb {
+      grid-column: 1;
+      display: block;
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      max-width: 48px;
+      min-height: 48px;
+      max-height: 48px;
+      overflow: hidden;
+      border-radius: 8px;
+      flex-shrink: 0;
+      border: 1px solid var(--line);
+      background: var(--soft);
+      align-self: center;
+    }
+    .dlv-thumb .order-item-thumb,
+    .dlv-card .order-item-thumb,
+    .delivery-ornament-row .order-item-thumb {
+      display: block;
+      width: 48px !important;
+      height: 48px !important;
+      max-width: 48px !important;
+      max-height: 48px !important;
+      border-radius: 8px;
+      object-fit: cover;
+      object-position: center;
+      flex-shrink: 0;
+      border: 0;
+    }
+    .dlv-card .order-item-thumb.placeholder,
+    .dlv-thumb .order-item-thumb.placeholder {
+      display: block;
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #ecece8, #dfe8f5);
+    }
+    .dlv-aside {
+      grid-column: 3;
+      width: 118px;
+      min-width: 118px;
+      max-width: 118px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: center;
+      justify-self: end;
+      gap: 2px;
+      text-align: right;
+      margin: 0;
+      padding: 0;
+    }
+    .dlv-aside-method {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      line-height: 1.2;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .dlv-aside-time {
+      display: block;
+      font-size: 19px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.15;
+      color: #3d3d3d;
+      white-space: nowrap;
+    }
+    .dlv-aside--home .dlv-aside-method {
+      color: #6b5a38;
+    }
+    .dlv-aside--home .dlv-aside-time {
+      color: #5c4a22;
+    }
+    .dlv-body,
+    .delivery-ornament-body {
+      grid-column: 2;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 3px;
+      text-align: left;
+    }
+    .dlv-title {
+      display: block;
+      font-size: 15px;
+      font-weight: 650;
+      line-height: 1.25;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    .dlv-meta {
+      display: block;
+      font-size: 13px;
+      font-weight: 400;
+      line-height: 1.35;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    .dlv-status {
+      margin-top: 6px;
+    }
+    .dlv-status .status-badge,
+    .card.side-card .status-badge {
+      font-size: 11px;
+      padding: 4px 8px;
+    }
+    .card.side-card .side-paint {
+      margin-top: 4px;
+    }
+    .card.side-card .side-status {
+      margin-top: 8px;
+    }
+    .delivery-day-section {
+      margin: 18px 0 8px;
+      padding: 0 2px;
+    }
+    .delivery-day-section:first-child { margin-top: 4px; }
+    .delivery-day-section h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+    }
+    .delivery-day-meta {
+      margin: 2px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .existing { cursor: grab; }
+    /* Ornament / pet photo inspection (staff QA) */
+    .inspect-screen { max-width: 960px; }
+    .inspect-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .inspect-order-code {
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--ink);
+      background: #fff;
+      border: 2px solid var(--ink);
+      border-radius: 10px;
+      padding: 8px 14px;
+    }
+    .inspect-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .inspect-pet-name,
+    .inspect-back-name,
+    .inspect-time-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: #fff;
+      border: 2px solid var(--ink);
+      border-radius: 12px;
+      padding: 12px 16px;
+      min-width: min(100%, 280px);
+    }
+    .inspect-time-wrap.is-done {
+      border-color: #8aab8a;
+      background: linear-gradient(180deg, #f6faf6, #ecf2ec);
+    }
+    .inspect-time-value {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      color: var(--ink);
+    }
+    .inspect-time-wrap.is-done .inspect-time-value {
+      color: #4a6b4a;
+    }
+    .inspect-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .inspect-value {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      color: var(--ink);
+    }
+    .inspect-viewer {
+      position: relative;
+      background: #111;
+      border-radius: 16px;
+      overflow: hidden;
+      touch-action: pan-y;
+      user-select: none;
+    }
+    .inspect-stage {
+      position: relative;
+      width: 100%;
+      min-height: min(72vh, 640px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .inspect-photo-hit {
+      display: block;
+      width: 100%;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: zoom-in;
+    }
+    .inspect-photo-hit:disabled {
+      cursor: default;
+    }
+    .inspect-photo {
+      display: block;
+      width: 100%;
+      max-height: min(72vh, 640px);
+      object-fit: contain;
+      background: #111;
+      pointer-events: none;
+    }
+    .inspect-empty {
+      color: #fff;
+      font-size: 18px;
+      font-weight: 600;
+      padding: 48px 24px;
+      text-align: center;
+    }
+    .inspect-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 2;
+      width: 48px;
+      height: 48px;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--ink);
+      font-size: 28px;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+    }
+    .inspect-nav:disabled { opacity: 0.35; cursor: not-allowed; }
+    .inspect-prev { left: 12px; }
+    .inspect-next { right: 12px; }
+    .inspect-counter {
+      position: absolute;
+      left: 50%;
+      bottom: 12px;
+      transform: translateX(-50%);
+      z-index: 2;
+      background: rgba(0, 0, 0, 0.72);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 6px 12px;
+      border-radius: 999px;
+    }
+    .inspect-thumbs {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .inspect-thumb {
+      flex: 0 0 auto;
+      width: 72px;
+      height: 72px;
+      padding: 0;
+      border: 2px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      background: #fff;
+    }
+    .inspect-thumb.active {
+      border-color: var(--ink);
+      box-shadow: 0 0 0 2px rgba(26, 26, 26, 0.15);
+    }
+    .inspect-thumb img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .inspect-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 18px;
+    }
+    .inspect-actions .btn.done-action {
+      border-color: #8aab8a;
+      color: #4a6b4a;
+    }
+    body.inspect-lightbox-open {
+      overflow: hidden;
+    }
+    .inspect-lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.96);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: pan-y;
+      user-select: none;
+    }
+    .inspect-lightbox[hidden] {
+      display: none !important;
+    }
+    .inspect-lightbox-stage {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 56px 64px;
+      box-sizing: border-box;
+    }
+    .inspect-lightbox-photo {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    .inspect-lightbox-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 2;
+      width: 44px;
+      height: 44px;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--ink);
+      font-size: 28px;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+    }
+    .inspect-lightbox .inspect-nav {
+      z-index: 2;
+    }
+    .inspect-lightbox-prev {
+      left: 16px;
+    }
+    .inspect-lightbox-next {
+      right: 16px;
+    }
+    .inspect-lightbox-counter {
+      bottom: 20px;
+    }
+    /* Sales tracking */
+    .sales-header { margin-bottom: 20px; }
+    .sales-header h1 { margin-bottom: 4px; }
+    .sales-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 920px) {
+      .sales-summary-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 520px) {
+      .sales-summary-grid { grid-template-columns: 1fr; }
+    }
+    .sales-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      min-height: 160px;
+      padding: 12px 4px 0;
+      overflow-x: auto;
+    }
+    .sales-bar-col {
+      flex: 1 0 64px;
+      max-width: 96px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .sales-bar {
+      width: 100%;
+      max-width: 48px;
+      border-radius: 8px 8px 4px 4px;
+      background: linear-gradient(180deg, var(--slot-fill), var(--slot-border));
+      min-height: 8px;
+    }
+    .sales-bar-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.2;
+    }
+    .sales-bar-val {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--ink);
+      text-align: center;
+    }
+    .sales-list { display: grid; gap: 10px; }
+    .sales-row { background: #fff; }
+    .sales-row-money {
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .sales-status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      line-height: 1.2;
+      padding: 5px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #f4f4f2;
+      color: var(--ink);
+    }
+    .status-badge--prod-not { background: #f4f4f2; color: #5a5a5a; }
+    .status-badge--prod-started {
+      background: #e8f0fa;
+      border-color: #b8cce4;
+      color: #2a4a6b;
+    }
+    .status-badge--prod-done {
+      background: #e8f2ea;
+      border-color: #b4d0b8;
+      color: #2f6b4f;
+    }
+    .status-badge--del-no {
+      background: #faf2e8;
+      border-color: #efd9a8;
+      color: #6b5220;
+    }
+    .status-badge--del-yes {
+      background: #e8f2ea;
+      border-color: #b4d0b8;
+      color: #2f6b4f;
+    }
+    .sales-pay-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">AWG</div>
+    <nav class="nav">
+      <a data-nav="agenda" class="active">Agenda</a>
+      <a data-nav="deliveries">All deliveries</a>
+      <a data-nav="sales">Sales</a>
+      <a data-nav="sale">New order</a>
+      <a>Log out</a>
+    </nav>
+    <button class="btn" type="button" id="btnCreateTop">+ Create order</button>
+  </header>
+
+  <main class="wrap">
+    <section id="screen-agenda" class="screen on">
+      <h1>Agenda</h1>
+      <p class="sub">
+        Ask the customer when they want it → create the slot on the calendar →
+        confirm duration (stay on agenda or open sale).
+      </p>
+      <div class="hint">
+        <b>How to test:</b> drag an empty slot on the grid. In the modal choose
+        duration and «Add another slot» or «Done · open sale». <b>Click</b> an existing
+        order to open order detail · drag any order to move it (cannot extend past pickup/delivery). Delete drafts:
+        swipe left on a draft in the calendar grid or right-click → Delete.
+      </div>
+      <div class="pick-mode-banner" id="pickModeBanner">
+        Pick another free slot on the calendar for the next ornament in this order.
+        <button class="btn ghost sm" type="button" id="btnCancelPick" style="margin-left:8px">Cancel</button>
+      </div>
+
+      <div class="cols">
+        <div class="panel">
+          <div id="calRoot"></div>
+          <p class="tiny" style="margin-top:12px;margin-bottom:0">
+            Click order = detail · drag empty = create · drag order = move
+          </p>
+        </div>
+
+        <aside class="panel">
+          <h2>Deliverables of the day</h2>
+          <div class="side-actions">
+            <button class="btn ghost sm" type="button" id="btnViewAllDeliveries">All deliveries</button>
+          </div>
+          <div class="list" id="sideList"></div>
+          <p class="tiny" style="margin-top:14px">
+            Pickup at the market · home delivery only Wed / Fri.
+          </p>
+        </aside>
+      </div>
+    </section>
+
+    <section id="screen-sale" class="screen">
+      <h1>New order</h1>
+      <div class="steps">
+        <span class="on">1 Ornaments</span>
+        <span>2 Delivery</span>
+        <span>3 Payment & QR</span>
+      </div>
+      <div class="hint" id="saleHint"></div>
+
+      <div class="cols">
+        <div>
+          <div class="panel" style="margin-bottom:16px">
+            <h2>Reserved block</h2>
+            <div id="blockSummary" class="muted">No block yet.</div>
+            <div class="capacity">
+              <span id="capLabel">0 / 0 min used</span>
+              <div class="bar" id="capBar"><span></span></div>
+            </div>
+            <div class="actions">
+              <button class="btn sm" type="button" id="btnAddInBlock">+ Ornament in this block</button>
+              <button class="btn ghost sm" type="button" id="btnAddFinished">+ Finished product (fixed price)</button>
+              <button class="btn ghost sm" type="button" id="btnPickOtherSlot">+ Add slot in calendar</button>
+              <button class="btn ghost sm" type="button" id="btnMergeOrnaments" hidden>Merge into one ornament</button>
+            </div>
+            <p class="tiny" style="margin-top:10px">
+              Example: no 1 h gap → reserve two 30 min slots, then link both blocks to one ornament below.
+            </p>
+          </div>
+
+          <div id="ornaments"></div>
+
+          <div class="actions">
+            <button class="btn ghost" type="button" id="btnBackAgenda">← Back to agenda</button>
+            <button class="btn" type="button" id="btnToDelivery" disabled>Choose delivery →</button>
+          </div>
+        </div>
+
+        <aside class="panel">
+          <h2>Order summary</h2>
+          <div class="card" style="margin-bottom:12px">
+            <div class="row"><b>Total</b><b id="totalEur">€0</b></div>
+            <div class="muted" id="totalMeta" style="margin-top:6px">0 ornaments</div>
+          </div>
+          <div class="list" id="summaryList"></div>
+          <div class="actions staff-actions" id="saleStaffActions">
+            <button class="btn sm ghost" type="button" id="btnGenerateQR" disabled>Generate QR</button>
+            <button class="btn sm" type="button" id="btnFillHere" disabled>Fill in here</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="screen-deliveries" class="screen">
+      <div class="deliveries-header">
+        <button class="btn ghost sm" type="button" id="btnDeliveriesBack">← Back to agenda</button>
+        <h1>All deliveries</h1>
+        <p class="sub" id="deliveriesSub">—</p>
+        <p class="tiny" style="margin:8px 0 0;color:var(--muted)">
+          Deliveries are <b>market pickup</b> (exact time on the right) or <b>home</b> on Wed/Fri. Cards sorted by pickup time.
+        </p>
+      </div>
+      <div class="panel deliveries-panel">
+        <div class="deliveries-toolbar">
+          <input type="search" id="deliveriesSearch" placeholder="Search by order number…" autocomplete="off" />
+        </div>
+        <div class="deliveries-filters">
+          <div class="filter-group">
+            <span class="filter-label">Status</span>
+            <div class="filter-chips" id="deliveriesReadyFilter" role="tablist" aria-label="Filter by readiness">
+              <button type="button" class="filter-chip on" data-ready="all" role="tab" aria-selected="true">All</button>
+              <button type="button" class="filter-chip" data-ready="ready" role="tab" aria-selected="false">Ready</button>
+              <button type="button" class="filter-chip" data-ready="not_ready" role="tab" aria-selected="false">Not ready</button>
+            </div>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Day</span>
+            <div class="filter-chips" id="deliveriesDayFilter" role="tablist" aria-label="Filter by day"></div>
+          </div>
+        </div>
+        <div class="deliveries-list" id="deliveriesList"></div>
+      </div>
+    </section>
+
+    <section id="screen-order-detail" class="screen">
+      <div class="order-detail-header">
+        <button class="btn ghost sm" type="button" id="btnOrderDetailBack">← Back to agenda</button>
+        <h1 id="orderDetailTitle">Order</h1>
+        <p class="sub" id="orderDetailSub" style="margin-bottom:0">—</p>
+      </div>
+
+      <div class="order-summary-grid">
+        <div class="order-summary-card">
+          <h2>Customer</h2>
+          <div class="val" id="orderDetailCustomer">—</div>
+        </div>
+        <div class="order-summary-card">
+          <h2>Contact</h2>
+          <div class="contact-lines" id="orderDetailContact">—</div>
+        </div>
+        <div class="order-summary-card">
+          <h2>Delivery / pickup</h2>
+          <div class="val" id="orderDetailDelivery">—</div>
+        </div>
+        <div class="order-summary-card">
+          <h2>Painting slots</h2>
+          <div class="val" id="orderDetailPaint">—</div>
+        </div>
+      </div>
+
+      <div class="panel order-items-panel">
+        <h2>Ornaments / pets</h2>
+        <div class="order-items-list" id="orderDetailItems"></div>
+      </div>
+    </section>
+
+    <section id="screen-sales" class="screen">
+      <div class="sales-header">
+        <button class="btn ghost sm" type="button" id="btnSalesBack">← Back to agenda</button>
+        <h1>Sales tracking</h1>
+        <p class="sub" style="margin-bottom:0">Order overview · production and delivery status (payments at handoff in Deliveries).</p>
+      </div>
+
+      <div class="sales-summary-grid">
+        <div class="order-summary-card">
+          <h2>Total sold</h2>
+          <div class="val" id="salesSoldTotal">€0.00</div>
+        </div>
+        <div class="order-summary-card">
+          <h2>Collected</h2>
+          <div class="val ok" id="salesCollectedTotal">€0.00</div>
+        </div>
+        <div class="order-summary-card">
+          <h2>Still due</h2>
+          <div class="val" id="salesDueTotal">€0.00</div>
+        </div>
+        <div class="order-summary-card">
+          <h2>Product mix</h2>
+          <div class="val" style="font-size:14px;font-weight:500" id="salesProductMix">—</div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:20px">
+        <h2>Daily sales</h2>
+        <div id="salesChart"></div>
+      </div>
+
+      <div class="panel">
+        <h2>All sales</h2>
+        <div id="salesList" class="sales-list"></div>
+      </div>
+    </section>
+
+    <section id="screen-delivery" class="screen">
+      <h1>Delivery</h1>
+      <div class="steps">
+        <span>1 Ornaments</span>
+        <span class="on">2 Delivery</span>
+        <span>3 Payment & QR</span>
+      </div>
+      <p class="sub">Pickup is scheduled <b>after</b> the reserved painting time.</p>
+      <div id="deliveryList"></div>
+      <div class="actions">
+        <button class="btn ghost" type="button" id="btnBackSale">← Ornaments</button>
+        <button class="btn" type="button" id="btnDone">Simulate payment / QR</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- AWG_SALE.ensureModal rellena el interior; contenedor vacío basta -->
+  <div class="modal-back" id="modalConfirm"></div>
+
+  <div class="modal-back" id="modalGenerateQr">
+    <div class="modal qr-modal">
+      <h3>Customer form · QR</h3>
+      <p class="muted" style="margin-bottom:14px">Scan or share this link so the customer can fill in their details.</p>
+      <div class="qr-stub" id="qrStub" aria-hidden="true"></div>
+      <p class="qr-link" id="qrLinkText"></p>
+      <div class="actions">
+        <button class="btn ghost" type="button" id="btnCloseQrModal">Close</button>
+        <button class="btn" type="button" id="btnOpenCustomerForm">Open customer form</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mini-grid opcional si se prefiere no reusar el calendario principal -->
+  <div class="modal-back" id="modalOrderSlots">
+    <div class="modal" style="width:min(480px,100%)">
+      <h3 id="orderSlotsTitle">Which slot?</h3>
+      <p id="orderSlotsDesc">This order has multiple painting slots. Which one should we open on the calendar?</p>
+      <div class="list" id="orderSlotsList" style="margin:12px 0"></div>
+      <div class="actions">
+        <button class="btn ghost" type="button" id="orderSlotsDismiss">Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-back" id="modalPickSlot">
+    <div class="modal" style="width:min(520px,100%)">
+      <h3>Add slot in calendar</h3>
+      <p>Go back to the agenda and drag a free slot, or cancel.</p>
+      <div class="actions" style="margin-top:12px">
+        <button class="btn ghost" type="button" id="pickCancel">Cancel</button>
+        <button class="btn" type="button" id="pickGoAgenda">Go to agenda</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="ctx-menu" id="draftContextMenu" role="menu" hidden>
+    <button type="button" data-action="delete" role="menuitem">Delete</button>
+  </div>
+
+  <script src="./agenda-data.js?v=dlv-status1"></script>
+  <script src="./agenda-calendar.js?v=dlv-status1"></script>
+  <script src="./agenda-order-detail.js?v=dlv-status1"></script>
+  <script src="./agenda-deliveries.js?v=dlv-status1"></script>
+  <script src="./agenda-sale.js?v=dlv-status1"></script>
+  <script src="./agenda-sales-tracking.js?v=dlv-status1"></script>
+  <script src="./agenda-customer-form.js?v=dlv-status1"></script>
+  <script src="./agenda-order-inspect.js?v=dlv-status1"></script>
+  <script>
+    (function () {
+      "use strict";
+
+      var DATA = window.AWG_DATA;
+      var CAL = window.AWG_CAL;
+      var ORDER = window.AWG_ORDER;
+      var DELIVERIES = window.AWG_DELIVERIES;
+      var SALE = window.AWG_SALE;
+      var SALES = window.AWG_SALES;
+      var FORM = window.AWG_FORM;
+      var INSPECT = window.AWG_INSPECT;
+
+      var $ = function (id) {
+        return document.getElementById(id);
+      };
+
+      var pickMode = false;
+      var toastTimer = null;
+      var ctxBlockId = null;
+      var SWIPE_THRESHOLD = 60;
+
+      function toast(msg) {
+        var t = $("toast");
+        if (!t) return;
+        t.textContent = msg;
+        t.classList.add("on");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () {
+          t.classList.remove("on");
+        }, 2200);
+      }
+
+      function setNav(name) {
+        document.querySelectorAll(".nav [data-nav]").forEach(function (a) {
+          a.classList.toggle("active", a.getAttribute("data-nav") === name);
+        });
+      }
+
+      function showScreen(name) {
+        ["agenda", "sale", "delivery", "customer-form", "order-detail", "ornament-inspect", "deliveries", "sales"].forEach(function (n) {
+          var el = $("screen-" + n);
+          if (el) el.classList.toggle("on", n === name);
+        });
+        setNav(
+          name === "delivery" || name === "customer-form"
+            ? "sale"
+            : name === "order-detail" || name === "ornament-inspect"
+              ? "agenda"
+              : name
+        );
+        if (name === "agenda" && CAL && typeof CAL.refresh === "function") {
+          CAL.refresh();
+        }
+        renderSideList();
+        if (DELIVERIES && typeof DELIVERIES.refreshDay === "function") {
+          DELIVERIES.refreshDay();
+        }
+      }
+
+      function setPickMode(on) {
+        pickMode = !!on;
+        var banner = $("pickModeBanner");
+        if (banner) banner.classList.toggle("on", pickMode);
+      }
+
+      function fmtHour(h) {
+        if (DATA && typeof DATA.fmt === "function") return DATA.fmt(h);
+        var hh = Math.floor(h);
+        var mm = Math.round((h - hh) * 60);
+        return String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0");
+      }
+
+      function deliveryLine(slot, paintDayId) {
+        if (DATA && typeof DATA.deliveryLabel === "function") {
+          return DATA.deliveryLabel(slot, paintDayId);
+        }
+        return "";
+      }
+
+      function orderIdFor(slot) {
+        return slot.orderId || slot.id;
+      }
+
+      function focusOrderSlot(dayId, slotId) {
+        showScreen("agenda");
+        if (CAL && typeof CAL.focusSlot === "function") {
+          CAL.focusSlot(dayId, slotId);
+        } else if (CAL && typeof CAL.setDay === "function") {
+          CAL.setDay(dayId);
+        }
+      }
+
+      function closeOrderSlotsModal() {
+        var modal = $("modalOrderSlots");
+        if (modal) modal.classList.remove("on");
+      }
+
+      function openOrderSlotsModal(orderSlots, clickedSlot) {
+        var modal = $("modalOrderSlots");
+        var list = $("orderSlotsList");
+        var title = $("orderSlotsTitle");
+        var desc = $("orderSlotsDesc");
+        if (!modal || !list) return;
+
+        var name = clickedSlot.name + " · " + clickedSlot.code;
+        if (title) title.textContent = "Multiple slots · " + name;
+        if (desc) {
+          desc.textContent =
+            "This order has " +
+            orderSlots.length +
+            " painting slots. Which one should we open on the calendar?";
+        }
+
+        list.innerHTML = orderSlots
+          .map(function (entry) {
+            var s = entry.slot;
+            var del = deliveryLine(s, entry.dayId);
+            return (
+              '<button type="button" class="slot-pick" data-day-id="' +
+              entry.dayId +
+              '" data-slot-id="' +
+              entry.slotId +
+              '">' +
+              "<b>" +
+              entry.weekdayShort +
+              " · " +
+              fmtHour(s.start) +
+              "–" +
+              fmtHour(s.end) +
+              "</b>" +
+              '<span class="muted">' +
+              (del || "Paint slot") +
+              "</span>" +
+              "</button>"
+            );
+          })
+          .join("");
+
+        list.querySelectorAll(".slot-pick").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            closeOrderSlotsModal();
+            focusOrderSlot(btn.dataset.dayId, btn.dataset.slotId);
+          });
+        });
+
+        modal.classList.add("on");
+      }
+
+      function openOrderDetail(slot, dayId) {
+        if (ORDER && typeof ORDER.open === "function") {
+          ORDER.open(slot, dayId);
+          return;
+        }
+        document.dispatchEvent(
+          new CustomEvent("awg:open-order", {
+            detail: { slot: slot, orderId: orderIdFor(slot), dayId: dayId },
+            bubbles: true,
+          })
+        );
+      }
+
+      function onSideCardClick(slot, dayId) {
+        openOrderDetail(slot, dayId);
+      }
+
+      function currentDay() {
+        if (!DATA || !DATA.days) return null;
+        var id =
+          CAL && typeof CAL.getSelectedDayId === "function"
+            ? CAL.getSelectedDayId()
+            : null;
+        if (id && typeof DATA.getDay === "function") return DATA.getDay(id);
+        if (typeof DATA.getTodayDay === "function") return DATA.getTodayDay();
+        return DATA.days[0] || null;
+      }
+
+      function closeDraftContextMenu() {
+        var menu = $("draftContextMenu");
+        if (!menu) return;
+        menu.classList.remove("on");
+        menu.hidden = true;
+        ctxBlockId = null;
+      }
+
+      function openDraftContextMenu(x, y, blockId) {
+        var menu = $("draftContextMenu");
+        if (!menu) return;
+        ctxBlockId = blockId;
+        menu.hidden = false;
+        menu.classList.add("on");
+        menu.style.left = Math.min(x, window.innerWidth - 160) + "px";
+        menu.style.top = Math.min(y, window.innerHeight - 60) + "px";
+      }
+
+      function deleteDraftBlock(blockId, options) {
+        options = options || {};
+        if (!blockId || !SALE || typeof SALE.removeDraftBlock !== "function") return;
+        if (options.confirm !== false) {
+          if (!window.confirm("Delete this draft slot?")) return;
+        }
+        if (!SALE.removeDraftBlock(blockId)) return;
+        toast("Draft removed");
+        closeDraftContextMenu();
+        if (CAL && typeof CAL.refresh === "function") CAL.refresh();
+        renderSideList();
+      }
+
+      function bindDraftDeleteActions(el, blockId) {
+        if (!el || el._awgDraftBound) return;
+        el._awgDraftBound = true;
+        el.dataset.blockId = blockId;
+
+        var track = el.querySelector(".draft-swipe-track, .swipe-track");
+        var deleteBtn = el.querySelector(".draft-swipe-delete, .swipe-delete");
+        var swipe = null;
+
+        function setOpen(on) {
+          el.classList.toggle("open", !!on);
+        }
+
+        function closeOthers() {
+          document.querySelectorAll(".draft.open, .swipe-row.open").forEach(function (node) {
+            if (node !== el) node.classList.remove("open");
+          });
+        }
+
+        if (deleteBtn) {
+          deleteBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            deleteDraftBlock(blockId, { confirm: false });
+          });
+          deleteBtn.addEventListener("pointerdown", function (e) {
+            e.stopPropagation();
+          });
+        }
+
+        el.addEventListener("contextmenu", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeOthers();
+          openDraftContextMenu(e.clientX, e.clientY, blockId);
+        });
+
+        el.addEventListener("pointerdown", function (e) {
+          if (e.button !== 0) return;
+          if (e.target.closest(".draft-swipe-delete, .swipe-delete")) return;
+          e.stopPropagation();
+          swipe = {
+            pointerId: e.pointerId,
+            startX: e.clientX,
+            startY: e.clientY,
+            baseOpen: el.classList.contains("open"),
+            moved: false,
+          };
+        });
+
+        el.addEventListener("pointermove", function (e) {
+          if (!swipe || swipe.pointerId !== e.pointerId || !track) return;
+          var dx = swipe.startX - e.clientX;
+          var dy = Math.abs(e.clientY - swipe.startY);
+          if (Math.abs(dx) > 8 && Math.abs(dx) > dy) swipe.moved = true;
+          if (!swipe.moved) return;
+          e.preventDefault();
+          if (dx > 0) {
+            track.style.transition = "none";
+            track.style.transform = "translateX(" + Math.max(-64, -dx) + "px)";
+          }
+        });
+
+        function finishSwipe(e) {
+          if (!swipe || swipe.pointerId !== e.pointerId) return;
+          var dx = swipe.startX - e.clientX;
+          if (track) {
+            track.style.transition = "";
+            track.style.transform = "";
+          }
+          if (swipe.moved && dx >= SWIPE_THRESHOLD) {
+            closeOthers();
+            setOpen(true);
+          } else if (swipe.moved && dx <= -SWIPE_THRESHOLD) {
+            setOpen(false);
+          } else if (!swipe.moved && swipe.baseOpen) {
+            setOpen(false);
+          }
+          swipe = null;
+        }
+
+        el.addEventListener("pointerup", finishSwipe);
+        el.addEventListener("pointercancel", finishSwipe);
+
+        el.addEventListener("click", function (e) {
+          if (e.target.closest(".draft-swipe-delete, .swipe-delete")) return;
+          if (el.classList.contains("open")) {
+            e.preventDefault();
+            e.stopPropagation();
+            setOpen(false);
+          }
+        });
+      }
+
+      function renderSideList() {
+        var list = $("sideList");
+        if (!list) return;
+        var day = currentDay();
+        if (!day) {
+          list.innerHTML = '<p class="muted">No agenda data.</p>';
+          return;
+        }
+
+        var slots = day.slots || [];
+        if (!slots.length) {
+          list.innerHTML = '<p class="muted">No deliverables this day.</p>';
+          return;
+        }
+
+        var html = slots
+          .map(function (s) {
+            var del = deliveryLine(s, day.id);
+            var orderId = orderIdFor(s);
+            var order =
+              DATA && typeof DATA.resolveOrderFromSlot === "function"
+                ? DATA.resolveOrderFromSlot(s)
+                : null;
+            var ornament = null;
+            if (order && order.ornaments && order.ornaments.length) {
+              if (s.ornamentId) {
+                for (var oi = 0; oi < order.ornaments.length; oi++) {
+                  if (order.ornaments[oi].id === s.ornamentId) {
+                    ornament = order.ornaments[oi];
+                    break;
+                  }
+                }
+              }
+              if (!ornament) ornament = order.ornaments[0];
+            }
+            var paintLabel =
+              DATA && typeof DATA.formatPaintWindow === "function"
+                ? DATA.formatPaintWindow(day.id, s.start, s.end)
+                : fmtHour(s.start) + "–" + fmtHour(s.end);
+            var statusBadge =
+              DATA && typeof DATA.productionStatusBadgeHtml === "function"
+                ? DATA.productionStatusBadgeHtml(ornament, s)
+                : "";
+            var orderCount =
+              DATA && typeof DATA.getOrderSlots === "function"
+                ? DATA.getOrderSlots(orderId).length
+                : 1;
+            return (
+              '<div class="card side-card" role="button" tabindex="0"' +
+              ' data-slot-id="' +
+              s.id +
+              '" data-day-id="' +
+              day.id +
+              '" data-order-id="' +
+              orderId +
+              '">' +
+              '<div class="row"><b>' +
+              s.name +
+              " · " +
+              s.code +
+              "</b></div>" +
+              '<div class="muted side-paint">Paint ' +
+              paintLabel +
+              "</div>" +
+              (del ? '<div class="muted" style="margin-top:2px">' + del + "</div>" : "") +
+              (statusBadge
+                ? '<div class="side-status">' + statusBadge + "</div>"
+                : "") +
+              (orderCount > 1
+                ? '<span class="multi-badge">' + orderCount + " slots · tap to choose</span>"
+                : "") +
+              "</div>"
+            );
+          })
+          .join("");
+
+        list.innerHTML = html;
+
+        list.querySelectorAll(".side-card").forEach(function (card) {
+          function activate() {
+            var slotId = card.dataset.slotId;
+            var dayId = card.dataset.dayId;
+            var slot = null;
+            var i;
+            for (i = 0; i < day.slots.length; i++) {
+              if (day.slots[i].id === slotId) {
+                slot = day.slots[i];
+                break;
+              }
+            }
+            if (slot) onSideCardClick(slot, dayId);
+          }
+          card.addEventListener("click", activate);
+          card.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              activate();
+            }
+          });
+        });
+      }
+
+      function onCreateRange(start, end, dayId) {
+        if (!SALE || typeof SALE.promptSlot !== "function") {
+          toast("Sale module unavailable");
+          return;
+        }
+        SALE.promptSlot({
+          dayId: dayId || (CAL && CAL.getSelectedDayId && CAL.getSelectedDayId()),
+          start: start,
+          end: end,
+          mode: pickMode ? "add-block" : "new",
+        });
+      }
+
+      function wireCalNavRefresh() {
+        var root = $("calRoot");
+        if (!root) return;
+        root.addEventListener("click", function (e) {
+          if (e.target.closest(".cal-prev, .cal-next, .cal-today")) {
+            setTimeout(renderSideList, 0);
+          }
+        });
+      }
+
+      function boot() {
+        if (!DATA) {
+          console.error("Missing window.AWG_DATA — load agenda-data.js");
+          toast("Error: missing agenda-data.js");
+          return;
+        }
+        if (!CAL || typeof CAL.mount !== "function") {
+          console.error("Missing window.AWG_CAL — load agenda-calendar.js");
+          toast("Error: missing agenda-calendar.js");
+          return;
+        }
+        if (!ORDER || typeof ORDER.mount !== "function") {
+          console.error("Missing window.AWG_ORDER — load agenda-order-detail.js");
+          toast("Error: missing agenda-order-detail.js");
+          return;
+        }
+
+        ORDER.mount($("screen-order-detail"), {
+          onShowScreen: showScreen,
+          onToast: toast,
+        });
+
+        if (!DELIVERIES || typeof DELIVERIES.mount !== "function") {
+          console.warn("Missing window.AWG_DELIVERIES — load agenda-deliveries.js");
+        } else {
+          DELIVERIES.mount($("screen-deliveries"), {
+            onShowScreen: showScreen,
+            getSelectedDayId: function () {
+              return CAL && typeof CAL.getSelectedDayId === "function"
+                ? CAL.getSelectedDayId()
+                : null;
+            },
+            onOpenOrder: function (orderId, dayId) {
+              openOrderDetail(orderId, dayId);
+            },
+          });
+        }
+
+        if (!SALE || typeof SALE.mount !== "function") {
+          console.error("Missing window.AWG_SALE — load agenda-sale.js");
+          toast("Error: missing agenda-sale.js");
+          return;
+        }
+
+        if (!SALES || typeof SALES.mount !== "function") {
+          console.warn("Missing window.AWG_SALES — load agenda-sales-tracking.js");
+        } else {
+          SALES.mount($("screen-sales"), {
+            onShowScreen: showScreen,
+            onToast: toast,
+          });
+        }
+
+        SALE.mount(
+          {
+            screenSale: $("screen-sale"),
+            screenDelivery: $("screen-delivery"),
+            modalConfirm: $("modalConfirm"),
+            modalGenerateQr: $("modalGenerateQr"),
+          },
+          {
+            onToast: toast,
+            onStayOnAgenda: function () {
+              setPickMode(true);
+              showScreen("agenda");
+              if (CAL.refresh) CAL.refresh();
+              renderSideList();
+              toast("Slot added · pick another slot on the calendar for this order");
+            },
+            onOpenSale: function () {
+              setPickMode(false);
+              showScreen("sale");
+              if (CAL.refresh) CAL.refresh();
+              renderSideList();
+              toast("Slot reserved · fill in the order");
+            },
+            onPickOtherSlot: function () {
+              setPickMode(true);
+              showScreen("agenda");
+              toast("Pick another slot on the calendar");
+            },
+            onShowScreen: showScreen,
+          }
+        );
+
+        if (!FORM || typeof FORM.mount !== "function") {
+          console.error("Missing window.AWG_FORM — load agenda-customer-form.js");
+          toast("Error: missing agenda-customer-form.js");
+        } else {
+          FORM.mount({}, { onToast: toast, onShowScreen: showScreen });
+        }
+
+        if (!INSPECT || typeof INSPECT.mount !== "function") {
+          console.warn("Missing window.AWG_INSPECT — load agenda-order-inspect.js");
+        } else {
+          INSPECT.mount({}, { onToast: toast, onShowScreen: showScreen });
+        }
+
+        CAL.mount($("calRoot"), {
+          onCreateRange: onCreateRange,
+          onToast: toast,
+          onOpenOrder: function (slot, dayId) {
+            openOrderDetail(slot, dayId);
+          },
+          onDayChange: function () {
+            renderSideList();
+          },
+          getDraftBlocks: function () {
+            return SALE.getDraftBlocks ? SALE.getDraftBlocks() : [];
+          },
+          onBindDraft: function (el, bl) {
+            bindDraftDeleteActions(el, bl.id);
+          },
+        });
+
+        var draftContextMenu = $("draftContextMenu");
+        if (draftContextMenu) {
+          draftContextMenu.querySelector("[data-action='delete']").addEventListener("click", function () {
+            if (ctxBlockId) deleteDraftBlock(ctxBlockId, { confirm: true });
+          });
+        }
+        document.addEventListener("click", closeDraftContextMenu);
+        document.addEventListener("contextmenu", function (e) {
+          if (!e.target.closest("#draftContextMenu")) closeDraftContextMenu();
+        });
+        window.addEventListener("scroll", closeDraftContextMenu, true);
+
+        wireCalNavRefresh();
+        renderSideList();
+
+        document.addEventListener("awg:ornament-status-changed", function () {
+          renderSideList();
+          if (DELIVERIES && typeof DELIVERIES.render === "function") {
+            DELIVERIES.render();
+          }
+        });
+
+        var orderSlotsDismiss = $("orderSlotsDismiss");
+        if (orderSlotsDismiss) {
+          orderSlotsDismiss.addEventListener("click", closeOrderSlotsModal);
+        }
+        var modalOrderSlots = $("modalOrderSlots");
+        if (modalOrderSlots) {
+          modalOrderSlots.addEventListener("click", function (e) {
+            if (e.target === modalOrderSlots) closeOrderSlotsModal();
+          });
+        }
+
+        document.querySelectorAll(".nav [data-nav]").forEach(function (a) {
+          a.addEventListener("click", function () {
+            var name = a.getAttribute("data-nav");
+            if (name === "deliveries") {
+              if (DELIVERIES && typeof DELIVERIES.open === "function") {
+                DELIVERIES.open({ scope: "all" });
+              } else {
+                showScreen("deliveries");
+              }
+              return;
+            }
+            if (name === "sales") {
+              if (SALES && typeof SALES.open === "function") {
+                SALES.open();
+              } else {
+                showScreen("sales");
+              }
+              return;
+            }
+            if (name === "sale" && SALE.render) SALE.render();
+            showScreen(name);
+          });
+        });
+
+        var btnTop = $("btnCreateTop");
+        if (btnTop) {
+          btnTop.addEventListener("click", function () {
+            if (SALE && typeof SALE.openEmptySale === "function") {
+              SALE.openEmptySale();
+              showScreen("sale");
+              toast("Empty order · add finished product or reserve a paint slot");
+            } else {
+              showScreen("agenda");
+              toast("Tip: drag a free slot on the agenda");
+            }
+          });
+        }
+
+        var btnCancelPick = $("btnCancelPick");
+        if (btnCancelPick) {
+          btnCancelPick.addEventListener("click", function () {
+            setPickMode(false);
+            toast("Another-slot mode cancelled");
+          });
+        }
+
+        var pickCancel = $("pickCancel");
+        if (pickCancel) {
+          pickCancel.addEventListener("click", function () {
+            $("modalPickSlot").classList.remove("on");
+          });
+        }
+        var pickGo = $("pickGoAgenda");
+        if (pickGo) {
+          pickGo.addEventListener("click", function () {
+            $("modalPickSlot").classList.remove("on");
+            setPickMode(true);
+            showScreen("agenda");
+          });
+        }
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot);
+      } else {
+        boot();
+      }
+    })();
+  </script>
+</body>
+</html>

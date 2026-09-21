@@ -1,0 +1,223 @@
+.hero {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(4px, 1.4vh, 14px);
+  width: 100%;
+  padding: clamp(4px, 1.5vh, 16px) 16px clamp(8px, 2vh, 20px);
+  text-align: center;
+}
+
+.copyTop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  animation: dropIn 0.6s var(--scene-ease) both;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 9.6vw, 3.6rem);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.015em;
+  color: #fbfdff;
+  text-shadow: 0 4px 22px rgba(8, 16, 34, 0.55);
+}
+
+.subtitle {
+  font-family: var(--font-display);
+  font-size: clamp(0.85rem, 3.4vw, 1.1rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #ffdca6;
+  text-shadow: 0 2px 12px rgba(8, 16, 34, 0.45);
+}
+
+.clock {
+  margin-top: clamp(6px, 1.4vh, 12px);
+}
+
+/** The svh term reserves room for the copy, both CTAs and the chrome on short windows. */
+.scene {
+  width: min(560px, 92vw, calc((100svh - 268px) * 1.19));
+  animation: sceneIn 0.85s var(--pop-ease) both;
+}
+
+.ctas {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(320px, 88vw);
+  animation: riseIn 0.6s 0.2s var(--scene-ease) both;
+}
+
+.trackBtn {
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  background: linear-gradient(180deg, var(--green-bright) 0%, var(--green) 62%, var(--green-deep) 100%);
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 10px 24px rgba(12, 74, 48, 0.42);
+}
+
+.trackBtn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #3ec07a 0%, var(--green) 60%, var(--green-deep) 100%);
+  transform: translateY(-2px);
+}
+
+.btnIcon {
+  color: var(--gold);
+  animation: twirl 3.4s ease-in-out infinite;
+}
+
+.buyBtn {
+  font-family: var(--font-display);
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(196, 122, 58, 0.5);
+  color: var(--public-ink);
+  box-shadow: 0 8px 18px rgba(10, 20, 40, 0.24);
+}
+
+.buyBtn:hover {
+  background: #fff;
+  transform: translateY(-2px);
+}
+
+/**
+ * Short portrait phones: trade title size, gaps and stall height so the copy, both CTAs *and* the
+ * footer line all stay on screen without a scroll.
+ */
+@media (max-height: 700px) and (max-width: 559px) {
+  .hero {
+    gap: 4px;
+    padding: 2px 14px 4px;
+  }
+
+  .title {
+    font-size: 1.85rem;
+  }
+
+  .clock {
+    margin-top: 2px;
+  }
+
+  .scene {
+    width: min(560px, 92vw, calc((100svh - 330px) * 1.19));
+  }
+}
+
+@media (min-width: 720px) {
+  .ctas {
+    flex-direction: row;
+    width: auto;
+    gap: 14px;
+  }
+
+  .ctas > * {
+    min-width: 210px;
+  }
+}
+
+/** Desktop keeps room for the footer as well as both CTAs, so the stall gives up the height. */
+@media (min-width: 1024px) {
+  .scene {
+    width: min(620px, 54vw, calc((100svh - 380px) * 1.19));
+  }
+}
+
+/** Landscape phones and short laptops: copy and CTAs beside the stall. */
+@media (max-height: 640px) and (min-width: 560px) {
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+    grid-template-areas: 'copy scene' 'ctas scene';
+    align-content: center;
+    column-gap: clamp(16px, 4vw, 40px);
+    row-gap: clamp(10px, 3vh, 20px);
+    text-align: left;
+  }
+
+  .copyTop {
+    grid-area: copy;
+    align-self: end;
+    align-items: flex-start;
+  }
+
+  .title {
+    font-size: clamp(1.9rem, 5.4vw, 3rem);
+  }
+
+  .scene {
+    grid-area: scene;
+    /** The reserve keeps the stall's base and drift inside the window instead of cropping them. */
+    width: min(46vw, calc((100svh - 140px) * 1.19));
+    justify-self: center;
+    align-self: center;
+  }
+
+  .ctas {
+    grid-area: ctas;
+    width: 100%;
+    max-width: 440px;
+    align-self: start;
+  }
+}
+
+@keyframes dropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sceneIn {
+  from {
+    opacity: 0;
+    transform: translateY(26px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes twirl {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copyTop,
+  .scene,
+  .ctas,
+  .btnIcon {
+    animation: none;
+  }
+}

@@ -1,0 +1,37 @@
+.card {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 28px 24px;
+  background: var(--staff-surface);
+  border-radius: 16px;
+  border: 1px solid var(--staff-line);
+}
+
+.page {
+  min-height: 100vh;
+  background: var(--staff-bg);
+  color: var(--staff-ink);
+  font-family: var(--font-staff);
+  padding: 48px 16px;
+}
+
+.card h1 {
+  margin-bottom: 8px;
+}
+
+.hint {
+  color: var(--staff-muted);
+  margin-bottom: 20px;
+}
+
+.err {
+  color: var(--staff-danger);
+  font-weight: 650;
+  margin-bottom: 12px;
+}
+
+.accounts {
+  font-size: var(--fs-small);
+  color: var(--staff-muted);
+  margin-top: 16px;
+}

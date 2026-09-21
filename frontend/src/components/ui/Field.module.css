@@ -1,0 +1,46 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--space-4);
+}
+
+.label {
+  font-weight: 650;
+  font-size: 1rem;
+}
+
+.hint {
+  color: var(--public-muted);
+  font-size: var(--fs-small);
+}
+
+.control :is(input, textarea, select) {
+  width: 100%;
+  min-height: var(--touch);
+  padding: 0.55rem 0.8rem;
+  border: 1.5px solid #c9d3de;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--public-ink);
+  font-size: 16px;
+}
+
+.control textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.control :is(input, textarea, select):disabled {
+  background: #f3f5f7;
+}
+
+.error {
+  color: #9a3b3b;
+  font-size: var(--fs-small);
+  font-weight: 600;
+}
+
+.invalid :is(input, textarea, select) {
+  border-color: #9a3b3b;
+}

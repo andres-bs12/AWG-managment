@@ -1,0 +1,13 @@
+.img {
+  display: block;
+  background: #fff;
+  border: 1px solid var(--staff-line);
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.placeholder {
+  background: #fff;
+  border: 1px dashed var(--staff-line);
+  border-radius: 12px;
+}

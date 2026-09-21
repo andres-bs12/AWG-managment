@@ -1,0 +1,89 @@
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --touch: 44px;
+  --touch-lg: 56px;
+  --radius: 12px;
+  --radius-pill: 999px;
+  --hour-h: 56px;
+
+  --font-display: 'Baloo 2', 'Trebuchet MS', 'Avenir Next Rounded', system-ui, sans-serif;
+  --font-sans: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+  --font-staff: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+
+  --fs-body: 1rem;
+  --fs-small: 0.875rem;
+  --fs-h1: 1.75rem;
+  --fs-h2: 1.25rem;
+  --fs-display: clamp(2rem, 6vw, 3.25rem);
+
+  --focus: 0 0 0 3px #fff, 0 0 0 6px #2c5aa0;
+
+  /* Public (stall) */
+  --night: #1b2740;
+  --night-2: #243352;
+  --snow: #eef4f8;
+  --snow-2: #d9e6ef;
+  --wood: #c47a3a;
+  --wood-dark: #8b4a22;
+  --wood-light: #e0a05a;
+  --cta: #c45c4a;
+  --cta-press: #a3483a;
+  --wreath: #3d8a4a;
+  --gift-blue: #4a7ab5;
+  --public-ink: #152033;
+  --public-muted: #5c6b80;
+
+  /* Public scene (illustrated, Santa-Tracker-ish) */
+  --sky-top: #101a33;
+  --sky-mid: #263a72;
+  --sky-low: #5a72ad;
+  --sky-horizon: #a9c2e0;
+  --aurora-a: rgba(63, 208, 201, 0.34);
+  --aurora-b: rgba(138, 108, 220, 0.3);
+  --ridge-far: #45598f;
+  --ridge-near: #2c3d6b;
+  --pine: #1d4a3f;
+  --pine-light: #2a6a54;
+  --snow-field: #f2f8ff;
+  --snow-shade: #d6e6f6;
+  --moon: #fff6d8;
+  --gold: #ffd166;
+  --gold-deep: #e0a83c;
+  --berry: #e0473f;
+  --berry-deep: #b53229;
+  --green: #1f7a4d;
+  --green-deep: #14553a;
+  --green-bright: #2fae6a;
+  --scene-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --pop-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Staff */
+  --staff-bg: #e8e2d4;
+  --staff-surface: #f7f3ea;
+  --staff-ink: #1c1914;
+  --staff-muted: #6a645a;
+  --staff-line: #d4cec0;
+  --staff-btn: #1a1814;
+  --staff-selected: #1a1814;
+  --staff-pressed: #11100e;
+  --staff-hover: #ece6d8;
+  --staff-ok: #2f6b4f;
+  --staff-warn: #9a6b2f;
+  --staff-danger: #9a3b3b;
+  --staff-slot: #cfd6c8;
+  --staff-slot-ink: #2a3328;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion: 0;
+  }
+}

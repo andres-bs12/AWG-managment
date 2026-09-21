@@ -1,0 +1,100 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(234, 242, 250, 0.7);
+}
+
+.cells {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 42px;
+  padding: 4px 6px 3px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(12, 24, 48, 0.32);
+  backdrop-filter: blur(3px);
+}
+
+.value {
+  font-family: var(--font-display);
+  font-size: clamp(0.95rem, 3.4vw, 1.25rem);
+  font-weight: 800;
+  line-height: 1.05;
+  color: #fdfeff;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  font-size: 0.56rem;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(226, 238, 250, 0.66);
+}
+
+.merry {
+  font-family: var(--font-display);
+  font-size: clamp(1rem, 3.8vw, 1.25rem);
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: 0 2px 12px rgba(8, 16, 34, 0.5);
+}
+
+/** Short phones: the caption sits beside the cells instead of stacking above them. */
+@media (max-height: 700px) and (max-width: 559px) {
+  .wrap {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .label {
+    flex: none;
+    font-size: 0.5rem;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
+  .cell {
+    min-width: 36px;
+    padding: 3px 5px 2px;
+  }
+}
+
+/**
+ * 320px-class phones: the seconds pill goes. Nobody reads it at that size and the three that stay
+ * get the room they need. The accessible summary is days-only anyway, so nothing is lost.
+ */
+@media (max-width: 359px) {
+  .cell {
+    min-width: 34px;
+    padding: 3px 4px 2px;
+  }
+
+  .cell:nth-child(4) {
+    display: none;
+  }
+}
+
+@media (min-width: 720px) {
+  .cell {
+    min-width: 52px;
+  }
+}
