@@ -49,7 +49,7 @@ src/
   styles/       tokens.css · global.css
 ```
 
-UI staff: [docs/staff.md](../docs/staff.md). Agentes: [AGENTS.md](../AGENTS.md).
+Contexto del proyecto: [docs/README.md](../docs/README.md).
 
 ## Scripts
 

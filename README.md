@@ -1,10 +1,13 @@
 # ArtWithGab (AWG)
 
-Seguimiento de ventas de ornamentos de Navidad personalizados: pedidos, agenda de pintura, pagos e inventario (mercados Viena 2026).
+Seguimiento de ventas de ornamentos personalizados (mercados Viena 2026).
 
-**App:** [`frontend/`](frontend/) (Vite + React). **Backend:** esqueleto Spring en [`awg-tracking/`](awg-tracking/).
+- **App:** [`frontend/`](frontend/) (Vite + React)
+- **Backend:** [`awg-tracking/`](awg-tracking/) (Spring Boot)
 
-## Quick start
+Contexto del proyecto: [`docs/README.md`](docs/README.md).
+
+## Quick start (frontend)
 
 ```bash
 cd frontend
@@ -12,10 +15,4 @@ npm install
 npm run dev
 ```
 
-http://localhost:5173 — detalle, rutas y cuentas mock: [frontend/README.md](frontend/README.md).
-
-## Contexto para agentes
-
-Índice corto: **[AGENTS.md](AGENTS.md)**. Qué documento abrir según la tarea: [docs/README.md](docs/README.md).
-
-Fase actual: pulir UX staff. Frontend v1 (mocks) está cerrado. No hace falta cargar todo `docs/` en cada chat.
+http://localhost:5173 — rutas y cuentas mock: [frontend/README.md](frontend/README.md).
