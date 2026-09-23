@@ -1,4 +1,4 @@
-/** Domain types aligned with FigJam Entities (19:2599) and docs/product.md */
+/** Domain types aligned with FigJam Entities (19:2599) and docs/README.md */
 
 export type PaymentState = 'unpaid' | 'deposit' | 'paid'
 export type PaymentMethod = 'cash' | 'card'
