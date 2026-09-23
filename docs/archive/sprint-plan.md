@@ -1,7 +1,9 @@
 # Plan de sprints ArtWithGab (15 h/semana)
 
+> Archivado. No es contexto de implementación. Vigente: `AGENTS.md` + `docs/product.md`.
+
 Calendario revisado. Cada sprint incluye pruebas y demo.
-**Flujo canónico staff custom:** FigJam [Buy custom flow](https://www.figma.com/board/9lexMCksAryAx0vio6OC7D/Christmas-2026-web?node-id=19-453) (`19:453`) — ver `docs/project-context.md`.
+**Flujo canónico staff custom:** FigJam [Buy custom flow](https://www.figma.com/board/9lexMCksAryAx0vio6OC7D/Christmas-2026-web?node-id=19-453) (`19:453`) — spec largo en [project-context.md](./project-context.md).
 Mocks HTML = wireframe; look navideño cliente por fases.
 
 | Sprint | Fechas | Objetivo |

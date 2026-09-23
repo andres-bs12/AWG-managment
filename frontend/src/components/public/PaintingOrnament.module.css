@@ -33,7 +33,7 @@
   width: 16%;
   aspect-ratio: 1;
   transform: translateX(-50%);
-  border: 3px solid #b6c0cb;
+  border: 3px solid #c7a66b;
   border-bottom-color: transparent;
   border-radius: 50%;
 }
@@ -46,7 +46,7 @@
   height: 12%;
   transform: translateX(-50%);
   border-radius: 4px 4px 2px 2px;
-  background: linear-gradient(180deg, #dfe5ec, #9fabb8);
+  background: linear-gradient(180deg, #f1d9a0, #c3a16b);
 }
 
 .ball {
@@ -57,18 +57,6 @@
   overflow: hidden;
   background: radial-gradient(circle at 34% 28%, #ffffff 0%, #e9edf3 52%, #c9d2dd 100%);
   box-shadow: inset -8px -10px 18px rgba(88, 104, 126, 0.26), 0 14px 26px rgba(20, 34, 60, 0.22);
-}
-
-.ball::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: repeating-linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0) 0 6px,
-    rgba(150, 165, 185, 0.12) 6px 7px
-  );
 }
 
 /**
@@ -90,14 +78,30 @@
   display: block;
 }
 
+/* Switch portraits only while the paint is hidden between two brush cycles. */
+.cat {
+  animation: petSwap calc(var(--paint-cycle) * 2) steps(1, end) infinite;
+}
+
+.dog {
+  opacity: 0;
+  animation: petSwap calc(var(--paint-cycle) * 2) steps(1, end) infinite reverse;
+}
+
+@keyframes petSwap {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
 .gloss {
   position: absolute;
-  top: 14%;
-  left: 16%;
-  width: 26%;
-  height: 16%;
+  top: 12%;
+  left: 18%;
+  width: 22%;
+  height: 9%;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.3);
   filter: blur(1px);
   z-index: 2;
 }
@@ -121,7 +125,17 @@
   width: 100%;
   height: auto;
   display: block;
-  filter: drop-shadow(0 6px 10px rgba(20, 34, 60, 0.28));
+  filter: drop-shadow(0 3px 4px rgba(65, 49, 35, 0.18));
+}
+
+.brushPaint {
+  fill: #7cae98;
+  animation: brushColor calc(var(--paint-cycle) * 2) steps(1, end) infinite;
+}
+
+@keyframes brushColor {
+  0%, 100% { fill: #7cae98; }
+  50% { fill: #86afc7; }
 }
 
 .palette {
@@ -137,7 +151,7 @@
   width: 100%;
   height: auto;
   display: block;
-  filter: drop-shadow(0 8px 12px rgba(20, 34, 60, 0.2));
+  filter: drop-shadow(0 5px 6px rgba(65, 49, 35, 0.14));
 }
 
 .splatter {
@@ -159,28 +173,28 @@
 .splatter span:nth-child(1) {
   right: 12%;
   top: 52%;
-  background: var(--gold);
+  background: #dfb46e;
   animation-delay: 1.4s;
 }
 
 .splatter span:nth-child(2) {
   right: 6%;
   top: 40%;
-  background: var(--berry);
+  background: #cb9180;
   animation-delay: 2.8s;
 }
 
 .splatter span:nth-child(3) {
   left: 10%;
   top: 30%;
-  background: var(--green-bright);
+  background: #7cae98;
   animation-delay: 4.1s;
 }
 
 .splatter span:nth-child(4) {
   right: 20%;
   top: 18%;
-  background: var(--gift-blue);
+  background: #86afc7;
   animation-delay: 5.3s;
 }
 
@@ -343,18 +357,21 @@
   .glow,
   .ornament,
   .paint,
+  .cat,
+  .dog,
   .brush,
+  .brushPaint,
   .palette,
   .splatter span {
     animation: none;
   }
 
-  /** A half-painted still tells the same story without a single moving pixel. */
+  /** Keep the full cat portrait legible when motion is reduced. */
   .paint {
-    clip-path: inset(38% 0 0 0);
+    clip-path: inset(0);
   }
 
   .brush {
-    transform: translate(-50%, -134%) rotate(-24deg);
+    transform: translate(80%, -18%) rotate(46deg);
   }
 }

@@ -16,12 +16,16 @@ export const httpApi: Api = {
   markets: {
     listMarkets: async () => notWired(),
     listMarketDays: async () => notWired(),
+    saveMarket: async () => notWired(),
+    deleteMarket: async () => notWired(),
+    deleteMarketDay: async () => notWired(),
   },
   agenda: {
     listDays: async () => notWired(),
     getDay: async () => notWired(),
     moveBlock: async () => notWired(),
     checkCapacity: async () => notWired(),
+    findMoveSuggestion: async () => notWired(),
   },
   orders: {
     getOrder: async () => notWired(),
@@ -29,9 +33,11 @@ export const httpApi: Api = {
     getOrderBundle: async () => notWired(),
     createSale: async () => notWired(),
     setItemStatus: async () => notWired(),
+    setHandedOver: async () => notWired(),
   },
   payments: {
     setPaymentState: async () => notWired(),
+    recordPayment: async () => notWired(),
   },
   tracking: {
     getByCode: async () => notWired(),

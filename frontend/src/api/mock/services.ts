@@ -3,6 +3,7 @@ import type { Photo } from '../../domain/types'
 import {
   checkCapacity,
   createSale,
+  findMoveSuggestion,
   getAgendaDay,
   getForm,
   getOrder,
@@ -10,13 +11,18 @@ import {
   getOrderByCode,
   getTrackByCode,
   listAgendaDays,
+  deleteMarket,
+  deleteMarketDay,
   listMarketDays,
   listMarkets,
+  saveMarket,
   mockLogin,
   mockLogout,
   mockMe,
   moveBlock,
+  recordPayment,
   setItemStatus,
+  setHandedOver,
   setPaymentState,
   submitForm,
   updateViennaAddress,
@@ -57,6 +63,15 @@ export const mockApi: Api = {
   markets: {
     listMarkets: () => later(() => listMarkets()),
     listMarketDays: (marketId) => later(() => listMarketDays(marketId)),
+    saveMarket: (input) => later(() => saveMarket(input)),
+    deleteMarket: (id) =>
+      later(() => {
+        deleteMarket(id)
+      }),
+    deleteMarketDay: (id) =>
+      later(() => {
+        deleteMarketDay(id)
+      }),
   },
   agenda: {
     listDays: () => later(() => listAgendaDays()),
@@ -66,6 +81,7 @@ export const mockApi: Api = {
         moveBlock(blockId, date, startHour)
       }),
     checkCapacity: (input) => later(() => checkCapacity(input), 120),
+    findMoveSuggestion: (input) => later(() => findMoveSuggestion(input), 120),
   },
   orders: {
     getOrder: (id) => later(() => getOrder(id)),
@@ -76,9 +92,14 @@ export const mockApi: Api = {
       later(() => {
         setItemStatus(orderId, itemId, status)
       }),
+    setHandedOver: (orderId, handedOver) =>
+      later(() => {
+        setHandedOver(orderId, handedOver)
+      }),
   },
   payments: {
     setPaymentState: (orderId, state, method) => later(() => setPaymentState(orderId, state, method)),
+    recordPayment: (orderId, amount, method) => later(() => recordPayment(orderId, amount, method)),
   },
   tracking: {
     getByCode: (code) => later(() => getTrackByCode(code), 420),

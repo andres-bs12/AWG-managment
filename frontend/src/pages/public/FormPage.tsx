@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { formatDateLabel, formatHour } from '../../lib/time'
+import { ProgressSteps } from '../../components/ui/ProgressSteps'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { OrnamentLoader } from '../../components/public/OrnamentLoader'
@@ -39,17 +41,36 @@ function isEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 }
 
+function ReviewRow({ label, onEdit, children }: { label: string; onEdit?: () => void; children: ReactNode }) {
+  const { t } = useLocale()
+  return (
+    <div className={styles.row}>
+      <div className={styles.rowBody}>
+        <dt>{label}</dt>
+        <dd>{children}</dd>
+      </div>
+      {onEdit ? (
+        <button type="button" className={styles.editLink} onClick={onEdit} aria-label={`${t('edit')}: ${label}`}>
+          {t('edit')}
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
 export function FormPage() {
   const { token = '' } = useParams()
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
   const [view, setView] = useState<CustomerFormView | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadedToken, setLoadedToken] = useState('')
   const [step, setStep] = useState<Step>('photos')
   const [draft, setDraft] = useState<Draft>(empty)
   const [fieldError, setFieldError] = useState<Record<string, string>>({})
   const [sending, setSending] = useState(false)
   const [orderCode, setOrderCode] = useState('')
+  const [copyMessage, setCopyMessage] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -62,6 +83,7 @@ export function FormPage() {
       .then((data) => {
         if (cancelled) return
         setView(data)
+        setLoadedToken(token)
         const saved = sessionStorage.getItem(draftKey(token))
         if (saved) {
           setDraft(JSON.parse(saved) as Draft)
@@ -91,13 +113,23 @@ export function FormPage() {
   }, [token])
 
   useEffect(() => {
-    if (!token) return
+    if (!token || loadedToken !== token || loading || step === 'done') return
     sessionStorage.setItem(draftKey(token), JSON.stringify(draft))
-  }, [draft, token])
+  }, [draft, token, loadedToken, loading, step])
 
   const steps = useMemo<Step[]>(() => ['photos', 'names', 'contact', 'extras', 'review'], [])
   const stepIndex = Math.max(0, steps.indexOf(step))
   const total = steps.length
+  const intlLocale = locale === 'de' ? 'de-AT' : 'en-GB'
+  const money = (value: number) => new Intl.NumberFormat(locale === 'de' ? 'de-AT' : 'en-IE', { style: 'currency', currency: 'EUR' }).format(value)
+  const orderItems = view ? (view.items ?? [view.item]).map((item) => (item.id === view.item.id ? { ...item, petName: draft.petName } : item)) : []
+  const handoffLines = [...new Set((view?.handoffs ?? []).map((handoff) =>
+    handoff.kind === 'vienna'
+      ? t('whenVienna')
+      : handoff.kind === 'unknown'
+        ? t('whenTbd')
+        : [handoff.marketName, handoff.date ? formatDateLabel(handoff.date, intlLocale) : '', handoff.fromHour != null ? t('whenFrom', { time: formatHour(handoff.fromHour) }) : ''].filter(Boolean).join(' · '),
+  ))]
 
   function patch(partial: Partial<Draft>) {
     setDraft((d) => ({ ...d, ...partial }))
@@ -191,7 +223,12 @@ export function FormPage() {
     return (
       <div className={styles.panel}>
         <h1>{t('formThanks')}</h1>
-        <p className={styles.lead}>{code}</p>
+        <p className={styles.lead}>{t('saveCode')}</p>
+        <div className={styles.codeBlock}>
+          <span>{t('trackCode')}</span><strong>{code}</strong>
+          <Button variant="secondary" onClick={() => { void navigator.clipboard.writeText(code).then(() => setCopyMessage(t('copiedCode'))).catch(() => setCopyMessage(t('copyFailed'))) }}>{t('copyCode')}</Button>
+          <span role="status">{copyMessage}</span>
+        </div>
         <ButtonLink to={`/track/${code}`} fullWidth>
           {t('goTrack')}
         </ButtonLink>
@@ -201,7 +238,8 @@ export function FormPage() {
 
   return (
     <div className={styles.panel}>
-      <p className={styles.lead}>{t('progress', { n: stepIndex + 1, total })}</p>
+      <ProgressSteps labels={[t('formPhotos'), t('formNames'), t('formContact'), t('formExtras'), t('review')]} current={stepIndex} label={t('progress', { n: stepIndex + 1, total })} compact />
+      {error ? <p role="alert">{error}</p> : null}
       {step === 'photos' ? (
         <>
           <h1>{t('formPhotos')}</h1>
@@ -309,19 +347,73 @@ export function FormPage() {
       {step === 'review' ? (
         <>
           <h1>{t('review')}</h1>
-          <ul style={{ paddingLeft: 18, lineHeight: 1.7 }}>
-            <li>
-              {draft.customerName} · {draft.petName}
-            </li>
-            <li>
-              {draft.phone} · {draft.email}
-            </li>
-            <li>
-              {draft.photos.length} photo{draft.photos.length === 1 ? '' : 's'}
-            </li>
-            {view?.withName ? <li>{draft.backName}</li> : null}
-            {draft.note ? <li>{draft.note}</li> : null}
-          </ul>
+          <p className={styles.lead}>{t('reviewLead')}</p>
+
+          <section className={styles.reviewCard} aria-labelledby="review-ornament">
+            <h2 id="review-ornament">{t('reviewOrnament')}</h2>
+            <dl className={styles.rows}>
+              <ReviewRow label={t('formPhotos')} onEdit={() => setStep('photos')}>
+                <span className={styles.photos}>{draft.photos.map(photo => <img key={photo.id} src={photo.dataUrl} alt={photo.name} />)}</span>
+              </ReviewRow>
+              <ReviewRow label={t('petName')} onEdit={() => setStep('names')}>{draft.petName}</ReviewRow>
+              {orderItems.length === 1 ? (
+                <ReviewRow label={t('colour')}>
+                  <span className={styles.itemLine}>
+                    <span className={styles.colorDot} data-color={orderItems[0].color ?? 'none'} aria-hidden="true" />
+                    {orderItems[0].color ? t(orderItems[0].color === 'red' ? 'colorRed' : 'colorGrey') : t('colorUnknown')}
+                  </span>
+                </ReviewRow>
+              ) : null}
+              {view?.withName ? <ReviewRow label={t('backName')} onEdit={() => setStep('extras')}>{draft.backName}</ReviewRow> : null}
+              {draft.note ? <ReviewRow label={t('noteLabel')} onEdit={() => setStep('extras')}>{draft.note}</ReviewRow> : null}
+            </dl>
+          </section>
+
+          <section className={styles.reviewCard} aria-labelledby="review-details">
+            <h2 id="review-details">{t('reviewDetails')}</h2>
+            <dl className={styles.rows}>
+              <ReviewRow label={t('yourName')} onEdit={() => setStep('names')}>{draft.customerName}</ReviewRow>
+              <ReviewRow label={t('phone')} onEdit={() => setStep('contact')}>{draft.phone}</ReviewRow>
+              <ReviewRow label={t('email')} onEdit={() => setStep('contact')}>{draft.email}</ReviewRow>
+            </dl>
+          </section>
+
+          {view ? (
+            <section className={styles.reviewCard} data-tone="fixed" aria-labelledby="review-order">
+              <h2 id="review-order">{t('reviewOrder')}</h2>
+              <dl className={styles.rows}>
+                {handoffLines.length ? (
+                  <ReviewRow label={t('pickupWhen')}>
+                    {handoffLines.map((line) => <span key={line} className={styles.line}>{line}</span>)}
+                  </ReviewRow>
+                ) : null}
+                {orderItems.length > 1 ? (
+                  <ReviewRow label={t('reviewItems')}>
+                    {orderItems.map((item) => (
+                      <span key={item.id} className={styles.itemLine}>
+                        <span className={styles.colorDot} data-color={item.color ?? 'none'} aria-hidden="true" />
+                        <span>
+                          {item.petName || t(item.kind === 'custom' ? 'customOrnament' : 'finishedOrnament')}
+                          {item.color ? ` · ${t(item.color === 'red' ? 'colorRed' : 'colorGrey')}` : ''}
+                        </span>
+                        {item.cost != null ? <span className={styles.itemPrice}>{money(item.cost)}</span> : null}
+                      </span>
+                    ))}
+                  </ReviewRow>
+                ) : null}
+                {view.total != null ? (
+                  <div className={styles.totalRow}>
+                    <dt>{t('orderTotal')}</dt>
+                    <dd>
+                      <strong>{money(view.total)}</strong>
+                      {view.paymentState ? <span className={styles.payState} data-paid={view.paymentState === 'paid'}>{t(`payment_${view.paymentState}`)}</span> : null}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+              <p className={styles.fixedNote}>{t('reviewFromStall')}</p>
+            </section>
+          ) : null}
         </>
       ) : null}
 

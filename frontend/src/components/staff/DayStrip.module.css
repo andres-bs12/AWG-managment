@@ -1,0 +1,90 @@
+.strip {
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.legend {
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.arrow {
+  min-width: var(--touch);
+  padding: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.track {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  padding: 2px 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chip {
+  flex: 0 0 auto;
+  min-width: 5.6rem;
+  min-height: var(--touch-lg);
+  padding: 0 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--staff-line);
+  background: var(--staff-surface);
+  color: var(--staff-ink);
+  font-weight: 650;
+  scroll-snap-align: start;
+  white-space: nowrap;
+}
+
+.chip:hover {
+  background: var(--staff-hover);
+}
+
+.chip:active {
+  transform: translateY(1px);
+  background: #ddd6c6;
+}
+
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.chip[data-selected='true'] {
+  background: var(--staff-selected);
+  color: #f7f3ea;
+  border-color: var(--staff-selected);
+}
+
+.chip[data-selected='true']:hover {
+  background: #2c2923;
+  border-color: #2c2923;
+}
+
+.chip[data-selected='true']:active {
+  background: var(--staff-pressed);
+}
+
+.chip[data-selected='true']:focus-visible {
+  box-shadow: var(--focus);
+}
+
+.chip { display: grid; gap: var(--space-1); min-width: 64px; text-align: center; }
+.chip > span { font-size: var(--fs-small); font-weight: 400; }
+.chip > strong { font-size: var(--fs-h2); }
+
+.tools { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.tools .legend { margin: 0; margin-right: auto; }
+.tools select { min-height: var(--touch); max-width: 55%; padding: var(--space-2); border: 1px solid var(--staff-line); border-radius: var(--radius); background: var(--staff-surface); color: var(--staff-ink); font: inherit; }

@@ -12,10 +12,10 @@
   width: min(460px, 100%);
   margin: 12px auto 0;
   padding: 20px 20px 24px;
-  border-radius: 24px;
-  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  border-radius: var(--public-card-radius);
+  background: var(--public-surface);
   color: var(--public-ink);
-  box-shadow: 0 20px 48px rgba(12, 22, 44, 0.24);
+  box-shadow: var(--public-card-shadow);
   text-align: center;
   animation: cardIn 0.5s var(--pop-ease) both;
 }
@@ -57,6 +57,15 @@
 .chipReady {
   background: rgba(47, 174, 106, 0.18);
   color: var(--green-deep);
+}
+
+.chipDone {
+  background: rgba(47, 110, 174, 0.14);
+  color: #1f4f7a;
+}
+
+.chipDone::before {
+  animation: none;
 }
 
 .title {

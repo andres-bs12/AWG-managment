@@ -11,3 +11,11 @@
   border: 1px dashed var(--staff-line);
   border-radius: 12px;
 }
+
+.expand { border: 0; padding: 0; background: transparent; color: var(--staff-muted); text-align: center; }
+.expand span { display: block; padding: var(--space-2); font-size: var(--fs-small); }
+.dialog { border: 0; border-radius: var(--radius); padding: var(--space-5); width: min(560px, 94vw); max-height: 90dvh; color: var(--staff-ink); }
+.dialog::backdrop { background: #101a33b8; }
+.dialog img { width: 100%; height: auto; }
+.dialog h2 { font-size: var(--fs-h2); text-align: center; }
+.close { display: block; margin-left: auto; min-height: var(--touch); padding: 0 var(--space-4); border: 1px solid var(--staff-line); border-radius: var(--radius); background: white; }

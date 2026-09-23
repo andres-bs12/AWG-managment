@@ -1,0 +1,39 @@
+.card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--staff-line);
+  border-radius: var(--radius);
+  background: var(--staff-surface);
+}
+
+.card img,
+.thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius);
+  object-fit: cover;
+  background: var(--staff-hover);
+}
+
+.body { display: grid; gap: var(--space-1); min-width: 0; }
+.head { display: grid; gap: 2px; }
+.head h3 { margin: 0; font-size: 1rem; line-height: 1.25; overflow-wrap: anywhere; }
+.status { color: var(--staff-muted); font-size: var(--fs-small); font-weight: 700; }
+.body p { margin: 0; }
+.customer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-1) var(--space-2); }
+.customer span, .note { color: var(--staff-muted); font-size: var(--fs-small); }
+.item { color: var(--staff-muted); font-size: var(--fs-small); }
+.quickLinks, .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
+.quickLinks a, .orderLink { display: inline-flex; align-items: center; min-height: var(--touch); color: var(--staff-ink); font-weight: 650; }
+.actions { margin-top: var(--space-1); }
+.orderLink { padding: 0 var(--space-2); }
+.missing { color: var(--staff-muted); font-size: var(--fs-small); }
+
+@media (max-width: 520px) {
+  .card { grid-template-columns: 40px minmax(0, 1fr); gap: var(--space-2); }
+  .card img, .thumb { width: 40px; height: 40px; }
+  .actions button { flex: 1; padding-inline: var(--space-2); white-space: nowrap; }
+}

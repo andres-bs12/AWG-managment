@@ -1,0 +1,27 @@
+.panel { min-width: 0; padding: var(--space-5); border: 1px solid var(--staff-line); border-radius: var(--radius); background: var(--staff-surface); }
+.heading { display: flex; justify-content: space-between; gap: var(--space-3); align-items: baseline; }
+.heading h2 { font-size: var(--fs-h2); margin: 0; }
+.heading > span { color: var(--staff-muted); font-size: var(--fs-small); }
+.totals { display: grid; gap: var(--space-2); margin: var(--space-4) 0; }
+.totals > div { display: flex; justify-content: space-between; gap: var(--space-3); }
+.totals dt { color: var(--staff-muted); }
+.totals dd { margin: 0; font-weight: 600; }
+.balance { padding-top: var(--space-3); border-top: 1px solid var(--staff-line); font-weight: 700; }
+.balance dt { color: var(--staff-ink); }
+.collect, .history { border-top: 1px solid var(--staff-line); }
+.collect summary, .history summary { cursor: pointer; min-height: var(--touch); padding: var(--space-3) 0; }
+.collect summary { font-weight: 600; }
+.fields { border: 0; margin: 0; padding: var(--space-2) 0; min-width: 0; display: grid; gap: var(--space-2); }
+.fields > label { font-weight: 600; }
+.amount { display: flex; align-items: center; gap: var(--space-2); border: 1px solid var(--staff-line); border-radius: var(--radius); padding-left: var(--space-3); }
+.amount input { width: 100%; min-width: 0; min-height: var(--touch); border: 0; background: transparent; color: inherit; font: inherit; padding: var(--space-2); }
+.methods { display: flex; gap: var(--space-2); border: 0; padding: var(--space-2) 0; margin: var(--space-2) 0; min-width: 0; }
+.methods label { flex: 1; display: flex; align-items: center; gap: var(--space-2); min-height: var(--touch); padding: var(--space-2); border: 1px solid var(--staff-line); border-radius: var(--radius); }
+.methods label:has(:checked) { background: var(--staff-hover); border-color: var(--staff-ok); }
+.methods input { accent-color: var(--staff-ok); }
+.error { font-size: var(--fs-small); color: var(--staff-danger); }
+.history { font-size: var(--fs-small); color: var(--staff-muted); }
+.history ul { list-style: none; padding: 0; margin: 0; }
+.history li { display: grid; gap: var(--space-1); padding-bottom: var(--space-3); }
+.legacy { margin: 0; color: var(--staff-muted); font-size: var(--fs-small); }
+@media (max-width:600px) { .panel { padding: var(--space-4); } }

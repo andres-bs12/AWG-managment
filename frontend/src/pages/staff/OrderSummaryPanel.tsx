@@ -25,7 +25,7 @@ export function OrderSummaryPanel({ items, markets, days, orderCode }: Props) {
         {items.map((item, index) => (
           <li key={item.id}>
             <div className={styles.row}>
-              <strong>{itemLabel(item, index)}</strong>
+              <strong><span className={styles.colorDot} data-color={item.color} aria-label={`${item.color} colour`} />{itemLabel(item, index)}</strong>
               <span>{formatEur(itemCost(item.kind, item.withName))}</span>
             </div>
             <p>{deliveryLabel(item, markets, days)}</p>

@@ -1,5 +1,7 @@
 # Intent — frontend v1
 
+> Archivado (fase aceptada y cerrada). No es contexto de implementación. Vigente: `AGENTS.md` + `docs/staff.md`.
+
 Confirmado 20 sep 2026.
 
 - **Outcome:** App React+TS en este repo (Vite) con UX primero. Cubre venta staff (custom/finished → horarios → QR → pedido/pago) y cliente (casita + form por pasos + Track). Datos mock. Sustituir mocks = capa de datos + env, no pantallas.

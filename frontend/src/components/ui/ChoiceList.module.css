@@ -17,7 +17,7 @@
   padding: 14px 16px;
   text-align: left;
   background: #fff;
-  border: 2px solid var(--staff-line);
+  border: 1px solid var(--staff-line);
   border-radius: var(--radius);
   color: var(--staff-ink);
   cursor: pointer;
@@ -44,7 +44,7 @@
 
 .card:hover {
   border-color: var(--staff-ink);
-  background: #efe9dc;
+  background: var(--staff-hover);
 }
 
 .card:active {
@@ -91,6 +91,40 @@
 .body {
   color: var(--staff-muted);
   font-size: var(--fs-small);
+}
+
+.compact {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+}
+
+.compact .card {
+  display: flex;
+  align-items: flex-start;
+  min-height: 78px;
+  padding: 10px 12px;
+}
+
+.compact .title {
+  font-size: 0.95rem;
+}
+
+.compact .body {
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.change {
+  justify-self: start;
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--staff-muted);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .card[data-selected='true'] .body {

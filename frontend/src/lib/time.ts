@@ -31,6 +31,18 @@ export function formatDateLabel(isoDate: string, locale = 'en-GB'): string {
   })
 }
 
+export function weekdayShort(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d))
+  return date.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })
+}
+
+/** `2026-12-02` → `02/12`. */
+export function formatDayMonth(isoDate: string): string {
+  const [, m, d] = isoDate.split('-')
+  return `${d}/${m}`
+}
+
 export function weekdayLong(isoDate: string): string {
   const [y, m, d] = isoDate.split('-').map(Number)
   const date = new Date(Date.UTC(y, m - 1, d))
@@ -64,6 +76,19 @@ export function hoursOverlap(a0: number, a1: number, b0: number, b1: number): bo
 export function utcWeekday(isoDate: string): number {
   const [y, m, d] = isoDate.split('-').map(Number)
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+}
+
+export function addUtcDays(isoDate: string, delta: number): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const next = new Date(Date.UTC(y, m - 1, d + delta))
+  return next.toISOString().slice(0, 10)
+}
+
+export function datesInRange(from: string, to: string): string[] {
+  if (from > to) return []
+  const out: string[] = []
+  for (let cursor = from; cursor <= to; cursor = addUtcDays(cursor, 1)) out.push(cursor)
+  return out
 }
 
 export function pickupHourOptions(openHour: number, closeHour: number, notBefore?: number): number[] {

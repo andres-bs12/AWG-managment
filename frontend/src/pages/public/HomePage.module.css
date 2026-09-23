@@ -16,13 +16,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   animation: dropIn 0.6s var(--scene-ease) both;
 }
 
 .title {
   font-family: var(--font-display);
-  font-size: clamp(2.2rem, 9.6vw, 3.6rem);
+  font-size: clamp(2.4rem, 10vw, 3.6rem);
   font-weight: 800;
   line-height: 1.06;
   letter-spacing: -0.015em;
@@ -32,7 +32,7 @@
 
 .subtitle {
   font-family: var(--font-display);
-  font-size: clamp(0.85rem, 3.4vw, 1.1rem);
+  font-size: clamp(1rem, 4.2vw, 1.25rem);
   font-weight: 600;
   letter-spacing: 0.04em;
   color: #ffdca6;
@@ -57,38 +57,14 @@
   animation: riseIn 0.6s 0.2s var(--scene-ease) both;
 }
 
-.trackBtn {
-  gap: 10px;
-  font-family: var(--font-display);
-  font-weight: 700;
-  background: linear-gradient(180deg, var(--green-bright) 0%, var(--green) 62%, var(--green-deep) 100%);
-  border-color: rgba(255, 255, 255, 0.24);
-  box-shadow: 0 10px 24px rgba(12, 74, 48, 0.42);
-}
-
-.trackBtn:hover:not(:disabled) {
-  background: linear-gradient(180deg, #3ec07a 0%, var(--green) 60%, var(--green-deep) 100%);
-  transform: translateY(-2px);
-}
+.trackBtn { gap: var(--space-2); }
 
 .btnIcon {
   color: var(--gold);
   animation: twirl 3.4s ease-in-out infinite;
 }
 
-.buyBtn {
-  font-family: var(--font-display);
-  font-weight: 700;
-  background: rgba(255, 255, 255, 0.94);
-  border-color: rgba(196, 122, 58, 0.5);
-  color: var(--public-ink);
-  box-shadow: 0 8px 18px rgba(10, 20, 40, 0.24);
-}
-
-.buyBtn:hover {
-  background: #fff;
-  transform: translateY(-2px);
-}
+.buyBtn { border-color: var(--snow-2); }
 
 /**
  * Short portrait phones: trade title size, gaps and stall height so the copy, both CTAs *and* the
@@ -101,15 +77,19 @@
   }
 
   .title {
-    font-size: 1.85rem;
+    font-size: 2.1rem;
+  }
+
+  .subtitle {
+    font-size: 1rem;
   }
 
   .clock {
-    margin-top: 2px;
+    margin-top: 4px;
   }
 
   .scene {
-    width: min(560px, 92vw, calc((100svh - 330px) * 1.19));
+    width: min(560px, 92vw, calc((100svh - 348px) * 1.19));
   }
 }
 

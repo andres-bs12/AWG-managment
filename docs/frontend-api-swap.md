@@ -1,6 +1,6 @@
 # Sustituir mocks por Spring
 
-La UI llama solo a `api` (`frontend/src/api/client.ts`). Hoy `VITE_DATA_SOURCE=mock`. El cliente HTTP vive en `frontend/src/api/http/services.ts` y lanza un error claro hasta que implementes `fetch`.
+On-demand: no forma parte de la fase UX staff. La UI llama solo a `api` (`frontend/src/api/client.ts`). Hoy `VITE_DATA_SOURCE=mock`. El cliente HTTP vive en `frontend/src/api/http/services.ts` y lanza un error claro hasta que implementes `fetch`.
 
 ## 1. Encender HTTP
 
@@ -30,6 +30,9 @@ Auth: el staff ya guarda un token en `localStorage` (`awg-staff-token`) y `AuthC
 | `auth.logout` | POST | `/api/staff/logout` (o no-op si JWT stateless) |
 | `markets.listMarkets` | GET | `/api/markets` |
 | `markets.listMarketDays` | GET | `/api/markets/{id}/days` o `/api/market-days` |
+| `markets.saveMarket` | PUT | `/api/markets` o `/api/markets/{id}` |
+| `markets.deleteMarket` | DELETE | `/api/markets/{id}` |
+| `markets.deleteMarketDay` | DELETE | `/api/market-days/{id}` |
 | `agenda.listDays` / `getDay` | GET | `/api/agenda?date=` |
 | `agenda.checkCapacity` | POST | `/api/agenda/capacity` |
 | `agenda.moveBlock` | PATCH | `/api/time-blocks/{id}` |
@@ -37,6 +40,7 @@ Auth: el staff ya guarda un token en `localStorage` (`awg-staff-token`) y `AuthC
 | `orders.getOrder` / `getOrderBundle` | GET | `/api/orders/{id}` |
 | `orders.getOrderByCode` | GET | `/api/orders?code=` |
 | `orders.setItemStatus` | PATCH | `/api/order-items/{id}/status` |
+| `orders.setHandedOver` | PATCH | `/api/orders/{id}/handed-over` |
 | `payments.setPaymentState` | POST | `/api/orders/{id}/payments` |
 | `forms.getForm` | GET | `/api/forms/{token}` |
 | `forms.submitForm` | POST | `/api/forms/{token}` |
@@ -57,7 +61,7 @@ Ajusta paths al estilo del backend; el punto es **un método UI = un fetch**, no
 1. Implementar helper `request(path, init)` con JSON + Bearer.
 2. Rellenar `http/services.ts` método a método (empieza por `auth` + `tracking.getByCode`).
 3. Poner `VITE_DATA_SOURCE=http`.
-4. Borrar `localStorage` key `awg-mock-store-v3` (solo mock).
+4. Borrar `localStorage` key `awg-mock-store-v11` (solo mock; constante `STORAGE_KEY` en `frontend/src/api/mock/seed.ts`).
 5. Quitar el botón “Reset demo data” del login cuando ya no haga falta.
 
 Los HTML antiguos están en `references/html-mocks/` — no son la app.

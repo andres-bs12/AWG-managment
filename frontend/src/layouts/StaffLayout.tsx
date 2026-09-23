@@ -1,7 +1,9 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { Button } from '../components/ui/Button'
 import { ButtonLink } from '../components/ui/ButtonLink'
+import { rememberStaffHub } from '../lib/staffNav'
 import styles from './StaffLayout.module.css'
 
 export function StaffGuard() {
@@ -22,9 +24,14 @@ export function StaffLayout() {
   const { user, logout } = useAuth()
   const location = useLocation()
   const onAgenda = location.pathname.startsWith('/staff/agenda')
+  const onDeliveries = location.pathname.startsWith('/staff/deliveries')
+  const onMarkets = location.pathname.startsWith('/staff/markets')
   const onNewSale = location.pathname.startsWith('/staff/sales/new')
   const onPaint = location.pathname.includes('/paint/')
-  const onOrder = location.pathname.startsWith('/staff/orders/') && !onPaint
+
+  useEffect(() => {
+    rememberStaffHub(location.pathname + location.search)
+  }, [location.pathname, location.search])
 
   return (
     <div className={onPaint ? `${styles.shell} ${styles.shellPaint}` : styles.shell}>
@@ -33,20 +40,21 @@ export function StaffLayout() {
           <p className={styles.brand}>AWG</p>
           <nav className={styles.nav} aria-label="Staff">
             <ButtonLink to="/staff/agenda" tone="staff" variant="ghost" selected={onAgenda}>
-              {onAgenda ? 'Current: Agenda' : 'Agenda'}
+              Agenda
+            </ButtonLink>
+            <ButtonLink to="/staff/deliveries" tone="staff" variant="ghost" selected={onDeliveries}>
+              Deliveries
+            </ButtonLink>
+            <ButtonLink to="/staff/markets" tone="staff" variant="ghost" selected={onMarkets}>
+              Markets
             </ButtonLink>
             <ButtonLink to="/staff/sales/new?fresh=1" tone="staff" variant="ghost" selected={onNewSale}>
-              {onNewSale ? 'Current: New sale' : 'New sale'}
+              New sale
             </ButtonLink>
-            {onOrder ? (
-              <span className={styles.navCurrent} aria-current="page">
-                Current: Order
-              </span>
-            ) : null}
           </nav>
           <div className={styles.who}>
-            <span>{user?.name}</span>
-            <Button tone="staff" variant="ghost" onClick={() => void logout()}>
+            <span className={styles.whoName}>{user?.name}</span>
+            <Button tone="staff" variant="ghost" className={styles.logout} onClick={() => void logout()}>
               Log out
             </Button>
           </div>

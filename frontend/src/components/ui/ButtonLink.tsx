@@ -11,6 +11,8 @@ type Props = {
   tone?: 'public' | 'staff'
   selected?: boolean
   className?: string
+  state?: object
+  'aria-label'?: string
 }
 
 export function ButtonLink({
@@ -22,6 +24,8 @@ export function ButtonLink({
   tone = 'public',
   selected,
   className,
+  state,
+  ...rest
 }: Props) {
   const cls = [
     styles.btn,
@@ -37,8 +41,10 @@ export function ButtonLink({
     <Link
       className={cls}
       to={to}
+      state={state}
       data-selected={selected ? 'true' : 'false'}
       aria-current={selected ? 'page' : undefined}
+      {...rest}
     >
       {children}
     </Link>

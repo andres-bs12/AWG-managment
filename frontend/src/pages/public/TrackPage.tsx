@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { ProgressSteps } from '../../components/ui/ProgressSteps'
+import { OrderReceipt } from '../../components/public/OrderReceipt'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { GiftBoxReady } from '../../components/public/GiftBoxReady'
@@ -13,11 +15,11 @@ import { formatDateLabel, formatHour } from '../../lib/time'
 import type { Address, TrackView } from '../../domain/types'
 import styles from './TrackPage.module.css'
 
-/** The sleigh must stay long enough to read, even when the API answers instantly. */
+/** Wipe only runs after a code resolves — keep it readable even when the API is instant. */
 const MIN_WIPE_MS = 1500
 const WIPE_OUT_MS = 380
 
-type Phase = 'idle' | 'loading' | 'leaving' | 'done'
+type Phase = 'idle' | 'checking' | 'loading' | 'leaving' | 'done'
 
 export function TrackPage() {
   const { t, locale } = useLocale()
@@ -25,7 +27,7 @@ export function TrackPage() {
   const navigate = useNavigate()
   const timers = useRef<number[]>([])
 
-  const [fetchPhase, setPhase] = useState<Phase>('loading')
+  const [fetchPhase, setPhase] = useState<Phase>(codeParam ? 'checking' : 'idle')
   const [reloadKey, setReloadKey] = useState(0)
   const [loaded, setLoaded] = useState<TrackView | null>(null)
   const [fetchError, setError] = useState('')
@@ -38,45 +40,38 @@ export function TrackPage() {
     if (!codeParam) return
 
     let cancelled = false
-    const startedAt = Date.now()
-    setPhase('loading')
+    setPhase('checking')
+    setLoaded(null)
     setError('')
     setEditing(false)
     setSaved(false)
-
-    const finish = (apply: () => void) => {
-      const wait = Math.max(0, MIN_WIPE_MS - (Date.now() - startedAt))
-      timers.current.push(
-        window.setTimeout(() => {
-          if (cancelled) return
-          apply()
-          setPhase('leaving')
-          timers.current.push(
-            window.setTimeout(() => {
-              if (!cancelled) setPhase('done')
-            }, WIPE_OUT_MS),
-          )
-        }, wait),
-      )
-    }
 
     api.tracking
       .getByCode(codeParam)
       .then((data) => {
         if (cancelled) return
-        finish(() => {
-          setLoaded(data)
-          setError('')
-          if (data.delivery.address) setAddr(data.delivery.address)
-        })
+        setLoaded(data)
+        setError('')
+        if (data.delivery.address) setAddr(data.delivery.address)
+        setPhase('loading')
+        timers.current.push(
+          window.setTimeout(() => {
+            if (cancelled) return
+            setPhase('leaving')
+            timers.current.push(
+              window.setTimeout(() => {
+                if (!cancelled) setPhase('done')
+              }, WIPE_OUT_MS),
+            )
+          }, MIN_WIPE_MS),
+        )
       })
       .catch((err: Error) => {
         if (cancelled) return
-        finish(() => {
-          setLoaded(null)
-          setError(err.message || t('trackNotFound'))
-          setDialogOpen(true)
-        })
+        setLoaded(null)
+        setError(err.message || t('trackNotFound'))
+        setPhase('done')
+        setDialogOpen(true)
       })
 
     return () => {
@@ -100,9 +95,12 @@ export function TrackPage() {
   }
 
   const status = view?.status ?? 'preparing'
-  const statusLabel = status === 'ready' ? t('ready') : status === 'delivered' ? t('delivered') : t('preparing')
+  const homeDelivery = view?.delivery.kind === 'vienna'
+  const statusLabel =
+    status === 'delivered' ? t('delivered') : status === 'ready' ? (homeDelivery ? t('outForDelivery') : t('ready')) : t('preparing')
   const stepIndex = status === 'delivered' ? 2 : status === 'ready' ? 1 : 0
-  const steps = [t('stepPainting'), t('stepReady'), t('stepHandover')]
+  const steps = [t('stepPainting'), homeDelivery ? t('outForDelivery') : t('stepReady'), t('stepHandover')]
+  /** Sleigh only after a hit — misses stay in the dialog without this animation. */
   const showWipe = phase === 'loading' || phase === 'leaving'
 
   /** Two short lines: the slot the customer picked, then how long the stall is still around. */
@@ -141,25 +139,16 @@ export function TrackPage() {
           </div>
 
           <div className={styles.details}>
-            <span className={`${styles.chip} ${status === 'preparing' ? styles.chipWork : styles.chipReady}`}>
+            <span
+              className={`${styles.chip} ${
+                status === 'preparing' ? styles.chipWork : status === 'delivered' ? styles.chipDone : styles.chipReady
+              }`}
+            >
               {statusLabel}
             </span>
             <h1 className={styles.title}>{t('trackGreeting', { name: view.customerName })}</h1>
 
-            <ol className={styles.steps} style={{ '--progress': `${(stepIndex / (steps.length - 1)) * 100}%` } as CSSProperties}>
-              {steps.map((label, i) => {
-                const state = i < stepIndex ? 'past' : i === stepIndex ? 'now' : 'next'
-                return (
-                  <li key={label} data-state={state} aria-current={state === 'now' ? 'step' : undefined}>
-                    <span className={styles.stepDot} aria-hidden="true" />
-                    <span className={styles.stepLabel}>{label}</span>
-                    {state === 'next' ? null : (
-                      <span className="visually-hidden">{state === 'now' ? t('stepCurrent') : t('stepDone')}</span>
-                    )}
-                  </li>
-                )
-              })}
-            </ol>
+            <ProgressSteps labels={steps} current={stepIndex} label={statusLabel} />
 
             <dl className={styles.facts}>
               <div>
@@ -175,17 +164,7 @@ export function TrackPage() {
               </div>
             </dl>
 
-            <div className={styles.includes}>
-              <h2 className={styles.includesTitle}>{t('orderIncludes')}</h2>
-              <ul className={styles.items}>
-                {view.items.map((item, i) => (
-                  <li key={`${item.petName}-${item.kind}-${i}`}>
-                    <span className={styles.itemDot} aria-hidden="true" />
-                    <span>{item.kind === 'custom' && item.petName ? item.petName : t('itemNotPersonalised')}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <OrderReceipt items={view.items} total={view.total} paymentState={view.paymentState} />
 
             {view.delivery.kind === 'vienna' ? (
               <div className={styles.address}>
@@ -242,7 +221,7 @@ export function TrackPage() {
         </section>
       ) : null}
 
-      {!view && phase !== 'loading' && phase !== 'leaving' ? (
+      {!view && phase !== 'checking' && phase !== 'loading' && phase !== 'leaving' ? (
         <section className={styles.card}>
           <div className={styles.artSmall} aria-hidden="true">
             <PaintingOrnament label={t('artPainting')} />

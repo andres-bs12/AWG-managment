@@ -1,0 +1,87 @@
+.dlv {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--staff-line);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 8px;
+  min-height: var(--touch-lg);
+  color: inherit;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease,
+    transform 0.12s ease;
+}
+
+.dlv:hover,
+.dlv:focus-visible {
+  border-color: var(--staff-btn);
+  background: var(--staff-btn);
+  color: #f7f3ea;
+}
+
+.dlv:hover span,
+.dlv:focus-visible span {
+  color: inherit;
+}
+
+.dlv:active {
+  transform: translateY(1px);
+  background: #11100e;
+  color: #f7f3ea;
+}
+
+.dlv:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.dlv img,
+.thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #e4ddd0;
+}
+
+.dlvBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dlvBody strong {
+  font-size: 0.95rem;
+}
+
+.dlvBody span {
+  color: var(--staff-muted);
+  font-size: var(--fs-small);
+}
+
+.dlvAside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  color: var(--staff-muted);
+  font-size: 12px;
+}
+
+.dlvTime {
+  color: var(--staff-ink);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.dlv:hover .dlvTime,
+.dlv:focus-visible .dlvTime {
+  color: #f7f3ea;
+}

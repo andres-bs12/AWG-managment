@@ -57,14 +57,13 @@
 }
 
 /**
- * The 52px floor is load-bearing, not decoration: the header band is 44–56px tall and its language
- * toggle is white text on transparent, so a pure percentage `top` slides the pale disc underneath
- * the toggle on any short window (568, 640 and 390-tall landscape all did) and kills its contrast.
+ * Parked below the header band. The language toggle owns the top-right, so we never slide this
+ * pale disc (or its halo) underneath white-on-transparent controls.
  */
 .moon {
   position: absolute;
-  top: max(8%, 52px);
-  right: 12%;
+  top: max(11%, 80px);
+  right: 16%;
   width: clamp(54px, 9vw, 96px);
   aspect-ratio: 1;
   display: grid;
@@ -280,14 +279,19 @@
 }
 
 /**
- * Short narrow phones: the header owns the top band and the centred wordmark owns the middle of the
- * sky, so the only free patch left is the right margin strip beside the title. The moon shrinks into
- * it — which is why it must not grow back into the toggle's corner.
+ * On phones and short windows the toggle sits in the top-right. The left sky is empty on home
+ * (the brand is hidden there), so the moon moves across and shrinks its halo.
  */
-@media (max-height: 700px) and (max-width: 559px) {
+@media (max-width: 900px), (max-height: 700px) {
   .moon {
-    right: 2%;
-    width: clamp(30px, 10vw, 44px);
+    right: auto;
+    left: 6%;
+    top: max(10%, 56px);
+    width: clamp(36px, 11vw, 72px);
+  }
+
+  .moon::before {
+    inset: -28%;
   }
 }
 

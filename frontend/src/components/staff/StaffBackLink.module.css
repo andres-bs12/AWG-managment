@@ -1,0 +1,25 @@
+.back {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+  margin: 0 0 8px;
+  padding: 0 12px 0 4px;
+  border-radius: var(--radius-pill);
+  font-weight: 650;
+  text-decoration: none;
+  color: var(--staff-ink);
+  width: fit-content;
+}
+
+.back:hover {
+  background: var(--staff-hover);
+}
+
+.back:active {
+  background: #ddd6c6;
+}
+
+.back:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}

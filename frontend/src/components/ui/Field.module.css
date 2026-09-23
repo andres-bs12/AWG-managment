@@ -7,7 +7,7 @@
 
 .label {
   font-weight: 650;
-  font-size: 1rem;
+  font-size: var(--fs-body);
 }
 
 .hint {
@@ -19,11 +19,11 @@
   width: 100%;
   min-height: var(--touch);
   padding: 0.55rem 0.8rem;
-  border: 1.5px solid #c9d3de;
-  border-radius: 10px;
+  border: 1px solid var(--snow-2);
+  border-radius: var(--radius);
   background: #fff;
   color: var(--public-ink);
-  font-size: 16px;
+  font-size: var(--fs-body);
 }
 
 .control textarea {

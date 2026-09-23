@@ -41,7 +41,11 @@
 
 .lang {
   display: flex;
-  gap: 6px;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: rgba(10, 18, 36, 0.48);
+  backdrop-filter: blur(10px);
 }
 
 /**
@@ -172,3 +176,7 @@
     padding: 4px 10px;
   }
 }
+
+.footer { flex-wrap: wrap; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); margin-top: auto; }
+.note { white-space: normal; overflow: visible; }
+.social { min-height: var(--touch); }

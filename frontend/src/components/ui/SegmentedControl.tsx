@@ -3,7 +3,6 @@ import styles from './SegmentedControl.module.css'
 export type SegmentOption<T extends string> = {
   value: T
   label: string
-  selectedLabel?: string
 }
 
 type Props<T extends string> = {
@@ -15,18 +14,9 @@ type Props<T extends string> = {
 }
 
 export function SegmentedControl<T extends string>({ legend, value, onChange, options, name }: Props<T>) {
-  const current = options.find((option) => option.value === value)
-
   return (
     <fieldset className={styles.wrap}>
       <legend className={styles.legend}>{legend}</legend>
-      {current ? (
-        <p className={styles.cue} aria-live="polite">
-          {current.selectedLabel ?? `Current: ${current.label}`}
-        </p>
-      ) : (
-        <p className={styles.cueMuted}>Nothing selected</p>
-      )}
       <div className={styles.row} role="radiogroup" aria-label={legend}>
         {options.map((option) => {
           const selected = value === option.value
@@ -42,10 +32,7 @@ export function SegmentedControl<T extends string>({ legend, value, onChange, op
               data-selected={selected ? 'true' : 'false'}
               onClick={() => onChange(option.value)}
             >
-              <span className={styles.mark} aria-hidden="true">
-                {selected ? '✓' : ''}
-              </span>
-              <span className={styles.label}>{option.label}</span>
+              {option.label}
             </button>
           )
         })}

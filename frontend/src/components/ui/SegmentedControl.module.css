@@ -41,7 +41,7 @@
   min-height: var(--touch-lg);
   padding: 10px 12px;
   border-radius: var(--radius);
-  border: 2px solid var(--staff-ink);
+  border: 1px solid var(--staff-line);
   background: var(--staff-surface);
   color: var(--staff-ink);
   font-weight: 650;

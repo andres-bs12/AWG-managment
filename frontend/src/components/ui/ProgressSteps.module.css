@@ -1,0 +1,11 @@
+.progress { margin: var(--space-5) 0; }
+.progress ol { display: flex; padding: 0; margin: 0; list-style: none; }
+.progress li { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); color: var(--public-muted); font-size: .75rem; text-align: center; }
+.progress li:not(:last-child)::after { content: ''; position: absolute; top: 15px; left: calc(50% + 18px); width: calc(100% - 36px); height: 2px; background: var(--snow-2); }
+.progress li[data-complete='true']::after { background: var(--green); }
+.dot { display: grid; place-items: center; width: 32px; height: 32px; border: 2px solid var(--snow-2); border-radius: 50%; background: white; font-weight: 700; }
+.progress li[aria-current] { color: var(--green-deep); font-weight: 700; }
+.progress li[aria-current] .dot { border-color: var(--green); box-shadow: 0 0 0 4px #1f7a4d14; }
+.progress li[data-complete='true'] .dot { background: var(--green); border-color: var(--green); color: white; }
+.progress p { font-size: var(--fs-small); color: var(--public-muted); margin: var(--space-3) 0 0; }
+.progress[data-compact='true'] .label { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }

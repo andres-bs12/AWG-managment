@@ -38,6 +38,9 @@
   --cta-press: #a3483a;
   --wreath: #3d8a4a;
   --gift-blue: #4a7ab5;
+  --public-surface: #fffdf9;
+  --public-card-radius: 20px;
+  --public-card-shadow: 0 16px 40px rgba(16, 24, 40, 0.16);
   --public-ink: #152033;
   --public-muted: #5c6b80;
 
@@ -66,20 +69,28 @@
   --pop-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* Staff */
-  --staff-bg: #e8e2d4;
-  --staff-surface: #f7f3ea;
-  --staff-ink: #1c1914;
-  --staff-muted: #6a645a;
-  --staff-line: #d4cec0;
-  --staff-btn: #1a1814;
-  --staff-selected: #1a1814;
+  --staff-bg: #f0f3f3;
+  --staff-surface: #ffffff;
+  --staff-ink: #20312e;
+  --staff-muted: #5b6c67;
+  --staff-line: #d7e0dc;
+  --staff-btn: #234c40;
+  --staff-selected: #234c40;
   --staff-pressed: #11100e;
-  --staff-hover: #ece6d8;
+  --staff-hover: #e8efec;
   --staff-ok: #2f6b4f;
   --staff-warn: #9a6b2f;
   --staff-danger: #9a3b3b;
-  --staff-slot: #cfd6c8;
-  --staff-slot-ink: #2a3328;
+  --staff-slot: #e7eeeb;
+  --staff-slot-ink: #2d2a25;
+  --staff-slot-idle: #e4e8e6;
+  --staff-slot-idle-ink: #6a7672;
+  --staff-slot-painting: #f3e2a8;
+  --staff-slot-painting-ink: #5c4a12;
+  --staff-slot-ready: #c8e6d4;
+  --staff-slot-ready-ink: #1f4d35;
+  --staff-slot-done: #eceeed;
+  --staff-slot-done-ink: #9aa3a0;
 }
 
 @media (prefers-reduced-motion: reduce) {

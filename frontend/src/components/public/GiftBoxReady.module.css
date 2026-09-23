@@ -1,107 +1,31 @@
 .wrap {
-  position: relative;
-  width: min(280px, 76vw);
+  width: min(280px, 74vw);
   margin: 0 auto;
 }
 
-.glow {
-  position: absolute;
-  left: 50%;
-  top: 48%;
-  width: 86%;
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(47, 174, 106, 0.3) 0%, transparent 66%);
-  animation: glowPulse 4.4s ease-in-out infinite;
-}
-
 .art {
-  position: relative;
+  display: block;
   width: 100%;
   height: auto;
-  display: block;
-  overflow: visible;
-  filter: drop-shadow(0 14px 22px rgba(20, 34, 60, 0.26));
 }
 
-.box {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: boxHop 3.6s var(--pop-ease) infinite;
-}
-
-.lid {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: lidTap 3.6s var(--pop-ease) infinite;
+.keepsake {
+  transform-origin: 130px 52px;
+  animation: keepsakeSway 6s ease-in-out infinite;
 }
 
 .bow {
-  transform-box: fill-box;
-  transform-origin: 50% 90%;
-  animation: bowWiggle 3.6s ease-in-out infinite;
+  transform-origin: 130px 184px;
+  animation: bowSettle 6s ease-in-out infinite;
 }
 
-.tagCard {
-  transform-box: fill-box;
-  transform-origin: 8% 0;
-  animation: tagSwing 3.2s ease-in-out infinite;
+.sparkle,
+.lateSparkle {
+  animation: shimmer 6s ease-in-out infinite;
 }
 
-.check {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: checkPop 3.6s var(--pop-ease) infinite;
-}
-
-.sparkles {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.sparkles span {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  background: var(--gold);
-  clip-path: polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%);
-  opacity: 0;
-  animation: sparkle 3.6s ease-out infinite;
-}
-
-.sparkles span:nth-child(1) {
-  left: 8%;
-  top: 22%;
-  animation-delay: 0.1s;
-}
-.sparkles span:nth-child(2) {
-  right: 10%;
-  top: 8%;
-  animation-delay: 0.5s;
-}
-.sparkles span:nth-child(3) {
-  left: 20%;
-  top: 6%;
-  animation-delay: 0.9s;
-  background: #fff;
-}
-.sparkles span:nth-child(4) {
-  right: 4%;
-  top: 46%;
-  animation-delay: 1.3s;
-  background: #fff;
-}
-.sparkles span:nth-child(5) {
-  left: 4%;
-  top: 56%;
-  animation-delay: 1.7s;
-}
-.sparkles span:nth-child(6) {
-  right: 26%;
-  top: 2%;
-  animation-delay: 2.1s;
+.lateSparkle {
+  animation-delay: -3s;
 }
 
 .caption {
@@ -112,109 +36,26 @@
   color: var(--green-deep);
 }
 
-@keyframes boxHop {
-  0%,
-  58%,
-  100% {
-    transform: translateY(0) scaleY(1) scaleX(1);
-  }
-  66% {
-    transform: translateY(0) scaleY(0.94) scaleX(1.05);
-  }
-  76% {
-    transform: translateY(-14px) scaleY(1.05) scaleX(0.97);
-  }
-  88% {
-    transform: translateY(0) scaleY(0.97) scaleX(1.03);
-  }
+@keyframes keepsakeSway {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-4px) rotate(2deg); }
 }
 
-@keyframes lidTap {
-  0%,
-  58%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  74% {
-    transform: translateY(-9px) rotate(-3deg);
-  }
-  86% {
-    transform: translateY(1px) rotate(1deg);
-  }
+@keyframes bowSettle {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
 }
 
-@keyframes bowWiggle {
-  0%,
-  100% {
-    transform: rotate(-3deg) scale(1);
-  }
-  50% {
-    transform: rotate(3deg) scale(1.04);
-  }
-}
-
-@keyframes tagSwing {
-  0%,
-  100% {
-    transform: rotate(-6deg);
-  }
-  50% {
-    transform: rotate(6deg);
-  }
-}
-
-@keyframes checkPop {
-  0%,
-  60%,
-  100% {
-    transform: scale(1) rotate(0deg);
-  }
-  72% {
-    transform: scale(1.18) rotate(-6deg);
-  }
-  84% {
-    transform: scale(0.96) rotate(3deg);
-  }
-}
-
-@keyframes glowPulse {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: translate(-50%, -50%) scale(0.95);
-  }
-  50% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1.06);
-  }
-}
-
-@keyframes sparkle {
-  0% {
-    opacity: 0;
-    transform: scale(0.2) rotate(0deg);
-  }
-  12% {
-    opacity: 1;
-    transform: scale(1.1) rotate(45deg);
-  }
-  30% {
-    opacity: 0;
-    transform: scale(0.5) rotate(90deg);
-  }
-  100% {
-    opacity: 0;
-  }
+@keyframes shimmer {
+  0%, 100% { opacity: .25; }
+  50% { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .glow,
-  .box,
-  .lid,
+  .keepsake,
   .bow,
-  .tagCard,
-  .check,
-  .sparkles span {
+  .sparkle,
+  .lateSparkle {
     animation: none;
   }
 }

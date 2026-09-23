@@ -1,211 +1,146 @@
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useLocation, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useMockStoreVersion } from '../../api/mock/useMockStore'
+import { OrderItemCard } from '../../components/staff/OrderItemCard'
+import { OrderPaymentPanel } from '../../components/staff/OrderPaymentPanel'
+import { QrCode } from '../../components/staff/QrCode'
+import { StaffBackLink } from '../../components/staff/StaffBackLink'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
-import { SegmentedControl } from '../../components/ui/SegmentedControl'
-import type { Customer, Order, OrderItem, PaymentMethod, PaymentState, ProductionStatus, TimeBlock } from '../../domain/types'
+import type { MarketDay } from '../../domain/types'
+import { handoffLabel } from '../../lib/handoff'
 import { formatEur } from '../../lib/money'
-import { formatHour } from '../../lib/time'
+import { paymentSummary } from '../../lib/paymentSummary'
 import styles from './OrderDetailPage.module.css'
 
-const PROD_OPTIONS: { value: ProductionStatus; label: string; selectedLabel: string }[] = [
-  { value: 'not_started', label: 'Not started', selectedLabel: 'Current: Not started' },
-  { value: 'in_progress', label: 'Start', selectedLabel: 'Current: Started' },
-  { value: 'finished', label: 'Finished', selectedLabel: 'Current: Finished' },
-]
-
-const PAY_STATE_OPTIONS: { value: PaymentState; label: string; selectedLabel: string }[] = [
-  { value: 'unpaid', label: 'Unpaid', selectedLabel: 'Current: Unpaid' },
-  { value: 'deposit', label: 'Deposit', selectedLabel: 'Current: Deposit' },
-  { value: 'paid', label: 'Paid', selectedLabel: 'Current: Paid' },
-]
-
-const PAY_METHOD_OPTIONS: { value: PaymentMethod; label: string; selectedLabel: string }[] = [
-  { value: 'cash', label: 'Cash', selectedLabel: 'Current: Cash' },
-  { value: 'card', label: 'Card', selectedLabel: 'Current: Card' },
-]
+type Bundle = Awaited<ReturnType<typeof api.orders.getOrderBundle>>
 
 export function OrderDetailPage() {
-  useMockStoreVersion()
   const { id = '' } = useParams()
-  const [order, setOrder] = useState<Order | null>(null)
-  const [customer, setCustomer] = useState<Customer | null>(null)
-  const [items, setItems] = useState<OrderItem[]>([])
-  const [blocks, setBlocks] = useState<TimeBlock[]>([])
-  const [error, setError] = useState('')
-  const [copied, setCopied] = useState(false)
+  return <OrderDetail key={id} id={id} />
+}
 
-  async function reload() {
-    const bundle = await api.orders.getOrderBundle(id)
-    setOrder(bundle.order)
-    setCustomer(bundle.customer)
-    setItems(bundle.items)
-    setBlocks(bundle.blocks)
-  }
+function OrderDetail({ id }: { id: string }) {
+  const version = useMockStoreVersion()
+  const location = useLocation()
+  const navigationState = location.state as { from?: string; itemId?: string } | undefined
+  const [bundle, setBundle] = useState<Bundle | null>(null)
+  const [days, setDays] = useState<MarketDay[]>([])
+  const [loadError, setLoadError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [busy, setBusy] = useState(false)
+  const actionLock = useRef(false)
+  const [copied, setCopied] = useState(false)
+  const [retry, setRetry] = useState(0)
 
   useEffect(() => {
-    reload().catch((err: Error) => setError(err.message))
-  }, [id])
+    let cancelled = false
+    Promise.all([api.orders.getOrderBundle(id), api.markets.listMarketDays()])
+      .then(([next, marketDays]) => {
+        if (cancelled) return
+        setBundle(next)
+        setDays(marketDays)
+        setLoadError('')
+      })
+      .catch((err: Error) => { if (!cancelled) setLoadError(err.message) })
+    return () => { cancelled = true }
+  }, [id, version, retry])
 
-  if (error) return <p role="alert">{error}</p>
-  if (!order || !customer) return <p>Loading order…</p>
-
-  const orderId = order.id
-  const formUrl = `${window.location.origin}/form/${order.formToken}`
-  const methodLabel = order.paymentMethod === 'cash' ? 'Cash' : order.paymentMethod === 'card' ? 'Card' : null
-  const stateLabel = PAY_STATE_OPTIONS.find((option) => option.value === order.paymentState)?.label ?? order.paymentState
-
-  const payMethod = order.paymentMethod
-  const needsCustomerForm = items.some((item) => item.kind === 'custom')
-
-  async function pay(state: PaymentState, method: PaymentMethod | null) {
-    await api.payments.setPaymentState(orderId, state, method)
-    await reload()
-  }
-
-  async function setStatus(itemId: string, status: ProductionStatus) {
-    await api.orders.setItemStatus(orderId, itemId, status)
-    await reload()
-  }
-
-  function setPayState(state: PaymentState) {
-    if (state === 'unpaid') {
-      void pay('unpaid', null)
-      return
+  async function runAction(action: () => Promise<unknown>, message: string) {
+    if (actionLock.current) return false
+    actionLock.current = true
+    setBusy(true)
+    setActionError('')
+    setNotice('')
+    try {
+      await action()
+      setBundle(await api.orders.getOrderBundle(id))
+      setNotice(message)
+      return true
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not save. Please try again.')
+      return false
+    } finally {
+      actionLock.current = false
+      setBusy(false)
     }
-    void pay(state, payMethod)
   }
 
-  return (
-    <article className={styles.page}>
-      <p>
-        <Link className={styles.back} to="/staff/agenda">
-          ← Agenda
-        </Link>
-      </p>
-      <h1>
-        {order.code} · {customer.name}
-      </h1>
-      <p className={styles.meta}>
-        {customer.phone || 'Phone on form'} · {customer.email || 'Email on form'}
-      </p>
-      <p>
-        Total {formatEur(order.total)}
-      </p>
+  if (!bundle) return <section className={styles.page}><StaffBackLink />{loadError ? <><p role="alert">{loadError}</p><Button tone="staff" onClick={() => setRetry(value => value + 1)}>Try again</Button></> : <p role="status">Loading order…</p>}</section>
 
-      <h2>Items</h2>
-      {items.map((item) => {
-        const block = blocks.find((b) => b.orderItemId === item.id)
-        return (
-          <section key={item.id} className={styles.card}>
-            <h3>
-              {item.kind === 'custom'
-                ? `Custom · ${item.petName || 'Waiting for form'}`
-                : 'Finished'}
-            </h3>
-            <p>
-              {item.kind === 'custom'
-                ? item.withName
-                  ? `Name: ${item.backName || '(on form)'}`
-                  : 'No name'
-                : 'Ready-made'}{' '}
-              · {formatEur(item.cost)}
-            </p>
-            {block ? (
-              <p>
-                Paint {formatHour(block.startHour)}–{formatHour(block.endHour)}
-              </p>
-            ) : null}
-            <p>
-              {item.delivery.kind === 'vienna'
-                ? `Vienna · ${item.delivery.address?.line1 || 'Wed/Fri, no clock'}`
-                : `Market pickup${item.delivery.pickupHour != null ? ` · ${formatHour(item.delivery.pickupHour)}` : ''}`}
-            </p>
-            {item.photos[0] ? (
-              <div className={styles.ref}>
-                <Link
-                  className={styles.photoLink}
-                  to={`/staff/orders/${orderId}/paint/${item.id}`}
-                  aria-label={`Paint ${item.petName || 'ornament'} from the full photo`}
-                >
-                  <img src={item.photos[0].dataUrl} alt={`${item.petName || 'Pet'} reference`} />
-                </Link>
-                <ButtonLink to={`/staff/orders/${orderId}/paint/${item.id}`} tone="staff">
-                  {item.productionStatus === 'in_progress' ? 'Continue painting' : 'Paint'}
-                </ButtonLink>
-              </div>
-            ) : (
-              <p>No photos yet</p>
-            )}
-            <SegmentedControl
-              legend="Production"
-              name={`prod-${item.id}`}
-              value={item.productionStatus}
-              onChange={(status) => void setStatus(item.id, status)}
-              options={PROD_OPTIONS}
-            />
-          </section>
-        )
-      })}
+  const { order, customer, blocks } = bundle
+  const items = [...bundle.items].sort((a, b) => Number(b.id === navigationState?.itemId) - Number(a.id === navigationState?.itemId))
+  const { remaining } = paymentSummary(order)
+  const allFinished = items.length > 0 && items.every(item => item.productionStatus === 'finished')
+  const formWaiting = items.some(item => item.kind === 'custom' && !item.formComplete)
+  const hasForm = items.some(item => item.kind === 'custom')
+  const deliveryItem = items.find(item => item.delivery.kind === 'vienna')
+  const deliveryAddress = deliveryItem?.delivery.address
+  const addressText = deliveryAddress ? [
+    [deliveryAddress.line1, deliveryAddress.line2].filter(Boolean).join(', '),
+    [deliveryAddress.postalCode, deliveryAddress.city].filter(Boolean).join(' '),
+  ].filter(Boolean).join(' · ') : ''
+  const deliveryDate = days.find(day => day.id === deliveryItem?.delivery.marketDayId)?.date
+  const deliveryTo = deliveryDate ? `/staff/deliveries?day=${deliveryDate}&mode=route` : '/staff/deliveries'
+  const handoffs = [...new Set(items.map(item => handoffLabel(item, days)))]
+  const formUrl = `${window.location.origin}/form/${order.formToken}`
+  const production = order.handedOver ? (deliveryItem ? 'Delivered' : 'Handed over') : allFinished ? (deliveryItem ? 'Ready for delivery' : 'Ready for pickup') : formWaiting ? 'Waiting for form' : 'In the workshop'
 
-      <h2>Payment</h2>
-      <p className={styles.payNow} role="status">
-        On now: {stateLabel}
-        {order.paymentState !== 'unpaid' && methodLabel ? ` · ${methodLabel}` : ''}
-      </p>
-      <div className={styles.payBlock}>
-        <SegmentedControl
-          legend="Payment state"
-          name="pay-state"
-          value={order.paymentState}
-          onChange={setPayState}
-          options={PAY_STATE_OPTIONS}
-        />
-        {order.paymentState !== 'unpaid' ? (
-          <SegmentedControl
-            legend="Method"
-            name="pay-method"
-            value={order.paymentMethod}
-            onChange={(method) => void pay(order.paymentState, method)}
-            options={PAY_METHOD_OPTIONS}
-          />
-        ) : (
-          <p className={styles.meta}>Choose Deposit or Paid, then Cash or Card.</p>
-        )}
+  const formContent = <div className={styles.share}>
+    <QrCode value={formUrl} size={180} />
+    <div className={styles.shareActions}>
+      <ButtonLink to={`/form/${order.formToken}`} tone="staff" variant={formWaiting ? 'primary' : 'secondary'}>Open customer form</ButtonLink>
+      <Button tone="staff" variant="secondary" onClick={() => {
+        setActionError('')
+        void navigator.clipboard.writeText(formUrl).then(() => setCopied(true)).catch(() => setActionError('Could not copy. Open the customer form to share its link.'))
+      }}>{copied ? 'Link copied' : 'Copy form link'}</Button>
+      <span role="status" className={styles.muted}>{copied ? 'Link copied to clipboard.' : 'Tap the QR to show it to the customer.'}</span>
+    </div>
+  </div>
+
+  return <article className={styles.page}>
+    <StaffBackLink />
+    <header className={styles.hero}>
+      <div><p className={styles.eyebrow}>Order</p><h1>{order.code}</h1><p className={styles.customer}>{customer.name || 'Customer details pending'}</p></div>
+      <span className={styles.status} data-ready={allFinished || order.handedOver}>{production}</span>
+    </header>
+    <div className={styles.overview} data-delivery={Boolean(deliveryItem)}>
+      <div><span>{deliveryItem ? 'Delivery' : 'Pickup'}</span><strong>{handoffs.join(' / ') || 'Not scheduled'}</strong>
+        {deliveryItem ? <div className={styles.handoffActions}>
+          {addressText ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText)}`} target="_blank" rel="noreferrer">{addressText} ↗</a> : <span>Address pending</span>}
+          {customer.phone ? <a href={`tel:${customer.phone}`}>{customer.phone}</a> : null}
+        </div> : null}
       </div>
-
-      {needsCustomerForm ? (
-        <>
-          <h2>Customer form</h2>
-          <p className={styles.link}>{formUrl}</p>
-          <div className={styles.row}>
-            <Button
-              tone="staff"
-              variant="secondary"
-              onClick={() => {
-                void navigator.clipboard.writeText(formUrl)
-                setCopied(true)
-              }}
-            >
-              {copied ? 'Copied' : 'Copy link'}
-            </Button>
-            <ButtonLink to={`/form/${order.formToken}`} variant="secondary" tone="staff">
-              Open form here
-            </ButtonLink>
-            <ButtonLink to={`/track/${order.code}`} variant="ghost" tone="staff">
-              Public track
-            </ButtonLink>
-          </div>
-        </>
-      ) : (
-        <div className={styles.row}>
-          <ButtonLink to={`/track/${order.code}`} variant="ghost" tone="staff">
-            Public track
-          </ButtonLink>
-        </div>
-      )}
-    </article>
-  )
+      <div><span>{remaining > 0 ? 'Balance due' : 'Total · paid'}</span><a href="#payment-heading">{formatEur(remaining > 0 ? remaining : order.total)}</a></div>
+    </div>
+    {loadError || actionError ? <p className={styles.error} role="alert">{actionError || loadError}</p> : null}
+    {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
+    {formWaiting ? <section className={styles.panel} aria-labelledby="pending-form"><h2 id="pending-form">Customer details needed</h2><p className={styles.muted}>Collect reference photos and personalisation before painting.</p>{formContent}</section> : null}
+    <div className={styles.workspace}>
+      <h2 id="order-items" className={styles.itemsTitle}>Ornaments <span>{items.length}</span></h2>
+      <section aria-labelledby="order-items" className={styles.items}>
+        {items.map(item => <OrderItemCard key={item.id} item={item} block={blocks.find(block => block.orderItemId === item.id)} days={days} showHandoff={handoffs.length > 1} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy} onStatus={status => { void runAction(() => api.orders.setItemStatus(id, item.id, status), `${item.petName || 'Ornament'} updated.`) }} />)}
+      </section>
+      <aside className={styles.support} aria-label="Order management">
+        <section className={styles.panel} aria-labelledby="handoff-heading">
+          <h2 id="handoff-heading">{deliveryItem ? 'Delivery' : 'Pickup'}</h2>
+          {order.handedOver ? <p className={styles.muted}>{deliveryItem ? 'Delivered to the customer.' : 'Picked up at the stall.'}</p> : <p className={styles.muted}>{allFinished ? (deliveryItem ? 'Ready to deliver.' : 'Ready for pickup.') : `${items.filter(item => item.productionStatus !== 'finished').length} still to finish.`}</p>}
+          {deliveryItem ? <ButtonLink tone="staff" fullWidth to={deliveryTo} variant={allFinished && !order.handedOver ? 'primary' : 'secondary'}>Open delivery run</ButtonLink> : <Button tone="staff" fullWidth variant={allFinished && !order.handedOver ? 'primary' : 'secondary'} disabled={busy || (!order.handedOver && !allFinished)} onClick={() => { void runAction(() => api.orders.setHandedOver(id, !order.handedOver), order.handedOver ? 'Pickup undone.' : 'Marked as picked up.') }}>{order.handedOver ? 'Undo pickup' : 'Mark picked up'}</Button>}
+        </section>
+        <OrderPaymentPanel order={order} busy={busy} onRecord={(amount, method) => runAction(() => api.payments.recordPayment(id, amount, method), `Payment of ${formatEur(amount)} recorded.`)} />
+        <details className={styles.panel}>
+          <summary>Customer contact</summary>
+          <dl className={styles.contacts}>
+            <div><dt>Name</dt><dd>{customer.name || 'Waiting for form'}</dd></div>
+            <div><dt>Phone</dt><dd>{customer.phone ? <a href={`tel:${customer.phone}`}>{customer.phone}</a> : 'Waiting for form'}</dd></div>
+            <div><dt>Email</dt><dd>{customer.email ? <a href={`mailto:${customer.email}`}>{customer.email}</a> : 'Waiting for form'}</dd></div>
+          </dl>
+        </details>
+        {hasForm && !formWaiting ? <details className={styles.panel}><summary>Customer form <span className={styles.muted}>Completed</span></summary>{formContent}</details> : null}
+        <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
+      </aside>
+    </div>
+  </article>
 }

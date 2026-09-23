@@ -70,6 +70,17 @@
   margin: 8px 0 4px;
 }
 
+.minsRow {
+  display: grid;
+  grid-template-columns: var(--touch) minmax(0, 1fr) var(--touch);
+  gap: 8px;
+  align-items: center;
+}
+
+.minsRow button {
+  padding: 0;
+}
+
 .check {
   display: flex;
   align-items: flex-start;
@@ -86,25 +97,94 @@
   flex-shrink: 0;
 }
 
+.amountField {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  font-weight: 700;
+}
+
+.amountField input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--staff-line);
+  border-radius: 8px;
+  padding: 0 12px;
+  font: inherit;
+  background: #fff;
+}
+
 .err {
   color: var(--staff-danger);
   font-weight: 650;
   margin-bottom: 12px;
 }
 
-.link {
-  word-break: break-all;
-  padding: 12px;
-  background: #fff;
-  border-radius: 10px;
-  font-weight: 650;
-  margin: 12px 0;
-}
-
 .qr {
   display: flex;
   justify-content: flex-start;
   margin: 12px 0;
+}
+
+.qrStep {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.qrStep .qr {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.qrSide {
+  flex: 1;
+  min-width: 0;
+}
+
+.qrSide .actions {
+  margin-top: 8px;
+}
+
+.qrSide .textBtn {
+  justify-self: start;
+}
+
+.doneCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--staff-line);
+  border-radius: 12px;
+  background: var(--staff-surface);
+}
+
+.doneCard > span {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 50%;
+  background: var(--staff-btn);
+  color: #f7f3ea;
+  font-weight: 800;
+}
+
+.doneCard strong {
+  font-size: 1.15rem;
+}
+
+.doneCard p {
+  margin: 4px 0 0;
+  color: var(--staff-muted);
+}
+
+@media (max-width: 700px) {
+  .qrStep {
+    flex-direction: column;
+  }
 }
 
 .slotBox {
@@ -114,6 +194,41 @@
   border-radius: 10px;
   font-weight: 650;
 }
+
+.slotHint {
+  margin: 0 0 8px;
+  font-weight: 600;
+  color: var(--staff-muted);
+  font-size: var(--fs-small);
+}
+
+.moveSuggestion {
+  display: grid;
+  gap: 10px;
+}
+
+.moveSuggestion p {
+  margin: 0;
+}
+
+.planTitle { margin: 0 0 12px; color: var(--staff-muted); font-size: 0.875rem; }
+.planPrompt { margin: 0; color: var(--staff-muted); font-weight: 600; }
+.pickupTime { margin-top: 16px; }
+.planSelected { display: grid; gap: 8px; animation: planIn 180ms ease-out; }
+.planSelected p { margin: 0; }
+.planSelected .textBtn { justify-self: start; }
+.moveSteps { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 12px; }
+.moveSteps li { display: flex; gap: 12px; padding: 12px; border: 1px solid var(--staff-line); border-radius: 8px; background: var(--staff-surface); }
+.moveSteps li > span { font-size: 1.4rem; }
+.moveSteps p { margin-top: 6px; font-weight: 400; }
+.moveSteps small, .planSelected small { color: var(--staff-muted); font-weight: 400; }
+.sessionList { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; }
+.sessionList li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--staff-line); border-radius: 8px; background: var(--staff-surface); }
+.sessionList li[data-state='missing'] { border-color: var(--staff-danger); }
+.sessionList p { margin: 4px 0 0; font-weight: 400; }
+.sessionList li[data-state='pending'] p { color: var(--staff-muted); }
+@keyframes planIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .planSelected { animation: none; } }
 
 .textBtn {
   border: 0;
@@ -145,6 +260,112 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.selectedDate {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--staff-line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--staff-ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.selectedDate:hover {
+  border-color: var(--staff-ink);
+  background: #f7f4ed;
+}
+
+.selectedDate:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.selectedDate > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.selectedDate small,
+.datePickerHead small {
+  color: var(--staff-muted);
+  font-weight: 500;
+}
+
+.calendarIcon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--staff-ink);
+  color: var(--staff-surface);
+  font-size: 1.2rem;
+}
+
+.dateChevron {
+  color: var(--staff-muted);
+  font-size: 0.75rem;
+}
+
+.datePicker {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--staff-line);
+  border-radius: 10px;
+  background: #f7f4ed;
+  animation: planIn 140ms ease-out;
+}
+
+.datePickerHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.datePickerHead > div {
+  display: grid;
+  gap: 2px;
+}
+
+.emptyDates {
+  margin: 0;
+  color: var(--staff-muted);
+}
+
+.closePicker {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border: 1px solid var(--staff-line);
+  border-radius: 50%;
+  background: var(--staff-surface);
+  color: var(--staff-ink);
+  font: inherit;
+  font-size: 1.35rem;
+  cursor: pointer;
+}
+
+.closePicker:hover {
+  border-color: var(--staff-ink);
+}
+
+.closePicker:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
 }
 
 @media (max-width: 900px) {

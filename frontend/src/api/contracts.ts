@@ -7,9 +7,12 @@ import type {
   CustomerFormView,
   Market,
   MarketDay,
+  SaveMarketInput,
+  MoveSuggestion,
   Order,
   Photo,
   PaymentMethod,
+  PaymentEntry,
   PaymentState,
   StaffUser,
   TrackView,
@@ -29,6 +32,9 @@ export type AuthService = {
 export type MarketService = {
   listMarkets: () => Promise<Market[]>
   listMarketDays: (marketId?: string) => Promise<MarketDay[]>
+  saveMarket: (input: SaveMarketInput) => Promise<{ market: Market; days: MarketDay[] }>
+  deleteMarket: (id: string) => Promise<void>
+  deleteMarketDay: (id: string) => Promise<void>
 }
 
 export type AgendaService = {
@@ -39,8 +45,15 @@ export type AgendaService = {
     date: string
     durationHours: number
     afterHour?: number
+    beforeHour?: number
     extraBusy?: { startHour: number; endHour: number }[]
   }) => Promise<CapacityResult>
+  findMoveSuggestion: (input: {
+    date: string
+    durationHours: number
+    handoffDate: string
+    beforeHour?: number
+  }) => Promise<MoveSuggestion | null>
 }
 
 export type OrderService = {
@@ -58,6 +71,8 @@ export type OrderService = {
     itemId: string,
     status: import('../domain/types').ProductionStatus,
   ) => Promise<void>
+  /** Mark (or undo) market pickup / Vienna handoff — Track becomes `delivered`. */
+  setHandedOver: (orderId: string, handedOver: boolean) => Promise<void>
 }
 
 export type PaymentService = {
@@ -66,6 +81,11 @@ export type PaymentService = {
     state: PaymentState,
     method?: PaymentMethod | null,
   ) => Promise<Order>
+  recordPayment: (
+    orderId: string,
+    amount: number,
+    method: PaymentMethod,
+  ) => Promise<{ order: Order; entry: PaymentEntry }>
 }
 
 export type TrackingService = {

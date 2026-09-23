@@ -1,7 +1,8 @@
-/** Domain types aligned with FigJam Entities (19:2599) and docs/project-context.md */
+/** Domain types aligned with FigJam Entities (19:2599) and docs/product.md */
 
 export type PaymentState = 'unpaid' | 'deposit' | 'paid'
 export type PaymentMethod = 'cash' | 'card'
+export type OrnamentColor = 'red' | 'grey'
 export type ItemKind = 'custom' | 'finished'
 export type ProductionStatus = 'not_started' | 'in_progress' | 'finished'
 export type DeliveryKind = 'market' | 'vienna'
@@ -40,6 +41,7 @@ export type OrderItem = {
   kind: ItemKind
   petName: string
   withName: boolean
+  color?: OrnamentColor
   backName: string
   note: string
   cost: number
@@ -66,6 +68,19 @@ export type Order = {
   total: number
   createdAt: string
   itemIds: string[]
+  /** True once staff marks market pickup / Vienna handoff as done. Drives Track `delivered`. */
+  handedOver: boolean
+  /** Append-only payment entries. Older records may not have this field yet. */
+  paymentEntries?: PaymentEntry[]
+  /** Previously recorded amount from legacy orders without individual receipts. */
+  paymentOpeningBalance?: number
+}
+
+export type PaymentEntry = {
+  id: string
+  amount: number
+  method: PaymentMethod
+  recordedAt: string
 }
 
 export type Market = {
@@ -73,6 +88,27 @@ export type Market = {
   name: string
   kind: MarketKind
   totalCost: number
+  /** Season bounds for a stall. Null for home painting. */
+  startDate: string | null
+  finishDate: string | null
+  /** Stall number at the market. Null for home painting. */
+  stall: number | null
+}
+
+export type SaveMarketDayInput = {
+  date: string
+  openHour: number
+  closeHour: number
+}
+
+export type SaveMarketInput = {
+  id?: string
+  name: string
+  startDate: string
+  finishDate: string
+  totalCost: number
+  stall: number
+  days: SaveMarketDayInput[]
 }
 
 export type MarketDay = {
@@ -101,15 +137,21 @@ export type AgendaSlot = {
 }
 
 export type AgendaDelivery = {
+  customerName?: string
+  color?: OrnamentColor
+  backName?: string
   orderId: string
   orderCode: string
   itemId: string
   title: string
   productionStatus: ProductionStatus
+  handedOver: boolean
   deliveryKind: DeliveryKind
   pickupHour: number | null
   methodLabel: string
   timeLabel: string | null
+  phone: string
+  addressLabel: string | null
   photoUrl?: string
 }
 
@@ -121,6 +163,8 @@ export type AgendaDay = {
 }
 
 export type TrackItemView = {
+  color?: OrnamentColor
+  cost?: number
   petName: string
   kind: ItemKind
   productionStatus: ProductionStatus
@@ -144,6 +188,8 @@ export type TrackWhen = {
 }
 
 export type TrackView = {
+  total?: number
+  paymentState?: PaymentState
   code: string
   status: TrackStatus
   customerName: string
@@ -153,6 +199,10 @@ export type TrackView = {
 }
 
 export type CustomerFormView = {
+  handoffs?: TrackWhen[]
+  total?: number
+  paymentState?: PaymentState
+  items?: OrderItem[]
   token: string
   orderCode: string
   withName: boolean
@@ -174,6 +224,7 @@ export type CustomerFormPayload = {
 export type CreateSaleItemInput = {
   kind: ItemKind
   withName: boolean
+  color?: OrnamentColor
   paintDate?: string
   paintStart?: number
   paintEnd?: number
@@ -185,6 +236,7 @@ export type CreateSaleItemInput = {
 }
 
 export type CreateSaleInput = {
+  plannedMove?: MoveSuggestion
   /** Optional: staff does not collect these; the customer form does. */
   customerName?: string
   phone?: string
@@ -198,4 +250,13 @@ export type CapacityResult = {
   slot: { date: string; startHour: number; endHour: number } | null
   remainingHours: number
   message: string
+}
+
+export type MoveSuggestion = {
+  blockId: string
+  orderCode: string
+  title: string
+  from: { date: string; startHour: number; endHour: number }
+  to: { date: string; startHour: number; endHour: number }
+  freedSlot: { date: string; startHour: number; endHour: number }
 }

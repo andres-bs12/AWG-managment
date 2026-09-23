@@ -1,11 +1,14 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
+import { api } from '../../api/client'
 import { Button } from '../ui/Button'
+import { Field } from '../ui/Field'
 import { useLocale } from '../../i18n/LocaleContext'
 import styles from './TrackDialog.module.css'
 
 type Props = {
   onClose: () => void
+  /** Called only after the code resolves — parent can navigate to the wipe. */
   onSubmit: (code: string) => void
   initialCode?: string
   error?: string
@@ -23,6 +26,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
   const restoreRef = useRef<HTMLElement | null>(null)
   const [code, setCode] = useState(initialCode)
   const [localError, setLocalError] = useState('')
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     restoreRef.current = document.activeElement as HTMLElement | null
@@ -39,7 +43,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') {
       event.stopPropagation()
-      onClose()
+      if (!busy) onClose()
       return
     }
     if (event.key !== 'Tab') return
@@ -56,7 +60,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
     }
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault()
     const next = code.trim().toUpperCase()
     if (!next) {
@@ -65,14 +69,30 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
       return
     }
     setLocalError('')
-    onSubmit(next)
+    setBusy(true)
+    try {
+      await api.tracking.getByCode(next)
+      onSubmit(next)
+    } catch (err) {
+      const message = err instanceof Error && err.message ? err.message : t('trackNotFound')
+      setLocalError(message)
+      inputRef.current?.focus()
+    } finally {
+      setBusy(false)
+    }
   }
 
   const shownError = localError || error || ''
 
   return createPortal(
     <div className={styles.overlay} onKeyDown={onKeyDown}>
-      <button type="button" className={styles.backdrop} aria-label={t('close')} onClick={onClose} />
+      <button
+        type="button"
+        className={styles.backdrop}
+        aria-label={t('close')}
+        onClick={onClose}
+        disabled={busy}
+      />
       <div
         className={styles.card}
         ref={cardRef}
@@ -80,6 +100,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={hintId}
+        aria-busy={busy}
       >
         <div className={styles.ribbon} aria-hidden="true">
           <svg viewBox="0 0 220 64" className={styles.ribbonArt}>
@@ -92,7 +113,13 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
           </svg>
         </div>
 
-        <button type="button" className={styles.close} onClick={onClose} aria-label={t('close')}>
+        <button
+          type="button"
+          className={styles.close}
+          onClick={onClose}
+          aria-label={t('close')}
+          disabled={busy}
+        >
           <span aria-hidden="true">×</span>
         </button>
 
@@ -108,37 +135,31 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
           {t('trackLead')}
         </p>
 
-        <form className={styles.form} onSubmit={submit} noValidate>
-          <label className={styles.label} htmlFor="track-dialog-code">
-            {t('trackCode')}
-          </label>
-          <input
-            id="track-dialog-code"
-            ref={inputRef}
-            className={styles.input}
-            name="code"
-            inputMode="text"
-            autoComplete="off"
-            autoCapitalize="characters"
-            spellCheck={false}
-            placeholder="AWG-2026"
-            aria-invalid={shownError ? 'true' : 'false'}
-            aria-errormessage={shownError ? `${titleId}-err` : undefined}
-            value={code}
-            onChange={(event) => {
-              setCode(event.target.value.toUpperCase())
-              if (localError) setLocalError('')
-            }}
-          />
-          {shownError ? (
-            <p className={styles.error} id={`${titleId}-err`} role="alert">
-              {shownError}
-            </p>
-          ) : null}
-          <Button type="submit" size="lg" fullWidth className={styles.submit}>
+        <form className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
+          <Field label={t('trackCode')} htmlFor="track-dialog-code" error={shownError || undefined}>
+            <input
+              id="track-dialog-code"
+              ref={inputRef}
+              className={styles.codeInput}
+              name="code"
+              inputMode="text"
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              placeholder="AWG-2026"
+              disabled={busy}
+              aria-invalid={shownError ? 'true' : 'false'}
+              value={code}
+              onChange={(event) => {
+                setCode(event.target.value.toUpperCase())
+                if (localError) setLocalError('')
+              }}
+            />
+          </Field>
+          <Button type="submit" size="lg" fullWidth className={styles.submit} disabled={busy}>
             {t('trackSubmit')}
           </Button>
-          <button type="button" className={styles.cancel} onClick={onClose}>
+          <button type="button" className={styles.cancel} onClick={onClose} disabled={busy}>
             {t('cancel')}
           </button>
         </form>

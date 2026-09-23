@@ -1,12 +1,13 @@
-import type { Address, CapacityResult, CreateSaleItemInput, ItemKind, Market, MarketDay } from '../../domain/types'
-import { formatDateLabel, formatHour, formatMinutes } from '../../lib/time'
+import type { Address, CapacityResult, CreateSaleItemInput, ItemKind, Market, MarketDay, OrnamentColor } from '../../domain/types'
+import { isMarketPickupWeekday } from '../../lib/calendar'
+import { formatDateLabel, formatHour, formatMinutes, hoursOverlap } from '../../lib/time'
 import { itemCost } from '../../lib/money'
 
 export const SALE_DRAFT_KEY = 'awg-sale-draft'
 
 export type DurationPreset = '45' | '60' | '75' | 'custom'
 export type DeliveryMode = 'now' | 'market' | 'vienna'
-export type SalePhase = 'items' | 'delivery' | 'qr' | 'formWhere' | 'payment' | 'done'
+export type SalePhase = 'items' | 'delivery' | 'qr' | 'payment' | 'done'
 
 export type DraftDelivery = {
   mode: DeliveryMode
@@ -18,9 +19,11 @@ export type DraftDelivery = {
 }
 
 export type DraftItem = {
+  plannedMove?: import('../../domain/types').MoveSuggestion
   id: string
   kind: ItemKind
   withName: boolean
+  color: OrnamentColor
   durationMinutes: number
   durationPreset: DurationPreset
   paintDate?: string
@@ -84,6 +87,7 @@ export function makeCustom(partial?: Partial<DraftItem>): DraftItem {
   return {
     id: newDraftId(),
     withName: false,
+    color: partial?.color ?? 'red',
     durationMinutes: minutes,
     durationPreset: presetFromMinutes(minutes),
     fromCalendar: false,
@@ -99,6 +103,7 @@ export function makeFinished(): DraftItem {
     id: newDraftId(),
     kind: 'finished',
     withName: false,
+    color: 'red',
     durationMinutes: 0,
     durationPreset: '60',
     fromCalendar: false,
@@ -117,7 +122,11 @@ export function makeCustomFromSlot(date: string, start: number, end: number): Dr
     paintEnd: end,
     fromCalendar: true,
     slotLocked: true,
-    delivery: { mode: 'market', pickupDate: date, pickupHour: end },
+    delivery: {
+      mode: 'market',
+      pickupDate: isMarketPickupWeekday(date) ? date : undefined,
+      pickupHour: isMarketPickupWeekday(date) ? end : null,
+    },
   })
 }
 
@@ -135,8 +144,8 @@ export function applySlot(item: DraftItem, date: string, start: number, end: num
     delivery: {
       ...item.delivery,
       mode: item.delivery.mode === 'vienna' ? 'vienna' : 'market',
-      pickupDate: item.delivery.mode === 'vienna' ? item.delivery.pickupDate : date,
-      pickupHour: item.delivery.mode === 'vienna' ? null : (item.delivery.pickupHour ?? end),
+      pickupDate: item.delivery.mode === 'vienna' ? item.delivery.pickupDate : isMarketPickupWeekday(date) ? date : item.delivery.pickupDate,
+      pickupHour: item.delivery.mode === 'vienna' ? null : (item.delivery.pickupHour ?? (isMarketPickupWeekday(date) ? end : null)),
     },
   }
 }
@@ -162,7 +171,7 @@ export function deliveryLabel(item: DraftItem, markets: Market[], days: MarketDa
   if (item.kind === 'finished' && item.delivery.mode === 'now') return 'Deliver now'
   if (item.delivery.mode === 'vienna') {
     const date = item.delivery.pickupDate ? formatDateLabel(item.delivery.pickupDate) : null
-    return ['Vienna · Wed/Fri · no clock', date].filter(Boolean).join(' · ')
+    return ['Vienna delivery · Wed/Fri · no exact time', date].filter(Boolean).join(' · ')
   }
   const day = days.find((d) => d.id === item.delivery.marketDayId) ?? days.find((d) => d.date === item.delivery.pickupDate)
   const market = markets.find((m) => m.id === (item.delivery.marketId ?? day?.marketId))
@@ -175,9 +184,9 @@ export function suggestionCopy(result: CapacityResult | undefined, busy: boolean
   if (busy) return 'Looking for a free slot…'
   if (!result) return ''
   if (result.ok && result.slot) {
-    return `Suggested ${formatHour(result.slot.startHour)}–${formatHour(result.slot.endHour)}`
+    return `Suggested paint ${formatDateLabel(result.slot.date)} · ${formatHour(result.slot.startHour)}–${formatHour(result.slot.endHour)}`
   }
-  return 'No free slot on this day.'
+  return 'No free paint slot before this handoff.'
 }
 
 export function toCreateItems(items: DraftItem[], days: MarketDay[], today?: MarketDay): CreateSaleItemInput[] {
@@ -191,22 +200,17 @@ export function toCreateItems(items: DraftItem[], days: MarketDay[], today?: Mar
     return {
       kind: item.kind,
       withName: item.kind === 'custom' && item.withName,
+      color: item.kind === 'custom' ? item.color : undefined,
       paintDate: item.kind === 'custom' ? item.paintDate : undefined,
       paintStart: item.kind === 'custom' ? item.paintStart : undefined,
       paintEnd: item.kind === 'custom' ? item.paintEnd : undefined,
       deliveryKind,
       marketId: deliveryKind === 'market' ? (item.delivery.marketId ?? pickupDay?.marketId) : undefined,
-      marketDayId: deliveryKind === 'market' ? (item.delivery.marketDayId ?? pickupDay?.id) : undefined,
+      marketDayId: item.delivery.marketDayId ?? pickupDay?.id,
       pickupHour: deliveryKind === 'vienna' ? null : mode === 'now' ? (item.delivery.pickupHour ?? null) : (item.delivery.pickupHour ?? null),
       address: deliveryKind === 'vienna' ? (item.delivery.address ?? null) : null,
     }
   })
-}
-
-export function extraBusyFor(items: DraftItem[], itemId: string, date: string) {
-  return items
-    .filter((item) => item.id !== itemId && item.kind === 'custom' && item.paintDate === date && item.paintStart != null && item.paintEnd != null)
-    .map((item) => ({ startHour: item.paintStart!, endHour: item.paintEnd! }))
 }
 
 export const SLOT_TAKEN_COPY = 'That hour is taken · change / place on board'
@@ -228,20 +232,32 @@ export function buildDraftFromParams(params: URLSearchParams): SaleDraft {
   const endRaw = params.get('end')
   const placeItem = params.get('placeItem')
   const stored = readStoredDraft()
+  const normalizedStored = stored
+    ? {
+        ...stored,
+        phase: (stored.phase as string) === 'formWhere' ? 'qr' as const : stored.phase,
+        items: stored.items.map((item) => ({ ...item, color: item.color ?? 'red' as const })),
+      }
+    : null
 
   if (date && startRaw != null && endRaw != null && startRaw !== '' && endRaw !== '') {
     const start = Number(startRaw)
     const end = Number(endRaw)
     if (Number.isFinite(start) && Number.isFinite(end)) {
-      if (placeItem && stored) {
-        const has = stored.items.some((item) => item.id === placeItem)
+      if (placeItem && normalizedStored) {
+        const has = normalizedStored.items.some((item) => item.id === placeItem)
+        const others = normalizedStored.items.map((item) =>
+          item.id !== placeItem && !item.slotLocked && item.paintDate === date && item.paintStart != null && item.paintEnd != null && hoursOverlap(start, end, item.paintStart, item.paintEnd)
+            ? { ...item, paintDate: undefined, paintStart: undefined, paintEnd: undefined }
+            : item,
+        )
         return {
-          ...stored,
+          ...normalizedStored,
           placingItemId: undefined,
           phase: 'delivery',
           items: has
-            ? stored.items.map((item) => (item.id === placeItem ? applySlot(item, date, start, end) : item))
-            : [...stored.items, makeCustomFromSlot(date, start, end)],
+            ? others.map((item) => (item.id === placeItem ? applySlot(item, date, start, end) : item))
+            : [...others, makeCustomFromSlot(date, start, end)],
         }
       }
       return {
@@ -252,8 +268,8 @@ export function buildDraftFromParams(params: URLSearchParams): SaleDraft {
     }
   }
 
-  if (stored && stored.phase !== 'done' && stored.items.length) {
-    return { ...stored, placingItemId: undefined }
+  if (normalizedStored && normalizedStored.phase !== 'done' && normalizedStored.items.length) {
+    return { ...normalizedStored, placingItemId: undefined }
   }
 
   return emptyDraft()

@@ -1,5 +1,7 @@
 # ArtWithGab — contexto del proyecto
 
+> Archivado (spec largo). No cargar en chats de implementación. Vigente: `docs/product.md` (reglas) y `docs/staff.md` (UX staff).
+
 ## Objetivo
 Gestionar las ventas de Navidad desde la última semana de noviembre de 2026. Andresito dispone de ~15 h/semana (~150 h hasta finales de noviembre) para un proyecto entendible, mantenible y presentable en portafolio.
 
@@ -12,7 +14,7 @@ Gestionar las ventas de Navidad desde la última semana de noviembre de 2026. An
 
 ## Fuente de verdad de flujos
 - **FigJam canónico (staff custom):** sección **Buy custom flow** en [Christmas-2026-web](https://www.figma.com/board/9lexMCksAryAx0vio6OC7D/Christmas-2026-web?node-id=19-453) (`fileKey` `9lexMCksAryAx0vio6OC7D`, `nodeId` `19:453`). Editado por Andresito — priorizar sobre mocks HTML y sobre el diagrama auto “Staff sale flow v1”.
-- Detalle de IDs Figma: [docs/figma.md](./figma.md).
+- Detalle de IDs Figma: [figma.md](../figma.md).
 - Mocks HTML (`references/html-mocks/`): wireframes de funcionamiento; no son el diseño final ni el flujo canónico.
 
 ## Mocks HTML actuales (`references/html-mocks/`)
@@ -140,7 +142,7 @@ Fuente: FigJam `19:453`. Resumen operativo:
 
 ## Organización
 - Sprints ~15 h/semana en Jira; demo con Gaby.
-- Backend: Andresito. Sprint plan: [docs/sprint-plan.md](./sprint-plan.md).
+- Backend: Andresito. Sprint plan: [sprint-plan.md](./sprint-plan.md).
 
 ## Decisiones cerradas
 - Stack Java/Spring + React/TS + PostgreSQL.

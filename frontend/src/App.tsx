@@ -8,7 +8,10 @@ import { FormPage } from './pages/public/FormPage'
 import { HomePage } from './pages/public/HomePage'
 import { TrackPage } from './pages/public/TrackPage'
 import { AgendaPage } from './pages/staff/AgendaPage'
+import { DeliveriesPage } from './pages/staff/DeliveriesPage'
 import { LoginPage } from './pages/staff/LoginPage'
+import { MarketEditorPage } from './pages/staff/MarketEditorPage'
+import { MarketsPage } from './pages/staff/MarketsPage'
 import { NewSalePage } from './pages/staff/NewSalePage'
 import { OrderDetailPage } from './pages/staff/OrderDetailPage'
 import { PaintPage } from './pages/staff/PaintPage'
@@ -30,6 +33,10 @@ export default function App() {
             <Route element={<StaffGuard />}>
               <Route element={<StaffLayout />}>
                 <Route path="/staff/agenda" element={<AgendaPage />} />
+                <Route path="/staff/deliveries" element={<DeliveriesPage />} />
+                <Route path="/staff/markets" element={<MarketsPage />} />
+                <Route path="/staff/markets/new" element={<MarketEditorPage />} />
+                <Route path="/staff/markets/:id" element={<MarketEditorPage />} />
                 <Route path="/staff/sales/new" element={<NewSalePage />} />
                 <Route path="/staff/orders/:id" element={<OrderDetailPage />} />
                 <Route path="/staff/orders/:id/paint/:itemId" element={<PaintPage />} />

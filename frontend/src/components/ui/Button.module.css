@@ -5,10 +5,10 @@
   gap: var(--space-2);
   min-height: var(--touch);
   padding: 0 1.15rem;
-  border-radius: var(--radius-pill);
-  border: 2px solid transparent;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
   font-weight: 650;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   text-decoration: none;
   transition:
     transform 0.12s ease,
@@ -48,16 +48,16 @@
 }
 
 .primary {
-  background: var(--cta);
+  background: var(--green);
   color: #fff;
 }
 
 .primary:hover:not(:disabled) {
-  background: var(--cta-press);
+  background: var(--green-deep);
 }
 
 .primary:active:not(:disabled) {
-  background: #8d3c31;
+  background: var(--green-deep);
 }
 
 .staff.primary {
@@ -76,21 +76,21 @@
 .secondary {
   background: #fff;
   color: var(--public-ink);
-  border-color: #d7c4b0;
+  border-color: var(--snow-2);
 }
 
 .secondary:hover:not(:disabled) {
-  background: #f6efe6;
+  background: var(--snow);
 }
 
 .secondary:active:not(:disabled) {
-  background: #eadccb;
+  background: var(--snow-2);
 }
 
 .staff.secondary {
   background: var(--staff-surface);
   color: var(--staff-ink);
-  border-color: var(--staff-ink);
+  border-color: var(--staff-line);
 }
 
 .staff.secondary:hover:not(:disabled) {
@@ -104,7 +104,7 @@
 .ghost {
   background: transparent;
   color: inherit;
-  border-color: currentColor;
+  border-color: transparent;
 }
 
 .ghost:hover:not(:disabled) {
@@ -148,20 +148,12 @@
 }
 
 .choice:hover:not(:disabled) {
-  border-color: var(--staff-ink);
+  border-color: var(--staff-line);
   background: #efe9dc;
 }
 
 .choice:active:not(:disabled) {
   background: #e4ddd0;
-}
-
-.btn[data-selected='true']::before,
-.staff[data-selected='true']::before,
-.choice[data-selected='true']::before {
-  content: '✓';
-  font-weight: 800;
-  line-height: 1;
 }
 
 .btn[data-selected='true'],
