@@ -4,34 +4,52 @@ import com.artwithgab.awg_tracking.enums.OrderState;
 import com.artwithgab.awg_tracking.enums.PaymentState;
 import jakarta.persistence.*;
 import lombok.*;
-import org.springframework.data.annotation.Id;
+import jakarta.persistence.Id;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
+@Entity
+@Table(name = "orders")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode
+
 public class Order {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(unique = true)
     private UUID id;
+
+    @Column(unique = true)
+    private String code;
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderItem> orderItems = new ArrayList<>();
+
+    private double total;
+
+    @Enumerated(EnumType.STRING)
+    private PaymentState paymentState;
+
+    private Boolean handedOver;
+
+    @Column(name = "form_token", nullable = false, unique = true)
+    private String formToken;
+
+    @Column(name = "track_token", nullable = false, unique = true)
+    private String trackToken;
 
     @JoinColumn(name = "customer_id", nullable = false)
     @ManyToOne
     private Customer customer;
 
-    @JoinColumn(name = "order_item_id", nullable = false)
-    @OneToMany
-    private OrderItem orderItem;
-    private double total;
-    private PaymentState paymentState;
-    private OrderState orderState;
+    private String deliveryAddress;
 
-    @JoinColumn(name = "market_id", nullable = false)
-    @OneToOne
-    private Market market;
+
 
 }

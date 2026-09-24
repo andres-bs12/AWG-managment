@@ -1,18 +1,15 @@
 package com.artwithgab.awg_tracking.model;
 
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.JoinColumn;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
-import org.springframework.data.annotation.Id;
+import jakarta.persistence.*;
+import lombok.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+@Entity
 @AllArgsConstructor
+@NoArgsConstructor
 @Getter
 @Setter
 @EqualsAndHashCode
@@ -22,13 +19,9 @@ public class Customer {
     private UUID id;
 
     private String name;
-    private String lastName;
-    private String main;
-    private Integer phone;
+    private String email;
+    private String phone;
 
-    @JoinColumn(name = "order_id", nullable = false)
-    private List<Order> orders;
-
-    private String Address;
-
+    @OneToMany(mappedBy = "customer")
+    private List<Order> orders = new ArrayList<>();
 }

@@ -1,22 +1,31 @@
 package com.artwithgab.awg_tracking.model;
 
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import org.springframework.data.annotation.Id;
+import jakarta.persistence.*;
+import lombok.*;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.UUID;
 
-public record MarketDay(
-        String name,
-        @Id
-        @GeneratedValue(strategy = GenerationType.AUTO)
-        UUID id,
+@Entity
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@EqualsAndHashCode
+public class MarketDay {
+    private String name;
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
 
-        Instant openTime,
-        Instant closeTime,
-        Market market,
-        LocalDate date
-) {
+    @JoinColumn(name = "market_id", nullable = false)
+    @ManyToOne
+    private Market market;
+
+    private LocalDate date;
+    private LocalTime openTime;
+    private LocalTime closeTime;
+
 }
