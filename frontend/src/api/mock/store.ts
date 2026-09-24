@@ -849,15 +849,18 @@ export function submitForm(token: string, payload: CustomerFormPayload): { order
   const customer = state.customers.find((c) => c.id === order.customerId)
   const items = state.items.filter((i) => i.orderId === order.id)
   const item = items.find((i) => i.kind === 'custom') ?? items[0]
-  const nameItem = items.find((i) => i.withName) ?? item
   if (!customer || !item) throw new Error('Form data missing')
   customer.name = payload.customerName.trim()
   customer.phone = payload.phone.trim()
   customer.email = payload.email.trim()
-  item.petName = payload.petName.trim()
-  item.note = payload.note?.trim() ?? ''
-  if (nameItem.withName) nameItem.backName = (payload.backName ?? '').trim().slice(0, 6).toUpperCase()
-  item.photos = payload.photos
+  for (const incoming of payload.items) {
+    const row = items.find((entry) => entry.id === incoming.orderItemId)
+    if (!row) continue
+    row.petName = incoming.petName.trim()
+    row.note = incoming.note?.trim() ?? ''
+    if (row.withName) row.backName = (incoming.backName ?? '').trim().slice(0, 6).toUpperCase()
+    row.photos = incoming.photos
+  }
   items.forEach((row) => {
     row.formComplete = true
   })

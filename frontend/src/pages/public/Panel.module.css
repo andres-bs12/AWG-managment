@@ -40,6 +40,11 @@
 .row dd { margin: 2px 0 0; font-weight: 600; }
 .editLink { flex-shrink: 0; min-height: 44px; min-width: 44px; margin: -10px -6px 0 0; padding: 0 6px; border: 0; background: none; color: var(--night); font: inherit; font-size: var(--fs-small); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .editLink:focus-visible { outline: 2px solid var(--night); outline-offset: 2px; border-radius: 6px; }
+.itemBlock { margin: 0 0 var(--space-5); padding-bottom: var(--space-4); border-bottom: 1px solid var(--snow-2); }
+.itemBlock:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+.itemBlock h2 { margin: 0 0 var(--space-2); font-size: 1.05rem; }
+.photoRow { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.photoRow img { width: 88px; height: 88px; object-fit: cover; border-radius: 12px; }
 .photos { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1); }
 .photos img { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radius); }
 .line { display: block; }
