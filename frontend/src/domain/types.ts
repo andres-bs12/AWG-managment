@@ -211,14 +211,19 @@ export type CustomerFormView = {
   item: OrderItem
 }
 
-export type CustomerFormPayload = {
-  customerName: string
+export type ItemFormPayload = {
+  orderItemId: string
   petName: string
-  phone: string
-  email: string
   backName?: string
   note?: string
   photos: Photo[]
+}
+
+export type CustomerFormPayload = {
+  customerName: string
+  phone: string
+  email: string
+  items: ItemFormPayload[]
 }
 
 export type CreateSaleItemInput = {

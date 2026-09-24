@@ -7,30 +7,32 @@ import { OrnamentLoader } from '../../components/public/OrnamentLoader'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
 import { Field } from '../../components/ui/Field'
-import type { CustomerFormView, Photo } from '../../domain/types'
+import type { CustomerFormView, OrderItem, Photo } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
 import styles from './Panel.module.css'
 
 type Step = 'photos' | 'names' | 'contact' | 'extras' | 'review' | 'done'
 
-type Draft = {
-  photos: Photo[]
-  customerName: string
+type ItemDraft = {
+  orderItemId: string
   petName: string
-  phone: string
-  email: string
   backName: string
   note: string
+  photos: Photo[]
+}
+
+type Draft = {
+  customerName: string
+  phone: string
+  email: string
+  items: ItemDraft[]
 }
 
 const empty: Draft = {
-  photos: [],
   customerName: '',
-  petName: '',
   phone: '',
   email: '',
-  backName: '',
-  note: '',
+  items: [],
 }
 
 function draftKey(token: string) {
@@ -39,6 +41,50 @@ function draftKey(token: string) {
 
 function isEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+}
+
+function formTargets(view: CustomerFormView): OrderItem[] {
+  const all = view.items ?? [view.item]
+  const custom = all.filter((item) => item.kind === 'custom')
+  return custom.length ? custom : [view.item]
+}
+
+function draftFromView(view: CustomerFormView): Draft {
+  return {
+    customerName: view.customer.name,
+    phone: view.customer.phone,
+    email: view.customer.email,
+    items: formTargets(view).map((item) => ({
+      orderItemId: item.id,
+      petName: item.petName,
+      backName: item.backName,
+      note: item.note,
+      photos: item.photos,
+    })),
+  }
+}
+
+function parseDraft(raw: string, itemIds: string[]): Draft | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<Draft>
+    if (typeof parsed.customerName !== 'string' || !Array.isArray(parsed.items)) return null
+    if (parsed.items.length !== itemIds.length) return null
+    if (parsed.items.some((item, index) => item?.orderItemId !== itemIds[index])) return null
+    return {
+      customerName: parsed.customerName,
+      phone: typeof parsed.phone === 'string' ? parsed.phone : '',
+      email: typeof parsed.email === 'string' ? parsed.email : '',
+      items: parsed.items.map((item) => ({
+        orderItemId: item.orderItemId,
+        petName: item.petName ?? '',
+        backName: item.backName ?? '',
+        note: item.note ?? '',
+        photos: Array.isArray(item.photos) ? item.photos : [],
+      })),
+    }
+  } catch {
+    return null
+  }
 }
 
 function ReviewRow({ label, onEdit, children }: { label: string; onEdit?: () => void; children: ReactNode }) {
@@ -84,21 +130,10 @@ export function FormPage() {
         if (cancelled) return
         setView(data)
         setLoadedToken(token)
+        const itemIds = formTargets(data).map((item) => item.id)
         const saved = sessionStorage.getItem(draftKey(token))
-        if (saved) {
-          setDraft(JSON.parse(saved) as Draft)
-        } else {
-          setDraft({
-            ...empty,
-            customerName: data.customer.name,
-            phone: data.customer.phone,
-            email: data.customer.email,
-            petName: data.item.petName,
-            backName: data.item.backName,
-            note: data.item.note,
-            photos: data.item.photos,
-          })
-        }
+        const restored = saved ? parseDraft(saved, itemIds) : null
+        setDraft(restored ?? draftFromView(data))
         if (data.alreadySubmitted) setStep('done')
       })
       .catch((err: Error) => {
@@ -122,7 +157,14 @@ export function FormPage() {
   const total = steps.length
   const intlLocale = locale === 'de' ? 'de-AT' : 'en-GB'
   const money = (value: number) => new Intl.NumberFormat(locale === 'de' ? 'de-AT' : 'en-IE', { style: 'currency', currency: 'EUR' }).format(value)
-  const orderItems = view ? (view.items ?? [view.item]).map((item) => (item.id === view.item.id ? { ...item, petName: draft.petName } : item)) : []
+  const formItems = useMemo(() => (view ? formTargets(view) : []), [view])
+  const multi = formItems.length > 1
+  const orderItems = view
+    ? (view.items ?? [view.item]).map((item) => {
+        const filled = draft.items.find((row) => row.orderItemId === item.id)
+        return filled ? { ...item, petName: filled.petName } : item
+      })
+    : []
   const handoffLines = [...new Set((view?.handoffs ?? []).map((handoff) =>
     handoff.kind === 'vienna'
       ? t('whenVienna')
@@ -131,33 +173,67 @@ export function FormPage() {
         : [handoff.marketName, handoff.date ? formatDateLabel(handoff.date, intlLocale) : '', handoff.fromHour != null ? t('whenFrom', { time: formatHour(handoff.fromHour) }) : ''].filter(Boolean).join(' · '),
   ))]
 
-  function patch(partial: Partial<Draft>) {
+  function ornamentTitle(index: number, item: OrderItem | undefined) {
+    const color = item?.color === 'red' ? t('colorRed') : item?.color === 'grey' ? t('colorGrey') : ''
+    return color ? t('ornamentWithColor', { n: index + 1, color }) : t('ornamentN', { n: index + 1 })
+  }
+
+  function sourceFor(orderItemId: string) {
+    return formItems.find((item) => item.id === orderItemId)
+  }
+
+  function patch(partial: Partial<Pick<Draft, 'customerName' | 'phone' | 'email'>>) {
     setDraft((d) => ({ ...d, ...partial }))
     setFieldError({})
   }
 
-  async function addFiles(files: FileList | null) {
-    if (!files) return
-    const next: Photo[] = []
-    for (const file of Array.from(files).slice(0, 4 - draft.photos.length)) {
-      next.push(await api.uploads.toPhoto(file))
-    }
-    patch({ photos: [...draft.photos, ...next] })
+  function patchItem(orderItemId: string, partial: Partial<Omit<ItemDraft, 'orderItemId'>>) {
+    setDraft((d) => ({
+      ...d,
+      items: d.items.map((item) => (item.orderItemId === orderItemId ? { ...item, ...partial } : item)),
+    }))
+    setFieldError({})
   }
 
-  function validate(current: Step): boolean {
+  async function addFiles(orderItemId: string, files: FileList | null) {
+    if (!files) return
+    const current = draft.items.find((item) => item.orderItemId === orderItemId)
+    if (!current) return
+    const next: Photo[] = []
+    for (const file of Array.from(files).slice(0, 4 - current.photos.length)) {
+      next.push(await api.uploads.toPhoto(file))
+    }
+    patchItem(orderItemId, { photos: [...current.photos, ...next] })
+  }
+
+  function errorsFor(current: Step): Record<string, string> {
     const errs: Record<string, string> = {}
-    if (current === 'photos' && draft.photos.length < 1) errs.photos = t('needPhoto')
+    if (current === 'photos') {
+      for (const item of draft.items) {
+        if (item.photos.length < 1) errs[`photos:${item.orderItemId}`] = t('needPhoto')
+      }
+    }
     if (current === 'names') {
       if (!draft.customerName.trim()) errs.customerName = t('required')
-      if (!draft.petName.trim()) errs.petName = t('required')
+      for (const item of draft.items) {
+        if (!item.petName.trim()) errs[`petName:${item.orderItemId}`] = t('required')
+      }
     }
     if (current === 'contact') {
       if (!draft.phone.trim()) errs.phone = t('required')
       if (!draft.email.trim()) errs.email = t('required')
       else if (!isEmail(draft.email.trim())) errs.email = t('invalidEmail')
     }
-    if (current === 'extras' && view?.withName && !draft.backName.trim()) errs.backName = t('required')
+    if (current === 'extras') {
+      for (const item of draft.items) {
+        if (sourceFor(item.orderItemId)?.withName && !item.backName.trim()) errs[`backName:${item.orderItemId}`] = t('required')
+      }
+    }
+    return errs
+  }
+
+  function validate(current: Step): boolean {
+    const errs = errorsFor(current)
     setFieldError(errs)
     return Object.keys(errs).length === 0
   }
@@ -175,20 +251,27 @@ export function FormPage() {
   }
 
   async function send() {
-    if (!validate('photos') || !validate('names') || !validate('contact') || !validate('extras')) {
-      setStep('photos')
-      return
+    for (const current of ['photos', 'names', 'contact', 'extras'] as const) {
+      const errs = errorsFor(current)
+      if (Object.keys(errs).length) {
+        setFieldError(errs)
+        setStep(current)
+        return
+      }
     }
     setSending(true)
     try {
       const result = await api.forms.submitForm(token, {
         customerName: draft.customerName,
-        petName: draft.petName,
         phone: draft.phone,
         email: draft.email,
-        backName: draft.backName,
-        note: draft.note,
-        photos: draft.photos,
+        items: draft.items.map((item) => ({
+          orderItemId: item.orderItemId,
+          petName: item.petName,
+          backName: item.backName,
+          note: item.note,
+          photos: item.photos,
+        })),
       })
       sessionStorage.removeItem(draftKey(token))
       setOrderCode(result.orderCode)
@@ -198,6 +281,52 @@ export function FormPage() {
     } finally {
       setSending(false)
     }
+  }
+
+  function photoFields(item: ItemDraft, title?: string) {
+    const cameraId = `camera-${item.orderItemId}`
+    const galleryId = `gallery-${item.orderItemId}`
+    return (
+      <section key={item.orderItemId} className={title ? styles.itemBlock : undefined} aria-labelledby={title ? `photos-${item.orderItemId}` : undefined}>
+        {title ? <h2 id={`photos-${item.orderItemId}`}>{title}</h2> : null}
+        {fieldError[`photos:${item.orderItemId}`] ? <p role="alert">{fieldError[`photos:${item.orderItemId}`]}</p> : null}
+        <div className={styles.photoRow}>
+          {item.photos.map((photo) => (
+            <img key={photo.id} src={photo.dataUrl} alt={photo.name} />
+          ))}
+        </div>
+        <div className={styles.actions}>
+          <Button variant="secondary" onClick={() => document.getElementById(cameraId)?.click()}>
+            {t('takePhoto')}
+          </Button>
+          <Button variant="secondary" onClick={() => document.getElementById(galleryId)?.click()}>
+            {t('addPhoto')}
+          </Button>
+          <input
+            id={cameraId}
+            className="visually-hidden"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(e) => {
+              void addFiles(item.orderItemId, e.target.files)
+              e.target.value = ''
+            }}
+          />
+          <input
+            id={galleryId}
+            className="visually-hidden"
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e) => {
+              void addFiles(item.orderItemId, e.target.files)
+              e.target.value = ''
+            }}
+          />
+        </div>
+      </section>
+    )
   }
 
   if (loading) {
@@ -236,6 +365,8 @@ export function FormPage() {
     )
   }
 
+  const single = draft.items[0]
+
   return (
     <div className={styles.panel}>
       <ProgressSteps labels={[t('formPhotos'), t('formNames'), t('formContact'), t('formExtras'), t('review')]} current={stepIndex} label={t('progress', { n: stepIndex + 1, total })} compact />
@@ -243,44 +374,8 @@ export function FormPage() {
       {step === 'photos' ? (
         <>
           <h1>{t('formPhotos')}</h1>
-          <p className={styles.lead}>{t('formPhotosLead')}</p>
-          {fieldError.photos ? <p role="alert">{fieldError.photos}</p> : null}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-            {draft.photos.map((p) => (
-              <img
-                key={p.id}
-                src={p.dataUrl}
-                alt={p.name}
-                width={88}
-                height={88}
-                style={{ objectFit: 'cover', borderRadius: 12 }}
-              />
-            ))}
-          </div>
-          <div className={styles.actions}>
-            <Button variant="secondary" onClick={() => document.getElementById('camera')?.click()}>
-              {t('takePhoto')}
-            </Button>
-            <Button variant="secondary" onClick={() => document.getElementById('gallery')?.click()}>
-              {t('addPhoto')}
-            </Button>
-            <input
-              id="camera"
-              className="visually-hidden"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={(e) => void addFiles(e.target.files)}
-            />
-            <input
-              id="gallery"
-              className="visually-hidden"
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => void addFiles(e.target.files)}
-            />
-          </div>
+          <p className={styles.lead}>{multi ? t('formPhotosLeadMulti') : t('formPhotosLead')}</p>
+          {multi ? draft.items.map((item, index) => photoFields(item, ornamentTitle(index, sourceFor(item.orderItemId)))) : single ? photoFields(single) : null}
         </>
       ) : null}
 
@@ -295,9 +390,20 @@ export function FormPage() {
               onChange={(e) => patch({ customerName: e.target.value })}
             />
           </Field>
-          <Field label={t('petName')} htmlFor="petName" error={fieldError.petName}>
-            <input id="petName" value={draft.petName} onChange={(e) => patch({ petName: e.target.value })} />
-          </Field>
+          {multi
+            ? draft.items.map((item, index) => (
+                <section key={item.orderItemId} className={styles.itemBlock}>
+                  <h2>{ornamentTitle(index, sourceFor(item.orderItemId))}</h2>
+                  <Field label={t('petName')} htmlFor={`petName-${item.orderItemId}`} error={fieldError[`petName:${item.orderItemId}`]}>
+                    <input id={`petName-${item.orderItemId}`} value={item.petName} onChange={(e) => patchItem(item.orderItemId, { petName: e.target.value })} />
+                  </Field>
+                </section>
+              ))
+            : single ? (
+                <Field label={t('petName')} htmlFor="petName" error={fieldError[`petName:${single.orderItemId}`]}>
+                  <input id="petName" value={single.petName} onChange={(e) => patchItem(single.orderItemId, { petName: e.target.value })} />
+                </Field>
+              ) : null}
         </>
       ) : null}
 
@@ -328,19 +434,45 @@ export function FormPage() {
       {step === 'extras' ? (
         <>
           <h1>{t('formExtras')}</h1>
-          {view?.withName ? (
-            <Field label={t('backName')} htmlFor="backName" hint={t('backNameHint')} error={fieldError.backName}>
-              <input
-                id="backName"
-                maxLength={6}
-                value={draft.backName}
-                onChange={(e) => patch({ backName: e.target.value.slice(0, 6) })}
-              />
-            </Field>
-          ) : null}
-          <Field label={t('note')} htmlFor="note">
-            <textarea id="note" value={draft.note} onChange={(e) => patch({ note: e.target.value })} />
-          </Field>
+          {multi
+            ? draft.items.map((item, index) => {
+                const source = sourceFor(item.orderItemId)
+                return (
+                  <section key={item.orderItemId} className={styles.itemBlock}>
+                    <h2>{ornamentTitle(index, source)}</h2>
+                    {source?.withName ? (
+                      <Field label={t('backName')} htmlFor={`backName-${item.orderItemId}`} hint={t('backNameHint')} error={fieldError[`backName:${item.orderItemId}`]}>
+                        <input
+                          id={`backName-${item.orderItemId}`}
+                          maxLength={6}
+                          value={item.backName}
+                          onChange={(e) => patchItem(item.orderItemId, { backName: e.target.value.slice(0, 6) })}
+                        />
+                      </Field>
+                    ) : null}
+                    <Field label={t('note')} htmlFor={`note-${item.orderItemId}`}>
+                      <textarea id={`note-${item.orderItemId}`} value={item.note} onChange={(e) => patchItem(item.orderItemId, { note: e.target.value })} />
+                    </Field>
+                  </section>
+                )
+              })
+            : single ? (
+                <>
+                  {sourceFor(single.orderItemId)?.withName ? (
+                    <Field label={t('backName')} htmlFor="backName" hint={t('backNameHint')} error={fieldError[`backName:${single.orderItemId}`]}>
+                      <input
+                        id="backName"
+                        maxLength={6}
+                        value={single.backName}
+                        onChange={(e) => patchItem(single.orderItemId, { backName: e.target.value.slice(0, 6) })}
+                      />
+                    </Field>
+                  ) : null}
+                  <Field label={t('note')} htmlFor="note">
+                    <textarea id="note" value={single.note} onChange={(e) => patchItem(single.orderItemId, { note: e.target.value })} />
+                  </Field>
+                </>
+              ) : null}
         </>
       ) : null}
 
@@ -349,25 +481,51 @@ export function FormPage() {
           <h1>{t('review')}</h1>
           <p className={styles.lead}>{t('reviewLead')}</p>
 
-          <section className={styles.reviewCard} aria-labelledby="review-ornament">
-            <h2 id="review-ornament">{t('reviewOrnament')}</h2>
-            <dl className={styles.rows}>
-              <ReviewRow label={t('formPhotos')} onEdit={() => setStep('photos')}>
-                <span className={styles.photos}>{draft.photos.map(photo => <img key={photo.id} src={photo.dataUrl} alt={photo.name} />)}</span>
-              </ReviewRow>
-              <ReviewRow label={t('petName')} onEdit={() => setStep('names')}>{draft.petName}</ReviewRow>
-              {orderItems.length === 1 ? (
-                <ReviewRow label={t('colour')}>
-                  <span className={styles.itemLine}>
-                    <span className={styles.colorDot} data-color={orderItems[0].color ?? 'none'} aria-hidden="true" />
-                    {orderItems[0].color ? t(orderItems[0].color === 'red' ? 'colorRed' : 'colorGrey') : t('colorUnknown')}
-                  </span>
-                </ReviewRow>
+          {multi
+            ? draft.items.map((item, index) => {
+                const source = sourceFor(item.orderItemId)
+                const title = ornamentTitle(index, source)
+                return (
+                  <section key={item.orderItemId} className={styles.reviewCard} aria-labelledby={`review-${item.orderItemId}`}>
+                    <h2 id={`review-${item.orderItemId}`}>{title}</h2>
+                    <dl className={styles.rows}>
+                      <ReviewRow label={t('formPhotos')} onEdit={() => setStep('photos')}>
+                        <span className={styles.photos}>{item.photos.map((photo) => <img key={photo.id} src={photo.dataUrl} alt={photo.name} />)}</span>
+                      </ReviewRow>
+                      <ReviewRow label={t('petName')} onEdit={() => setStep('names')}>{item.petName}</ReviewRow>
+                      <ReviewRow label={t('colour')}>
+                        <span className={styles.itemLine}>
+                          <span className={styles.colorDot} data-color={source?.color ?? 'none'} aria-hidden="true" />
+                          {source?.color ? t(source.color === 'red' ? 'colorRed' : 'colorGrey') : t('colorUnknown')}
+                        </span>
+                      </ReviewRow>
+                      {source?.withName ? <ReviewRow label={t('backName')} onEdit={() => setStep('extras')}>{item.backName}</ReviewRow> : null}
+                      {item.note ? <ReviewRow label={t('noteLabel')} onEdit={() => setStep('extras')}>{item.note}</ReviewRow> : null}
+                    </dl>
+                  </section>
+                )
+              })
+            : single ? (
+                <section className={styles.reviewCard} aria-labelledby="review-ornament">
+                  <h2 id="review-ornament">{t('reviewOrnament')}</h2>
+                  <dl className={styles.rows}>
+                    <ReviewRow label={t('formPhotos')} onEdit={() => setStep('photos')}>
+                      <span className={styles.photos}>{single.photos.map((photo) => <img key={photo.id} src={photo.dataUrl} alt={photo.name} />)}</span>
+                    </ReviewRow>
+                    <ReviewRow label={t('petName')} onEdit={() => setStep('names')}>{single.petName}</ReviewRow>
+                    {orderItems.length === 1 ? (
+                      <ReviewRow label={t('colour')}>
+                        <span className={styles.itemLine}>
+                          <span className={styles.colorDot} data-color={orderItems[0].color ?? 'none'} aria-hidden="true" />
+                          {orderItems[0].color ? t(orderItems[0].color === 'red' ? 'colorRed' : 'colorGrey') : t('colorUnknown')}
+                        </span>
+                      </ReviewRow>
+                    ) : null}
+                    {sourceFor(single.orderItemId)?.withName ? <ReviewRow label={t('backName')} onEdit={() => setStep('extras')}>{single.backName}</ReviewRow> : null}
+                    {single.note ? <ReviewRow label={t('noteLabel')} onEdit={() => setStep('extras')}>{single.note}</ReviewRow> : null}
+                  </dl>
+                </section>
               ) : null}
-              {view?.withName ? <ReviewRow label={t('backName')} onEdit={() => setStep('extras')}>{draft.backName}</ReviewRow> : null}
-              {draft.note ? <ReviewRow label={t('noteLabel')} onEdit={() => setStep('extras')}>{draft.note}</ReviewRow> : null}
-            </dl>
-          </section>
 
           <section className={styles.reviewCard} aria-labelledby="review-details">
             <h2 id="review-details">{t('reviewDetails')}</h2>
