@@ -8,7 +8,7 @@ Ventas de ornamentos de Navidad personalizados (mercados Viena 2026): pedidos, a
 - **Ahora:** dominio y API en Spring. **Lo hace el dueño del repo.** Los agentes **no** tocan `awg-tracking/` (ni modelos, enums, controllers, POM, etc.) **salvo petición explícita**.
 - **No ahora:** Stripe real, emails, Buy web, dashboard, inventario.
 
-Arranque front: `frontend/README.md`. Canon visual staff: FigJam Buy custom [`19:453`](https://www.figma.com/board/9lexMCksAryAx0vio6OC7D/Christmas-2026-web?node-id=19-453). NodeIds mid-fi: `docs/figma.md`. Swap mocks→HTTP: `docs/frontend-api-swap.md`.
+Arranque front: `frontend/README.md`. Canon visual staff: FigJam Buy custom [`19:453`](https://www.figma.com/board/9lexMCksAryAx0vio6OC7D/Christmas-2026-web?node-id=19-453). NodeIds mid-fi: `docs/figma.md`. Swap mocks→HTTP: `docs/frontend-api-swap.md`. DTOs y contratos: `docs/contracts-and-dtos.md`.
 
 ## Stack y límites
 

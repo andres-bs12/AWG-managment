@@ -11,7 +11,7 @@ public record OrderRequest(
 
         @Valid
         @NotEmpty
-        List<OrderItem> orderItemList,
+        List<OrderItemRequest> orderItemRequestsList,
 
         @Nullable
         String name,

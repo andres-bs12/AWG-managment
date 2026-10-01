@@ -29,7 +29,6 @@ public record OrderItemResponse(
         String petName,
         List<String> photos,
         String note,
-        Inventory inventory,
         CustomColor customColor
 ) {
 }
