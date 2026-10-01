@@ -1,6 +1,7 @@
 package com.artwithgab.awg_tracking.model;
 
 import com.artwithgab.awg_tracking.enums.CustomColor;
+import com.artwithgab.awg_tracking.enums.ItemKind;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -19,5 +20,6 @@ public class Inventory {
     @Enumerated(EnumType.STRING)
     private CustomColor customColor;
     private int quantity;
-    private int size;
+    @Enumerated(EnumType.STRING)
+    private ItemKind itemKind;
 }

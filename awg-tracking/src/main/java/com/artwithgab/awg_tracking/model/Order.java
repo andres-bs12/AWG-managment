@@ -26,7 +26,7 @@ public class Order {
     private UUID id;
 
     @Column(unique = true)
-    private String code;
+    private String code; // links
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();
@@ -49,7 +49,4 @@ public class Order {
     private Customer customer;
 
     private String deliveryAddress;
-
-
-
 }

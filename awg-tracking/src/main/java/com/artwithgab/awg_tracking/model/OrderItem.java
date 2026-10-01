@@ -1,16 +1,12 @@
 package com.artwithgab.awg_tracking.model;
 
-import com.artwithgab.awg_tracking.enums.DeliveryKind;
-import com.artwithgab.awg_tracking.enums.ItemKind;
-import com.artwithgab.awg_tracking.enums.ItemState;
-import com.artwithgab.awg_tracking.enums.ProductionStatus;
+import com.artwithgab.awg_tracking.enums.*;
 import jakarta.persistence.*;
 import lombok.*;
 import jakarta.persistence.Id;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -46,7 +42,7 @@ public class OrderItem {
     @ManyToOne(fetch = FetchType.LAZY)
     private MarketDay market;
 
-    private LocalDateTime pickUpHour;
+    private LocalTime pickUpHour;
 
 
     private Instant startDate; //
@@ -62,6 +58,9 @@ public class OrderItem {
     private String note;
 
     @JoinColumn(name = "inventory_id")
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     private Inventory inventory;
+
+    @Enumerated(EnumType.STRING)
+    private CustomColor customColor;
 }
