@@ -41,7 +41,7 @@ Este documento registra las decisiones arquitectónicas y de negocio de los DTOs
 
 ### 2.3 `CustomerFormResponse` (Apertura del formulario)
 - **Sin pre-rellenado de cliente:** En la operativa del puesto, el cliente siempre escribe sus datos desde cero en su móvil; no se pre-rellena para evitar confusiones.
-- **`code` incluido:** Para que la cabecera del móvil confirme al cliente el código de su compra (ej. *«Pedido AWG142»*).
+- **`code` incluido:** Para que la cabecera del móvil confirme al cliente el código de su compra (ej. *«Pedido AWG1042»*). Formato estándar: prefijo `AWG` seguido de 4 dígitos numéricos (rango 1000 - 9999).
 - **Sin color global:** El color pertenece a cada adorno dentro de `orderItemResponses`, no a la cabecera.
 
 ---
@@ -50,7 +50,7 @@ Este documento registra las decisiones arquitectónicas y de negocio de los DTOs
 
 - **`trackToken` eliminado por redundancia:**
   - La pantalla pública de seguimiento (`/track/:code`) solo muestra datos inocuos (primer nombre, nombre de la mascota, estado en taller y horario de recogida). No expone teléfonos, emails ni direcciones completas.
-  - Por tanto, la búsqueda pública y los enlaces de email usan directamente el `code` (`AWG142`), simplificando el modelo.
+  - Por tanto, la búsqueda pública y los enlaces de email usan directamente el `code` (`AWG` + 4 dígitos, ej. `AWG1042`), simplificando el modelo.
 - **`formToken` se mantiene estrictamente:**
   - El formulario tiene permisos de **escritura** (subir fotos, modificar datos del encargo). Por seguridad, requiere un token largo e indescifrable (`formToken`) para impedir que usuarios maliciosos manipulen pedidos ajenos.
 

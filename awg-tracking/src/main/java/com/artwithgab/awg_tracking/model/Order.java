@@ -38,6 +38,8 @@ public class Order {
 
     private Boolean handedOver;
 
+    private Boolean formSubmitted = false;
+
     @Column(name = "form_token", nullable = false, unique = true)
     private String formToken;
 
