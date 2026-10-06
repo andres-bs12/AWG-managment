@@ -45,8 +45,8 @@ public class OrderItem {
     private LocalTime pickUpHour;
 
 
-    private Instant startDate; //
-    private Instant endDate;
+    private Instant paintStart;
+    private Instant paintEnd;
 
     private boolean withName;
     private String nameInOrnament;

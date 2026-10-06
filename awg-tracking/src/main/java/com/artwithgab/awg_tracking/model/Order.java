@@ -46,7 +46,7 @@ public class Order {
     @Column(name = "track_token", nullable = false, unique = true)
     private String trackToken;
 
-    @JoinColumn(name = "customer_id", nullable = false)
+    @JoinColumn(name = "customer_id")
     @ManyToOne
     private Customer customer;
 

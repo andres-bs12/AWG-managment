@@ -7,6 +7,7 @@ import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 
+import java.time.Instant;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,10 +30,10 @@ public record OrderItemRequest(
         LocalTime pickUpHour,
 
         @Nullable
-        LocalDateTime startDate,
+        Instant paintStart,
 
         @Nullable
-        LocalDateTime endDate,
+        Instant paintEnd,
 
         boolean withName,
 
