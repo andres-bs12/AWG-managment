@@ -23,6 +23,13 @@ import java.util.List;
 import java.util.UUID;
 
 /**
+ *
+ * // Métodos restantes de OrderService:
+ * getOrderByCode(String code) (para consultar una orden en el iPad).
+ * updatePaymentState(UUID orderId, PaymentState state) (cobro de saldo pendiente).
+ * markAsHandedOver(UUID orderId) (entrega física de la bolsa al cliente).
+ *
+ *
  * 3. Implementar métodos de ciclo de vida de la orden:
  * - getOrderByCode(String code)
  * - updatePaymentState(UUID orderId, PaymentState state)
@@ -43,9 +50,9 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderCodeGeneratorService orderCodeGeneratorService;
     private final OrderItemMapper orderItemMapper;
-    private final InventoryRepository inventoryRepository;
     private final OrderMapper orderMapper;
     private final MarketDayRepository marketDayRepository;
+    private final InventoryService inventoryService;
 
     @Transactional
     public OrderResponse createOrder(OrderRequest orderRequest) {
@@ -61,10 +68,8 @@ public class OrderService {
 
         for (OrderItemRequest newItemRequest : orderRequest.orderItemRequestsList()) {
             total += newItemRequest.cost();
-
-
-
             OrderItem newItem = (orderItemMapper.toEntity(newItemRequest));
+            inventoryService.deductItem(newItem);
 
             switch (newItem.getItemKind()) {
                 case CUSTOM -> newItem.setProductionStatus(ProductionStatus.NOT_STARTED);
@@ -75,7 +80,6 @@ public class OrderService {
                 marketDayRepository.findById(newItemRequest.marketDayId())
                         .ifPresent(newItem::setMarket);
             }
-
             linkItemToOrder(order, newItem);
 
         }
@@ -88,5 +92,4 @@ public class OrderService {
         order.getOrderItems().add(item);
         item.setOrder(order);
     }
-
 }

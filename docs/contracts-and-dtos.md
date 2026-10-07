@@ -58,6 +58,16 @@ Este documento registra las decisiones arquitectónicas y de negocio de los DTOs
 
 ## 4. Separación de Stock en `Inventory`
 
-- `Inventory` utiliza la pareja **`itemKind` (`CUSTOM` | `GENERIC`) + `customColor` (`RED`, `GREEN`, `WHITE`)**:
-  - *Razón de negocio:* Una bola blanca virgen en blanco (`CUSTOM + WHITE`) es un lienzo para pintar y reserva capacidad de taller. Una bola blanca terminada del expositor (`GENERIC + WHITE`) ya está fabricada y no consume lienzo virgen.
-  - Se rastrean en filas separadas de inventario para que el stock de uno jamás bloquee o contamine al otro.
+- **Modelo de inventario diferenciado:**
+  - **`CUSTOM` (Esferas crudas de taller):** Se rastrean estrictamente por la pareja `itemKind = CUSTOM` + `customColor` (`RED`, `GREEN`, `WHITE`). Representan el lienzo virgen que Gab pintará en el taller.
+  - **`GENERIC` (Esferas terminadas de expositor):** Representan un inventario global de producto terminado para venta rápida en el puesto. No se rastrean por color en el almacén; se descuentan directamente como una unidad genérica global (`findByItemKind(ItemKind.GENERIC)`).
+- **Trazabilidad en `OrderItem` (`inventory_id`):**
+  - Cada vez que se crea un adorno, se asocia directamente a la fila de inventario de donde salió (`item.setInventory(inventory)`). Esto deja constancia histórica en base de datos del stock consumido.
+
+---
+
+## 5. Hoja de Ruta: Devoluciones y Reposición de Stock (`Returns & Restock`)
+
+- **Reposición automática vía Trazabilidad:**
+  - En una fase futura, cuando se implemente la cancelación de pedidos o reembolso/devolución de un adorno (`cancelOrder` / `refundOrderItem`), el sistema aprovechará la relación `item.getInventory()`.
+  - Para reponer el stock al almacén, no será necesario recalcular o adivinar qué tipo o color era el adorno: simplemente se accederá al inventario vinculado y se incrementará la cantidad (`item.getInventory().setQuantity(quantity + 1)`), manteniendo la integridad total del stock sin riesgo de desfasar colores o tipos.
