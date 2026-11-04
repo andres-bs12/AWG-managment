@@ -108,7 +108,6 @@ export function NewSalePage() {
   const [copied, setCopied] = useState(false)
   const [payMethod, setPayMethod] = useState<PaymentMethod | null>(null)
   const [payState, setPayState] = useState<PaymentState>('paid')
-  const [payAmount, setPayAmount] = useState('')
   const [paidNote, setPaidNote] = useState('')
   const paramKey = `${params.get('date')}|${params.get('start')}|${params.get('end')}|${params.get('placeItem')}|${params.get('fresh')}`
 
@@ -415,7 +414,6 @@ export function NewSalePage() {
     })
     const ref = { id: created.id, code: created.code, formToken: created.formToken, total: created.total }
     setDraft((current) => ({ ...current, order: ref }))
-    setPayAmount(String(ref.total))
     return ref
   }
 
@@ -431,7 +429,7 @@ export function NewSalePage() {
       if (state !== 'unpaid') {
         const amount = state === 'deposit' ? Math.round((created.total / 2) * 100) / 100 : created.total
         if (!payMethod) throw new Error('Choose cash or card.')
-        await api.payments.recordPayment(created.id, amount, payMethod)
+        await api.payments.setPaymentState(created.id, state, payMethod)
         setPaidNote(`${formatEur(amount)} received · ${payMethod === 'cash' ? 'cash' : 'card'}`)
       } else {
         setPaidNote('Not paid yet')
@@ -474,14 +472,10 @@ export function NewSalePage() {
       setError('Choose cash or card.')
       return
     }
-    const amount = Number(payAmount.replace(',', '.'))
-    if (state !== 'unpaid' && (!Number.isFinite(amount) || amount <= 0)) {
-      setError('Enter the amount received.')
-      return
-    }
+    const amount = state === 'deposit' ? Math.round((order.total / 2) * 100) / 100 : order.total
     setBusy(true)
     try {
-      if (state !== 'unpaid') await api.payments.recordPayment(order.id, amount, payMethod!)
+      if (state !== 'unpaid') await api.payments.setPaymentState(order.id, state, payMethod)
       setPaidNote(state === 'unpaid' ? 'Not paid yet' : `${formatEur(amount)} received · ${payMethod === 'cash' ? 'cash' : 'card'}`)
       setPhase('done')
     } catch (err) {
@@ -611,10 +605,6 @@ export function NewSalePage() {
                       { value: 'card', label: 'Card' },
                     ]}
                   />
-                  <label className={styles.amountField}>
-                    Amount received
-                    <input inputMode="decimal" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="0.00" />
-                  </label>
                   <SegmentedControl
                     legend="Payment state"
                     name="finished-state"
@@ -682,13 +672,6 @@ export function NewSalePage() {
 
           {phase === 'payment' && order ? (
             <div>
-              <label className={styles.amountField}>
-                Amount received
-                <input inputMode="decimal" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="0.00" />
-              </label>
-              <button type="button" className={styles.textBtn} onClick={() => setPayAmount(String(order.total))}>
-                Use full remaining balance ({formatEur(order.total)})
-              </button>
               <SegmentedControl
                 legend="Method"
                 name="pay-method"
@@ -701,7 +684,10 @@ export function NewSalePage() {
               />
               <div className={styles.actions}>
                 <Button tone="staff" size="lg" disabled={busy || !payMethod} onClick={() => void recordPayment('paid')}>
-                  Record payment
+                  Mark paid ({formatEur(order.total)})
+                </Button>
+                <Button tone="staff" variant="secondary" disabled={busy || !payMethod} onClick={() => void recordPayment('deposit')}>
+                  Mark deposit (50% · {formatEur(Math.round((order.total / 2) * 100) / 100)})
                 </Button>
                 <Button tone="staff" variant="ghost" disabled={busy} onClick={() => void recordPayment('unpaid')}>
                   Leave unpaid

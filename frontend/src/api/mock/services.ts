@@ -20,7 +20,6 @@ import {
   mockLogout,
   mockMe,
   moveBlock,
-  recordPayment,
   setItemStatus,
   setHandedOver,
   setPaymentState,
@@ -99,7 +98,6 @@ export const mockApi: Api = {
   },
   payments: {
     setPaymentState: (orderId, state, method) => later(() => setPaymentState(orderId, state, method)),
-    recordPayment: (orderId, amount, method) => later(() => recordPayment(orderId, amount, method)),
   },
   tracking: {
     getByCode: (code) => later(() => getTrackByCode(code), 420),

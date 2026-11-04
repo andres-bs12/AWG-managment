@@ -35,6 +35,8 @@ export function TrackPage() {
   const [addr, setAddr] = useState<Address>({ line1: '', city: 'Vienna', postalCode: '' })
   const [editing, setEditing] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [savingAddress, setSavingAddress] = useState(false)
+  const [addressError, setAddressError] = useState('')
 
   useEffect(() => {
     if (!codeParam) return
@@ -87,11 +89,19 @@ export function TrackPage() {
   const error = codeParam ? fetchError : ''
 
   async function saveAddress() {
-    if (!view) return
-    const next = await api.tracking.updateViennaAddress(view.code, addr)
-    setLoaded(next)
-    setEditing(false)
-    setSaved(true)
+    if (!view || savingAddress) return
+    setSavingAddress(true)
+    setAddressError('')
+    try {
+      const next = await api.tracking.updateViennaAddress(view.code, addr)
+      setLoaded(next)
+      setEditing(false)
+      setSaved(true)
+    } catch (err) {
+      setAddressError(err instanceof Error && err.message ? err.message : t('addressSaveError'))
+    } finally {
+      setSavingAddress(false)
+    }
   }
 
   const status = view?.status ?? 'preparing'
@@ -201,8 +211,9 @@ export function TrackPage() {
                     <Field label={t('city')} htmlFor="city">
                       <input id="city" value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} />
                     </Field>
-                    <Button fullWidth onClick={() => void saveAddress()}>
-                      {t('saveAddress')}
+                    {addressError ? <p role="alert" className={styles.addressError}>{addressError}</p> : null}
+                    <Button fullWidth disabled={savingAddress} onClick={() => void saveAddress()}>
+                      {savingAddress ? t('saving') : t('saveAddress')}
                     </Button>
                   </div>
                 )}

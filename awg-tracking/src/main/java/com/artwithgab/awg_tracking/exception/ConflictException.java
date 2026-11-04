@@ -1,11 +1,10 @@
 package com.artwithgab.awg_tracking.exception;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
 
-@ResponseStatus(HttpStatus.CONFLICT)
-public class ConflictException extends RuntimeException {
+/** 409: the request is valid but clashes with the current state (slot taken, stock, ...). */
+public class ConflictException extends ApiException {
     public ConflictException(String message) {
-        super(message);
+        super(HttpStatus.CONFLICT, message);
     }
 }

@@ -10,7 +10,7 @@ import java.util.UUID;
 
 public interface InventoryRepository extends JpaRepository<Inventory, UUID> {
 
-    Optional<Inventory> findInventoriesByCustomColor(CustomColor customColor);
+    Optional<Inventory> findByItemKindAndCustomColor(ItemKind itemKind, CustomColor customColor);
 
-    Optional<Inventory> findByItemKind(ItemKind itemKind);
+    Optional<Inventory> findFirstByItemKind(ItemKind itemKind);
 }

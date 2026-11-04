@@ -127,9 +127,28 @@ export function DeliveriesPage() {
     setParams(next)
   }
 
+  const [loadError, setLoadError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [reload, setReload] = useState(0)
+
   useEffect(() => {
-    api.agenda.listDays().then(setDays)
-  }, [version])
+    let cancelled = false
+    setLoadError('')
+    api.agenda
+      .listDays()
+      .then((next) => {
+        if (!cancelled) setDays(next)
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Could not load deliveries')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [version, reload])
 
   const dated = useMemo(() => flattenDays(days), [days])
 
@@ -174,6 +193,7 @@ export function DeliveriesPage() {
     setBusyOrderId(orderId)
     try {
       await api.orders.setHandedOver(orderId, handedOver)
+      setReload((value) => value + 1)
     } catch (err) {
       setHandoffError(err instanceof Error ? err.message : 'Could not update handoff')
     } finally {
@@ -181,7 +201,16 @@ export function DeliveriesPage() {
     }
   }
 
-  if (!days.length) return <p>Loading deliveries…</p>
+  if (loadError && !days.length) {
+    return (
+      <section>
+        <h1>Deliveries</h1>
+        <p role="alert">{loadError}</p>
+        <Button tone="staff" onClick={() => { setLoading(true); setReload((value) => value + 1) }}>Try again</Button>
+      </section>
+    )
+  }
+  if (loading && !days.length) return <p role="status">Loading deliveries…</p>
 
   return (
     <section>

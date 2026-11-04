@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useMockStoreVersion } from '../../api/mock/useMockStore'
+import { CompleteOrderDialog } from '../../components/staff/CompleteOrderDialog'
 import { OrderItemCard } from '../../components/staff/OrderItemCard'
 import { OrderPaymentPanel } from '../../components/staff/OrderPaymentPanel'
 import { QrCode } from '../../components/staff/QrCode'
 import { StaffBackLink } from '../../components/staff/StaffBackLink'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
-import type { MarketDay } from '../../domain/types'
+import type { MarketDay, ProductionStatus } from '../../domain/types'
 import { handoffLabel } from '../../lib/handoff'
 import { formatEur } from '../../lib/money'
 import { paymentSummary } from '../../lib/paymentSummary'
@@ -34,6 +35,7 @@ function OrderDetail({ id }: { id: string }) {
   const actionLock = useRef(false)
   const [copied, setCopied] = useState(false)
   const [retry, setRetry] = useState(0)
+  const [pendingCompleteItemId, setPendingCompleteItemId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -73,7 +75,8 @@ function OrderDetail({ id }: { id: string }) {
   const { order, customer, blocks } = bundle
   const items = [...bundle.items].sort((a, b) => Number(b.id === navigationState?.itemId) - Number(a.id === navigationState?.itemId))
   const { remaining } = paymentSummary(order)
-  const allFinished = items.length > 0 && items.every(item => item.productionStatus === 'finished')
+  const finishedCount = items.filter(item => item.productionStatus === 'finished').length
+  const allFinished = items.length > 0 && finishedCount === items.length
   const formWaiting = items.some(item => item.kind === 'custom' && !item.formComplete)
   const hasForm = items.some(item => item.kind === 'custom')
   const deliveryItem = items.find(item => item.delivery.kind === 'vienna')
@@ -87,6 +90,26 @@ function OrderDetail({ id }: { id: string }) {
   const handoffs = [...new Set(items.map(item => handoffLabel(item, days)))]
   const formUrl = `${window.location.origin}/form/${order.formToken}`
   const production = order.handedOver ? (deliveryItem ? 'Delivered' : 'Handed over') : allFinished ? (deliveryItem ? 'Ready for delivery' : 'Ready for pickup') : formWaiting ? 'Waiting for form' : 'In the workshop'
+
+  function handleItemStatus(itemId: string, status: ProductionStatus, noticeLabel: string) {
+    const item = items.find(entry => entry.id === itemId)
+    if (!item) return
+    if (status === 'finished' && item.productionStatus !== 'finished' && finishedCount === items.length - 1) {
+      setPendingCompleteItemId(itemId)
+      return
+    }
+    void runAction(() => api.orders.setItemStatus(id, itemId, status), noticeLabel)
+  }
+
+  async function confirmCompleteOrder() {
+    if (!pendingCompleteItemId || actionLock.current) return
+    const item = items.find(entry => entry.id === pendingCompleteItemId)
+    const ok = await runAction(
+      () => api.orders.setItemStatus(id, pendingCompleteItemId, 'finished'),
+      item ? `${item.petName || 'Ornament'} finished — order ready.` : 'Order ready for pickup.',
+    )
+    if (ok) setPendingCompleteItemId(null)
+  }
 
   const formContent = <div className={styles.share}>
     <QrCode value={formUrl} size={180} />
@@ -119,9 +142,14 @@ function OrderDetail({ id }: { id: string }) {
     {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
     {formWaiting ? <section className={styles.panel} aria-labelledby="pending-form"><h2 id="pending-form">Customer details needed</h2><p className={styles.muted}>Collect reference photos and personalisation before painting.</p>{formContent}</section> : null}
     <div className={styles.workspace}>
-      <h2 id="order-items" className={styles.itemsTitle}>Ornaments <span>{items.length}</span></h2>
+      <h2 id="order-items" className={styles.itemsTitle}>
+        Ornaments
+        <span className={styles.progressBadge} data-complete={allFinished || undefined}>
+          {finishedCount}/{items.length} {allFinished ? 'completed' : 'ready'}
+        </span>
+      </h2>
       <section aria-labelledby="order-items" className={styles.items}>
-        {items.map(item => <OrderItemCard key={item.id} item={item} block={blocks.find(block => block.orderItemId === item.id)} days={days} showHandoff={handoffs.length > 1} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy} onStatus={status => { void runAction(() => api.orders.setItemStatus(id, item.id, status), `${item.petName || 'Ornament'} updated.`) }} />)}
+        {items.map(item => <OrderItemCard key={item.id} item={item} block={blocks.find(block => block.orderItemId === item.id)} days={days} showHandoff={handoffs.length > 1} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy} onStatus={status => { handleItemStatus(item.id, status, `${item.petName || 'Ornament'} updated.`) }} />)}
       </section>
       <aside className={styles.support} aria-label="Order management">
         <section className={styles.panel} aria-labelledby="handoff-heading">
@@ -129,7 +157,7 @@ function OrderDetail({ id }: { id: string }) {
           {order.handedOver ? <p className={styles.muted}>{deliveryItem ? 'Delivered to the customer.' : 'Picked up at the stall.'}</p> : <p className={styles.muted}>{allFinished ? (deliveryItem ? 'Ready to deliver.' : 'Ready for pickup.') : `${items.filter(item => item.productionStatus !== 'finished').length} still to finish.`}</p>}
           {deliveryItem ? <ButtonLink tone="staff" fullWidth to={deliveryTo} variant={allFinished && !order.handedOver ? 'primary' : 'secondary'}>Open delivery run</ButtonLink> : <Button tone="staff" fullWidth variant={allFinished && !order.handedOver ? 'primary' : 'secondary'} disabled={busy || (!order.handedOver && !allFinished)} onClick={() => { void runAction(() => api.orders.setHandedOver(id, !order.handedOver), order.handedOver ? 'Pickup undone.' : 'Marked as picked up.') }}>{order.handedOver ? 'Undo pickup' : 'Mark picked up'}</Button>}
         </section>
-        <OrderPaymentPanel order={order} busy={busy} onRecord={(amount, method) => runAction(() => api.payments.recordPayment(id, amount, method), `Payment of ${formatEur(amount)} recorded.`)} />
+        <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method) => runAction(() => api.payments.setPaymentState(id, state, method), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} />
         <details className={styles.panel}>
           <summary>Customer contact</summary>
           <dl className={styles.contacts}>
@@ -142,5 +170,16 @@ function OrderDetail({ id }: { id: string }) {
         <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
       </aside>
     </div>
+    {pendingCompleteItemId ? (
+      <CompleteOrderDialog
+        orderCode={order.code}
+        customerName={customer.name}
+        items={items}
+        pendingItemId={pendingCompleteItemId}
+        busy={busy}
+        onClose={() => { if (!busy) setPendingCompleteItemId(null) }}
+        onConfirm={() => { void confirmCompleteOrder() }}
+      />
+    ) : null}
   </article>
 }

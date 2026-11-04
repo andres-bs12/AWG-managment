@@ -12,7 +12,8 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from ?? '/staff/agenda'
-  const [email, setEmail] = useState('gaby@artwithgab.com')
+  const isMock = getDataSource() === 'mock'
+  const [email, setEmail] = useState(isMock ? 'gaby@artwithgab.com' : '')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -37,7 +38,7 @@ export function LoginPage() {
     <div className={styles.page}>
     <div className={styles.card}>
       <h1>Staff sign in</h1>
-      <p className={styles.hint}>Two accounts: Gaby and Andres. Same permissions.</p>
+      {isMock ? <p className={styles.hint}>Two accounts: Gaby and Andres. Same permissions.</p> : null}
       <form onSubmit={onSubmit}>
         {error ? (
           <p className={styles.err} role="alert">
@@ -66,12 +67,14 @@ export function LoginPage() {
           Enter
         </Button>
       </form>
-      <p className={styles.accounts}>
-        gaby@artwithgab.com / gaby
-        <br />
-        andres@artwithgab.com / andres
-      </p>
-      {getDataSource() === 'mock' ? (
+      {isMock ? (
+        <p className={styles.accounts}>
+          gaby@artwithgab.com / gaby
+          <br />
+          andres@artwithgab.com / andres
+        </p>
+      ) : null}
+      {isMock ? (
         <Button
           tone="staff"
           variant="ghost"

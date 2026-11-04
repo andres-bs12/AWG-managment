@@ -12,7 +12,6 @@ import type {
   Order,
   Photo,
   PaymentMethod,
-  PaymentEntry,
   PaymentState,
   StaffUser,
   TrackView,
@@ -81,11 +80,6 @@ export type PaymentService = {
     state: PaymentState,
     method?: PaymentMethod | null,
   ) => Promise<Order>
-  recordPayment: (
-    orderId: string,
-    amount: number,
-    method: PaymentMethod,
-  ) => Promise<{ order: Order; entry: PaymentEntry }>
 }
 
 export type TrackingService = {
