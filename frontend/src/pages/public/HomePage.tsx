@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { CabinScene } from '../../components/public/CabinScene'
 import { Countdown } from '../../components/public/Countdown'
 import { TrackDialog } from '../../components/public/TrackDialog'
+import { VillageStreet } from '../../components/public/VillageStreet'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
 import { useLocale } from '../../i18n/LocaleContext'
@@ -23,8 +24,12 @@ export function HomePage() {
         </div>
       </div>
 
-      <div className={styles.scene}>
-        <CabinScene title={t('sceneAlt')} />
+      {/* sky → stall on its street → clear snow for the buttons: one ground line for everything */}
+      <div className={styles.stage}>
+        <div className={styles.scene}>
+          <CabinScene title={t('sceneAlt')} />
+        </div>
+        <VillageStreet />
       </div>
 
       <div className={styles.ctas}>

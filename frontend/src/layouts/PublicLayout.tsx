@@ -1,8 +1,18 @@
+import { useLayoutEffect, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
+import { IntroCurtain } from '../components/public/IntroCurtain'
 import { Snowfield } from '../components/public/Snowfield'
 import { WinterBackdrop } from '../components/public/WinterBackdrop'
 import { useLocale } from '../i18n/LocaleContext'
 import styles from './PublicLayout.module.css'
+
+/** The opening curtain plays once per page load, and only when the visit starts on home. */
+let introPlayed = false
+
+function holdHeroEntrance(on: boolean) {
+  if (on) document.documentElement.dataset.intro = 'on'
+  else delete document.documentElement.dataset.intro
+}
 
 export function PublicLayout() {
   const { t, locale, setLocale } = useLocale()
@@ -10,9 +20,27 @@ export function PublicLayout() {
   const quiet = location.pathname.startsWith('/form') || location.pathname.startsWith('/track')
   /** The home hero already shouts the brand, so the header there is only the language switch. */
   const atHome = location.pathname === '/'
+  const [intro, setIntro] = useState(() => !introPlayed && atHome)
+
+  /** Pauses the home entrance animations under the curtain, so they play as it lifts. */
+  useLayoutEffect(() => {
+    if (!intro) return
+    holdHeroEntrance(true)
+    return () => holdHeroEntrance(false)
+  }, [intro])
 
   return (
     <div className={`${styles.shell} ${quiet ? styles.quiet : ''}`}>
+      {intro ? (
+        <IntroCurtain
+          label={t('introLoading')}
+          onReveal={() => holdHeroEntrance(false)}
+          onDone={() => {
+            introPlayed = true
+            setIntro(false)
+          }}
+        />
+      ) : null}
       <WinterBackdrop mood={quiet ? 'calm' : 'hero'} />
       <Snowfield density={quiet ? 'low' : 'full'} />
       <header className={styles.top}>

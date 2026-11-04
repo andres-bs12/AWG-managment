@@ -1,6 +1,7 @@
 .layer {
   pointer-events: none;
-  position: absolute;
+  /** Fixed like the backdrop, so the snow keeps falling over long pages too. */
+  position: fixed;
   inset: 0;
   overflow: hidden;
 }
@@ -11,7 +12,9 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.92);
+  /** A faint blue rim keeps white flakes visible against the pale daytime sky. */
+  box-shadow: 0 0 0 1px rgba(70, 140, 210, 0.18);
   animation: fall linear infinite;
 }
 
