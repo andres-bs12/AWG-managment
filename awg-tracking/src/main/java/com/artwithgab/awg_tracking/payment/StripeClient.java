@@ -36,7 +36,18 @@ public class StripeClient {
     private final AwgProperties props;
     private final ObjectMapper objectMapper;
     private final Clock clock;
-    private final RestClient restClient = RestClient.builder().baseUrl("https://api.stripe.com/v1").build();
+    /** Short timeouts: checkout holds the schedule lock while it waits for Stripe. */
+    private final RestClient restClient = RestClient.builder()
+            .baseUrl("https://api.stripe.com/v1")
+            .requestFactory(timeouts())
+            .build();
+
+    private static org.springframework.http.client.SimpleClientHttpRequestFactory timeouts() {
+        var f = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        f.setConnectTimeout(java.time.Duration.ofSeconds(5));
+        f.setReadTimeout(java.time.Duration.ofSeconds(15));
+        return f;
+    }
 
     public record Line(String name, BigDecimal unitAmount, int quantity) {
     }
@@ -82,6 +93,21 @@ public class StripeClient {
             JsonNode json = objectMapper.readTree(body);
             return new Session(json.path("id").asString(), json.path("url").asString());
         } catch (RestClientException | IllegalArgumentException e) {
+            throw new PaymentProviderException();
+        }
+    }
+
+    /** Fetches a Checkout Session (status, payment_status, amount_total, currency). */
+    public JsonNode retrieveSession(String sessionId) {
+        if (!isConfigured()) throw new ShopUnavailableException();
+        if (!sessionId.matches("^cs_[A-Za-z0-9_]+$")) throw new IllegalArgumentException("Bad session id");
+        try {
+            String body = restClient.get().uri("/checkout/sessions/{id}", sessionId)
+                    .header("Authorization", "Bearer " + props.shop().stripeSecretKey())
+                    .retrieve()
+                    .body(String.class);
+            return objectMapper.readTree(body);
+        } catch (RestClientException e) {
             throw new PaymentProviderException();
         }
     }

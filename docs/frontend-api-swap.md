@@ -21,47 +21,34 @@ Interfaces en `frontend/src/api/contracts.ts`. Implementa cada método en `http/
 
 Auth: el staff ya guarda un token en `localStorage` (`awg-staff-token`) y `AuthContext` lo revalida con `api.auth.me`. En HTTP, manda `Authorization: Bearer <token>` en el helper de `fetch`.
 
-## 3. Mapa sugerido (cuando existan los controllers)
+## 3. Mapa implementado
 
-| Servicio UI | Método | Endpoint Spring sugerido |
-|-------------|--------|--------------------------|
-| `auth.login` | POST | `/api/staff/login` → `{ token, user }` |
-| `auth.me` | GET | `/api/staff/me` |
-| `auth.logout` | POST | `/api/staff/logout` (o no-op si JWT stateless) |
-| `markets.listMarkets` | GET | `/api/markets` |
-| `markets.listMarketDays` | GET | `/api/markets/{id}/days` o `/api/market-days` |
-| `markets.saveMarket` | PUT | `/api/markets` o `/api/markets/{id}` |
-| `markets.deleteMarket` | DELETE | `/api/markets/{id}` |
-| `markets.deleteMarketDay` | DELETE | `/api/market-days/{id}` |
-| `agenda.listDays` / `getDay` | GET | `/api/agenda?date=` |
-| `agenda.checkCapacity` | POST | `/api/agenda/capacity` |
-| `agenda.moveBlock` | PATCH | `/api/time-blocks/{id}` |
-| `orders.createSale` | POST | `/api/orders` |
-| `orders.getOrder` / `getOrderBundle` | GET | `/api/orders/{id}` |
-| `orders.getOrderByCode` | GET | `/api/orders?code=` |
-| `orders.setItemStatus` | PATCH | `/api/order-items/{id}/status` |
-| `orders.setHandedOver` | PATCH | `/api/orders/{id}/handed-over` |
-| `payments.setPaymentState` | POST | `/api/orders/{id}/payments` |
-| `forms.getForm` | GET | `/api/forms/{token}` |
-| `forms.submitForm` | POST | `/api/forms/{token}` |
-| `uploads.toPhoto` | POST | `/api/uploads` (multipart) → URL, no data URL |
-| `tracking.getByCode` | GET | `/api/track/{code}` |
-| `tracking.updateViennaAddress` | PATCH | `/api/track/{code}/address` |
+Todos los cuerpos y respuestas tienen la forma exacta de `frontend/src/domain/types.ts`. Errores: `{ status, message }`.
 
-Ajusta paths al estilo del backend; el punto es **un método UI = un fetch**, no lógica de negocio en React.
+| Servicio UI | Endpoint | Auth |
+|-------------|----------|------|
+| `auth.login` / `me` / `logout` | `POST /api/staff/login`, `GET /api/staff/me`, `POST /api/staff/logout` | login público |
+| `markets.*` | `GET /api/markets`, `GET /api/market-days[?marketId=]`, `POST /api/markets`, `DELETE /api/markets/{id}`, `DELETE /api/market-days/{id}` | staff |
+| `agenda.*` | `GET /api/agenda/days`, `GET /api/agenda/days/{date}`, `PATCH /api/agenda/blocks/{itemId}`, `POST /api/agenda/capacity`, `POST /api/agenda/move-suggestion` (204 = ninguna) | staff |
+| `orders.*` | `GET /api/orders/{id}`, `GET /api/orders?code=`, `GET /api/orders/{id}/bundle`, `POST /api/orders`, `PATCH /api/orders/{id}/items/{itemId}/status`, `PATCH /api/orders/{id}/handed-over` | staff |
+| `payments.setPaymentState` | `PATCH /api/orders/{id}/payment-state` `{ state, method? }` | staff |
+| `tracking.getByCode` / `updateViennaAddress` | `GET /api/track/{code}`, `PATCH /api/track/{code}/address` | público; la dirección solo con `X-Form-Token` |
+| `forms.getForm` / `submitForm` | `GET /api/forms/{token}`, `POST /api/forms/{token}` (multipart `payload` + `photo-{id}`) | público por token |
+| fotos | `GET /api/photos/{id}` | público (id no adivinable) |
+| `shop.*` | `GET /api/shop/config`, `POST /api/shop/delivery-dates`, `POST /api/shop/checkout`, webhook `POST /api/shop/stripe/webhook` | público |
+
+Notas: no hay entidad `TimeBlock`; el bloque se deriva de `OrderItem.paintStart/paintEnd` y su `id` es el del ítem. `marketDayId` de entrega/bloque se resuelve por fecha (gana el puesto sobre casa). `recordPayment` se eliminó del contrato: el staff marca estados.
 
 ## 4. Fotos y Stripe
 
 - Mock: `FileReader` → `dataUrl` en memoria.
-- Real: `FormData` al storage que elijas; guarda URL en `OrderItem.photos`.
-- Pago card: hoy `setPaymentState(..., 'card')`. Sustituye por Checkout/PaymentIntent y, al webhook, el mismo `paymentState`.
+- Real: `toPhoto` sigue leyendo el archivo en el navegador (vista previa); `submitForm`/`shop.checkout` suben los archivos en multipart. El backend detecta el tipo por bytes (JPEG/PNG/WebP/HEIC, máx. 10 MB), los guarda en `UPLOADS_DIR` y devuelve `/api/photos/{id}`.
+- Pagos en el puesto: el staff verifica el cobro y marca el estado; la app no cobra. Pagos online: solo la tienda web, con Stripe Checkout (ver `docs/README.md`).
 
 ## 5. Checklist de swap
 
-1. Implementar helper `request(path, init)` con JSON + Bearer.
-2. Rellenar `http/services.ts` método a método (empieza por `auth` + `tracking.getByCode`).
-3. Poner `VITE_DATA_SOURCE=http`.
-4. Borrar `localStorage` key `awg-mock-store-v11` (solo mock; constante `STORAGE_KEY` en `frontend/src/api/mock/seed.ts`).
-5. Quitar el botón “Reset demo data” del login cuando ya no haga falta.
+Hecho. En modo `http` el login ya no muestra credenciales demo ni «Reset demo data».
 
-Los HTML antiguos están en `references/html-mocks/` — no son la app.
+## Estado del swap
+
+Hecho (2026-11-04): todos los métodos implementados, proxy `/api` en Vite, Entregas recarga tras cada cambio, pagos por estado. El mock queda para demos (`VITE_DATA_SOURCE=mock`).

@@ -1,35 +1,35 @@
 # Contexto del proyecto — ArtWithGab (AWG)
 
-**Actualizado:** 2026-10-21  
+**Actualizado:** 2026-11-04  
 **Propósito de este archivo:** memoria persistente para el dueño del proyecto y los agentes que trabajen en este repositorio.
 
 ## Instrucción de mantenimiento
 
 Lee este archivo al comenzar una tarea. Después de un cambio importante, actualízalo para reflejar el estado real: decisiones nuevas, trabajo terminado, pendientes, problemas conocidos y cambios locales relevantes. Mantén un resumen útil y conciso; no copies la conversación completa ni dejes como vigente información obsoleta. Antes de describir o cambiar el estado del código, revisa `git status` y los diffs actuales.
 
-El árbol de trabajo ya tenía modificaciones sin confirmar cuando se creó esta nota. No las descartes, reviertas ni sobrescribas como parte de otra tarea sin una instrucción explícita.
+No descartes, reviertas ni sobrescribas cambios locales sin confirmar como parte de otra tarea sin una instrucción explícita.
 
 ## Proyecto y fase
 
 ArtWithGab es una herramienta para registrar ventas y coordinar la producción y entrega de ornamentos navideños personalizados en los mercados de Viena de 2026. La aplicación tiene una interfaz pública y herramientas de staff.
 
-- **Frontend:** React, TypeScript y Vite, en `frontend/`. La versión de UX con datos mock se considera cerrada.
-- **Backend:** Java 21, Spring Boot 4.1.1 y Maven, en `awg-tracking/`. El dominio está en construcción.
-- **Base de datos:** PostgreSQL aparece como objetivo del proyecto, pero la configuración actual de `application.properties` solo declara el nombre de la aplicación; no des por hecho que una base local esté configurada.
-- **Fase documentada:** avanzar el dominio/API del backend. El dueño del repositorio escribe en `awg-tracking/`; los agentes no modifican ese módulo salvo petición explícita.
+- **Frontend:** React, TypeScript y Vite, en `frontend/`. Flujos staff cerrados; funciona contra el backend real (`VITE_DATA_SOURCE=http`) o el mock.
+- **Backend:** Java 21, Spring Boot 4.1.1 y Maven, en `awg-tracking/`. API REST completa (ver `docs/frontend-api-swap.md`).
+- **Base de datos:** PostgreSQL (`DB_URL`/`DB_USERNAME`/`DB_PASSWORD`; local por defecto `awg_tracking`). Tests en H2.
+- **Fase:** desde 2026-11-04 el dueño delegó a los agentes la implementación del backend y la integración; se trabaja por sprints con auditoría (código, seguridad, UX/UI) al final de cada uno, y las dudas van a `tasks/preguntas-pendientes.md`.
 
 ## Reglas de producto y límites
 
 - El formulario del cliente recoge datos y fotos; no cobra. El staff confirma manualmente un pago después de verificar que se recibió.
 - Estados de pago acordados en la documentación: `unpaid`, `deposit` y `paid`. `deposit` representa exactamente el 50 % del total porque el estado actual no guarda un importe parcial arbitrario.
-- No integrar Stripe, Checkout, PaymentIntent ni otro procesador de pagos mientras se mantenga este flujo.
+- En el puesto no se integra ningún procesador de pagos. **Excepción decidida por el dueño (2026-11-04):** la tienda web pública (`/buy`, solo entrega en Viena) cobra con Stripe Checkout.
 - El nombre personalizado en el adorno cuesta 12,99 €. Si se quita, no hay reembolso.
 - Un pedido puede mezclar adornos `custom` y `finished`. Pintura y recogida/entrega son eventos distintos; comprobar capacidad antes de comprometer un bloque.
 - Recogida en mercado: viernes, sábado o domingo. Entrega en Viena: miércoles o viernes. Si un viernes coincide con mercado, tiene prioridad el puesto.
 - Capacidad de pintura en casa: lunes, martes y jueves, 3 huecos entre 10:00–13:00; miércoles y viernes, 2 huecos entre 10:00–12:00. Un bloque suele durar 60 minutos, unos 75 si incluye nombre.
 - El idioma del staff es inglés; la experiencia pública es alemán/inglés.
-- La UI accede a datos solo mediante `frontend/src/api/`. El mock es la fuente predeterminada (`VITE_DATA_SOURCE=mock`); la implementación HTTP sigue siendo stub.
-- Buy web, emails, dashboard y pagos reales no forman parte de la fase actual. No inventes IDs (`fileKey`/`nodeId`) de Figma ni confirmes que se envió una notificación si no existe integración real.
+- La UI accede a datos solo mediante `frontend/src/api/`. El mock es la fuente predeterminada (`VITE_DATA_SOURCE=mock`); también existe implementación HTTP.
+- Emails/notificaciones, dashboard e inventario en la UI no forman parte de la fase actual. No inventes IDs (`fileKey`/`nodeId`) de Figma ni confirmes que se envió una notificación si no existe integración real.
 - No incluyas secretos en commits.
 
 ## Modelo de dominio acordado
@@ -54,7 +54,7 @@ El esquema de referencia está en `docs/README.md`; las entidades reales del bac
 - `tasks/todo.md`: backlog activo; mantenerlo coordinado con el estado real.
 - `frontend/src/api/contracts.ts`: contratos de servicio que consume la UI.
 - `frontend/src/api/mock/`: servicios y almacenamiento demo.
-- `frontend/src/api/http/services.ts`: stubs; cada método falla con un mensaje que explica que HTTP no está conectado.
+- `frontend/src/api/http/services.ts`: implementación HTTP y subida multipart de fotos para la tienda.
 - `frontend/src/domain/types.ts`: tipos usados por la UI mock/API.
 - `frontend/src/pages/public/`: Home, Buy placeholder, formulario y Track.
 - `frontend/src/pages/staff/`: agenda, entregas, mercados, venta, detalle de pedido y pintura.
@@ -82,56 +82,22 @@ Scripts disponibles en `frontend/package.json`: `dev`, `build`, `lint` y `previe
 - `IntroCurtain.tsx`: fondo verde como el loader de Track, dos adornos con gato y perro que se balancean y 4 puntos de carga. Solo aparece al cargar entrando por `/`, dura entre 2 y 3,8 s y se salta con un toque o una tecla. Mientras se muestra, `html[data-intro='on']` pausa la entrada del Home.
 - Rendimiento: animaciones solo con `transform`/`opacity`. Las luces dentro de los SVG usan `steps()`, la noria y los aerogeneradores giran por pasos, y la hilera de árboles no se anima. Todo respeta `prefers-reduced-motion`.
 
-## Backend actual y puntos de integración
+## Backend actual
 
-El paquete Java usa `com.artwithgab.awg_tracking` (con guion bajo; no cambiarlo al nombre con guion). Hay entidades/DTOs/enums, mappers, repositorios, `InventoryService`, generador de códigos y `OrderService`, pero todavía no hay controllers ni endpoints HTTP implementados. La configuración de persistencia/API también está pendiente.
+Paquete `com.artwithgab.awg_tracking` (con guion bajo; no cambiarlo). Capas: `model`, `repository`, `dto/*` (misma forma que `frontend/src/domain/types.ts`), `service` (lógica portada del mock con los mismos mensajes de error), `controller`, `security` (sesiones bearer opacas con hash, rate limit), `payment/StripeClient` (REST sin SDK), `config` (`AwgProperties`, `Bootstrap`).
 
-Antes de conectar el frontend, coordinar estos contratos; la UI mock y el backend aún no coinciden del todo:
+- No hay entidad `TimeBlock`: el bloque es `OrderItem.paintStart/paintEnd`, su id es el del ítem. `marketDayId` se resuelve por fecha (gana el puesto).
+- Toda operación que reserva tiempo de pintura toma el lock de fila `ScheduleLock` (evita doble reserva y sobreventa de stock).
+- Los precios los calcula el servidor (`awg.pricing.*`).
+- Pedidos web `PENDING` ocupan horas pero se ocultan en Agenda/Entregas hasta que Stripe confirma.
+- Arranque: `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev` (datos demo y usuarios demo). Tests: `./mvnw test` (40 tests).
+- Las auditorías usan Codex CLI (`codex exec -s read-only`) como revisor independiente además de subagentes.
 
-- `docs/README.md` y `frontend/src/domain/types.ts` usan pagos `unpaid/deposit/paid`, mientras el backend actual asigna `PaymentState.PENDING`. Revisar y alinear nombres antes de integración.
-- `createOrder` devuelve `OrderResponse`; `createSale` en `frontend/src/api/contracts.ts` promete `Order`.
-- La UI usa `getOrderBundle()` con `{ order, customer, items, blocks }`; no existe aún una entidad `TimeBlock` en el backend. Decidir si se deriva de los datos de `OrderItem` o se persiste antes de implementar la agenda HTTP.
-- La UI necesita consulta de pedido por ID, actualización del estado de pago y cambios de estado/entrega. No asumir que tener métodos de servicio equivale a tener endpoints.
-- El backend ya descuenta inventario al crear pedidos. En el futuro, cancelaciones/devoluciones deben considerar la relación `OrderItem.inventory` documentada en `docs/contracts-and-dtos.md`.
-- Resuelto (2026-11-03): `OrderItem` separa venta (`soldOnDay`), pintura (`paintStart/paintEnd`, `LocalDateTime`, obligatorios en CUSTOM) y entrega (`handoffDate` + `pickUpTime`, hora obligatoria solo en MARKET). No hay entidad `TimeBlock`; los bloques se derivan de la pintura. Reglas en `docs/README.md`. Request/response/mapper y validaciones de `createOrder` siguen pendientes.
+## Tienda pública
 
-## Estado del repositorio al crear esta nota
+- `/buy` ofrece solo adornos personalizados en cinco pasos; obtiene colores y disponibilidad de la API, comprueba fechas de entrega y conserva los campos de texto en `sessionStorage`. Las fotos deben volver a añadirse después de recargar.
+- El contrato `ShopConfig.colors` requiere que el backend entregue la lista de colores con `inStock`; el mock marca rojo y gris disponibles, verde y blanco agotados. La entrega y el pago definitivo requieren validar la integración real con Stripe.
 
-Rama `feat/backend-domain`, en `5e8cf77` (`feat(backend): implement InventoryService, stock deduction and ResourceNotFoundException`), **6 commits por delante** de `origin/feat/backend-domain`. El directorio ya tenía cambios locales antes de crear este archivo; no son parte de ese commit y deben preservarse.
+## Estado y siguientes tareas
 
-Cambios locales observados (sin confirmar):
-
-- Backend: `OrderRepository.java` añade `@Transactional(readOnly = true)` a la búsqueda por código. `OrderService.java` añade lectura por código y métodos para cambiar estado de pago, marcar/deshacer entrega y cambiar estado de un ítem. No hay todavía búsqueda por ID/bundle; revisar el diff antes de continuar. El archivo también contiene imports/código sin terminar que pueden requerir limpieza.
-- El backlog de `tasks/todo.md` aún marca como pendiente desmarcar `handedOver` si un ítem deja de estar `FINISHED`; el método `setItemStatus` del diff local parece implementar ya ese comportamiento. Verificarlo y sincronizar el TODO antes de repetir el trabajo.
-- Frontend: `OrderDetailPage.tsx` y su CSS muestran progreso de adornos y abren un diálogo al terminar el último; se añadieron `CompleteOrderDialog.tsx` y CSS. El texto actual del diálogo afirma que se enviará una notificación de recogida; no hay integración de email en esta fase, así que confirmar o corregir ese copy antes de darlo por válido.
-- Documentación: `docs/README.md`, `docs/frontend-api-swap.md` y `tasks/todo.md` reflejan el flujo de pago manual y registran diferencias/pedientes de integración.
-- `package-lock.json` en la raíz aparece como archivo sin seguimiento; determinar si es intencional antes de incluirlo o eliminarlo.
-
-`git status` mostró estos archivos modificados/no seguidos:
-
-```text
- M awg-tracking/src/main/java/com/artwithgab/awg_tracking/repository/OrderRepository.java
- M awg-tracking/src/main/java/com/artwithgab/awg_tracking/service/OrderService.java
- M docs/README.md
- M docs/frontend-api-swap.md
- M frontend/src/pages/staff/OrderDetailPage.module.css
- M frontend/src/pages/staff/OrderDetailPage.tsx
- M tasks/todo.md
-?? frontend/src/components/staff/CompleteOrderDialog.module.css
-?? frontend/src/components/staff/CompleteOrderDialog.tsx
-?? package-lock.json
-```
-
-## Siguientes tareas conocidas
-
-La lista editable está en `tasks/todo.md`; estos son los principales pendientes anotados allí y en la documentación:
-
-1. Revisar y preservar los diffs locales existentes; no resolverlos suponiendo que pertenecen a la tarea nueva.
-2. Completar y alinear el dominio/enums del backend con las decisiones en `docs/README.md`.
-3. Implementar búsqueda de pedido por ID y decidir el contrato de bundle/bloques para `OrderDetailPage` y `PaintPage`.
-4. Alinear la respuesta de `createOrder` con el contrato frontend.
-5. Verificar que el cambio local de `setItemStatus` cubre el caso de desmarcar `handedOver` cuando un ítem deja de estar `FINISHED`; si sí, actualizar el TODO en vez de repetirlo.
-6. Exponer la actualización manual de estado de pago y los métodos necesarios para la UI.
-7. Implementar persistencia/API y solo conectar HTTP cuando se solicite; seguir `docs/frontend-api-swap.md`, incluida la recarga de Entregas tras mutaciones.
-
-No empieces el swap HTTP, pagos reales ni cambios del backend sin respetar la petición concreta del dueño y las restricciones de fase anteriores.
+Rama `feat/backend-domain`, subida a GitHub. Backlog en `tasks/todo.md`; decisiones abiertas del dueño en `tasks/preguntas-pendientes.md` (colores, stock, festivos, coste de envío, notificaciones, claves Stripe, textos legales, longitud del código, despliegue, Flyway).

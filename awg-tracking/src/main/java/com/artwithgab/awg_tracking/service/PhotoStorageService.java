@@ -80,6 +80,15 @@ public class PhotoStorageService {
         photoRepository.delete(photo);
     }
 
+    /** Removes only the file on disk (used when the surrounding transaction rolls back). */
+    public void deleteFile(StoredPhoto photo) {
+        try {
+            Files.deleteIfExists(root().resolve(photo.getStorageKey()).normalize());
+        } catch (IOException ignored) {
+            // Best effort.
+        }
+    }
+
     private Path root() {
         return Path.of(props.uploads().dir()).toAbsolutePath().normalize();
     }

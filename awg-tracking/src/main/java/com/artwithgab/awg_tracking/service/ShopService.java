@@ -57,6 +57,7 @@ public class ShopService {
     private final OrderRepository orderRepository;
     private final CustomerRepository customerRepository;
     private final StoredPhotoRepository photoRepository;
+    private final com.artwithgab.awg_tracking.repository.InventoryRepository inventoryRepository;
     private final PhotoStorageService photoStorage;
     private final StripeClient stripe;
     private final Clock clock;
@@ -65,15 +66,30 @@ public class ShopService {
         return props.shop().enabled() && stripe.isConfigured();
     }
 
+    @Transactional(readOnly = true)
     public ShopConfigDto config() {
         var p = props.pricing();
-        return new ShopConfigDto(isOpen(), p.custom(), p.finished(), p.nameExtra(), fee(), MAX_ITEMS);
+        List<ShopColorOptionDto> colors = new ArrayList<>();
+        for (CustomColor color : CustomColor.values()) {
+            inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, color)
+                    .ifPresent(inv -> colors.add(new ShopColorOptionDto(color, inv.getQuantity() > 0)));
+        }
+        return new ShopConfigDto(isOpen(), p.custom(), p.nameExtra(), fee(), MAX_ITEMS, colors);
+    }
+
+    /** Online orders are custom pet ornaments only. */
+    private static void requireCustomOnly(List<? extends Object> items) {
+        for (Object o : items) {
+            ItemKind kind = o instanceof ShopItemShape sh ? sh.kind() : ((ShopItemRequest) o).kind();
+            if (kind != ItemKind.CUSTOM) throw new BadRequestException("Only custom pet ornaments can be ordered online.");
+        }
     }
 
     // ─── Delivery days ──────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public List<DeliveryDateDto> deliveryDates(List<ShopItemShape> items) {
+        requireCustomOnly(items);
         AgendaService.Snapshot s = agendaService.snapshot();
         List<Double> durations = durations(items);
         List<DeliveryDateDto> out = new ArrayList<>();
@@ -146,8 +162,10 @@ public class ShopService {
         }
 
         // Validate items before reserving anything.
+        requireCustomOnly(req.items());
         for (ShopItemRequest item : req.items()) {
-            if (item.kind() == ItemKind.CUSTOM) {
+            if (item.color() == null) throw new BadRequestException("Choose a color for each ornament.");
+            {
                 if (item.petName() == null || item.petName().isBlank()) throw new BadRequestException("Add your pet's name for each custom ornament.");
                 if (item.photos() == null || item.photos().isEmpty()) throw new BadRequestException("Add at least one photo for " + item.petName().trim() + ".");
                 for (FormPhotoRef ref : item.photos()) {
@@ -192,7 +210,7 @@ public class ShopService {
             boolean withName = custom && row.withName();
             item.setItemKind(row.kind());
             item.setWithName(withName);
-            item.setCustomColor(custom ? (row.color() == null ? CustomColor.RED : row.color()) : null);
+            item.setCustomColor(custom ? row.color() : null);
             item.setCost(pricingService.itemCost(row.kind(), withName));
             item.setProductionStatus(custom ? ProductionStatus.NOT_STARTED : ProductionStatus.FINISHED);
             item.setPosition(position++);
@@ -219,27 +237,35 @@ public class ShopService {
         order.setTotal(total);
         orderRepository.saveAndFlush(order);
 
-        for (var entry : sources.entrySet()) {
-            ShopItemRequest row = entry.getValue();
-            if (row.photos() == null) continue;
-            for (FormPhotoRef ref : row.photos()) {
-                StoredPhoto stored = photoStorage.store(files.get("photo-" + ref.id()), entry.getKey().getId(), ref.name());
-                entry.getKey().getPhotos().add(new PhotoRef(stored.getId(), stored.getOriginalName()));
+        // Files are not transactional: if anything below fails, delete what was written so a failed
+        // checkout leaves no orphan uploads (the DB rows roll back on their own).
+        List<StoredPhoto> written = new ArrayList<>();
+        StripeClient.Session session;
+        try {
+            for (var entry : sources.entrySet()) {
+                ShopItemRequest row = entry.getValue();
+                if (row.photos() == null) continue;
+                for (FormPhotoRef ref : row.photos()) {
+                    StoredPhoto stored = photoStorage.store(files.get("photo-" + ref.id()), entry.getKey().getId(), ref.name());
+                    written.add(stored);
+                    entry.getKey().getPhotos().add(new PhotoRef(stored.getId(), stored.getOriginalName()));
+                }
             }
-        }
 
-        List<StripeClient.Line> lines = new ArrayList<>();
-        for (OrderItem item : order.getOrderItems()) {
-            String name = item.getItemKind() == ItemKind.CUSTOM
-                    ? "Custom pet ornament" + (item.getPetName().isBlank() ? "" : " · " + item.getPetName()) + (item.isWithName() ? " + name" : "")
-                    : "Finished ornament";
-            lines.add(new StripeClient.Line(name, item.getCost(), 1));
+            List<StripeClient.Line> lines = new ArrayList<>();
+            for (OrderItem item : order.getOrderItems()) {
+                String name = "Custom pet ornament" + (item.getPetName().isBlank() ? "" : " · " + item.getPetName()) + (item.isWithName() ? " + name" : "");
+                lines.add(new StripeClient.Line(name, item.getCost(), 1));
+            }
+            if (fee().signum() > 0) lines.add(new StripeClient.Line("Delivery in Vienna", fee(), 1));
+            session = stripe.createCheckoutSession(order.getId().toString(), order.getCode(),
+                    customer.getEmail(), lines, order.getCheckoutExpiresAt());
+            order.setStripeSessionId(session.id());
+        } catch (RuntimeException e) {
+            written.forEach(photoStorage::deleteFile);
+            throw e;
         }
-        if (fee().signum() > 0) lines.add(new StripeClient.Line("Delivery in Vienna", fee(), 1));
-        StripeClient.Session session = stripe.createCheckoutSession(order.getId().toString(), order.getCode(),
-                customer.getEmail(), lines, order.getCheckoutExpiresAt());
-        order.setStripeSessionId(session.id());
-        return new CheckoutResponse(order.getCode(), session.url());
+        return new CheckoutResponse(order.getCode(), order.getFormToken(), session.url());
     }
 
     private static List<ShopItemRequest> customsFirst(List<ShopItemRequest> all, List<ShopItemRequest> customsInPlanOrder) {
@@ -257,25 +283,21 @@ public class ShopService {
         JsonNode session = event.path("data").path("object");
         String sessionId = session.path("id").asString("");
         if (sessionId.isEmpty()) return;
+        // Same lock as checkout and the cleanup job, so "completed" and "expired" never race.
+        calendarService.lockSchedule();
         Optional<Order> found = orderRepository.findByStripeSessionId(sessionId);
         if (found.isEmpty()) {
-            log.warn("Stripe event {} for unknown session {}", type, sessionId);
+            if ("paid".equals(session.path("payment_status").asString(""))) {
+                log.error("PAID Stripe session {} has no order (released?) — refund or recreate it manually", sessionId);
+            } else {
+                log.warn("Stripe event {} for unknown session {}", type, sessionId);
+            }
             return;
         }
         Order order = found.get();
         switch (type) {
             case "checkout.session.completed", "checkout.session.async_payment_succeeded" -> {
-                if (!"paid".equals(session.path("payment_status").asString(""))) return;
-                long expectedCents = order.getTotal().movePointRight(2).longValueExact();
-                if (session.path("amount_total").asLong(-1) != expectedCents || !"eur".equalsIgnoreCase(session.path("currency").asString(""))) {
-                    log.error("Stripe amount mismatch for order {}: got {} {}", order.getCode(),
-                            session.path("amount_total").asLong(-1), session.path("currency").asString(""));
-                    return;
-                }
-                order.setCheckoutStatus(CheckoutStatus.CONFIRMED);
-                order.setPaymentState(PaymentState.PAID);
-                order.setPaymentMethod(PaymentMethod.CARD);
-                log.info("Web order {} paid", order.getCode());
+                if (order.getCheckoutStatus() == CheckoutStatus.PENDING) confirmIfPaid(order, session);
             }
             case "checkout.session.expired" -> {
                 if (order.getCheckoutStatus() == CheckoutStatus.PENDING) release(order);
@@ -286,14 +308,50 @@ public class ShopService {
         }
     }
 
-    /** Safety net in case the "expired" webhook never arrives. */
+    /**
+     * Safety net in case the "expired" webhook never arrives. Asks Stripe first: a session that was
+     * paid but whose webhook is late gets confirmed instead of deleted.
+     */
     @Scheduled(fixedDelayString = "PT5M")
     @Transactional
     public void releaseExpired() {
         Instant cutoff = clock.instant().minusSeconds(600);
+        if (orderRepository.findByCheckoutStatusAndCheckoutExpiresAtBefore(CheckoutStatus.PENDING, cutoff).isEmpty()) return;
+        calendarService.lockSchedule();
         for (Order order : orderRepository.findByCheckoutStatusAndCheckoutExpiresAtBefore(CheckoutStatus.PENDING, cutoff)) {
-            release(order);
+            if (order.getStripeSessionId() == null) {
+                release(order);
+                continue;
+            }
+            JsonNode session;
+            try {
+                session = stripe.retrieveSession(order.getStripeSessionId());
+            } catch (RuntimeException e) {
+                log.warn("Could not check Stripe session for order {}; will retry", order.getCode());
+                continue;
+            }
+            String status = session.path("status").asString("");
+            if ("complete".equals(status)) {
+                confirmIfPaid(order, session);
+            } else if ("expired".equals(status)) {
+                release(order);
+            }
+            // "open": Stripe has not expired it yet; try again next run.
         }
+    }
+
+    private void confirmIfPaid(Order order, JsonNode session) {
+        if (!"paid".equals(session.path("payment_status").asString(""))) return;
+        long expectedCents = order.getTotal().movePointRight(2).longValueExact();
+        if (session.path("amount_total").asLong(-1) != expectedCents || !"eur".equalsIgnoreCase(session.path("currency").asString(""))) {
+            log.error("Stripe amount mismatch for order {}: got {} {}", order.getCode(),
+                    session.path("amount_total").asLong(-1), session.path("currency").asString(""));
+            return;
+        }
+        order.setCheckoutStatus(CheckoutStatus.CONFIRMED);
+        order.setPaymentState(PaymentState.PAID);
+        order.setPaymentMethod(PaymentMethod.CARD);
+        log.info("Web order {} paid", order.getCode());
     }
 
     /** Deletes an unpaid web order and gives back its stock, slots and photos. */

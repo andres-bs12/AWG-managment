@@ -1,5 +1,15 @@
 # Decisiones de Diseño: DTOs y Contratos de API (Spring Boot)
 
+> **Actualizado 2026-11-04.** Los DTOs viven ahora en `dto/{auth,market,agenda,order,form,tracking,shop,common}` y tienen **la misma forma que `frontend/src/domain/types.ts`** (el contrato del front es la especificación). Los enums se serializan en minúsculas (`custom`/`finished`, `market`/`vienna`, `unpaid`/`deposit`/`paid`…). Cambios respecto a lo descrito abajo:
+> - `OrderRequest`/`OrderItemRequest` → `CreateSaleRequest`/`CreateSaleItemRequest`. **El precio ya no viene del cliente**: lo calcula `PricingService` (49,99 / 39,99 / +12,99). La entrega llega como `marketDayId` + `pickupHour` y la pintura como `paintDate` + `paintStart/paintEnd` (horas decimales); el servicio los convierte a `handoffDate`/`pickUpTime`/`LocalDateTime`.
+> - `soldOnDay` se asigna solo: la jornada del puesto de hoy, si la hay.
+> - `OrderResponse` → `OrderDto`; `OrderBundleResponse` → `OrderBundleDto` (`order, customer, items, blocks`); `TimeBlockResponse` → `TimeBlockDto` derivado del ítem.
+> - `CustomerFormRequest` sigue siendo el «candado»: datos de contacto obligatorios y al menos una foto por adorno custom (validado en `FormService`). Se puede reenviar hasta que empiece la pintura.
+> - `TrackingResponse` → `TrackViewDto`. La dirección no se devuelve ni se cambia sin el `formToken` (cabecera `X-Form-Token`), porque el código corto es adivinable.
+> - Mappers MapStruct sustituidos por `ViewMapper` (a mano), porque varios campos se resuelven contra el calendario.
+> - `CustomColor` añade `GREY` (el front vende rojo/gris); `ItemState`/`OrderState` se eliminaron por no usarse.
+
+
 Este documento registra las decisiones arquitectónicas y de negocio de los DTOs en `awg-tracking/src/main/java/com/artwithgab/awg_tracking/dto/`. Consúltalo antes de modificar campos de entrada o salida para entender **por qué** están diseñados así.
 
 ---
@@ -15,9 +25,13 @@ Este documento registra las decisiones arquitectónicas y de negocio de los DTOs
   - Un pedido siempre debe contener al menos un adorno. `@Valid` propaga la validación a cada ítem individual.
 
 ### 1.2 `OrderItemRequest` (Adorno individual al crear la venta)
-- **`petName`, `photos`, `pickUpHour` son `@Nullable`:**
+- **`petName` y `photos` son `@Nullable`:**
   - Para ítems `GENERIC` estos campos no aplican.
   - Para ítems `CUSTOM`, `petName` y `photos` se capturan en la siguiente fase (Customer Form vía QR).
+- **Horarios (ver la tabla de `order_item` en `docs/README.md`):**
+  - `handoffDate` (`LocalDate`) es `@NotNull`: todo adorno tiene fecha de entrega.
+  - `pickUpTime` (`LocalTime`), `paintStart` y `paintEnd` (`LocalDateTime`) van **sin anotación**. Son obligatorios según `deliveryKind` (MARKET pide hora) e `itemKind` (CUSTOM pide pintura), y esa regla condicional se valida en `OrderService.createOrder`, que responde 400 si falta algo.
+  - `soldOnDayId` es la jornada del puesto donde se vendió, no la de recogida.
 - **`withName`:** Booleano que indica si el cliente pagó el suplemento de personalización de texto.
 - **`customColor`:** Color del lienzo/adorno (`RED`, `GREEN`, `WHITE`).
 
