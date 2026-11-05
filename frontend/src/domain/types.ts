@@ -2,7 +2,8 @@
 
 export type PaymentState = 'unpaid' | 'deposit' | 'paid'
 export type PaymentMethod = 'cash' | 'card'
-export type OrnamentColor = 'red' | 'grey' | 'green' | 'white'
+export type OrnamentColor = 'red' | 'grey' | 'green' | 'white' | 'beige'
+export type CustomFinish = 'shiny' | 'matte'
 export type ItemKind = 'custom' | 'finished'
 export type ProductionStatus = 'not_started' | 'in_progress' | 'finished'
 export type DeliveryKind = 'market' | 'vienna'
@@ -42,6 +43,7 @@ export type OrderItem = {
   petName: string
   withName: boolean
   color?: OrnamentColor
+  finish?: CustomFinish
   backName: string
   note: string
   cost: number
@@ -71,6 +73,7 @@ export type Order = {
   itemIds: string[]
   /** True once staff marks market pickup / Vienna handoff as done. Drives Track `delivered`. */
   handedOver: boolean
+  handedOverAt?: string
   paymentReview?: boolean
   /** Append-only payment entries. Older records may not have this field yet. */
   paymentEntries?: PaymentEntry[]
@@ -141,6 +144,7 @@ export type AgendaSlot = {
 export type AgendaDelivery = {
   customerName?: string
   color?: OrnamentColor
+  finish?: CustomFinish
   backName?: string
   orderId: string
   orderCode: string
@@ -166,6 +170,7 @@ export type AgendaDay = {
 
 export type TrackItemView = {
   color?: OrnamentColor
+  finish?: CustomFinish
   cost?: number
   petName: string
   kind: ItemKind
@@ -236,6 +241,7 @@ export type CreateSaleItemInput = {
   kind: ItemKind
   withName: boolean
   color?: OrnamentColor
+  finish?: CustomFinish
   paintDate?: string
   paintStart?: number
   paintEnd?: number
@@ -272,11 +278,12 @@ export type MoveSuggestion = {
   freedSlot: { date: string; startHour: number; endHour: number }
 }
 
-export type InventoryItem = { id: string; kind: ItemKind; color: OrnamentColor | null; quantity: number }
+export type InventoryItem = { id: string; kind: ItemKind; color: OrnamentColor | null; finish?: CustomFinish | null; quantity: number }
 export type PaintingDay = { date: string; open: boolean; maxPaintings: number; booked: number }
 
 export type ShopConfig = {
   seasonEnd: string
+  deliveriesFrom: string | null
   seasonOver: boolean
   enabled: boolean
   customPrice: number
@@ -287,7 +294,7 @@ export type ShopConfig = {
   colors: ShopColorOption[]
 }
 
-export type ShopColorOption = { color: OrnamentColor; inStock: boolean }
+export type ShopColorOption = { color: OrnamentColor; finish: CustomFinish; inStock: boolean }
 
 export type ShopDeliveryDate = { date: string; weekday: string }
 
@@ -295,6 +302,7 @@ export type ShopItemInput = {
   kind: 'custom'
   withName: boolean
   color?: OrnamentColor
+  finish?: CustomFinish
   petName?: string
   backName?: string
   note?: string

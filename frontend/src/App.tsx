@@ -5,6 +5,7 @@ import { AuthProvider } from './auth/AuthContext'
 import { LocaleProvider } from './i18n/LocaleContext'
 import { PublicLayout } from './layouts/PublicLayout'
 import { StaffGuard, StaffLayout } from './layouts/StaffLayout'
+const WaitlistPage = lazy(() => import('./pages/public/WaitlistPage').then(module => ({ default: module.WaitlistPage })))
 const BuyPage = lazy(() => import('./pages/public/BuyPage').then(module => ({ default: module.BuyPage })))
 const BuyThanksPage = lazy(() => import('./pages/public/BuyThanksPage').then(module => ({ default: module.BuyThanksPage })))
 const FormPage = lazy(() => import('./pages/public/FormPage').then(module => ({ default: module.FormPage })))
@@ -41,6 +42,8 @@ export default function App() {
               <Route path="/impressum" element={<LegalPage title="impressum" />} />
               <Route path="/agb" element={<LegalPage title="terms" />} />
               <Route path="/datenschutz" element={<LegalPage title="privacy" />} />
+              <Route path="/waitlist/confirm" element={<WaitlistPage />} />
+              <Route path="/waitlist/unsubscribe" element={<WaitlistPage />} />
               <Route path="/buy" element={<BuyPage />} />
               <Route path="/buy/thanks" element={<BuyThanksPage />} />
               <Route path="/track" element={<TrackPage />} />

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useLocale } from '../../../i18n/LocaleContext'
 import styles from '../BuyPage.module.css'
 import type { BuyStepProps } from './shared'
@@ -9,146 +10,21 @@ import { colorKeys } from './shared'
 
 export function BuyItemsStep({ t, draft, config, itemPrice, patch, patchItem, err, described }: Pick<BuyStepProps, 't' | 'draft' | 'config' | 'itemPrice' | 'patch' | 'patchItem' | 'err' | 'described'>) {
   const { locale } = useLocale()
-  return (<>
-    <div className={styles.product}>
-      <svg
-
-        className={styles.productArt}
-
-        viewBox="0 0 80 90"
-
-        aria-hidden="true"
-
-        data-color={draft.items[0]?.color || 'red'}>
-        <path d="M34 12a6 6 0 0 1 12 0" fill="none" stroke="#b89a56" strokeWidth="3" />
-        <path d="M31 12h18v10H31z" fill="#d2b66f" />
-        <circle cx="40" cy="52" r="32" fill="currentColor" stroke="#bca980" strokeWidth="2" />
-        <path
-
-          d="M20 41c3-11 11-17 20-18"
-
-          fill="none"
-
-          stroke="white"
-
-          strokeOpacity=".55"
-
-          strokeWidth="4"
-
-          strokeLinecap="round" />
-        <path d="M40 37c-3-5-10-4-10 2 0 5 10 12 10 12s10-7 10-12c0-6-7-7-10-2Z" fill="#fff6e2" />
-      </svg>
-      <div>
-        <h3>
-          {t('shopProduct')}</h3>
-        <strong>
-          {formatEur(config.customPrice, locale)}</strong>
-        <p>
-          {t('shopCustomHint')}</p>
-        <p>
-          {t('shopIncludes')}</p></div></div>
+  const [explained, setExplained] = useState<string | null>(null)
+  return <>
+    <div className={styles.product}><svg className={styles.productArt} viewBox="0 0 80 90" aria-hidden="true" data-color={draft.items[0]?.color || 'red'}><path d="M34 12a6 6 0 0 1 12 0" fill="none" stroke="#b89a56" strokeWidth="3" /><path d="M31 12h18v10H31z" fill="#d2b66f" /><circle cx="40" cy="52" r="32" fill="currentColor" stroke="#bca980" strokeWidth="2" /><path d="M20 41c3-11 11-17 20-18" fill="none" stroke="white" strokeOpacity=".55" strokeWidth="4" strokeLinecap="round" /><path d="M40 37c-3-5-10-4-10 2 0 5 10 12 10 12s10-7 10-12c0-6-7-7-10-2Z" fill="#fff6e2" /></svg><div><h3>{t('shopProduct')}</h3><strong>{formatEur(config.customPrice, locale)}</strong><p>{t('shopCustomHint')}</p></div></div>
     {draft.items.map((item, index) => <div className={styles.card} key={item.uid}>
-      <div className={styles.cardHead}>
-        <h3>
-          {t('ornamentN', { n: index + 1 })}</h3>
-        <span className={styles.price}>
-          {formatEur(itemPrice(item), locale)}</span>
-        {draft.items.length > 1 && <button
-
-          type="button"
-
-          className={styles.linkBtn}
-
-          aria-label={t('shopRemoveItem', { n: index + 1 })}
-
-          onClick={() => patch({ items: draft.items.filter((other) => other.uid !== item.uid) })}>
-          {t('shopRemove')}</button>}</div>
-      <fieldset
-
-        id={`color-${item.uid}`}
-
-        tabIndex={-1}
-
-        className={styles.chips}
-
-        aria-describedby={described(`color-${item.uid}`)}>
-        <legend>
-          {t('shopColour')}</legend>
-        {config.colors.map((option) => <label
-
-          key={option.color}
-
-          className={styles.chip}
-
-          data-selected={item.color === option.color}
-
-          data-disabled={!option.inStock}>
-          <input
-
-            className="visually-hidden"
-
-            aria-label={`${t(colorKeys[option.color])}${!option.inStock ? ` ${t('shopSoldOut')}` : ''}`}
-            type="radio"
-
-            name={`color-${item.uid}`}
-
-            checked={item.color === option.color}
-
-            disabled={!option.inStock}
-
-            onChange={() => patchItem(item.uid, { color: option.color })} />
-          <span className={styles.swatch} data-color={option.color} aria-hidden="true" />
-          <span>
-            {t(colorKeys[option.color])}{!option.inStock && <small>
-              {t('shopSoldOut')}</small>}</span></label>)}</fieldset>
-      {err(`color-${item.uid}`) && <p className={styles.error} id={`color-${item.uid}-error`} role="alert">
-        {err(`color-${item.uid}`)}</p>}
-      <label className={styles.check}>
-        <input
-
-          aria-label={t('shopNameOnBack', { price: formatEur(config.nameExtra, locale) })}
-          type="checkbox"
-
-          checked={item.withName}
-
-          onChange={(event) => patchItem(item.uid, { withName: event.target.checked })} />
-        <span>
-          {t('shopNameOnBack', { price: formatEur(config.nameExtra, locale) })}</span></label>
-      {item.withName && <Field
-
-        label={t('backName')}
-
-        htmlFor={`back-${item.uid}`}
-
-        hint={t('shopBackNameHint')}
-
-        error={err(`back-${item.uid}`)}>
-        <input
-
-          id={`back-${item.uid}`}
-
-          value={item.backName}
-
-          maxLength={6}
-
-          aria-invalid={!!err(`back-${item.uid}`)}
-
-          aria-describedby={described(`back-${item.uid}`, true)}
-
-          onChange={(event) => patchItem(item.uid, { backName: event.target.value.toUpperCase().replace(/[^\p{L}]/gu, '').slice(0, 6) })} /></Field>}
+      <div className={styles.cardHead}><h3>{t('ornamentN', { n: index + 1 })}</h3><span className={styles.price}>{formatEur(itemPrice(item), locale)}</span>{draft.items.length > 1 && <button type="button" className={styles.linkBtn} aria-label={t('shopRemoveItem', { n: index + 1 })} onClick={() => patch({ items: draft.items.filter(other => other.uid !== item.uid) })}>{t('shopRemove')}</button>}</div>
+      <fieldset id={`color-${item.uid}`} tabIndex={-1} className={styles.chips} aria-describedby={described(`color-${item.uid}`)}><legend>{t('shopColour')}</legend>
+        {(['red', 'green', 'beige'] as const).map(color => { const available = config.colors.some(option => option.color === color && option.inStock); return <label key={color} className={styles.chip} data-selected={item.color === color} data-disabled={!available}><input className="visually-hidden" type="radio" name={`color-${item.uid}`} checked={item.color === color} disabled={!available} onChange={() => patchItem(item.uid, { color, finish: config.colors.some(option => option.color === color && option.finish === item.finish && option.inStock) ? item.finish : '' })} /><span className={styles.swatch} data-color={color} aria-hidden="true" /><span>{t(colorKeys[color])}{!available && <small>{t('shopSoldOut')}</small>}</span></label> })}
+      </fieldset>{err(`color-${item.uid}`) && <p className={styles.error} id={`color-${item.uid}-error`} role="alert">{err(`color-${item.uid}`)}</p>}
+      <fieldset id={`finish-${item.uid}`} tabIndex={-1} className={styles.chips} aria-describedby={described(`finish-${item.uid}`)}><legend>{t('shopFinish')} <button type="button" className={styles.help} aria-label={t('explainFinishes')} aria-expanded={explained === item.uid} aria-controls={`explain-${item.uid}`} onClick={() => setExplained(explained === item.uid ? null : item.uid)} onKeyDown={e => { if (e.key === 'Escape') setExplained(null) }}><span aria-hidden="true">?</span></button></legend>
+        <p id={`explain-${item.uid}`} className={styles.explanation} hidden={explained !== item.uid}>{t('finishExplanation')}</p>
+        {(['shiny', 'matte'] as const).map(finish => { const available = !!item.color && config.colors.some(option => option.color === item.color && option.finish === finish && option.inStock); return <label key={finish} className={styles.chip} data-selected={item.finish === finish} data-disabled={!available}><input className="visually-hidden" type="radio" name={`finish-${item.uid}`} checked={item.finish === finish} disabled={!available} onChange={() => patchItem(item.uid, { finish })} /><span className={styles.swatch} data-color={item.color || 'beige'} data-finish={finish} aria-hidden="true" /><span>{t(finish === 'shiny' ? 'finishShiny' : 'finishMatte')}{item.color && !available && <small>{t('shopSoldOut')}</small>}</span></label> })}
+      </fieldset>{err(`finish-${item.uid}`) && <p className={styles.error} id={`finish-${item.uid}-error`} role="alert">{err(`finish-${item.uid}`)}</p>}
+      <label className={styles.check}><input type="checkbox" checked={item.withName} onChange={event => patchItem(item.uid, { withName: event.target.checked })} /><span>{t('shopNameOnBack', { price: formatEur(config.nameExtra, locale) })}</span><svg className={styles.nameArt} viewBox="0 0 64 64" aria-hidden="true"><path d="M27 8a5 5 0 0 1 10 0" fill="none" stroke="#9b7a36" strokeWidth="2"/><path d="M26 8h12v6H26z" fill="#b89a56"/><circle cx="32" cy="36" r="24" fill="#d8c3a0" stroke="#a88a60"/><text x="12" y="40" fontSize="11" fontWeight="700" fill="#513b32">LUNA</text><path d="M48 48 61 29" stroke="#684433" strokeWidth="4" strokeLinecap="round"/><path d="m48 48-3 5 5-3" fill="#9b542e"/></svg></label>
+      {item.withName && <><Field label={t('backName')} htmlFor={`back-${item.uid}`} hint={t('shopBackNameHint')} error={err(`back-${item.uid}`)}><input id={`back-${item.uid}`} value={item.backName} maxLength={6} aria-invalid={!!err(`back-${item.uid}`)} aria-describedby={described(`back-${item.uid}`, true)} onChange={event => patchItem(item.uid, { backName: event.target.value.toUpperCase().replace(/[^\p{L}]/gu, '').slice(0, 6) })} /></Field><p className={styles.muted}>{t('nameNonRefund')}</p></>}
     </div>)}
-    <Button
-
-      id="buy-add"
-
-      variant="secondary"
-
-      disabled={draft.items.length >= config.maxItems}
-
-      onClick={() => patch({ items: [...draft.items, newItem()] })}>
-      {t('shopAddAnother')}</Button>
-    {err('buy-add') && <p className={styles.error} role="alert">
-      {err('buy-add')}</p>}{draft.items.length >= config.maxItems && <p className={styles.muted}>
-        {t('shopMaxItems', { max: config.maxItems })}</p>}
-  </>)
+    <Button id="buy-add" variant="secondary" disabled={draft.items.length >= config.maxItems} onClick={() => patch({ items: [...draft.items, newItem()] })}>{t('shopAddAnother')}</Button>{err('buy-add') && <p className={styles.error} role="alert">{err('buy-add')}</p>}
+  </>
 }

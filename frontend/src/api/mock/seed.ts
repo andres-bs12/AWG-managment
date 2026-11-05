@@ -35,6 +35,7 @@ export type MockState = {
   inventory?: import('../../domain/types').InventoryItem[]
   paintingDays?: Record<string, { open: boolean; maxPaintings: number }>
   waitlist?: string[]
+  waitlistTokens?: Record<string, { email: string; confirmed: boolean }>
   seedRevision: number
   staff: StaffUser[]
   customers: Customer[]

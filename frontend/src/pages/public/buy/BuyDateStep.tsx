@@ -3,41 +3,14 @@ import type { BuyStepProps } from './shared'
 import { useLocale } from '../../../i18n/LocaleContext'
 import { Button } from '../../../components/ui/Button'
 
-export function BuyDateStep({ t, draft, config, dates, datesState, setDatesRetry, patch, formatDate, err, described }: Pick<BuyStepProps, 't' | 'draft' | 'config' | 'dates' | 'datesState' | 'setDatesRetry' | 'patch' | 'formatDate' | 'err' | 'described'>) {
+export function BuyDateStep({ t, draft, dates, datesState, setDatesRetry, patch, formatDate, err, described }: Pick<BuyStepProps, 't' | 'draft' | 'dates' | 'datesState' | 'setDatesRetry' | 'patch' | 'formatDate' | 'err' | 'described'>) {
   const { locale } = useLocale()
-  return (<>
-    <p>
-      {t('shopDateLead')}</p><p>{t('shopSeasonEnd', { date: new Intl.DateTimeFormat(locale === 'de' ? 'de-AT' : 'en-GB', { day: 'numeric', month: 'long' }).format(new Date(`${config.seasonEnd}T12:00:00`)) })}</p>
-    <p className={styles.muted} role="status">
-      {datesState === 'loading' ? t('shopDatesLoading') : datesState === 'error' ? t('shopDatesError') : datesState === 'ready' && !dates.length ? t('shopDatesNone') : datesState === 'ready' ? t('shopDatesReady', { n: dates.length }) : t('shopDatesNeedItems')}</p>
-    {datesState === 'error' && <Button variant="secondary" onClick={() => setDatesRetry((value) => value + 1)}>
-      {t('shopRetry')}</Button>}
-    <fieldset
-
-      id="buy-date"
-
-      tabIndex={-1}
-
-      className={styles.chips}
-
-      aria-busy={datesState === 'loading'}
-
-      aria-describedby={described('buy-date')}>
-      <legend className="visually-hidden">
-        {t('shopStepDate')}</legend>
-      {datesState === 'ready' && dates.map((date) => <label key={date.date} className={styles.chip} data-selected={draft.deliveryDate === date.date}>
-        <input
-
-          className="visually-hidden"
-
-          type="radio"
-
-          name="delivery-date"
-
-          checked={draft.deliveryDate === date.date}
-
-          onChange={() => patch({ deliveryDate: date.date })} />
-        {formatDate(date.date)}</label>)}</fieldset>
-    {err('buy-date') && <p className={styles.error} id="buy-date-error" role="alert">
-      {err('buy-date')}</p>}</>)
+  const lang = locale === 'de' ? 'de-AT' : 'en-GB'
+  const months = [...new Set(dates.map(d => d.date.slice(0, 7)))].sort()
+  return <><p>{t('shopDateLead')}</p>{datesState === 'ready' && dates.length > 0 && <p>{t('deliveryFrom', { date: new Intl.DateTimeFormat(lang, { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(`${[...dates].sort((a, b) => a.date.localeCompare(b.date))[0].date}T12:00:00`)) })}</p>}
+    <p className={styles.muted} role="status">{datesState === 'loading' ? t('shopDatesLoading') : datesState === 'error' ? t('shopDatesError') : datesState === 'ready' && !dates.length ? t('shopDatesNone') : ''}</p>
+    {datesState === 'error' && <Button variant="secondary" onClick={() => setDatesRetry(value => value + 1)}>{t('shopRetry')}</Button>}
+    <fieldset id="buy-date" tabIndex={-1} className={styles.calendarField} aria-busy={datesState === 'loading'} aria-describedby={described('buy-date')}><legend className="visually-hidden">{t('shopStepDate')}</legend>
+      {datesState === 'ready' && months.map(month => { const first = new Date(`${month}-01T12:00:00`); const offset = (first.getDay() + 6) % 7; const count = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate(); return <div key={month}><h3>{new Intl.DateTimeFormat(lang, { month: 'long', year: 'numeric' }).format(first)}</h3><div className={styles.calendar}>{Array.from({ length: 7 }, (_, i) => <span key={`w${i}`} className={styles.weekday}>{new Intl.DateTimeFormat(lang, { weekday: 'short' }).format(new Date(2026, 10, 2 + i))}</span>)}{Array.from({ length: offset }, (_, i) => <span key={`blank${i}`} />)}{Array.from({ length: count }, (_, i) => { const date = `${month}-${String(i + 1).padStart(2, '0')}`; const available = dates.some(d => d.date === date); return available ? <label key={date} className={styles.day} data-selected={draft.deliveryDate === date}><input className="visually-hidden" type="radio" name="delivery-date" aria-label={formatDate(date)} checked={draft.deliveryDate === date} onChange={() => patch({ deliveryDate: date })} /><span>{i + 1}</span></label> : <span key={date} className={styles.unavailable}>{i + 1}</span> })}</div></div> })}
+    </fieldset>{draft.deliveryDate && <p className={styles.dateConfirmation}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M7 14h3v3H7z"/></svg> {formatDate(draft.deliveryDate)} · {t('evening')}</p>}{dates.length > 0 && <div className={styles.calendarLegend}><span><i className={styles.legendAvailable} aria-hidden="true" />{t('available')}</span><span><i className={styles.legendSelected} aria-hidden="true" />{t('selected')}</span></div>}{err('buy-date') && <p className={styles.error} id="buy-date-error" role="alert">{err('buy-date')}</p>}</>
 }

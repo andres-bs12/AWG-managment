@@ -567,6 +567,7 @@ export function NewSalePage() {
               onRemove={removeItem}
               onToggleName={toggleName}
               onColor={setColor}
+              onFinish={(item, finish) => patchItem(item.id, { finish })}
               onDuration={setDuration}
               onContinue={() => {
                 if (!draft.items.length) return
@@ -795,6 +796,7 @@ function ItemsStep({
   onRemove,
   onToggleName,
   onColor,
+  onFinish,
   onDuration,
   onContinue,
 }: {
@@ -803,6 +805,7 @@ function ItemsStep({
   onRemove: (id: string) => void
   onToggleName: (item: DraftItem) => void
   onColor: (item: DraftItem, color: OrnamentColor) => void
+  onFinish: (item: DraftItem, finish: import('../../domain/types').CustomFinish) => void
   onDuration: (item: DraftItem, preset: DurationPreset, customMinutes?: number) => void
   onContinue: () => void
 }) {
@@ -843,8 +846,9 @@ function ItemsStep({
                     name={`colour-${item.id}`}
                     value={item.color}
                     onChange={(color) => onColor(item, color)}
-                    options={[{ value: 'red', label: 'Red' }, { value: 'grey', label: 'Grey' }]}
+                    options={[{ value: 'red', label: 'Red' }, { value: 'green', label: 'Green' }, { value: 'beige', label: 'Beige' }]}
                   />
+                  <SegmentedControl legend="Finish" name={`finish-${item.id}`} value={item.finish ?? 'shiny'} onChange={finish => onFinish(item, finish)} options={[{ value: 'shiny', label: 'Shiny' }, { value: 'matte', label: 'Matte' }]} />
                   <SegmentedControl
                     legend="Paint time"
                     name={`duration-${item.id}`}

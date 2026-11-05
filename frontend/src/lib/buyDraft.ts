@@ -1,10 +1,11 @@
-import type { OrnamentColor, Photo } from '../domain/types'
+import type { OrnamentColor, CustomFinish, Photo } from '../domain/types'
 
 export const BUY_DRAFT_KEY = 'awg-buy-draft'
 
 export type BuyItem = {
   uid: string
   color: OrnamentColor | ''
+  finish: CustomFinish | ''
   withName: boolean
   backName: string
   petName: string
@@ -26,7 +27,7 @@ export type BuyDraft = {
 }
 
 export function newItem(): BuyItem {
-  return { uid: crypto.randomUUID(), color: '', withName: false, backName: '', petName: '', note: '', photos: [], photosNeedReload: false }
+  return { uid: crypto.randomUUID(), color: '', finish: '', withName: false, backName: '', petName: '', note: '', photos: [], photosNeedReload: false }
 }
 
 const emptyDraft = (): BuyDraft => ({
@@ -39,7 +40,7 @@ export function loadBuyDraft(): BuyDraft {
     if (!raw) return emptyDraft()
     const parsed = JSON.parse(raw) as Partial<BuyDraft>
     const items = Array.isArray(parsed.items) ? parsed.items.filter((item) => item && typeof item.uid === 'string' && (!('kind' in item) || item.kind === 'custom')).map((item) => ({
-        ...newItem(), ...item, photos: [], photosNeedReload: !!item.photosNeedReload || (Array.isArray(item.photos) && item.photos.length > 0),
+        ...newItem(), ...item, color: ['red', 'green', 'beige'].includes(item.color) && item.finish ? item.color : '', finish: ['red', 'green', 'beige'].includes(item.color) && (item.finish === 'shiny' || item.finish === 'matte') ? item.finish : '' as const, photos: [], photosNeedReload: !!item.photosNeedReload || (Array.isArray(item.photos) && item.photos.length > 0),
       })) : []
     return {
       ...emptyDraft(), ...parsed,

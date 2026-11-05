@@ -38,6 +38,7 @@ export function BuyPage() {
   const [storageError, setStorageError] = useState(false)
   const [busy, setBusy] = useState(false)
   const busyRef = useRef(false)
+  const navRef = useRef<HTMLElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const didNavigate = useRef(false)
   const pendingErrorFocus = useRef(false)
@@ -51,8 +52,8 @@ export function BuyPage() {
   useEffect(() => { const code = params.get('cancelled'); if (code) void api.shop.abandonCheckout(code).catch(() => {}) }, [params])
   useEffect(() => {
     if (!didNavigate.current || pendingErrorFocus.current) return
-    headingRef.current?.focus()
-    headingRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' })
+    headingRef.current?.focus({ preventScroll: true })
+    navRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' })
   }, [step])
 
   const signature = draft.items.map((item) => `${item.color}:${item.withName ? 1 : 0}`).join(',')
@@ -78,7 +79,7 @@ export function BuyPage() {
 
   const dateFmt = useMemo(() => new Intl.DateTimeFormat(locale === 'de' ? 'de-AT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), [locale])
   const formatDate = (date: string) => dateFmt.format(new Date(`${date}T12:00:00`))
-  const stepLabels = [t('shopStepItems'), t('shopStepPet'), t('shopStepDate'), t('shopStepContact'), t('shopStepPay')]
+  const stepLabels = ['stepShortItems', 'stepShortPet', 'stepShortDelivery', 'stepShortContact', 'stepShortReview'].map(key => t(key))
   if (configFailed) return <div className={panel.panel}><h1>{t('shopTitle')}</h1><p role="alert">{t('shopLoadError')}</p><Button onClick={() => { setConfigFailed(false); setConfigRetry((value) => value + 1) }}>{t('shopRetry')}</Button></div>
   if (!config) return <div className={panel.panel}><OrnamentLoader /></div>
   if (config.seasonOver) return <SeasonClosed />
@@ -93,7 +94,7 @@ export function BuyPage() {
   function patch(partial: Partial<BuyDraft>) { setDraft((current) => ({ ...current, ...partial })); const fields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', line2: 'buy-line2', postalCode: 'buy-postal', deliveryDate: 'buy-date', acceptTerms: 'buy-terms' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[fields[key]]); return next }); setServerError('') }
   function patchItem(uid: string, partial: Partial<BuyItem>) {
     setDraft((current) => ({ ...current, items: current.items.map((item) => item.uid === uid ? { ...item, ...partial } : item) }))
-    const fields: Record<string, string> = { color: 'color', backName: 'back', petName: 'pet', note: 'note', photos: 'photos' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[`${fields[key]}-${uid}`]); return next }); setServerError('')
+    const fields: Record<string, string> = { color: 'color', finish: 'finish', backName: 'back', petName: 'pet', note: 'note', photos: 'photos' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[`${fields[key]}-${uid}`]); return next }); setServerError('')
   }
   function validate(currentStep: number) {
     const found: Record<string, string> = {}
@@ -101,6 +102,7 @@ export function BuyPage() {
       if (!draft.items.length) found['buy-add'] = 'shopNeedItem'
       for (const item of draft.items) {
         if (!shopConfig.colors.some((option) => option.color === item.color && option.inStock)) found[`color-${item.uid}`] = 'shopChooseColor'
+        if (item.color && !shopConfig.colors.some(option => option.color === item.color && option.finish === item.finish && option.inStock)) found[`finish-${item.uid}`] = 'shopChooseFinish'
         if (item.withName && !item.backName.trim()) found[`back-${item.uid}`] = 'shopBackNameRequired'
       }
     }
@@ -140,7 +142,7 @@ export function BuyPage() {
     const added = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []) as Photo[]
     setPhotoErrors((current) => ({ ...current, [uid]: results.some((result) => result.status === 'rejected') ? (selected.some(file => file.size > 10 * 1024 * 1024) ? 'photoTooLarge' : 'photoInvalid') : files.length > available ? 'shopPhotoLimit' : '' }))
     setDraft((current) => ({ ...current, items: current.items.map((item) => item.uid === uid ? { ...item, photos: [...item.photos, ...added].slice(0, MAX_PHOTOS), photosNeedReload: added.length ? false : item.photosNeedReload } : item) }))
-    setErrors(current => { const next = { ...current }; delete next[`photos-${uid}`]; return next })
+    if (added.length) setErrors(current => { const next = { ...current }; delete next[`photos-${uid}`]; return next })
   }
   async function pay() {
     if (busyRef.current || showErrors(validate(4))) return
@@ -155,11 +157,11 @@ export function BuyPage() {
         customerName: draft.customerName.trim(), email: draft.email.trim(), phone: draft.phone.trim(),
         address: { line1: draft.line1.trim(), line2: draft.line2.trim() || undefined, postalCode: draft.postalCode.trim(), city: 'Wien' },
         deliveryDate: draft.deliveryDate, acceptTerms: draft.acceptTerms,
-        items: draft.items.map((item) => ({ kind: 'custom', withName: item.withName, color: item.color || undefined, petName: item.petName.trim(), backName: item.withName ? item.backName.trim() : undefined, note: item.note.trim() || undefined, photos: item.photos })),
+        items: draft.items.map((item) => ({ kind: 'custom', withName: item.withName, color: item.color || undefined, finish: item.finish || undefined, petName: item.petName.trim(), backName: item.withName ? item.backName.trim() : undefined, note: item.note.trim() || undefined, photos: item.photos })),
       })
       window.location.assign(result.checkoutUrl)
     } catch (error) {
-      const problem = apiError(error, locale, t('shopCheckoutError')); const field = problem.field ?? ''; const match = field.match(/^items\[(\d+)\]\.(\w+)/); const item = match ? draft.items[Number(match[1])] : undefined; const itemFields: Record<string, [number, string]> = { petName: [1, 'pet'], photos: [1, 'photos'], color: [0, 'color'], backName: [0, 'back'], note: [1, 'note'] }; const simple: Record<string, [number, string]> = { customerName: [3, 'buy-name'], email: [3, 'buy-email'], phone: [3, 'buy-phone'], 'address.line1': [3, 'buy-line1'], 'address.line2': [3, 'buy-line2'], 'address.city': [3, 'buy-city'], address: [3, 'buy-line1'], 'address.postalCode': [3, 'buy-postal'], deliveryDate: [2, 'buy-date'] }; const target = field === 'photos' && draft.items[0] ? [1, `photos-${draft.items[0].uid}`] as const : match && item && itemFields[match[2]] ? [itemFields[match[2]][0], `${itemFields[match[2]][1]}-${item.uid}`] as const : simple[field];
+      const problem = apiError(error, locale, t('shopCheckoutError')); const field = problem.field ?? ''; const match = field.match(/^items\[(\d+)\]\.(\w+)/); const item = match ? draft.items[Number(match[1])] : undefined; const itemFields: Record<string, [number, string]> = { petName: [1, 'pet'], photos: [1, 'photos'], color: [0, 'color'], finish: [0, 'finish'], backName: [0, 'back'], note: [1, 'note'] }; const simple: Record<string, [number, string]> = { customerName: [3, 'buy-name'], email: [3, 'buy-email'], phone: [3, 'buy-phone'], 'address.line1': [3, 'buy-line1'], 'address.line2': [3, 'buy-line2'], 'address.city': [3, 'buy-city'], address: [3, 'buy-line1'], 'address.postalCode': [3, 'buy-postal'], deliveryDate: [2, 'buy-date'] }; const target = field === 'photos' && draft.items[0] ? [1, `photos-${draft.items[0].uid}`] as const : match && item && itemFields[match[2]] ? [itemFields[match[2]][0], `${itemFields[match[2]][1]}-${item.uid}`] as const : simple[field];
       if (target) { go(target[0]); showErrors({ [target[1]]: (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string') ? `api:${error.code}` : 'shopFixErrors' }) } else setServerError(problem.text)
       busyRef.current = false; setBusy(false)
     }
@@ -168,19 +170,19 @@ export function BuyPage() {
   const stepProps = { t, draft, config, itemPrice, patch, patchItem, err, described, photoErrors: Object.fromEntries(Object.entries(photoErrors).map(([key, value]) => [key, value ? t(value) : ''])), addFiles, dates, datesState, setDatesRetry, formatDate, serverError }
 
   return <form className={`${panel.panel} ${styles.shop}`} noValidate onSubmit={(event) => { event.preventDefault(); if (step === 4) void pay(); else if (!showErrors(validate(step))) go(step + 1) }}>
-    <h1>{t('shopTitle')}</h1><p className={panel.lead}>{t('shopLead')}</p>
+    <h1>{t('shopTitle')}</h1>{step === 0 && <p className={panel.lead}>{t('shopLead')}</p>}
     {storageError ? <p role="status">{t('shopStorageError')}</p> : null}
     {params.get('cancelled') ? <p className={styles.notice} role="status">{t('shopCancelled')}</p> : null}
-    <nav aria-label={t('shopProgress')}><ol className={styles.progress}>{stepLabels.map((label, index) => <li key={label} aria-current={index === step ? 'step' : undefined} data-done={index < step}><span>{index + 1}</span>{label}</li>)}</ol></nav>
+    <nav ref={navRef} aria-label={t('shopProgress')}><ol className={styles.progress}>{stepLabels.map((label, index) => <li key={label} aria-current={index === step ? 'step' : undefined} data-done={index < step}><span>{index < step ? '✓' : index + 1}</span>{label}</li>)}</ol></nav>
     <section className={styles.step} aria-labelledby="buy-heading">
-      <h2 id="buy-heading" ref={headingRef} tabIndex={-1}>{stepLabels[step]}</h2>
+      <h2 id="buy-heading" ref={headingRef} tabIndex={-1}>{step === 3 ? t('shopStepContact') : stepLabels[step]}</h2>
       {step === 0 && <BuyItemsStep {...stepProps} />}
       {step === 1 && <BuyPetStep {...stepProps} />}
       {step === 2 && <BuyDateStep {...stepProps} />}
       {step === 3 && <BuyContactStep {...stepProps} />}
-      {step === 4 && <BuyReviewStep {...stepProps} />}
+      {step === 4 && <BuyReviewStep {...stepProps} go={go} itemsTotal={itemsTotal} total={total} />}
     </section>
-    <aside className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><dl aria-live="polite"><div><dt>{t('shopItemsTotal')} ({draft.items.length})</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{config.deliveryFee ? formatEur(config.deliveryFee, locale) : t('shopFree')}</dd></div><div className={styles.cartTotal}><dt>{t('shopTotal')}</dt><dd>{formatEur(total, locale)}</dd></div></dl></aside>
-    <div className={styles.actions}><div className={styles.mobileTotal}><span>{t('shopTotal')}</span><strong>{formatEur(total, locale)}</strong></div>{step > 0 && <Button variant="secondary" disabled={busy} onClick={() => go(step - 1)}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 4 ? busy ? t('shopPaying') : t('shopPayStripe') : t('continue')}</Button></div>
+    <aside hidden={step === 4} className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><dl aria-live="polite"><div><dt>{t('shopItemsTotal')} ({draft.items.length})</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{config.deliveryFee ? formatEur(config.deliveryFee, locale) : t('shopFree')}</dd></div><div className={styles.cartTotal}><dt>{t('shopTotal')}</dt><dd>{formatEur(total, locale)}</dd></div></dl></aside>
+    <div className={styles.actions}><div className={styles.mobileTotal} hidden={step === 4}><span>{t('shopTotal')}</span><strong>{formatEur(total, locale)}</strong></div>{step > 0 && <Button variant="secondary" disabled={busy} onClick={() => go(step - 1)}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 4 ? busy ? t('shopPaying') : t('shopPayStripe') : t('continue')}</Button>{step === 4 && <small className={styles.stripeLine}>{t('stripeTotal', { total: formatEur(total, locale) })}</small>}</div>
   </form>
 }

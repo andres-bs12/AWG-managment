@@ -6,6 +6,7 @@ const messages: Record<string, [string, string]> = {
   VALIDATION: ['Please check this value.', 'Bitte überprüfe diese Angabe.'],
   NOT_FOUND: ['This item could not be found.', 'Dieser Eintrag wurde nicht gefunden.'],
   ORDER_NOT_FOUND: ['Order not found. Check your code.', 'Bestellung nicht gefunden. Bitte überprüfe deinen Code.'],
+  FORM_EXPIRED: ['This link has expired. Write to us if you need anything.', 'Dieser Link ist abgelaufen. Schreib uns, wenn du etwas brauchst.'],
   FORM_LOCKED: ['Painting has started or the order was handed over. Changes are no longer possible.', 'Die Bemalung hat begonnen oder die Bestellung wurde übergeben. Änderungen sind nicht mehr möglich.'],
   POSTAL_OUTSIDE_VIENNA: ['Please enter a Vienna postal code (1010–1230).', 'Bitte gib eine Wiener Postleitzahl (1010–1230) ein.'],
   DELIVERY_DAY_INVALID: ['Please choose an available delivery date.', 'Bitte wähle einen verfügbaren Liefertermin.'],

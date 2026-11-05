@@ -1,14 +1,15 @@
 import styles from '../BuyPage.module.css'
 import type { BuyStepProps } from './shared'
-import { Button } from '../../../components/ui/Button'
 import { Field } from '../../../components/ui/Field'
-import panel from '../Panel.module.css'
 import { colorKeys, MAX_PHOTOS } from './shared'
 
+import { useState } from 'react'
+
 export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, addFiles }: Pick<BuyStepProps, 't' | 'draft' | 'patchItem' | 'err' | 'described' | 'photoErrors' | 'addFiles'>) {
+  const [reading, setReading] = useState<string | null>(null)
   return (draft.items.map((item, index) => <div className={styles.card} key={item.uid}>
     <h3>
-      {t('ornamentN', { n: index + 1 })} · {item.color && t(colorKeys[item.color])}</h3>
+      {t('ornamentN', { n: index + 1 })} · {item.color && t(colorKeys[item.color])}{item.finish && <> · {t(item.finish === 'shiny' ? 'finishShiny' : 'finishMatte')}</>}</h3>
     <Field label={t('petName')} htmlFor={`pet-${item.uid}`} error={err(`pet-${item.uid}`)}>
       <input
 
@@ -27,33 +28,21 @@ export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, a
       <p className={styles.label}>
         {t('formPhotos')}</p>
       <p className={styles.muted} id={`photos-${item.uid}-hint`}>
-        {t('shopPhotosHint')} {t('shopPhotosWarning')}</p>
+        {t('shopPhotosHint')} {(item.photos.length > 0) && t('shopPhotosWarning')}</p>
       {item.photosNeedReload && <p className={styles.notice} role="status">
         {t('shopPhotosReload')}</p>}
-      <div className={panel.photoRow}>
-        {item.photos.map((photo) => <span key={photo.id} className={styles.thumb}>
-          <img src={photo.dataUrl} alt={photo.name} />
+      <div className={styles.photoRow}>
+        {item.photos.map((photo, photoIndex) => <span key={photo.id} className={styles.thumb}>
+          <img src={photo.dataUrl} alt={t('photoAlt', { n: photoIndex + 1, name: item.petName })} />
           <button
 
             type="button"
 
             aria-label={t('shopRemovePhoto', { name: photo.name })}
 
-            onClick={() => patchItem(item.uid, { photos: item.photos.filter((other) => other.id !== photo.id) })}>×</button></span>)}</div>
+            onClick={() => patchItem(item.uid, { photos: item.photos.filter((other) => other.id !== photo.id) })}>×</button></span>)}{item.photos.length < MAX_PHOTOS && <button type="button" id={`photos-${item.uid}`} className={styles.photoAdd} aria-label={t('addPhoto')} aria-describedby={described(`photos-${item.uid}`, true)} disabled={reading === item.uid} onClick={() => document.getElementById(`gallery-${item.uid}`)?.click()}>+</button>}</div>{reading === item.uid && <p role="status">{t('photoReading')}</p>}
       <p className={styles.muted} aria-live="polite">
         {t('shopPhotosCount', { n: item.photos.length, max: MAX_PHOTOS })}</p>
-      <Button
-
-        id={`photos-${item.uid}`}
-
-        variant="secondary"
-
-        disabled={item.photos.length >= MAX_PHOTOS}
-
-        aria-describedby={described(`photos-${item.uid}`, true)}
-
-        onClick={() => document.getElementById(`gallery-${item.uid}`)?.click()}>
-        {t('addPhoto')}</Button>
       <input
 
         id={`gallery-${item.uid}`}
@@ -70,18 +59,18 @@ export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, a
 
         aria-hidden="true"
 
-        onChange={(event) => { const files = Array.from(event.target.files ?? []); void addFiles(item.uid, files); event.target.value = '' }} />
+        onChange={(event) => { const files = Array.from(event.target.files ?? []); setReading(item.uid); void addFiles(item.uid, files).finally(() => setReading(null)); event.target.value = '' }} />
       {err(`photos-${item.uid}`) && <p className={styles.error} id={`photos-${item.uid}-error`} role="alert">
         {err(`photos-${item.uid}`)}</p>}{photoErrors[item.uid] && <p className={styles.error} role="alert">
           {photoErrors[item.uid]}</p>}
     </div>
-    <Field label={t('note')} htmlFor={`note-${item.uid}`} error={err(`note-${item.uid}`)}>
+    <details><summary>{t('optionalNote')}</summary><Field label={t('note')} htmlFor={`note-${item.uid}`} error={err(`note-${item.uid}`)}>
       <textarea
 
         id={`note-${item.uid}`} maxLength={1000}
 
         value={item.note}
 
-        onChange={(event) => patchItem(item.uid, { note: event.target.value })} /></Field>
+        onChange={(event) => patchItem(item.uid, { note: event.target.value })} /></Field></details>
   </div>))
 }

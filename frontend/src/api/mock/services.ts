@@ -3,7 +3,7 @@ import type { Api } from '../contracts'
 import type { Photo } from '../../domain/types'
 import {
   createMockCheckout, abandonMockCheckout,
-  listInventory, updateInventory, paintingDay, updatePaintingDay, joinWaitlist,
+  listInventory, updateInventory, paintingDay, updatePaintingDay, joinWaitlist, confirmWaitlist, unsubscribeWaitlist,
   checkCapacity,
   cancelOrder,
   mockChangePassword,
@@ -66,6 +66,7 @@ function nextDeliveryDates(itemCount: number) {
     day.setDate(day.getDate() + 1)
     const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
     if (iso > '2026-12-24') break
+    if (iso < '2026-11-30') continue
     const stall = listMarketDays().some(row => row.date === iso && listMarkets().some(m => m.id === row.marketId && m.kind === 'market'))
     if (iso === '2026-12-24' || day.getDay() === 3 || (day.getDay() === 5 && !stall)) {
       let available = 0; const paint = new Date(); paint.setHours(12, 0, 0, 0)
@@ -145,18 +146,21 @@ export const mockApi: Api = {
   },
   shop: {
     abandonCheckout: (code) => later(() => { abandonMockCheckout(code); try { localStorage.removeItem(`awg-form-token:${code.trim().toUpperCase()}`) } catch { /* storage unavailable */ } }),
+    confirmWaitlist: (token) => later(() => confirmWaitlist(token)),
+    unsubscribeWaitlist: (token) => later(() => unsubscribeWaitlist(token)),
     joinWaitlist: (email) => later(() => joinWaitlist(email)),
     getConfig: () =>
       later(() => ({
         enabled: true,
         seasonEnd: '2026-12-24',
+        deliveriesFrom: '2026-11-30',
         seasonOver: new Date() >= new Date('2026-12-25T00:00:00'),
         customPrice: 49.99,
         nameExtra: 12.99,
         deliveryFee: 0,
         maxItems: 10,
         colors: [
-          ...listInventory().filter(row => row.kind === 'custom' && row.color).map(row => ({ color: row.color!, inStock: row.quantity > 0 })),
+          ...listInventory().filter(row => row.kind === 'custom' && row.color && row.finish && ['red', 'green', 'beige'].includes(row.color)).map(row => ({ color: row.color!, finish: row.finish!, inStock: row.quantity > 0 })),
         ],
       }), 80),
     listDeliveryDates: (items) => later(() => (items.length ? nextDeliveryDates(items.length) : []), 120),

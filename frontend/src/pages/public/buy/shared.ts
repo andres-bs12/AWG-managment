@@ -4,7 +4,7 @@ import type { BuyDraft, BuyItem } from '../../../lib/buyDraft'
 import { useLocale } from '../../../i18n/LocaleContext'
 
 export const MAX_PHOTOS = 6
-export const colorKeys: Record<OrnamentColor, string> = { red: 'colorRed', grey: 'colorGrey', green: 'colorGreen', white: 'colorWhite' }
+export const colorKeys: Record<OrnamentColor, string> = { red: 'colorRed', grey: 'colorGrey', green: 'colorGreen', white: 'colorWhite', beige: 'colorBeige' }
 
 export type BuyStepProps = {
   t: ReturnType<typeof useLocale>['t']

@@ -301,6 +301,8 @@ export const httpApi: Api = {
   },
   shop: {
     abandonCheckout: async (code) => { await request(`/api/shop/checkout/${enc(code)}/abandon`, { method: 'POST', headers: formTokenHeader(code) }); try { localStorage.removeItem(FORM_TOKEN_PREFIX + code.trim().toUpperCase()) } catch { /* storage unavailable */ } },
+    confirmWaitlist: (token) => request('/api/shop/waitlist/confirm', jsonInit('POST', { token })),
+    unsubscribeWaitlist: (token) => request('/api/shop/waitlist/unsubscribe', jsonInit('POST', { token })),
     joinWaitlist: (email, locale) => request('/api/shop/waitlist', jsonInit('POST', { email, locale })),
     getConfig: () => request<ShopConfig>('/api/shop/config'),
     listDeliveryDates: (items) => request<ShopDeliveryDate[]>('/api/shop/delivery-dates', jsonInit('POST', { items })),

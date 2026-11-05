@@ -1,4 +1,4 @@
-import type { Address, CapacityResult, CreateSaleItemInput, ItemKind, Market, MarketDay, OrnamentColor } from '../../domain/types'
+import type { Address, CapacityResult, CustomFinish, CreateSaleItemInput, ItemKind, Market, MarketDay, OrnamentColor } from '../../domain/types'
 import { isMarketPickupWeekday } from '../../lib/calendar'
 import { formatDateLabel, formatHour, formatMinutes, hoursOverlap } from '../../lib/time'
 import { itemCost } from '../../lib/money'
@@ -24,6 +24,7 @@ export type DraftItem = {
   kind: ItemKind
   withName: boolean
   color: OrnamentColor
+  finish: CustomFinish
   durationMinutes: number
   durationPreset: DurationPreset
   paintDate?: string
@@ -89,6 +90,7 @@ export function makeCustom(partial?: Partial<DraftItem>): DraftItem {
     id: newDraftId(),
     withName: false,
     color: partial?.color ?? 'red',
+    finish: partial?.finish ?? 'shiny',
     durationMinutes: minutes,
     durationPreset: presetFromMinutes(minutes),
     fromCalendar: false,
@@ -105,6 +107,7 @@ export function makeFinished(): DraftItem {
     kind: 'finished',
     withName: false,
     color: 'red',
+    finish: 'shiny',
     durationMinutes: 0,
     durationPreset: '60',
     fromCalendar: false,
@@ -202,6 +205,7 @@ export function toCreateItems(items: DraftItem[], days: MarketDay[], today?: Mar
       kind: item.kind,
       withName: item.kind === 'custom' && item.withName,
       color: item.kind === 'custom' ? item.color : undefined,
+      finish: item.kind === 'custom' ? item.finish ?? 'shiny' : undefined,
       paintDate: item.kind === 'custom' ? item.paintDate : undefined,
       paintStart: item.kind === 'custom' ? item.paintStart : undefined,
       paintEnd: item.kind === 'custom' ? item.paintEnd : undefined,
@@ -238,7 +242,7 @@ export function buildDraftFromParams(params: URLSearchParams): SaleDraft {
     ? {
         ...stored,
         phase: (stored.phase as string) === 'formWhere' ? 'qr' as const : stored.phase,
-        items: stored.items.map((item) => ({ ...item, color: item.color ?? 'red' as const })),
+        items: stored.items.map((item) => ({ ...item, color: item.color ?? 'red' as const, finish: item.finish ?? 'shiny' as const })),
       }
     : null
 

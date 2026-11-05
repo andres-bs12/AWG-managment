@@ -1,10 +1,10 @@
 import type { BuyStepProps } from './shared'
+import styles from '../BuyPage.module.css'
 import { Field } from '../../../components/ui/Field'
 
 export function BuyContactStep({ t, draft, patch, err, described }: Pick<BuyStepProps, 't' | 'draft' | 'patch' | 'err' | 'described'>) {
   return (<>
-    <p>
-      {t('shopRequiredFields')}</p>
+    <fieldset className={styles.contactGroup}><legend>{t('contactHeading')}</legend>
     <Field label={t('yourName')} htmlFor="buy-name" error={err('buy-name')}>
       <input
 
@@ -19,7 +19,7 @@ export function BuyContactStep({ t, draft, patch, err, described }: Pick<BuyStep
         aria-describedby={described('buy-name')}
 
         onChange={(event) => patch({ customerName: event.target.value })} /></Field>
-    <Field label={t('email')} htmlFor="buy-email" error={err('buy-email')}>
+    <div className={styles.contactRow}><Field label={t('email')} htmlFor="buy-email" error={err('buy-email')}>
       <input
 
         id="buy-email" maxLength={200}
@@ -35,7 +35,7 @@ export function BuyContactStep({ t, draft, patch, err, described }: Pick<BuyStep
         aria-describedby={described('buy-email')}
 
         onChange={(event) => patch({ email: event.target.value })} /></Field>
-    <Field label={t('phone')} htmlFor="buy-phone" error={err('buy-phone')}>
+    <Field label={t('phone')} htmlFor="buy-phone" hint={t('phoneHint')} error={err('buy-phone')}>
       <input
 
         id="buy-phone" maxLength={40}
@@ -51,6 +51,7 @@ export function BuyContactStep({ t, draft, patch, err, described }: Pick<BuyStep
         aria-describedby={described('buy-phone')}
 
         onChange={(event) => patch({ phone: event.target.value })} /></Field>
+    </div></fieldset><fieldset className={styles.contactGroup}><legend>{t('addressHeading')}</legend><p className={styles.infoNote}><span aria-hidden="true">ⓘ</span> {t('viennaNotice')}</p><div className={styles.addressRow}>
     <Field label={t('shopStreet')} htmlFor="buy-line1" error={err('buy-line1')}>
       <input
 
@@ -75,13 +76,12 @@ export function BuyContactStep({ t, draft, patch, err, described }: Pick<BuyStep
         value={draft.line2}
 
         onChange={(event) => patch({ line2: event.target.value })} /></Field>
-    <Field
+    </div><div className={styles.postalRow}><Field
 
       label={t('shopPostal')}
 
       htmlFor="buy-postal"
 
-      hint={t('shopPostalHint')}
 
       error={err('buy-postal')}>
       <input
@@ -98,10 +98,9 @@ export function BuyContactStep({ t, draft, patch, err, described }: Pick<BuyStep
 
         aria-invalid={!!err('buy-postal')}
 
-        aria-describedby={described('buy-postal', true)}
+        aria-describedby={described('buy-postal')}
 
         onChange={(event) => patch({ postalCode: event.target.value.replace(/\D/g, '') })} /></Field>
-    <Field label={t('shopCity')} htmlFor="buy-city" error={err('buy-city')}>
-      <input id="buy-city" value="Wien" readOnly /></Field>
+    <div className={styles.cityField}><strong>{t('shopCity')}</strong><span>Wien</span></div></div></fieldset>
   </>)
 }

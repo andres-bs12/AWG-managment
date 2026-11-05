@@ -52,7 +52,7 @@ export function DeliveryRow({ row, from }: Props) {
         <strong>
           {row.orderCode} · {row.title}
         </strong>
-        <span>{deliveryStatusLabel(row)}</span>
+        <span>{[row.color, row.finish, deliveryStatusLabel(row)].filter(Boolean).join(' · ')}</span>
       </span>
       <span className={styles.dlvAside}>
         <span>{row.methodLabel}</span>

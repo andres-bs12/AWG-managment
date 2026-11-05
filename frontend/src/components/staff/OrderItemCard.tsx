@@ -33,7 +33,7 @@ export function OrderItemCard({ item, block, days, selected, showHandoff, naviga
         </div>
       </div>
       <dl className={styles.specs}>
-        {item.kind === 'custom' ? <div><dt>Colour</dt><dd>{item.color ? <><i className={styles.swatch} data-color={item.color} aria-hidden="true" />{item.color === 'red' ? 'Red' : 'Grey'}</> : 'Not recorded'}</dd></div> : null}
+        {item.kind === 'custom' ? <div><dt>Colour</dt><dd>{item.color ? <><i className={styles.swatch} data-color={item.color} aria-hidden="true" />{item.color} · {item.finish ?? 'shiny'}</> : 'Not recorded'}</dd></div> : null}
         {item.withName ? <div><dt>Name to paint</dt><dd className={styles.name}>{item.backName || 'Waiting for form'}</dd></div> : null}
         {showHandoff ? <div><dt>{item.delivery.kind === 'vienna' ? 'Delivery' : 'Pickup'}</dt><dd>{handoffLabel(item, days)}</dd></div> : null}
       </dl>

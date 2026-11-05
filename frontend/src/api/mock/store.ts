@@ -155,7 +155,18 @@ function blocksForDay(dayId: string): TimeBlock[] {
 }
 
 export function listInventory(): InventoryItem[] {
-  return state.inventory ??= [...(['red', 'grey', 'green', 'white'] as const).map(color => ({ id: `custom-${color}`, kind: 'custom' as const, color, quantity: 3 })), { id: 'finished', kind: 'finished', color: null, quantity: 10 }]
+  const rows = state.inventory ??= []
+  for (const color of ['red', 'green', 'beige'] as const) for (const finish of ['shiny', 'matte'] as const) {
+    if (!rows.some(row => row.kind === 'custom' && row.color === color && row.finish === finish)) {
+      const legacy = finish === 'shiny' ? rows.find(row => row.kind === 'custom' && row.color === color && !row.finish) : undefined
+      if (legacy) { legacy.finish = finish; legacy.id = `custom-${color}-${finish}` }
+      else rows.push({ id: `custom-${color}-${finish}`, kind: 'custom', color, finish, quantity: color === 'red' ? 3 : 0 })
+    }
+  }
+  for (const row of rows) if (row.kind === 'custom' && !row.finish) row.finish = 'shiny'
+  if (!rows.some(row => row.kind === 'finished')) rows.push({ id: 'finished', kind: 'finished', color: null, finish: null, quantity: 10 })
+  return rows
+
 }
 export function updateInventory(id: string, quantity: number, expectedQuantity?: number): InventoryItem {
   if (!Number.isInteger(quantity) || quantity < 0 || quantity > 10000) throw new Error('Quantity must be between 0 and 10000.')
@@ -173,7 +184,9 @@ export function updatePaintingDay(date: string, open: boolean, maxPaintings: num
   if (!Number.isInteger(maxPaintings) || maxPaintings < 0 || maxPaintings > 10) throw new Error('Maximum must be between 0 and 10.')
   state.paintingDays ??= {}; state.paintingDays[date] = { open, maxPaintings }; emit(); return paintingDay(date)
 }
-export function joinWaitlist(email: string) { state.waitlist ??= []; if (!state.waitlist.includes(email.toLowerCase())) state.waitlist.push(email.toLowerCase()); emit() }
+export function joinWaitlist(email: string) { const token = crypto.randomUUID(); (state.waitlistTokens ??= {})[token] = { email: email.toLowerCase(), confirmed: false }; emit() }
+export function confirmWaitlist(token: string) { const entry = state.waitlistTokens?.[token]; if (!entry) throw Object.assign(new Error('Unknown token'), { status: 404 }); entry.confirmed = true; state.waitlist ??= []; if (!state.waitlist.includes(entry.email)) state.waitlist.push(entry.email); emit() }
+export function unsubscribeWaitlist(token: string) { const entry = state.waitlistTokens?.[token]; if (entry) { state.waitlist = (state.waitlist ?? []).filter(email => email !== entry.email); delete state.waitlistTokens![token]; emit() } }
 export function makeOrderCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let code: string
   do { code = 'AWG' + Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('') } while (state.orders.some(order => order.code === code))
@@ -266,7 +279,9 @@ export function mockChangePassword(currentPassword: string, newPassword: string)
 export function cancelOrder(id: string) {
   const order = requireOrder(id)
   if (order.handedOver) throw new Error('Cannot cancel an order that has been handed over.')
-  const itemIds = new Set(state.items.filter((item) => item.orderId === id).map((item) => item.id))
+  const cancelled = state.items.filter(item => item.orderId === id)
+  for (const item of cancelled) { const stock = listInventory().find(row => row.kind === item.kind && (item.kind === 'finished' || (row.color === item.color && row.finish === (item.finish ?? 'shiny')))); if (stock) stock.quantity++ }
+  const itemIds = new Set(cancelled.map(item => item.id))
   state.blocks = state.blocks.filter((block) => !block.orderItemId || !itemIds.has(block.orderItemId))
   state.items = state.items.filter((item) => item.orderId !== id)
   state.orders = state.orders.filter((entry) => entry.id !== id)
@@ -277,7 +292,8 @@ export function createMockCheckout(input: ShopCheckoutInput) {
   const inventory = listInventory()
   const counts = new Map<string, number>()
   for (const item of input.items) {
-    const id = `custom-${item.color ?? 'red'}`
+    if (!item.finish || !item.color || !['red', 'green', 'beige'].includes(item.color)) throw Object.assign(new Error('Choose a valid colour and finish.'), { code: 'VALIDATION', field: `items[${input.items.indexOf(item)}].${!item.finish ? 'finish' : 'color'}` })
+    const id = `custom-${item.color}-${item.finish}`
     counts.set(id, (counts.get(id) ?? 0) + 1)
   }
   for (const [id, count] of counts) {
@@ -289,7 +305,7 @@ export function createMockCheckout(input: ShopCheckoutInput) {
   const token = uid('frm')
   const items: OrderItem[] = input.items.map(item => ({
     id: uid('orn'), orderId, kind: 'custom', petName: item.petName ?? '', withName: item.withName,
-    color: item.color ?? 'red', backName: item.backName ?? '', note: item.note ?? '',
+    color: item.color ?? 'red', finish: item.finish, backName: item.backName ?? '', note: item.note ?? '',
     cost: itemCost('custom', item.withName), productionStatus: 'not_started', photos: item.photos,
     formComplete: true, delivery: { kind: 'vienna', address: input.address },
   }))
@@ -311,10 +327,6 @@ export function abandonMockCheckout(code: string) {
   if (!token || suppliedToken !== token) return
   const order = state.orders.find(row => row.code === code && row.formToken === token)
   if (!token || !order || order.paymentState !== 'unpaid') return
-  for (const item of state.items.filter(row => row.orderId === order.id)) {
-    const stock = listInventory().find(row => row.kind === item.kind && row.color === item.color)
-    if (stock) stock.quantity++
-  }
   delete state.pendingCheckouts![code]
   state.customers = state.customers.filter(row => row.id !== order.customerId)
   cancelOrder(order.id)
@@ -556,6 +568,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         itemId: item.id,
         customerName: customer.name,
         color: item.color,
+        finish: item.finish,
         backName: item.backName,
         title,
         productionStatus: item.productionStatus,
@@ -576,6 +589,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         itemId: item.id,
         customerName: customer.name,
         color: item.color,
+        finish: item.finish,
         backName: item.backName,
         title,
         productionStatus: item.productionStatus,
@@ -722,6 +736,7 @@ export function createSale(input: CreateSaleInput): Order {
       petName: '',
       withName,
       color: row.color ?? 'red',
+      finish: row.kind === 'custom' ? row.finish ?? 'shiny' : undefined,
       backName: '',
       note: '',
       cost,
@@ -771,6 +786,15 @@ export function createSale(input: CreateSaleInput): Order {
       })
     }
   }
+
+  const stockCounts = new Map<InventoryItem, number>()
+  for (const item of createdItems) {
+    const stock = listInventory().find(row => row.kind === item.kind && (item.kind === 'finished' || (row.color === item.color && row.finish === item.finish)))
+    if (!stock) throw Object.assign(new Error('Out of stock.'), { code: 'OUT_OF_STOCK' })
+    stockCounts.set(stock, (stockCounts.get(stock) ?? 0) + 1)
+  }
+  for (const [stock, count] of stockCounts) if (stock.quantity < count) throw Object.assign(new Error('Out of stock.'), { code: 'OUT_OF_STOCK' })
+  for (const [stock, count] of stockCounts) stock.quantity -= count
 
   for (const block of createdBlocks) {
     if (!state.marketDays.some(day => day.id === block.marketDayId)) {
@@ -865,6 +889,7 @@ export function setHandedOver(orderId: string, handedOver: boolean) {
     throw new Error('Finish all ornaments before marking handed over')
   }
   order.handedOver = handedOver
+  order.handedOverAt = handedOver ? new Date().toISOString() : undefined
   emit()
 }
 
@@ -907,6 +932,7 @@ export function getTrackByCode(code: string): TrackView {
     customerName: customer?.name.split(' ')[0] ?? 'there',
     items: items.map((i) => ({
       color: i.color,
+      finish: i.finish,
       cost: i.cost,
       petName: i.petName,
       kind: i.kind,
@@ -934,6 +960,7 @@ export function updateViennaAddress(code: string, address: Address): TrackView {
 export function getForm(token: string): CustomerFormView {
   const order = state.orders.find((o) => o.formToken === token)
   if (!order) throw new Error('This form link is not valid.')
+  if (order.handedOver && order.handedOverAt && Date.now() - Date.parse(order.handedOverAt) >= 30 * 86400000) throw Object.assign(new Error('Form expired.'), { code: 'FORM_EXPIRED', status: 404 })
   const customer = state.customers.find((c) => c.id === order.customerId)
   const items = state.items.filter((i) => i.orderId === order.id)
   const item = items.find((i) => i.kind === 'custom') ?? items[0]
@@ -968,6 +995,7 @@ export function getForm(token: string): CustomerFormView {
 export function submitForm(token: string, payload: CustomerFormPayload): { orderCode: string } {
   const order = state.orders.find((o) => o.formToken === token)
   if (!order) throw new Error('This form link is not valid.')
+  if (order.handedOver && order.handedOverAt && Date.now() - Date.parse(order.handedOverAt) >= 30 * 86400000) throw Object.assign(new Error('Form expired.'), { code: 'FORM_EXPIRED', status: 404 })
   const customer = state.customers.find((c) => c.id === order.customerId)
   const items = state.items.filter((i) => i.orderId === order.id)
   const item = items.find((i) => i.kind === 'custom') ?? items[0]

@@ -15,7 +15,7 @@ export function AgendaSessionList({ slots, days, selectedId, onOpen }: Props) {
       return <li key={slot.block.id}>
         <button type="button" className={styles.row} data-status={tone} data-selected={selectedId === slot.block.id} disabled={!slot.order} onClick={() => onOpen(slot)} aria-label={`Open ${name}, ${formatHour(slot.block.startHour)}, ${status}`}>
           <span className={styles.time}><strong>{formatHour(slot.block.startHour)}</strong><span>{formatHour(slot.block.endHour)}</span></span>
-          <span className={styles.body}><strong>{name}</strong><span>{slot.order?.code}{slot.item ? ` · ${handoffLabel(slot.item, days)}` : ''}</span></span>
+          <span className={styles.body}><strong>{name}</strong><span>{slot.order?.code}{slot.item?.color ? ` · ${slot.item.color} · ${slot.item.finish ?? 'shiny'}` : ''}{slot.item ? ` · ${handoffLabel(slot.item, days)}` : ''}</span></span>
           <span className={styles.status} data-status={tone}>{status}<span aria-hidden="true"> →</span></span>
         </button>
       </li>

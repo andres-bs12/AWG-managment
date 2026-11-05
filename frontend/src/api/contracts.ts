@@ -106,6 +106,8 @@ export type UploadService = {
 }
 
 export type ShopService = {
+  confirmWaitlist: (token: string) => Promise<void>
+  unsubscribeWaitlist: (token: string) => Promise<void>
   joinWaitlist: (email: string, locale: 'de' | 'en') => Promise<void>
   getConfig: () => Promise<ShopConfig>
   listDeliveryDates: (items: Pick<ShopItemInput, 'kind' | 'withName'>[]) => Promise<ShopDeliveryDate[]>
