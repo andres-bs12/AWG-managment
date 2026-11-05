@@ -128,6 +128,11 @@ public class PhotoStorageService {
                 if (w < 1 || h < 1 || w > 12000 || h > 12000 || (long) w * h > 80_000_000L) {
                     throw new BadRequestException("A photo is too large. Use a smaller image.");
                 }
+                // Decode every pixel row (subsampled, so memory stays small): truncated or corrupt data fails here.
+                javax.imageio.ImageReadParam param = reader.getDefaultReadParam();
+                int step = Math.max(1, Math.max(w, h) / 512);
+                param.setSourceSubsampling(step, step, 0, 0);
+                reader.read(0, param);
             } finally {
                 reader.dispose();
             }

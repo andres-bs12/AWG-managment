@@ -116,6 +116,22 @@ public class StripeClient {
         }
     }
 
+    /**
+     * Closes a session and returns its final status: "expired" (safe to release the order) or "complete"
+     * (it was paid meanwhile; keep the order). If the expire call fails — e.g. Stripe expired it but the
+     * response was lost, or a retry after a rollback — the session is fetched to learn what really happened.
+     */
+    public String expireOrReconcile(String sessionId) {
+        try {
+            expireSession(sessionId);
+            return "expired";
+        } catch (PaymentProviderException e) {
+            String status = retrieveSession(sessionId).path("status").asString("");
+            if (status.equals("expired") || status.equals("complete")) return status;
+            throw e;
+        }
+    }
+
     /** Fetches a Checkout Session (status, payment_status, amount_total, currency). */
     public JsonNode retrieveSession(String sessionId) {
         if (!isConfigured()) throw new ShopUnavailableException();

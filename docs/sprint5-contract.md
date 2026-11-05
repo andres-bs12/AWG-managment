@@ -20,7 +20,7 @@ Every non-2xx body: `{ status, message, code?, field? }`.
 - POST when not editable → 409 `FORM_LOCKED`.
 
 ## Stock
-- `PATCH /api/inventory/{id}` body `{ quantity, expectedQuantity? }`. When `expectedQuantity` is given and differs from the stored quantity (a sale happened meanwhile) → 409 `STOCK_CHANGED` with the current row; the UI reloads and asks again.
+- `PATCH /api/inventory/{id}` body `{ quantity, expectedQuantity? }`. When `expectedQuantity` is given and differs from the stored quantity (a sale happened meanwhile) → 409 `STOCK_CHANGED` (the message names the current count); the UI reloads the list and asks again.
 
 ## Shop
 - `POST /api/shop/checkout/{code}/abandon` with header `X-Form-Token` → 204. Used when the customer returns from Stripe with `?cancelled=CODE`: expires the Stripe session and releases the pending order (no-op if already paid or gone). The browser has the form token from checkout.

@@ -125,6 +125,14 @@ class FormTrackApiTests extends ApiTestSupport {
                 .andExpect(jsonPath("$.delivery.address").doesNotExist());
     }
 
+    @Test
+    void truncatedJpegIsRejected() throws Exception {
+        Created c = customOrder(login(), "market", SAT, 14.0);
+        byte[] cut = java.util.Arrays.copyOf(JPEG, JPEG.length / 2);
+        MvcResult res = submit(c, new MockMultipartFile("photo-p1", "bella.jpg", "image/jpeg", cut));
+        assertEquals(400, res.getResponse().getStatus());
+    }
+
     private MvcResult submitWithAddress(Created c, Map<String, Object> address) throws Exception {
         Map<String, Object> payload = new java.util.LinkedHashMap<>(Map.of(
                 "customerName", "Maria Muster", "phone", "+43 660 1234567", "email", "maria@example.com",

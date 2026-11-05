@@ -99,7 +99,8 @@ public class ShopService {
             throw new com.artwithgab.awg_tracking.exception.ForbiddenException("This checkout belongs to another browser.");
         }
         if (!order.isAwaitingPayment()) return;
-        if (order.getStripeSessionId() != null) stripe.expireSession(order.getStripeSessionId());
+        // Paid meanwhile: keep it; the webhook (or the cleanup job) confirms it.
+        if (order.getStripeSessionId() != null && stripe.expireOrReconcile(order.getStripeSessionId()).equals("complete")) return;
         release(order);
     }
 

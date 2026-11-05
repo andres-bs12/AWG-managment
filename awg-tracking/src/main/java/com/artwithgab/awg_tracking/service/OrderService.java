@@ -317,7 +317,10 @@ public class OrderService {
         if (order.isHandedOver()) throw new ConflictException("This order was already handed over.");
         if (order.isAwaitingPayment() && order.getStripeSessionId() != null) {
             // Close the Stripe page first so the customer cannot pay an order that no longer exists.
-            stripe.expireSession(order.getStripeSessionId());
+            if (stripe.expireOrReconcile(order.getStripeSessionId()).equals("complete")) {
+                throw new ConflictException("The customer just paid this order online. Refresh before cancelling.")
+                        .code("PAYMENT_PENDING");
+            }
         } else if (order.getStripeSessionId() != null) {
             log.warn("Cancelled web order {} (Stripe session {}): refund it in Stripe if it was paid",
                     order.getCode(), order.getStripeSessionId());

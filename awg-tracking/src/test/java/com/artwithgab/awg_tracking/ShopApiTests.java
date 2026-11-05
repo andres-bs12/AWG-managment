@@ -46,6 +46,7 @@ class ShopApiTests extends ApiTestSupport {
         when(stripe.createCheckoutSession(anyString(), anyString(), anyString(), anyList(), any()))
                 .thenReturn(new StripeClient.Session("cs_test_1", "https://checkout.stripe.test/cs_test_1"));
         when(stripe.verifySignature(anyString(), anyString())).thenReturn(true);
+        when(stripe.expireOrReconcile(anyString())).thenReturn("expired");
     }
 
     private List<String> dates(List<Map<String, Object>> items) throws Exception {
@@ -171,9 +172,19 @@ class ShopApiTests extends ApiTestSupport {
         mvc.perform(withIp(post("/api/shop/checkout/" + code + "/abandon")).header("X-Form-Token", formToken))
                 .andExpect(status().isNoContent());
         assertThat(orderRepository.findByCodeIgnoreCase(code)).isEmpty();
-        org.mockito.Mockito.verify(stripe).expireSession("cs_test_1");
+        org.mockito.Mockito.verify(stripe).expireOrReconcile("cs_test_1");
         assertThat(inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.GREY).orElseThrow().getQuantity())
                 .isEqualTo(stockBefore);
+    }
+
+    @Test
+    void abandonKeepsAnOrderPaidMeanwhile() throws Exception {
+        when(stripe.expireOrReconcile(anyString())).thenReturn("complete");
+        MvcResult res = checkout("1070", "2026-12-02", 1);
+        String code = read(res, "$.orderCode");
+        mvc.perform(withIp(post("/api/shop/checkout/" + code + "/abandon")).header("X-Form-Token", this.<String>read(res, "$.formToken")))
+                .andExpect(status().isNoContent());
+        assertThat(orderRepository.findByCodeIgnoreCase(code)).isPresent();
     }
 
     @Test
