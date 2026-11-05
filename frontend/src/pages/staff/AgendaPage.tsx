@@ -457,7 +457,7 @@ export function AgendaPage() {
       {moveProposal ? (
         <StaffDialog title="Confirm schedule change" busy={moving} onClose={() => { setMoveProposal(null); setMoveError('') }}>
           <div>
-            <strong>Move {moveProposal.slot.order?.code ?? moveProposal.slot.item?.petName ?? 'session'}?</strong>
+            <strong>Move {[moveProposal.slot.item?.petName, moveProposal.slot.order?.code ? `(${moveProposal.slot.order.code})` : null].filter(Boolean).join(' ') || 'session'}?</strong>
             <p>
               {formatHour(moveProposal.slot.block.startHour)}–{formatHour(moveProposal.slot.block.endHour)}
               <span aria-hidden="true"> → </span>

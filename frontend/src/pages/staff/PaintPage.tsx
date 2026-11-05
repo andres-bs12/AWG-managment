@@ -95,7 +95,7 @@ export function PaintPage() {
           <p className={styles.handoff}>{handoff}</p>
           <p className={styles.meta}>{order.code} · {customer.name || 'Customer pending'}</p>
           <p className={styles.meta}>{slot}</p>
-          {(item.withName && item.backName) || item.color ? <p className={styles.paintFacts}>{item.withName && item.backName ? <strong>Back: {item.backName}</strong> : null}{item.color ? <span>Colour: {item.color} · {item.finish ?? 'shiny'}</span> : null}</p> : null}
+          <p className={styles.paintFacts}>{item.withName && item.backName ? <strong>Name on back: {item.backName}</strong> : null}<span>Colour: {item.color ? `${item.color} · ${item.finish ?? 'shiny'}` : 'not set'}</span></p>
           {item.note ? <p className={styles.paintNote}>{item.note}</p> : null}
           {statusAction.unconfirmed && <p role="status">Waiting for online payment review. Painting is unavailable.</p>}
           {actionError ? <p role="alert">{actionError}</p> : null}

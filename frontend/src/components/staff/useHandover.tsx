@@ -21,7 +21,7 @@ export function useHandover(onChanged: () => Promise<unknown> | void, onError: (
     const target = trigger.current
     requestAnimationFrame(() => { if (target?.isConnected) target.focus() })
   }
-  async function perform(id: string, target: boolean, collect = false) {
+  async function perform(id: string, target: boolean, collect = false, inDialog = false) {
     if (lock.current) return
     lock.current = true; setBusy(true); onError(''); setError('')
     try {
@@ -31,7 +31,7 @@ export function useHandover(onChanged: () => Promise<unknown> | void, onError: (
       await onChanged()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not update handover.'
-      setError(message); onError(message)
+      setError(message); if (!inDialog) onError(message)
     } finally { lock.current = false; setBusy(false) }
   }
   async function request(id: string, target: boolean) {
@@ -54,8 +54,8 @@ export function useHandover(onChanged: () => Promise<unknown> | void, onError: (
     <p>{pending.order.code}: collect {formatEur(paymentSummary(pending.order).remaining, 'en')} before handing over the whole order.</p>
     <SegmentedControl legend="Collection method" name="handover-method" value={method} onChange={setMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} />
     {error && <p role="alert">{error}</p>}
-    <Button tone="staff" disabled={busy || !method} onClick={() => void perform(pending.order.id, true, true)}>Mark paid &amp; hand over</Button>
-    <Button tone="staff" variant="ghost" disabled={busy} onClick={() => void perform(pending.order.id, true)}>Hand over with balance due</Button>
+    <Button tone="staff" disabled={busy || !method} onClick={() => void perform(pending.order.id, true, true, true)}>Mark paid &amp; hand over</Button>
+    <Button tone="staff" variant="ghost" disabled={busy} onClick={() => void perform(pending.order.id, true, false, true)}>Hand over with balance due</Button>
     <Button tone="staff" variant="secondary" disabled={busy} onClick={dismiss}>Not yet</Button>
   </StaffDialog> : null
   return { request, busy, dialog }

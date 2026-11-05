@@ -1,5 +1,7 @@
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: var(--size-control); padding: var(--space-2) var(--space-4); border-radius: var(--radius-control); border: 1px solid transparent; font-weight: var(--type-button-weight); text-decoration: none; text-align: center; transition: transform var(--dur-press) var(--ease-press); }
 .btn:disabled { background: var(--color-disabled-surface); color: var(--color-disabled-text); border-color: var(--color-control-border); cursor: not-allowed; }
+/* A disabled quiet action must not look more clickable than an enabled one. */
+.ghost:disabled { background: transparent; border-color: transparent; }
 .btn:active:not(:disabled) { transform: scale(var(--motion-press-scale)); }
 .btn:focus-visible { outline: none; box-shadow: var(--focus); }
 .lg { min-height: var(--touch-lg); padding-inline: var(--space-5); }

@@ -65,7 +65,7 @@ export function DayStrip({ days, value, onChange, today }: Props) {
                 data-selected={selected ? 'true' : 'false'}
                 onClick={() => onChange(day.value)}
               >
-                <span>{day.label.split(' ')[0]}</span>
+                <span>{day.label.split(' ')[0].replace(',', '')}</span>
                 <strong>{day.label.split(' ').slice(1).join(' ')}</strong>
               </button>
             )

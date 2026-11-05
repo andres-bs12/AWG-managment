@@ -31,6 +31,8 @@ export function StaffLayout() {
   const navigate = useNavigate()
   const onPaint = location.pathname.includes('/paint/')
   const selected = (path: string) => location.pathname.startsWith(path)
+  // Pages reached through More keep a current tab, so the shell always shows where you are.
+  const inMore = ['/staff/inventory', '/staff/markets', '/staff/painting-days', '/staff/password'].some(selected)
   useEffect(() => { rememberStaffHub(location.pathname + location.search); setMenuOpen(false) }, [location.pathname, location.search])
   useEffect(() => {
     let active = true
@@ -75,7 +77,7 @@ export function StaffLayout() {
           <ButtonLink to="/staff/agenda" tone="staff" variant="ghost" selected={selected('/staff/agenda')}>Agenda</ButtonLink>
           <ButtonLink to="/staff/deliveries" tone="staff" variant="ghost" selected={selected('/staff/deliveries')}>Deliveries</ButtonLink>
           <ButtonLink to="/staff/sales/new?fresh=1" tone="staff" variant="ghost" selected={selected('/staff/sales/new')}>New sale</ButtonLink>
-          <Button tone="staff" variant="ghost" aria-expanded={menuOpen} aria-controls="staff-more" onClick={() => setMenuOpen(open => !open)}>More</Button>
+          <Button tone="staff" variant="ghost" data-selected={inMore ? 'true' : 'false'} aria-current={inMore ? 'page' : undefined} aria-expanded={menuOpen} aria-controls="staff-more" onClick={() => setMenuOpen(open => !open)}>More</Button>
         </nav>
       </header>
       {attentionError && <p className={styles.status} role="status">{attentionError} <ButtonLink to="/staff/attention" tone="staff" variant="ghost">Review orders</ButtonLink></p>}
@@ -93,7 +95,7 @@ export function StaffLayout() {
       <ButtonLink to="/staff/deliveries" tone="staff" variant="ghost" selected={selected('/staff/deliveries')}>Deliveries</ButtonLink>
       <ButtonLink to="/staff/sales/new?fresh=1" tone="staff" variant="ghost" selected={selected('/staff/sales/new')}>New sale</ButtonLink>
       <ButtonLink to="/staff/search" tone="staff" variant="ghost" selected={selected('/staff/search')}>Search</ButtonLink>
-      <Button tone="staff" variant="ghost" aria-expanded={menuOpen} aria-controls="staff-more" onClick={() => setMenuOpen(open => !open)}>More</Button>
+      <Button tone="staff" variant="ghost" data-selected={inMore ? 'true' : 'false'} aria-current={inMore ? 'page' : undefined} aria-expanded={menuOpen} aria-controls="staff-more" onClick={() => setMenuOpen(open => !open)}>More</Button>
     </nav>}
   </div>
 }

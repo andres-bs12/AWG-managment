@@ -137,7 +137,7 @@
   justify-content: flex-start;
   gap: var(--space-1);
   overflow: hidden;
-  border-radius: var(--space-2);
+  border-radius: var(--radius-small);
   border: var(--border-control) solid transparent;
   text-align: left;
   padding: var(--space-1) var(--space-2);
@@ -224,7 +224,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  z-index: 3;
+  z-index: 1;
   height: var(--border-control);
   background: var(--staff-danger);
   pointer-events: none;
