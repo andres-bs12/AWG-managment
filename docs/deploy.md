@@ -63,3 +63,20 @@ docker run --rm -v NOMBRE_DEL_VOLUMEN:/data:ro -v "$PWD":/backup alpine:3.21 tar
 Coordina las copias de la base y las fotos para que representen el mismo momento; detener temporalmente las escrituras durante ambas evita que queden desincronizadas. No uses `docker compose down -v` salvo que quieras eliminar los datos persistentes.
 
 El esquema lo gestiona Flyway (`awg-tracking/src/main/resources/db/migration`): al arrancar aplica las migraciones pendientes y Hibernate solo valida (`ddl-auto=validate`). Cualquier cambio de esquema va en un archivo nuevo `V<n>__descripcion.sql`; nunca edites uno ya aplicado.
+
+## E-mails (notificaciones)
+
+Cada movimiento de un pedido manda un e-mail al dueño y al cliente:
+- Al dueño: pedido web pagado, venta en el puesto, cambio de pago, todo pintado, entregado, cancelado, cambio de dirección y formulario enviado.
+- Al cliente, en alemán e inglés: los mismos movimientos excepto el formulario enviado.
+
+Variables:
+
+| Variable | Uso |
+|---|---|
+| `MAIL_HOST`, `MAIL_PORT` | Servidor SMTP (por ejemplo, el de tu proveedor de correo; puerto 587 con STARTTLS). Vacío = no se envía nada (solo queda en el log). |
+| `MAIL_USERNAME`, `MAIL_PASSWORD` | Credenciales SMTP (contraseña de aplicación si el proveedor la pide). |
+| `MAIL_FROM` | Remitente, por ejemplo `pedidos@<tu-dominio>`. |
+| `OWNER_EMAIL` | A dónde llegan los avisos del dueño. |
+
+Los e-mails se envían en segundo plano después de guardar el cambio. Si el SMTP falla, el pedido no se ve afectado y el error queda en el log.

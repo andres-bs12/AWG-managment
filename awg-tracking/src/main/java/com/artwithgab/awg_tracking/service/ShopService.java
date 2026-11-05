@@ -53,6 +53,7 @@ public class ShopService {
     private final InventoryService inventoryService;
     private final OrderCodeGenerator codeGenerator;
     private final OrderRepository orderRepository;
+    private final org.springframework.context.ApplicationEventPublisher events;
     private final CustomerRepository customerRepository;
     private final com.artwithgab.awg_tracking.repository.InventoryRepository inventoryRepository;
     private final PhotoStorageService photoStorage;
@@ -389,6 +390,7 @@ public class ShopService {
         order.setPaymentState(PaymentState.PAID);
         order.setPaymentMethod(PaymentMethod.CARD);
         order.setAmountPaid(order.getTotal());
+        events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.WEB_PAID));
         log.info("Web order {} paid", order.getCode());
     }
 

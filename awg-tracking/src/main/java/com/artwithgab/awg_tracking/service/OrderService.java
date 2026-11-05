@@ -35,6 +35,7 @@ public class OrderService {
     private final AgendaService agendaService;
     private final ViewMapper mapper;
     private final Clock clock;
+    private final org.springframework.context.ApplicationEventPublisher events;
     private final com.artwithgab.awg_tracking.repository.StoredPhotoRepository photoRepository;
     private final PhotoStorageService photoStorage;
 
@@ -210,7 +211,9 @@ public class OrderService {
             moving.setPaintStart(to.atTime(Hours.toTime(move.to().startHour())));
             moving.setPaintEnd(to.atTime(Hours.toTime(move.to().endHour())));
         }
-        return mapper.order(orderRepository.save(order));
+        orderRepository.save(order);
+        events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.SALE_CREATED));
+        return mapper.order(order);
     }
 
     // ─── Updates ────────────────────────────────────────────────────────────
@@ -230,10 +233,12 @@ public class OrderService {
         if (state == PaymentState.DEPOSIT && (received.signum() <= 0 || received.compareTo(total) >= 0)) {
             throw new BadRequestException("A deposit must be more than 0 and less than the total.");
         }
+        boolean changed = order.getPaymentState() != state || order.getAmountPaid().compareTo(received) != 0;
         order.setPaymentState(state);
         order.setAmountPaid(received);
         if (state == PaymentState.UNPAID) order.setPaymentMethod(null);
         else if (method != null) order.setPaymentMethod(method);
+        if (changed) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.PAYMENT_CHANGED));
         return mapper.order(order);
     }
 
@@ -243,7 +248,9 @@ public class OrderService {
         if (handedOver && order.getOrderItems().stream().anyMatch(i -> i.getProductionStatus() != ProductionStatus.FINISHED)) {
             throw new ConflictException("Finish all ornaments before marking handed over");
         }
+        boolean changed = order.isHandedOver() != handedOver;
         order.setHandedOver(handedOver);
+        if (changed && handedOver) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.HANDED_OVER));
     }
 
     /** Changes one item's production status; un-finishing an item also undoes the handoff. */
@@ -252,7 +259,11 @@ public class OrderService {
         Order order = findOrderOrThrow(orderId);
         OrderItem item = order.getOrderItems().stream().filter(i -> i.getId().equals(itemId)).findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Item not found"));
+        boolean wasFinished = item.getProductionStatus() == ProductionStatus.FINISHED;
         item.setProductionStatus(status);
+        if (!wasFinished && status == ProductionStatus.FINISHED && order.getOrderItems().stream().allMatch(i -> i.getProductionStatus() == ProductionStatus.FINISHED)) {
+            events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.ALL_FINISHED));
+        }
         if (order.isHandedOver() && order.getOrderItems().stream().anyMatch(i -> i.getProductionStatus() != ProductionStatus.FINISHED)) {
             order.setHandedOver(false);
         }
@@ -267,6 +278,7 @@ public class OrderService {
         calendarService.lockSchedule();
         Order order = findOrderOrThrow(orderId);
         if (order.isHandedOver()) throw new ConflictException("This order was already handed over.");
+        events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.CANCELLED));
         deleteAndRestock(order);
     }
 

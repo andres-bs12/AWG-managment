@@ -30,6 +30,13 @@ services:
       UPLOADS_DIR: /data/uploads
       # Behind nginx: trust X-Forwarded-* from the internal proxy so rate limits see the real client IP.
       FORWARD_HEADERS: native
+      # E-mail notifications (owner + customer); nothing is sent while MAIL_HOST is empty.
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      OWNER_EMAIL: ${OWNER_EMAIL:-}
     volumes:
       - uploads_data:/data/uploads
     depends_on:

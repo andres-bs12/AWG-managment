@@ -25,6 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TrackingService {
     private final OrderRepository orderRepository;
+    private final org.springframework.context.ApplicationEventPublisher events;
     private final CalendarService calendarService;
     private final ViewMapper mapper;
 
@@ -56,6 +57,7 @@ public class TrackingService {
             throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).");
         }
         order.setDeliveryAddress(OrderService.toAddress(address));
+        events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.ADDRESS_CHANGED));
         return view(order, true);
     }
 

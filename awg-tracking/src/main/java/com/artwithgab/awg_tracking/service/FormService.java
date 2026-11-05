@@ -22,6 +22,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class FormService {
     private final OrderRepository orderRepository;
+    private final org.springframework.context.ApplicationEventPublisher events;
     private final StoredPhotoRepository photoRepository;
     private final PhotoStorageService photoStorage;
     private final CalendarService calendarService;
@@ -90,6 +91,7 @@ public class FormService {
             replacePhotos(item, row, files);
         }
         order.setFormSubmitted(true);
+        events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.FORM_SUBMITTED));
         return new SubmitFormResponse(order.getCode());
     }
 
