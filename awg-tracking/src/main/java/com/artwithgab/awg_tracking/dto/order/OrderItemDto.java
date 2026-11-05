@@ -2,6 +2,7 @@ package com.artwithgab.awg_tracking.dto.order;
 
 import com.artwithgab.awg_tracking.dto.common.PhotoDto;
 import com.artwithgab.awg_tracking.enums.CustomColor;
+import com.artwithgab.awg_tracking.enums.CustomFinish;
 import com.artwithgab.awg_tracking.enums.ItemKind;
 import com.artwithgab.awg_tracking.enums.ProductionStatus;
 
@@ -16,6 +17,7 @@ public record OrderItemDto(
         String petName,
         boolean withName,
         CustomColor color,
+        CustomFinish finish,
         String backName,
         String note,
         BigDecimal cost,

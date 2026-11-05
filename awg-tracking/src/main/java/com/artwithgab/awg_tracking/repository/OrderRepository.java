@@ -18,6 +18,10 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("select o from Order o join fetch o.customer where o.formToken = :formToken")
     Optional<Order> findByFormToken(String formToken);
 
+    List<Order> findByHandedOverAtBeforeAndAnonymizedAtIsNull(java.time.Instant cutoff);
+
+    List<Order> findByHandedOverFalseAndAnonymizedAtIsNullAndCreatedAtBefore(java.time.Instant cutoff);
+
     boolean existsByCustomerId(UUID customerId);
 
     Optional<Order> findByIdempotencyKey(String idempotencyKey);

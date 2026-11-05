@@ -23,8 +23,11 @@ public class Customer {
     public static final String PLACEHOLDER_NAME = "Walk-in";
 
     /** The real name, or "" while it is still the stall placeholder. */
+    /** Name left after the personal data was deleted (data retention). */
+    public static final String DELETED_NAME = "(deleted)";
+
     public String publicName() {
-        return name == null || PLACEHOLDER_NAME.equals(name.trim()) ? "" : name.trim();
+        return name == null || PLACEHOLDER_NAME.equals(name.trim()) || DELETED_NAME.equals(name.trim()) ? "" : name.trim();
     }
 
     @Id

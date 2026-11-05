@@ -112,6 +112,7 @@ public class ViewMapper {
                 nz(i.getPetName()),
                 i.isWithName(),
                 i.getCustomColor(),
+                i.getCustomFinish(),
                 nz(i.getNameInOrnament()),
                 nz(i.getNote()),
                 i.getCost(),

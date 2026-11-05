@@ -115,7 +115,7 @@ public class AgendaService {
             boolean market = item.getDeliveryKind() == DeliveryKind.MARKET;
             Double hour = market && item.getPickUpTime() != null ? Hours.of(item.getPickUpTime()) : null;
             rows.add(new AgendaDeliveryDto(
-                    customer.getName(), item.getCustomColor(), ViewMapper.nz(item.getNameInOrnament()),
+                    customer.getName(), item.getCustomColor(), item.getCustomFinish(), ViewMapper.nz(item.getNameInOrnament()),
                     order.getId().toString(), order.getCode(), item.getId().toString(), title,
                     item.getProductionStatus(), order.isHandedOver(), item.getDeliveryKind(), hour,
                     market ? "Market pickup" : "Vienna · Wed/Fri",

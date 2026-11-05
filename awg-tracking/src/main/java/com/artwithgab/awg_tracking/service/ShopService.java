@@ -69,14 +69,17 @@ public class ShopService {
     @Transactional(readOnly = true)
     public ShopConfigDto config() {
         var p = props.pricing();
-        List<ShopColorOptionDto> colors = new ArrayList<>();
-        for (CustomColor color : CustomColor.values()) {
-            inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, color)
-                    .ifPresent(inv -> colors.add(new ShopColorOptionDto(color, inv.getQuantity() > 0)));
-        }
+        List<ShopColorOptionDto> colors = inventoryRepository.findByItemKind(ItemKind.CUSTOM).stream()
+                .filter(inv -> inv.getCustomColor() != null && inv.getCustomColor().isOffered() && inv.getCustomFinish() != null)
+                .sorted(Comparator.comparing((Inventory inv) -> inv.getCustomColor().ordinal())
+                        .thenComparing(inv -> inv.getCustomFinish().ordinal()))
+                .map(inv -> new ShopColorOptionDto(inv.getCustomColor(), inv.getCustomFinish(), inv.getQuantity() > 0))
+                .toList();
         LocalDate end = seasonEnd();
+        LocalDate from = props.shop().deliveriesFrom();
         return new ShopConfigDto(isOpen(), p.custom(), p.nameExtra(), fee(), MAX_ITEMS, colors,
-                end.toString(), LocalDate.now(clock.withZone(java.time.ZoneId.of(props.zone()))).isAfter(end));
+                end.toString(), LocalDate.now(clock.withZone(java.time.ZoneId.of(props.zone()))).isAfter(end),
+                from == null ? null : from.toString());
     }
 
     private LocalDate seasonEnd() {
@@ -104,20 +107,50 @@ public class ShopService {
         release(order);
     }
 
-    /** Stores a waitlist e-mail once (repeat sign-ups are silently accepted). */
+    /**
+     * Double opt-in: stores the e-mail unconfirmed and sends the confirmation link. A repeat sign-up
+     * of an unconfirmed address sends the link again; a confirmed one changes nothing. The response
+     * is the same in every case, so it does not reveal who is on the list.
+     */
     @Transactional
     public void joinWaitlist(String email, String locale) {
         String normalized = email.trim().toLowerCase(Locale.ROOT);
-        if (waitlistRepository.existsByEmail(normalized)) return;
+        String lang = "en".equals(locale) ? "en" : "de";
+        var existing = waitlistRepository.findByEmail(normalized);
+        if (existing.isPresent()) {
+            var entry = existing.get();
+            if (entry.getConfirmedAt() == null) {
+                events.publishEvent(new WaitlistConfirmation(entry.getEmail(), lang, entry.getToken()));
+            }
+            return;
+        }
         var entry = new com.artwithgab.awg_tracking.model.WaitlistEntry();
         entry.setEmail(normalized);
-        entry.setLocale("en".equals(locale) ? "en" : "de");
+        entry.setLocale(lang);
         entry.setCreatedAt(clock.instant());
+        entry.setToken(codeGenerator.generateFormToken());
         try {
             waitlistRepository.saveAndFlush(entry);
         } catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
-            // Same e-mail sent twice at once: already on the list.
+            // Same e-mail sent twice at once: the other request sends the link.
+            return;
         }
+        events.publishEvent(new WaitlistConfirmation(normalized, lang, entry.getToken()));
+    }
+
+    /** Link from the confirmation e-mail. Unknown or deleted tokens → 404 so the page can say so. */
+    @Transactional
+    public void confirmWaitlist(String token) {
+        var entry = waitlistRepository.findByToken(token == null ? "" : token.trim())
+                .orElseThrow(() -> new com.artwithgab.awg_tracking.exception.ResourceNotFoundException("This link is no longer valid.")
+                        .code("NOT_FOUND"));
+        if (entry.getConfirmedAt() == null) entry.setConfirmedAt(clock.instant());
+    }
+
+    /** Link in every waitlist e-mail: deletes the address. Always succeeds (no hint whether it existed). */
+    @Transactional
+    public void leaveWaitlist(String token) {
+        waitlistRepository.findByToken(token == null ? "" : token.trim()).ifPresent(waitlistRepository::delete);
     }
 
     /** Online orders are custom pet ornaments only. */
@@ -136,7 +169,7 @@ public class ShopService {
         AgendaService.Snapshot s = agendaService.snapshot();
         List<Double> durations = durations(items);
         List<DeliveryDateDto> out = new ArrayList<>();
-        LocalDate first = s.index().today().plusDays(Math.max(1, props.shop().leadDays()));
+        LocalDate first = firstDeliveryDay(s.index().today());
         LocalDate last = s.index().today().plusDays(props.shop().maxDaysAhead());
         if (last.isAfter(seasonEnd())) last = seasonEnd();
         for (LocalDate d = first; !d.isAfter(last); d = d.plusDays(1)) {
@@ -146,6 +179,13 @@ public class ShopService {
             }
         }
         return out;
+    }
+
+    /** Lead time after today, and never before the season's first delivery day. */
+    private LocalDate firstDeliveryDay(LocalDate today) {
+        LocalDate first = today.plusDays(Math.max(1, props.shop().leadDays()));
+        LocalDate from = props.shop().deliveriesFrom();
+        return from != null && from.isAfter(first) ? from : first;
     }
 
     /**
@@ -217,7 +257,7 @@ public class ShopService {
         }
         AgendaService.Snapshot s = agendaService.snapshot();
         LocalDate today = s.index().today();
-        if (req.deliveryDate().isBefore(today.plusDays(Math.max(1, props.shop().leadDays())))
+        if (req.deliveryDate().isBefore(firstDeliveryDay(today))
                 || req.deliveryDate().isAfter(today.plusDays(props.shop().maxDaysAhead()))
                 || !isDeliveryDay(s, req.deliveryDate())) {
             throw new BadRequestException("Choose one of the offered delivery days.").code("DELIVERY_DAY_INVALID").field("deliveryDate");
@@ -225,8 +265,14 @@ public class ShopService {
 
         // Validate items before reserving anything.
         requireCustomOnly(req.items());
-        for (ShopItemRequest item : req.items()) {
-            if (item.color() == null) throw new BadRequestException("Choose a color for each ornament.");
+        for (int n = 0; n < req.items().size(); n++) {
+            ShopItemRequest item = req.items().get(n);
+            if (item.color() == null || !item.color().isOffered()) {
+                throw new BadRequestException("Choose a color for each ornament.").code("VALIDATION").field("items[" + n + "].color");
+            }
+            if (item.finish() == null) {
+                throw new BadRequestException("Choose shiny or matte for each ornament.").code("VALIDATION").field("items[" + n + "].finish");
+            }
             {
                 if (item.petName() == null || item.petName().isBlank()) throw new BadRequestException("Add your pet's name for each custom ornament.");
                 if (item.photos() == null || item.photos().isEmpty()) throw new BadRequestException("Add at least one photo for " + item.petName().trim() + ".");
@@ -275,6 +321,7 @@ public class ShopService {
             item.setItemKind(row.kind());
             item.setWithName(withName);
             item.setCustomColor(custom ? row.color() : null);
+            item.setCustomFinish(custom ? row.finish() : null);
             item.setCost(pricingService.itemCost(row.kind(), withName));
             item.setProductionStatus(custom ? ProductionStatus.NOT_STARTED : ProductionStatus.FINISHED);
             item.setPosition(position++);

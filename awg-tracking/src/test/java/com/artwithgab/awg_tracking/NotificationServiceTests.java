@@ -37,7 +37,7 @@ class NotificationServiceTests {
     @MockitoBean JavaMailSender mail;
 
     @Test void salePaymentAndCancellationAreSentAfterCommit() {
-        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, DeliveryKind.MARKET, null, null, null, null);
+        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null);
         var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(item)));
         UUID id = UUID.fromString(order.id());
         try {
@@ -55,7 +55,7 @@ class NotificationServiceTests {
                 .allMatch(m -> m.getText().contains("/track/" + order.code()) && m.getText().contains("Hallo") && m.getText().contains("Hello")));
     }
     @Test void rolledBackSaleDoesNotSend() {
-        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, DeliveryKind.MARKET, null, null, null, null);
+        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null);
         transactions.executeWithoutResult(status -> {
             orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(item)));
             status.setRollbackOnly();

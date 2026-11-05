@@ -1,6 +1,7 @@
 package com.artwithgab.awg_tracking.model;
 
 import com.artwithgab.awg_tracking.enums.CustomColor;
+import com.artwithgab.awg_tracking.enums.CustomFinish;
 import com.artwithgab.awg_tracking.enums.DeliveryKind;
 import com.artwithgab.awg_tracking.enums.ItemKind;
 import com.artwithgab.awg_tracking.enums.ProductionStatus;
@@ -111,6 +112,9 @@ public class OrderItem {
 
     @Enumerated(EnumType.STRING)
     private CustomColor customColor;
+
+    @Enumerated(EnumType.STRING)
+    private CustomFinish customFinish;
 
     /** Reference photos ({@link StoredPhoto}), in display order. */
     @ElementCollection

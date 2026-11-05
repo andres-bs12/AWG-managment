@@ -92,6 +92,20 @@ public class ShopController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/waitlist/confirm")
+    public ResponseEntity<Void> confirmWaitlist(@Valid @RequestBody com.artwithgab.awg_tracking.dto.shop.WaitlistTokenRequest body, HttpServletRequest request) {
+        rateLimiter.check("shop-waitlist-token", request.getRemoteAddr(), 10);
+        shopService.confirmWaitlist(body.token());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/waitlist/unsubscribe")
+    public ResponseEntity<Void> leaveWaitlist(@Valid @RequestBody com.artwithgab.awg_tracking.dto.shop.WaitlistTokenRequest body, HttpServletRequest request) {
+        rateLimiter.check("shop-waitlist-token", request.getRemoteAddr(), 10);
+        shopService.leaveWaitlist(body.token());
+        return ResponseEntity.noContent().build();
+    }
+
     /** Stripe calls this. The signature is verified with STRIPE_WEBHOOK_SECRET before anything is read. */
     @PostMapping("/stripe/webhook")
     public ResponseEntity<Void> webhook(@RequestBody String payload, @RequestHeader(value = "Stripe-Signature", required = false) String signature) {

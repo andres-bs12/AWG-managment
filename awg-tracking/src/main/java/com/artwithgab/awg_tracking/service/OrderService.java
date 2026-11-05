@@ -154,6 +154,7 @@ public class OrderService {
             item.setItemKind(row.kind());
             item.setWithName(withName);
             item.setCustomColor(custom ? (row.color() == null ? CustomColor.RED : row.color()) : null);
+            item.setCustomFinish(custom ? (row.finish() == null ? com.artwithgab.awg_tracking.enums.CustomFinish.SHINY : row.finish()) : null);
             item.setCost(pricingService.itemCost(row.kind(), withName));
             item.setProductionStatus(custom ? ProductionStatus.NOT_STARTED : ProductionStatus.FINISHED);
             item.setSoldOnDay(soldOn);
@@ -293,6 +294,7 @@ public class OrderService {
         }
         boolean changed = order.isHandedOver() != handedOver;
         order.setHandedOver(handedOver);
+        if (changed) order.setHandedOverAt(handedOver ? clock.instant() : null);
         if (changed && handedOver) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.HANDED_OVER));
     }
 
@@ -309,6 +311,7 @@ public class OrderService {
         }
         if (order.isHandedOver() && order.getOrderItems().stream().anyMatch(i -> i.getProductionStatus() != ProductionStatus.FINISHED)) {
             order.setHandedOver(false);
+            order.setHandedOverAt(null);
         }
     }
 

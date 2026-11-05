@@ -23,7 +23,7 @@ class SaleApiTests extends ApiTestSupport {
     @Test
     void customPlusFinishedSaleTotals10297AndDeductsStock() throws Exception {
         String token = login();
-        int redBefore = inventory.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.RED).orElseThrow().getQuantity();
+        int redBefore = inventory.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity();
         int genericBefore = inventory.findFirstByItemKind(ItemKind.GENERIC).orElseThrow().getQuantity();
 
         Map<String, Object> custom = customItem(true, TUE, 10.0, 11.25, "market", dayId(token, SAT), 14.0);
@@ -36,7 +36,7 @@ class SaleApiTests extends ApiTestSupport {
         assertEquals(201, res.getResponse().getStatus(), res.getResponse().getContentAsString());
         assertEquals(0, new BigDecimal("102.97").compareTo(new BigDecimal(this.<Object>read(res, "$.total").toString())));
 
-        assertEquals(redBefore - 1, inventory.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.RED).orElseThrow().getQuantity());
+        assertEquals(redBefore - 1, inventory.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity());
         assertEquals(genericBefore - 1, inventory.findFirstByItemKind(ItemKind.GENERIC).orElseThrow().getQuantity());
     }
 

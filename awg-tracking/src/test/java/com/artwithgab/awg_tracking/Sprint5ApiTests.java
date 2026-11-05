@@ -77,7 +77,7 @@ class Sprint5ApiTests extends ApiTestSupport {
     @Test
     void stockUpdateWithStaleExpectedQuantityIs409() throws Exception {
         String token = login();
-        var row = inventory.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.RED).orElseThrow();
+        var row = inventory.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow();
         int now = row.getQuantity();
 
         mvc.perform(patch("/api/inventory/" + row.getId()).header("Authorization", bearer(token))

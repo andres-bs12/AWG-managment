@@ -27,10 +27,15 @@ public class FormService {
     private final PhotoStorageService photoStorage;
     private final CalendarService calendarService;
     private final ViewMapper mapper;
+    private final FormLinkPolicy formLinks;
 
     private Order find(String token) {
         if (token == null || token.length() < 20 || token.length() > 100) throw new ResourceNotFoundException("This form link is not valid.");
-        return orderRepository.findByFormToken(token).orElseThrow(() -> new ResourceNotFoundException("This form link is not valid."));
+        Order order = orderRepository.findByFormToken(token).orElseThrow(() -> new ResourceNotFoundException("This form link is not valid."));
+        if (formLinks.isExpired(order)) {
+            throw new ResourceNotFoundException("This form link has expired.").code("FORM_EXPIRED");
+        }
+        return order;
     }
 
     @Transactional(readOnly = true)

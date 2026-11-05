@@ -17,7 +17,8 @@ public record AwgProperties(
         Calendar calendar,
         Bootstrap bootstrap,
         Shop shop,
-        Mail mail
+        Mail mail,
+        Retention retention
 ) {
     public record Pricing(BigDecimal custom, BigDecimal finished, BigDecimal nameExtra) {
     }
@@ -46,7 +47,22 @@ public record AwgProperties(
      */
     public record Shop(boolean enabled, String publicBaseUrl, String stripeSecretKey, String stripeWebhookSecret,
                        BigDecimal deliveryFee, int checkoutMinutes, int leadDays, int maxDaysAhead,
-                       java.time.LocalDate seasonEnd, int maxOpenCheckouts) {
+                       java.time.LocalDate seasonEnd, int maxOpenCheckouts, java.time.LocalDate deliveriesFrom) {
+    }
+
+    /**
+     * Data retention, counted from the handover: the customer form link stops working after
+     * formLinkDays; photos and personal data are deleted after personalDataDays. Orders never handed
+     * over are cleaned up staleOrderDays after creation. Unconfirmed waitlist sign-ups are deleted
+     * after waitlistUnconfirmedDays.
+     */
+    public record Retention(int formLinkDays, int personalDataDays, int staleOrderDays, int waitlistUnconfirmedDays) {
+        public Retention {
+            if (formLinkDays <= 0) formLinkDays = 30;
+            if (personalDataDays <= 0) personalDataDays = 60;
+            if (staleOrderDays <= 0) staleOrderDays = 365;
+            if (waitlistUnconfirmedDays <= 0) waitlistUnconfirmedDays = 7;
+        }
     }
 
     /** E-mail notifications; nothing is sent while spring.mail.host is empty. */

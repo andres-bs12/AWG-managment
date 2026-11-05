@@ -52,13 +52,18 @@ public class Bootstrap implements ApplicationRunner {
 
     private void seedInventory() {
         int qty = props.bootstrap().initialCustomStock();
-        for (CustomColor color : new CustomColor[]{CustomColor.RED, CustomColor.GREY}) {
-            if (inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, color).isEmpty()) {
-                Inventory row = new Inventory();
-                row.setItemKind(ItemKind.CUSTOM);
-                row.setCustomColor(color);
-                row.setQuantity(qty);
-                inventoryRepository.save(row);
+        // One stock row per offered color and finish; rows of colors no longer sold are kept as they are.
+        for (CustomColor color : CustomColor.values()) {
+            if (!color.isOffered()) continue;
+            for (com.artwithgab.awg_tracking.enums.CustomFinish finish : com.artwithgab.awg_tracking.enums.CustomFinish.values()) {
+                if (inventoryRepository.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, color, finish).isEmpty()) {
+                    Inventory row = new Inventory();
+                    row.setItemKind(ItemKind.CUSTOM);
+                    row.setCustomColor(color);
+                    row.setCustomFinish(finish);
+                    row.setQuantity(qty);
+                    inventoryRepository.save(row);
+                }
             }
         }
         if (inventoryRepository.findFirstByItemKind(ItemKind.GENERIC).isEmpty()) {

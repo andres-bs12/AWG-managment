@@ -2,6 +2,7 @@ package com.artwithgab.awg_tracking.dto.order;
 
 import com.artwithgab.awg_tracking.dto.common.AddressDto;
 import com.artwithgab.awg_tracking.enums.CustomColor;
+import com.artwithgab.awg_tracking.enums.CustomFinish;
 import com.artwithgab.awg_tracking.enums.DeliveryKind;
 import com.artwithgab.awg_tracking.enums.ItemKind;
 import jakarta.validation.Valid;
@@ -18,6 +19,7 @@ public record CreateSaleItemRequest(
         @NotNull ItemKind kind,
         boolean withName,
         CustomColor color,
+        CustomFinish finish,
         LocalDate paintDate,
         Double paintStart,
         Double paintEnd,

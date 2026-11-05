@@ -28,6 +28,7 @@ public class TrackingService {
     private final org.springframework.context.ApplicationEventPublisher events;
     private final CalendarService calendarService;
     private final ViewMapper mapper;
+    private final FormLinkPolicy formLinks;
 
     /**
      * The address is personal data, so it is only returned with the order's form token
@@ -36,7 +37,7 @@ public class TrackingService {
     @Transactional(readOnly = true)
     public TrackViewDto getByCode(String code, String formToken) {
         Order order = find(code);
-        return view(order, ownsOrder(order, formToken));
+        return view(order, ownsOrder(order, formToken) && !formLinks.isExpired(order));
     }
 
     /**
@@ -46,7 +47,7 @@ public class TrackingService {
     @Transactional
     public TrackViewDto updateViennaAddress(String code, String formToken, AddressDto address) {
         Order order = find(code);
-        if (!ownsOrder(order, formToken)) {
+        if (!ownsOrder(order, formToken) || formLinks.isExpired(order)) {
             throw new ForbiddenException("Open the link from your order form to change the address.");
         }
         if (order.getOrderItems().stream().noneMatch(i -> i.getDeliveryKind() == DeliveryKind.DELIVERY)) {
@@ -72,6 +73,11 @@ public class TrackingService {
         return include ? d : new DeliveryDto(d.kind(), d.marketId(), d.marketDayId(), d.pickupHour(), null);
     }
 
+    /** Codes generated before 2026-11-05 have fewer than 6 characters after "AWG". */
+    static boolean isLegacyCode(String code) {
+        return code == null || code.length() < 9;
+    }
+
     private Order find(String code) {
         if (code == null || !code.trim().matches("(?i)AWG[A-Z0-9]{4,6}")) {
             throw new ResourceNotFoundException("Order not found. Check the code.").code("ORDER_NOT_FOUND");
@@ -80,7 +86,7 @@ public class TrackingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found. Check the code.").code("ORDER_NOT_FOUND"));
     }
 
-    private TrackViewDto view(Order order, boolean includeAddress) {
+    private TrackViewDto view(Order order, boolean owner) {
         CalendarIndex index = calendarService.snapshot();
         List<OrderItem> items = order.getOrderItems();
         OrderItem first = items.isEmpty() ? null : items.getFirst();
@@ -88,7 +94,10 @@ public class TrackingService {
                 : items.stream().allMatch(i -> i.getProductionStatus() == ProductionStatus.FINISHED) ? "ready" : "preparing";
         // Empty when unknown: the client shows a generic greeting in its own language.
         String name = order.getCustomer().publicName();
-        String firstName = name.isEmpty() ? "" : name.split("\\s+")[0];
+        // Codes from before AWG + 6 characters are short enough to guess: without the form token they
+        // only show the status, not the customer's or pets' names.
+        boolean personal = owner || !isLegacyCode(order.getCode());
+        String firstName = name.isEmpty() || !personal ? "" : name.split("\\s+")[0];
         TrackWhenDto when = first == null ? new TrackWhenDto("unknown", null, null, null, null) : mapper.when(first, index);
         return new TrackViewDto(
                 order.getTotal(),
@@ -96,9 +105,10 @@ public class TrackingService {
                 order.getCode(),
                 status,
                 firstName,
-                items.stream().map(i -> new TrackItemDto(i.getCustomColor(), i.getCost(), ViewMapper.nz(i.getPetName()),
-                        i.getItemKind(), i.getProductionStatus(), i.isWithName(), ViewMapper.nz(i.getNameInOrnament()))).toList(),
-                first == null ? null : withoutAddressUnless(mapper.delivery(first, index), includeAddress),
+                items.stream().map(i -> new TrackItemDto(i.getCustomColor(), i.getCustomFinish(), i.getCost(),
+                        personal ? ViewMapper.nz(i.getPetName()) : "", i.getItemKind(), i.getProductionStatus(), i.isWithName(),
+                        personal ? ViewMapper.nz(i.getNameInOrnament()) : "")).toList(),
+                first == null ? null : withoutAddressUnless(mapper.delivery(first, index), owner),
                 when);
     }
 }

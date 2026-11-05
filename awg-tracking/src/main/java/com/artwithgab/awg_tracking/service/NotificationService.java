@@ -42,6 +42,30 @@ public class NotificationService {
         }
     }
 
+    /**
+     * Waitlist double opt-in. The token travels in the URL fragment (after #), so it never reaches
+     * server logs; the page posts it to the API.
+     */
+    @Async("notificationExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onWaitlistConfirmation(WaitlistConfirmation event) {
+        String base = properties.shop().publicBaseUrl().replaceAll("/+$", "");
+        String confirm = base + "/waitlist/confirm#" + event.token();
+        String leave = base + "/waitlist/unsubscribe#" + event.token();
+        boolean en = "en".equals(event.locale());
+        String subject = en ? "ArtWithGab: please confirm your e-mail" : "ArtWithGab: bitte bestätige deine E-Mail";
+        String body = en
+                ? "Hello,\n\nyou asked us to tell you when orders for hand-painted pet ornaments open again.\n"
+                  + "Please confirm your e-mail address: " + confirm
+                  + "\n\nIf this was not you, ignore this e-mail; we delete unconfirmed addresses after a week.\n"
+                  + "Remove your address at any time: " + leave + "\n\nArtWithGab"
+                : "Hallo,\n\ndu möchtest erfahren, wann wieder Bestellungen für handbemalte Tierkugeln möglich sind.\n"
+                  + "Bitte bestätige deine E-Mail-Adresse: " + confirm
+                  + "\n\nWarst du das nicht? Dann ignoriere diese E-Mail; unbestätigte Adressen löschen wir nach einer Woche.\n"
+                  + "Du kannst dich jederzeit abmelden: " + leave + "\n\nArtWithGab";
+        send(event.email(), subject, body);
+    }
+
     private void send(String recipient, String subject, String body) {
         subject = header(subject);
         try {

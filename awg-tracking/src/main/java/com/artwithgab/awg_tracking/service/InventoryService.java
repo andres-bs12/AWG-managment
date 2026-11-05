@@ -19,7 +19,8 @@ public class InventoryService {
     public java.util.List<com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto> list() {
         return inventoryRepository.findAll().stream()
                 .sorted(java.util.Comparator.comparing((Inventory i) -> i.getItemKind().ordinal())
-                        .thenComparing(i -> i.getCustomColor() == null ? 0 : i.getCustomColor().ordinal()))
+                        .thenComparing(i -> i.getCustomColor() == null ? 0 : i.getCustomColor().ordinal())
+                        .thenComparing(i -> i.getCustomFinish() == null ? 0 : i.getCustomFinish().ordinal()))
                 .map(InventoryService::view).toList();
     }
 
@@ -39,21 +40,26 @@ public class InventoryService {
     }
 
     private static com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto view(Inventory i) {
-        return new com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto(i.getId().toString(), i.getItemKind(), i.getCustomColor(), i.getQuantity());
+        return new com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto(i.getId().toString(), i.getItemKind(), i.getCustomColor(), i.getCustomFinish(), i.getQuantity());
     }
 
     void deductItem(OrderItem item) {
         Inventory inventory = item.getItemKind() == ItemKind.CUSTOM
-                ? inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, item.getCustomColor())
-                        .orElseThrow(() -> new ConflictException("No stock configured for " + item.getCustomColor().name().toLowerCase() + " ornaments"))
+                ? inventoryRepository.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, item.getCustomColor(), item.getCustomFinish())
+                        .orElseThrow(() -> new ConflictException("No stock configured for " + label(item) + " ornaments").code("OUT_OF_STOCK"))
                 : inventoryRepository.findFirstByItemKind(ItemKind.GENERIC)
                         .orElseThrow(() -> new ConflictException("No stock configured for finished ornaments"));
         if (inventory.getQuantity() <= 0) {
             throw new ConflictException(item.getItemKind() == ItemKind.CUSTOM
-                    ? "Out of stock: " + item.getCustomColor().name().toLowerCase() + " ornaments"
+                    ? "Out of stock: " + label(item) + " ornaments"
                     : "Out of stock: finished ornaments").code("OUT_OF_STOCK");
         }
         inventory.setQuantity(inventory.getQuantity() - 1);
         item.setInventory(inventory);
+    }
+
+    private static String label(OrderItem item) {
+        String finish = item.getCustomFinish() == null ? "" : item.getCustomFinish().name().toLowerCase() + " ";
+        return finish + item.getCustomColor().name().toLowerCase();
     }
 }

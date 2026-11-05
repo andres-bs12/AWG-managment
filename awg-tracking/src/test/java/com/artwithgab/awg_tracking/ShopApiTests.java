@@ -59,7 +59,7 @@ class ShopApiTests extends ApiTestSupport {
         List<Map<String, Object>> items = new ArrayList<>();
         var req = multipart("/api/shop/checkout");
         for (int i = 0; i < customs; i++) {
-            items.add(Map.of("kind", "custom", "withName", i == 0, "color", "grey", "petName", "Luna" + i,
+            items.add(Map.of("kind", "custom", "withName", i == 0, "color", "red", "finish", "shiny", "petName", "Luna" + i,
                     "backName", "luna", "photos", List.of(Map.of("id", "p" + i, "name", "luna.jpg"))));
             req.file(new MockMultipartFile("photo-p" + i, "luna.jpg", "image/jpeg", JPEG));
         }
@@ -113,7 +113,7 @@ class ShopApiTests extends ApiTestSupport {
 
     @Test
     void paidCheckoutAppearsInAgendaAndDeliveries() throws Exception {
-        int stockBefore = inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.GREY).orElseThrow().getQuantity();
+        int stockBefore = inventoryRepository.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity();
         MvcResult res = checkout("1070", "2026-12-02", 2);
         assertThat(res.getResponse().getStatus()).isEqualTo(200);
         String code = read(res, "$.orderCode");
@@ -125,7 +125,7 @@ class ShopApiTests extends ApiTestSupport {
             assertThat(i.getPaintEnd().toLocalDate()).isBefore(java.time.LocalDate.of(2026, 12, 2));
             assertThat(i.getPhotos()).hasSize(1);
         });
-        assertThat(inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.GREY).orElseThrow().getQuantity())
+        assertThat(inventoryRepository.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity())
                 .isEqualTo(stockBefore - 2);
 
         String token = login();
@@ -173,7 +173,7 @@ class ShopApiTests extends ApiTestSupport {
 
     @Test
     void abandonReleasesThePendingCheckout() throws Exception {
-        int stockBefore = inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.GREY).orElseThrow().getQuantity();
+        int stockBefore = inventoryRepository.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity();
         MvcResult res = checkout("1070", "2026-12-02", 1);
         String code = read(res, "$.orderCode");
         String formToken = read(res, "$.formToken");
@@ -187,7 +187,7 @@ class ShopApiTests extends ApiTestSupport {
                 .andExpect(status().isNoContent());
         assertThat(orderRepository.findByCodeIgnoreCase(code)).isEmpty();
         org.mockito.Mockito.verify(stripe).expireOrReconcile("cs_test_1");
-        assertThat(inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.GREY).orElseThrow().getQuantity())
+        assertThat(inventoryRepository.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity())
                 .isEqualTo(stockBefore);
     }
 
@@ -210,11 +210,11 @@ class ShopApiTests extends ApiTestSupport {
 
     @Test
     void expiredCheckoutReleasesSlotsAndStock() throws Exception {
-        int stockBefore = inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.GREY).orElseThrow().getQuantity();
+        int stockBefore = inventoryRepository.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity();
         String code = read(checkout("1070", "2026-12-02", 1), "$.orderCode");
         webhook("checkout.session.expired", "unpaid", 0);
         assertThat(orderRepository.findByCodeIgnoreCase(code)).isEmpty();
-        assertThat(inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.GREY).orElseThrow().getQuantity())
+        assertThat(inventoryRepository.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity())
                 .isEqualTo(stockBefore);
     }
 

@@ -42,13 +42,13 @@ class StaffOpsApiTests extends ApiTestSupport {
     @Test
     void cancelDeletesTheOrderAndRestocks() throws Exception {
         String token = login();
-        int before = inventory.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.RED).orElseThrow().getQuantity();
+        int before = inventory.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity();
         String id = saleOk(token, customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0));
-        assertThat(inventory.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.RED).orElseThrow().getQuantity()).isEqualTo(before - 1);
+        assertThat(inventory.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity()).isEqualTo(before - 1);
 
         mvc.perform(post("/api/orders/" + id + "/cancel").header("Authorization", bearer(token))).andExpect(status().isNoContent());
         mvc.perform(get("/api/orders/" + id).header("Authorization", bearer(token))).andExpect(status().isNotFound());
-        assertThat(inventory.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.RED).orElseThrow().getQuantity()).isEqualTo(before);
+        assertThat(inventory.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity()).isEqualTo(before);
         // The painting time is free again: the same slot can be booked.
         saleOk(token, customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0));
     }

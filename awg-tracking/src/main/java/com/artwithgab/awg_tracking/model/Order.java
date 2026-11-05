@@ -94,6 +94,12 @@ public class Order {
     @Column(unique = true, length = 64)
     private String idempotencyKey;
 
+    /** When the order was marked handed over; the form link expires and personal data is deleted after it. */
+    private Instant handedOverAt;
+
+    /** Set once the customer's personal data and photos were deleted (data retention). */
+    private Instant anonymizedAt;
+
     public boolean isPaymentReview() {
         return checkoutStatus == CheckoutStatus.REVIEW;
     }

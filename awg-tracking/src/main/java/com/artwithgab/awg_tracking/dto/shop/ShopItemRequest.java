@@ -2,6 +2,7 @@ package com.artwithgab.awg_tracking.dto.shop;
 
 import com.artwithgab.awg_tracking.dto.form.FormPhotoRef;
 import com.artwithgab.awg_tracking.enums.CustomColor;
+import com.artwithgab.awg_tracking.enums.CustomFinish;
 import com.artwithgab.awg_tracking.enums.ItemKind;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -14,6 +15,7 @@ public record ShopItemRequest(
         @NotNull ItemKind kind,
         boolean withName,
         CustomColor color,
+        CustomFinish finish,
         @Size(max = 60) String petName,
         @Size(max = 6) String backName,
         @Size(max = 1000) String note,
