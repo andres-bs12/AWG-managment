@@ -10,18 +10,13 @@ and check the log shows `session id` within a minute.
 Goals 1–5 of plan /Users/andresbejarano/.claude/plans/reflective-giggling-kernighan.md: /buy shop, review fixes,
 Flyway, Docker (verified), password change + cancel order (backend+frontend), lazy routes, legal placeholders.
 
-## Sprint 4 (owner answers in chat 2026-11-05; spec in docs/sprint4-contract.md)
-- Backend (Claude) — DONE locally, NOT committed yet, 49 tests green: inventory API, painting days (open switch,
-  default max 2/day, every weekday), season end 2026-12-24 + waitlist, deposit amountPaid, AWG+6 codes, V2 migration.
-- Frontend (Codex run, scratchpad codex-s4-brief.md / codex-s4-result.md): stock page, painting days, deposit amount,
-  Santa-left + waitlist, code format, cancel modal. Check result, build/lint, browser test, commit.
-- TODO e-mail notifications (owner + customer on every movement; Spring Mail, disabled without MAIL_HOST; never claim
-  sent). TODO legal base texts (DE/EN drafts from the app's features — artwithgab.com does not resolve; placeholders
-  for name/address/UID). TODO Stripe kit for the owner (docs/stripe-setup.md step by step + Stripe CLI test script).
-- TODO update tasks/preguntas-pendientes.md with the owner's answers; docs; AGENTS.md.
+## Sprint 4 — DONE and pushed (backend 4ff367b, frontend 76795b9, e-mails a940770, legal 97ecfc1, Stripe kit 6bce633).
+tasks/preguntas-pendientes.md rewritten with the owner's answers.
 
-## Final phase (owner request)
-Dual audit UI, UX, Security: write one specialized prompt per topic; BOTH Codex and Claude run each (test
-everything possible, browser at http://localhost:5174, backend `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`
-with SHOP_ENABLED=true dummy Stripe keys). Merge into a general report (tasks/audit-final.md), plan fixes, fix,
-retest, commit, push, Spanish summary to the owner.
+## Final phase — IN PROGRESS (started ~02:40 2026-11-05)
+Prompts: tasks/audit-prompts/{_context,ui,ux,security}.md. Six auditors running:
+- Codex (read-only, static): outputs in scratchpad codex-audit-{ui,ux,security}.md → copy to tasks/audit-results/codex-*.md
+- Claude subagents (live browser/curl): tasks/audit-results/claude-{ui,ux,security}.md
+Test backend runs from a git worktree at scratchpad/wt (branch tip) so in-progress edits don't break it.
+Next: merge all six into tasks/audit-final.md (dedupe, prioritize), plan fixes (split Claude/Codex; reviewer ≠ author),
+fix, retest (tests + browser), commit, push, update AGENTS.md/todo, delete RESUME.md + .agent-heartbeat, Spanish report.

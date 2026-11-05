@@ -1,29 +1,30 @@
 # Preguntas pendientes para el dueño
 
-Decisiones que tomé con un valor por defecto razonable para no bloquear el trabajo. Revísalas y dime si cambio alguna. (2026-11-04)
+Actualizado 2026-11-05 con tus respuestas. Abajo: lo que queda abierto y lo resuelto (para referencia).
 
-## Producto
+## Abiertas
 
-1. **Colores de los adornos.** El front vende rojo y gris; el backend tenía RED/GREEN/WHITE. Añadí GREY y solo hay stock de rojo y gris. ¿Cuáles son los colores reales?
-2. **Stock.** Al arrancar se crean 200 unidades por color y 200 terminados (`INITIAL_STOCK`). Si llega a 0, la venta se bloquea y no hay pantalla para reponer. ¿Quieres una pantalla de inventario o prefieres no bloquear por stock?
-3. **Festivos.** Los días de pintura en casa se generan de lunes a viernes, incluidos 8, 24, 25, 26 y 31 de diciembre y 1 de enero. ¿Los quito?
-4. **Adorno terminado vendido "ahora".** Si no tiene hora de recogida, se acepta y se entrega hoy. ¿Correcto?
-5. **Depósito.** Sigue siendo exactamente el 50 %; no se guardan importes parciales distintos. ¿Lo mantienes?
+1. **Colores de los adornos.** Sin respuesta. Hoy se venden rojo y gris (los únicos con stock). Verde y blanco existen en el sistema, pero sin stock: si los quieres, créales stock y aparecen solos en la tienda. ¿Cuáles son los colores reales?
+2. **Stripe.** Lo activas mañana. Tienes la guía en `docs/stripe-setup.md`. La CLI de Stripe ya está instalada; solo falta `stripe login` y tus claves de prueba.
+3. **E-mail (SMTP).** Los avisos al dueño y al cliente ya están programados, pero no se envía nada hasta configurar `MAIL_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` y `OWNER_EMAIL` (ver `docs/deploy.md`). ¿Qué proveedor de correo usas (Gmail/Workspace, Zoho, Brevo…)?
+4. **Datos para los textos legales.** Los borradores de `/impressum`, `/agb` y `/datenschutz` tienen marcadores `[…]`: nombre o empresa, dirección, e-mail, teléfono, UID, GISA, proveedor de hosting y de e-mail. Necesitan esos datos y una revisión legal. (artwithgab.com no resolvía cuando lo consulté.)
+5. **Despliegue.** Lo decides mañana. Todo está listo con Docker (`docs/deploy.md`); falta dominio y proveedor.
+6. **Lista de espera.** Los e-mails se guardan (tabla `waitlist_entry`), pero no hay pantalla para verlos ni envío automático cuando abra la temporada 2027. ¿Lo hacemos más adelante?
+7. **Avisos con agentes.** Comentaste que después quieres un seguimiento "más inteligente" de los movimientos. Queda para una fase futura.
 
-## Tienda web
+## Resueltas (2026-11-05)
 
-6. **Coste de envío.** Ahora es 0 € (`SHOP_DELIVERY_FEE`). ¿Cuánto cobras por el envío en Viena?
-7. **Antelación.** La pintura empieza como pronto mañana y se ofrecen días hasta 45 días vista. ¿Quieres más margen (p. ej. 2 días) o una fecha final de temporada?
-8. ~~Adornos terminados online~~ — **Resuelto (2026-11-04):** online solo personalizados. Pendiente relacionado: los colores verde y blanco no tienen stock creado; ¿se venden online o solo rojo y gris?
-9. **Notificaciones.** No hay aviso cuando entra un pedido web (lo dejaste para después). ¿Email, Telegram o WhatsApp? ¿Y email de confirmación al cliente? (Stripe puede enviar el recibo si lo activas en su panel.)
-10. **Stripe.** Mencionaste un plugin de Stripe: no lo encontré en esta sesión. Para activarlo hace falta: cuenta Stripe, `STRIPE_SECRET_KEY` (empieza por `sk_test_` en pruebas), crear el webhook a `https://<tu-api>/api/shop/stripe/webhook` con los eventos `checkout.session.completed`, `checkout.session.async_payment_succeeded` y `checkout.session.expired`, copiar su `STRIPE_WEBHOOK_SECRET`, y poner `SHOP_ENABLED=true` y `PUBLIC_BASE_URL`. Pásame el plugin o las claves de test y lo pruebo de punta a punta.
-11. **Textos legales.** Para vender online en Austria hacen falta AGB, Datenschutzerklärung (DSGVO, hay fotos de mascotas y direcciones) e Impressum. ¿Los tienes? ¿Cuánto tiempo guardamos fotos y direcciones?
-12. **Cambios después de pagar.** No hay cancelación ni reembolso en la app; se haría a mano en Stripe. ¿Suficiente para este año?
-
-## Seguridad y despliegue
-
-13. **Código de pedido.** `AWG` + 4 dígitos (9.000 combinaciones) se puede adivinar. Track muestra solo el nombre de pila, la mascota y los importes, y la dirección ya está protegida con el token largo, pero recomiendo pasar a 6 dígitos o letras. ¿Lo cambio? (Los docs fijaban 4.)
-14. **Despliegue.** ¿Dónde lo vas a alojar? Necesito saber el dominio para CORS, `PUBLIC_BASE_URL` y HTTPS. Las fotos van a disco (`UPLOADS_DIR`), así que el servidor necesita un volumen persistente.
-15. **Base de datos.** Ahora Hibernate crea y actualiza las tablas (`ddl-auto=update`). Antes de producción conviene usar migraciones Flyway. ¿Las preparo?
-16. **Contraseñas del staff.** En producción se crean desde `STAFF_GABY_PASSWORD` y `STAFF_ANDRES_PASSWORD`, y no hay pantalla para cambiarlas. ¿Quieres esa pantalla?
-17. **`package-lock.json` en la raíz.** Está sin seguimiento y no pertenece a ningún paquete. ¿Lo borro?
+- **Stock:** 3 bases por color y 10 terminados en una base nueva. Gaby lo ajusta en *Stock* (`/staff/inventory`). La base de desarrollo conserva sus números antiguos.
+- **Días de pintura:** pinta todos los días. Por día hay un interruptor (abierto o cerrado) y un máximo (2 por defecto) en *Painting days*. Las sugerencias automáticas y la tienda respetan el límite; los movimientos manuales pueden superarlo.
+- **Temporada:** se vende y se entrega hasta el 24 de diciembre (último día de entrega). Después, la tienda muestra "Santa ya salió" con la lista de espera.
+- **Terminados:** flujo simple: se venden, se descuenta el stock y listo.
+- **Depósito:** 50 % por defecto. El staff puede anotar otro importe si el cliente deja más.
+- **Envío en Viena:** 0 €.
+- **Antelación:** la pintura empieza en cuanto hay hueco (desde mañana), dentro de la semana previa a la entrega.
+- **Solo personalizados online.**
+- **Notificaciones:** e-mail al dueño y al cliente en cada movimiento (pendiente de SMTP, ver la pregunta 3).
+- **Cancelaciones:** online, el cliente escribe un e-mail; en el puesto, lo cancelas tú en el detalle del pedido (*Cancel order*). Los reembolsos con tarjeta se hacen a mano en Stripe.
+- **Código de pedido:** ahora `AWG` + 6 caracteres; los códigos antiguos siguen funcionando.
+- **Base de datos:** migraciones Flyway (V1 y V2).
+- **Contraseñas del staff:** pantalla *Change password*.
+- **`package-lock.json` de la raíz:** borrado (estaba vacío).

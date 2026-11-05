@@ -1,0 +1,11 @@
+# Shared context for the final audit (ArtWithGab, 2026-11-05)
+
+App: ArtWithGab — sales, production and delivery tool for hand-painted custom pet Christmas ornaments (Vienna markets 2026) + a public web shop.
+- Repo root: /Users/andresbejarano/dev/AWG Tracking. Read AGENTS.md, docs/README.md, docs/sprint4-contract.md, docs/figma.md (brand/design refs), frontend/src/styles/tokens.css (design tokens).
+- Frontend: React + TS + Vite in frontend/ (public pages in src/pages/public, staff in src/pages/staff, components in src/components, i18n DE/EN in src/i18n). Backend: Spring Boot in awg-tracking/.
+- Running locally (Claude live testing): frontend http://localhost:5174 (talks to the real backend at :8080 via the Vite proxy). Staff login: gaby@artwithgab.com / gaby (dev only). Shop is enabled with a DUMMY Stripe key, so "Pay" ends in a handled error (expected). Season end 2026-12-24 (shop open now).
+- Public routes: / (home scene + intro curtain), /buy (5-step shop, custom ornaments only), /buy/thanks, /track and /track/:code (order tracking; codes like AWG + 4–6 chars), /form/:token (customer form with photos), /impressum, /agb, /datenschutz (DRAFT legal texts with [placeholders] — placeholders are expected, not bugs).
+- Staff routes (English UI): /staff/login, /staff/agenda, /staff/deliveries, /staff/markets, /staff/sales/new (wizard), /staff/orders/:id (payment, status, cancel), /staff/inventory (stock), /staff/painting-days, /staff/password, paint studio.
+- Product rules: see AGENTS.md "Reglas de producto". Staff language English; public DE/EN. No payment processor at the stall; Stripe only for the web shop.
+- Output: write your findings to the file you are told, in Spanish (Latin American), as a prioritized list: Severity (Crítica/Alta/Media/Baja) · Area/route · file:line when relevant · what you observed (evidence: steps, screenshot description, measured values) · why it matters · concrete fix. Max 25 findings, most severe first. Verify each finding; no speculation. Add a short "Qué está bien" section (max 5 bullets) and a list of what you could NOT test.
+- Do NOT modify any project file (read-only audit). Do not create orders you don't clean up: if you create test data through the UI, cancel test orders afterwards in the staff order page ("Cancel order").
