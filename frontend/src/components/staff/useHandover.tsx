@@ -14,6 +14,13 @@ export function useHandover(onChanged: () => Promise<unknown> | void, onError: (
   const [pending, setPending] = useState<Bundle | null>(null)
   const [method, setMethod] = useState<PaymentMethod | null>(null)
   const [error, setError] = useState('')
+  // The dialog opens after an async check while the trigger is disabled, so remember it to return focus on dismiss.
+  const trigger = useRef<HTMLElement | null>(null)
+  function dismiss() {
+    setPending(null)
+    const target = trigger.current
+    requestAnimationFrame(() => { if (target?.isConnected) target.focus() })
+  }
   async function perform(id: string, target: boolean, collect = false) {
     if (lock.current) return
     lock.current = true; setBusy(true); onError(''); setError('')
@@ -30,6 +37,7 @@ export function useHandover(onChanged: () => Promise<unknown> | void, onError: (
   async function request(id: string, target: boolean) {
     if (lock.current) return
     if (!target) { await perform(id, false); return }
+    trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     lock.current = true; setBusy(true); onError('')
     let proceed = false
     try {
@@ -42,13 +50,13 @@ export function useHandover(onChanged: () => Promise<unknown> | void, onError: (
     finally { lock.current = false; setBusy(false) }
     if (proceed) await perform(id, true)
   }
-  const dialog = pending ? <StaffDialog title="Balance due" busy={busy} onClose={() => setPending(null)}>
+  const dialog = pending ? <StaffDialog title="Balance due" busy={busy} onClose={dismiss}>
     <p>{pending.order.code}: collect {formatEur(paymentSummary(pending.order).remaining, 'en')} before handing over the whole order.</p>
     <SegmentedControl legend="Collection method" name="handover-method" value={method} onChange={setMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} />
     {error && <p role="alert">{error}</p>}
     <Button tone="staff" disabled={busy || !method} onClick={() => void perform(pending.order.id, true, true)}>Mark paid &amp; hand over</Button>
     <Button tone="staff" variant="ghost" disabled={busy} onClick={() => void perform(pending.order.id, true)}>Hand over with balance due</Button>
-    <Button tone="staff" variant="secondary" disabled={busy} onClick={() => setPending(null)}>Not yet</Button>
+    <Button tone="staff" variant="secondary" disabled={busy} onClick={dismiss}>Not yet</Button>
   </StaffDialog> : null
   return { request, busy, dialog }
 }

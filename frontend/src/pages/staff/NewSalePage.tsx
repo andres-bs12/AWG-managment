@@ -483,7 +483,7 @@ export function NewSalePage() {
         if (state === 'deposit' && (!Number.isFinite(amount) || amount <= 0 || amount >= created.total)) throw new Error('Enter a deposit greater than zero and less than the total.')
         if (!payMethod) throw new Error('Choose cash or card.')
         await api.payments.setPaymentState(created.id, state, payMethod, amount)
-        setPaidNote(`${formatEur(amount)} received · ${payMethod === 'cash' ? 'cash' : 'card'}`)
+        setPaidNote(`${formatEur(amount, 'en')} received · ${payMethod === 'cash' ? 'cash' : 'card'}`)
       } else {
         setPaidNote('Not paid yet')
       }
@@ -540,7 +540,7 @@ export function NewSalePage() {
     setError('')
     try {
       if (state !== 'unpaid') await api.payments.setPaymentState(order.id, state, payMethod, amount)
-      setPaidNote(state === 'unpaid' ? 'Not paid yet' : `${formatEur(amount)} received · ${payMethod === 'cash' ? 'cash' : 'card'}`)
+      setPaidNote(state === 'unpaid' ? 'Not paid yet' : `${formatEur(amount, 'en')} received · ${payMethod === 'cash' ? 'cash' : 'card'}`)
       setPhase('done')
     } catch (err) {
       setError(saleErrorMessage(err, 'Could not record payment'))
@@ -606,7 +606,7 @@ export function NewSalePage() {
         <Button tone="staff" disabled={busy || !payMethod} onClick={() => void finishFinishedSale('paid')}>Mark paid &amp; hand over</Button>
         <Button tone="staff" variant="secondary" disabled={busy} onClick={() => void finishFinishedSale(payState, false)}>Save without handover</Button>
         <Button tone="staff" variant="ghost" disabled={busy} onClick={() => void finishFinishedSale(payState)}>Hand over with balance due</Button>
-        <Button tone="staff" variant="ghost" disabled={busy} onClick={() => setFinishedHandoff(false)}>Keep working</Button>
+        <Button tone="staff" variant="ghost" disabled={busy} onClick={() => setFinishedHandoff(false)}>Not yet</Button>
         {error && <p role="alert">{error}</p>}
       </StaffDialog>}
       <div className={styles.workspace}>
@@ -754,11 +754,11 @@ export function NewSalePage() {
               <div className={styles.doneCard} role="status">
                 <span aria-hidden="true">✓</span>
                 <div>
-                  <strong>{order.code} · {formatEur(order.total)}</strong>
+                  <strong>{order.code} · {formatEur(order.total, 'en')}</strong>
                   {paidNote ? <p>{paidNote}</p> : null}
                 </div>
               </div>
-              <StaffActions className={styles.actions} total={order?.total ?? (prices ? draftTotal(draft.items, prices) : null)}>
+              <StaffActions className={styles.actions} total={!paidNote || payState !== 'deposit' ? order.total : order.total - depositValue(depositAmount, order.total)} totalLabel={!paidNote ? 'Total' : payState === 'paid' ? 'Total · paid' : 'Balance due'}>
                 <Button tone="staff" size="lg" onClick={startOver}>
                   New sale
                 </Button>

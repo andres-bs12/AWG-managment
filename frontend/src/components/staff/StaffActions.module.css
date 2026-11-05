@@ -2,4 +2,4 @@
 .total { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); font-variant-numeric: tabular-nums; }
 .total strong { white-space: nowrap; }
 .bar[data-docked='true'] { margin-top: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; box-shadow: var(--shadow-up); }
-@media (min-width: 1024px) { .total { display: none; } .bar { padding: 0; border: 0; } }
+@media (min-width: 1024px) { .total { display: none; } .bar { padding: 0; border: 0; background: transparent; } }

@@ -53,6 +53,7 @@ export function LoginPage() {
             id="email"
             type="email"
             autoComplete="username"
+            required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
@@ -62,12 +63,16 @@ export function LoginPage() {
             id="password"
             type="password"
             autoComplete="current-password"
+            required
+            enterKeyHint="go"
+            // After a shared-iPad sign-out the email is already filled in; go straight to the password.
+            autoFocus={Boolean(email)}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </Field>
         <Button type="submit" tone="staff" fullWidth size="lg" disabled={busy}>
-          {busy ? 'Signing in…' : 'Enter'}
+          {busy ? 'Signing in…' : 'Sign in'}
         </Button>
       </form>
       {isMock ? (

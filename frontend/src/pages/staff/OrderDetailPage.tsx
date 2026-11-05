@@ -134,7 +134,7 @@ function OrderDetail({ id }: { id: string }) {
       <div><p className={styles.eyebrow}>Order</p><h1 title={order.code}>{order.code}</h1><p className={styles.customer} title={customer.name}>{customer.name || 'Customer details pending'}</p></div>
       <span className={styles.status} data-ready={allFinished || order.handedOver}>{production}</span>
     </header>
-    {order.paymentReview ? <InsetNote><p role="alert">Stripe reported a payment that does not match this order. Check it in Stripe, then record it as paid or deposit (or cancel the order). It remains held on the agenda until resolved.</p></InsetNote> : null}
+    {order.paymentReview ? <InsetNote tone="warning"><p role="alert">Stripe reported a payment that does not match this order. Check it in Stripe, then record it as paid or deposit (or cancel the order). It remains held on the agenda until resolved.</p></InsetNote> : null}
     <details className={styles.panel}><summary>Order info</summary><p>{order.source === 'web' || order.checkoutStatus ? 'Web order' : 'Stall order'} · Created {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(new Date(order.createdAt.endsWith('Z') || /[+-]\d\d:\d\d$/.test(order.createdAt) ? order.createdAt : `${order.createdAt}Z`))} (Vienna)</p><p>Payment method: {order.paymentMethod ?? 'Not recorded'}</p></details>
     <div className={styles.overview} data-delivery={Boolean(deliveryItem)}>
       <div><span>{deliveryItem ? 'Delivery' : 'Pickup'}</span><strong>{handoffs.join(' / ') || 'Not scheduled'}</strong>
@@ -143,7 +143,7 @@ function OrderDetail({ id }: { id: string }) {
           {customer.phone ? <a href={`tel:${customer.phone}`}>{customer.phone}</a> : null}
         </div> : null}
       </div>
-      <div><span>{remaining > 0 ? 'Balance due' : 'Total · paid'}</span><a href="#payment-heading">{formatEur(remaining > 0 ? remaining : order.total)}</a></div>
+      <div><span>{remaining > 0 ? 'Balance due' : 'Total · paid'}</span><a href="#payment-heading">{formatEur(remaining > 0 ? remaining : order.total, 'en')}</a></div>
     </div>
     {loadError || actionError ? <p className={styles.error} role="alert">{actionError || loadError}</p> : null}
     {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
@@ -191,8 +191,8 @@ function CancelOrderDialog({ busy, order, items, onClose, onConfirm }: { busy: b
   const painted = items.filter(item => item.kind === 'custom' && item.productionStatus !== 'not_started')
   return <StaffDialog title="Cancel order?" busy={busy} onClose={onClose}>
     <p>This permanently deletes the order, customer form, photos and payment record. Painting reservations are released. This cannot be undone.</p>
-    <p>Received: {formatEur(paid, 'en')}. Refund any money manually{order.source === 'web' ? ' in Stripe' : ''}; cancelling does not issue a refund.</p>
-    <p>{items.length} ornaments will be removed. Only unpainted bases and eligible finished stock return to inventory.</p>
+    <p>Received: {formatEur(paid, 'en')}.{paid > 0 ? ` Refund it manually${order.source === 'web' ? ' in Stripe' : ''}; cancelling does not issue a refund.` : ''}</p>
+    <p>{items.length} {items.length === 1 ? 'ornament' : 'ornaments'} will be removed. Only unpainted bases and eligible finished stock return to inventory.</p>
     {painted.length > 0 && <p>Painting already started: {painted.map(item => item.petName || `${item.color} ${item.finish} ornament`).join(', ')}. These bases will not be restocked.</p>}
     <Button tone="staff" variant="secondary" disabled={busy} onClick={onClose}>Keep order</Button>
     <Button tone="staff" variant="danger" disabled={busy} onClick={onConfirm}>{busy ? 'Cancelling…' : 'Cancel order'}</Button>

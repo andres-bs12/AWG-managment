@@ -1,4 +1,4 @@
-.panel { min-width: 0; padding: var(--space-5); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius); background: var(--staff-surface); }
+.panel { min-width: 0; padding: var(--space-4); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius); background: var(--staff-surface); }
 .heading { display: flex; justify-content: space-between; gap: var(--space-3); align-items: baseline; }
 .heading h2 { font-size: var(--type-staff-h2-size); margin: 0; }
 .heading > span { color: var(--staff-muted); font-size: var(--type-staff-meta-size); }

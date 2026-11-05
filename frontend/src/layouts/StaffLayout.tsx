@@ -70,7 +70,7 @@ export function StaffLayout() {
           <input id="staff-search" type="search" placeholder="Code, name or phone" value={query} onChange={event => setQuery(event.target.value)} />
           <Button tone="staff" variant="secondary" type="submit">Search</Button>
         </form>
-        <ButtonLink to="/staff/attention" tone="staff" variant="secondary" selected={selected('/staff/attention')}>Needs attention{attention !== null ? ` (${attention})` : ''}</ButtonLink>
+        <ButtonLink to="/staff/attention" tone="staff" variant={attention ? 'secondary' : 'ghost'} selected={selected('/staff/attention')}>Needs attention{attention !== null ? ` (${attention})` : ''}</ButtonLink>
         <nav className={styles.desktopNav} aria-label="Staff">
           <ButtonLink to="/staff/agenda" tone="staff" variant="ghost" selected={selected('/staff/agenda')}>Agenda</ButtonLink>
           <ButtonLink to="/staff/deliveries" tone="staff" variant="ghost" selected={selected('/staff/deliveries')}>Deliveries</ButtonLink>

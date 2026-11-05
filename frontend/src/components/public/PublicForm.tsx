@@ -9,7 +9,7 @@ export function PublicPage({ className = '', variant = 'form', ...props }: HTMLA
 export function PageHeader({ title, children }: { title: string; children?: ReactNode }) {
   return <header className={styles.header}><h1>{title}</h1>{children && <div className={styles.lead}>{children}</div>}</header>
 }
-export function InsetNote({ children }: { children: ReactNode }) { return <div className={styles.inset}>{children}</div> }
+export function InsetNote({ children, tone }: { children: ReactNode; tone?: 'warning' }) { return <div className={styles.inset} data-tone={tone}>{children}</div> }
 export function StickyActions({ children, className = '' }: { children: ReactNode; className?: string }) {
   const ref = usePublicActions()
   return <div ref={ref} data-sticky-actions className={`${styles.actions} ${className}`}>{children}</div>

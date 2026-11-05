@@ -5,17 +5,21 @@
 .lg { min-height: var(--touch-lg); padding-inline: var(--space-5); }
 .full { width: 100%; }
 .primary { background: var(--color-primary); color: var(--color-on-primary); }
-.primary:hover:not(:disabled) { background: var(--color-primary-hover); }
 .secondary, .choice { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-control-border); }
 .ghost { background: transparent; color: inherit; }
-.secondary:hover:not(:disabled), .ghost:hover:not(:disabled), .choice:hover:not(:disabled) { background: var(--color-selection-hover); }
 .danger { background: var(--color-error); color: var(--color-on-primary); }
-.danger:hover:not(:disabled) { text-decoration: underline; }
 .choice { min-height: var(--size-choice-card); justify-content: flex-start; text-align: left; }
 .staff { min-height: var(--size-control-staff); font-family: var(--font-staff); }
 .staff.lg { min-height: var(--touch-lg); }
 .btn[data-selected='false'] { padding: calc(var(--space-2) + var(--border-thin)) calc(var(--space-4) + var(--border-thin)); }
 .btn[data-selected='true'] { background: var(--color-selected-surface); color: var(--color-text); border: var(--border-control) solid var(--color-selected); font-weight: 600; }
-.btn[data-selected='true']:hover:not(:disabled) { background: var(--color-selected-surface); }
 
 .btn[data-selected='true']:disabled { background: var(--color-disabled-surface); color: var(--color-disabled-text); border-color: var(--color-control-border); border-style: dashed; }
+
+/* iPad Safari keeps :hover after a tap, which reads as a selection on the next button in that place. */
+@media (hover: hover) {
+  .primary:hover:not(:disabled) { background: var(--color-primary-hover); }
+  .secondary:hover:not(:disabled), .ghost:hover:not(:disabled), .choice:hover:not(:disabled) { background: var(--color-selection-hover); }
+  .danger:hover:not(:disabled) { text-decoration: underline; }
+  .btn[data-selected='true']:hover:not(:disabled) { background: var(--color-selected-surface); }
+}

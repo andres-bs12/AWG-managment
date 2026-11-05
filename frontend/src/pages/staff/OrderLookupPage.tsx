@@ -10,6 +10,8 @@ import { Button } from '../../components/ui/Button'
 import { StaffBackLink } from '../../components/staff/StaffBackLink'
 import styles from './OrderLookupPage.module.css'
 
+
+const PAYMENT_LABEL: Record<string, string> = { unpaid: 'Unpaid', deposit: 'Deposit paid', paid: 'Paid' }
 export function OrderLookupPage({ attention = false }: { attention?: boolean }) {
   const [params, setParams] = useSearchParams()
   const query = params.get('q') ?? ''
@@ -39,7 +41,7 @@ export function OrderLookupPage({ attention = false }: { attention?: boolean }) 
     <ul className={styles.list}>{rows.map(row => <li key={row.id}><Link className={styles.result} to={`/staff/orders/${row.id}`} state={{ from: attention ? '/staff/attention' : `/staff/search?${params}` }}>
       <strong>{row.code} · {row.customerName || 'Customer pending'}</strong>
       <span>{row.phone || 'Phone pending'} · {row.items} {row.items === 1 ? 'ornament' : 'ornaments'} · {formatEur(row.total, 'en')}</span>
-      <span>{row.checkoutStatus === 'review' ? 'Payment review — check Stripe' : row.checkoutStatus === 'pending' ? 'Waiting for online payment' : row.handedOver ? 'Handed over' : row.paymentState} · {row.nextHandoffDate ? formatDateLabel(row.nextHandoffDate) : 'Handoff not scheduled'}</span>
+      <span>{row.checkoutStatus === 'review' ? 'Payment review — check Stripe' : row.checkoutStatus === 'pending' ? 'Waiting for online payment' : row.handedOver ? 'Handed over' : PAYMENT_LABEL[row.paymentState] ?? row.paymentState} · {row.nextHandoffDate ? `Handoff ${formatDateLabel(row.nextHandoffDate)}` : 'Handoff not scheduled'}</span>
     </Link></li>)}</ul>
   </section>
 }

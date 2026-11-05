@@ -79,6 +79,7 @@ p.muted { margin: 0 0 var(--space-4); }
 }
 
 .overview a { color: var(--staff-ink); font-weight: 700; text-underline-offset: var(--space-1); }
+.overview > div > a { display: inline-flex; align-items: center; min-height: var(--touch); justify-self: start; }
 .notice, .error { position: sticky; top: var(--space-2); z-index: 10; }
 .support h2 { scroll-margin-top: var(--space-5); }
 

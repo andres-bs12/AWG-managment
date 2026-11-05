@@ -4,7 +4,7 @@ import { formatEur } from '../../lib/money'
 import styles from './StaffActions.module.css'
 
 /** The tablet shell reserves a separate row for actions, so the scrollport never sits behind them. */
-export function StaffActions({ total, className = '', children }: { total: number | null; className?: string; children: ReactNode }) {
+export function StaffActions({ total, totalLabel = 'Total', className = '', children }: { total: number | null; totalLabel?: string; className?: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   const [docked, setDocked] = useState(false)
   const target = document.getElementById('staff-actions-root')
@@ -24,7 +24,7 @@ export function StaffActions({ total, className = '', children }: { total: numbe
     return () => { observer.disconnect(); window.visualViewport?.removeEventListener('resize', measure); window.removeEventListener('resize', measure); document.documentElement.style.removeProperty('--staff-actions-height') }
   }, [docked])
   const bar = <div ref={ref} data-staff-actions data-docked={docked} className={`${styles.bar} ${className}`}>
-    <p className={styles.total}><span>Total</span><strong>{total === null ? 'Price unavailable' : formatEur(total, 'en')}</strong></p>
+    <p className={styles.total}><span>{totalLabel}</span><strong>{total === null ? 'Price unavailable' : formatEur(total, 'en')}</strong></p>
     {children}
   </div>
   return docked && target ? createPortal(bar, target) : bar

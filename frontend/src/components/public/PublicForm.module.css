@@ -4,6 +4,7 @@
 .lead { color: var(--color-text-muted); max-width: var(--measure-prose); }
 .lead p { margin: 0; }
 .inset { padding: var(--space-1) 0 var(--space-1) var(--space-4); border-inline-start: var(--border-inset) solid var(--color-control-border); }
+.inset[data-tone='warning'] { padding-block: var(--space-3); padding-inline-end: var(--space-4); border-inline-start-color: var(--color-warning); background: var(--color-warning-surface); }
 .inset p { margin: 0; }
 .inset p + p { margin-top: var(--space-2); }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-5); }

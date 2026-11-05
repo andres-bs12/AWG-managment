@@ -12,6 +12,6 @@ export function CompleteOrderDialog({ orderCode, customerName, items, pendingIte
       const ready = item.productionStatus === 'finished' || item.id === pendingItemId
       return <li key={item.id} className={styles.row} data-ready={ready}><strong>{item.petName || 'Ornament'}</strong><span>{ready ? 'Ready' : 'Pending'}</span></li>
     })}</ul>
-    <div className={styles.actions}><Button tone="staff" variant="secondary" disabled={busy} onClick={onClose}>Cancel / Keep working</Button><Button tone="staff" disabled={busy} onClick={onConfirm}>{busy ? 'Saving…' : 'Confirm & mark ready'}</Button></div>
+    <div className={styles.actions}><Button tone="staff" variant="secondary" disabled={busy} onClick={onClose}>Not yet</Button><Button tone="staff" disabled={busy} onClick={onConfirm}>{busy ? 'Saving…' : 'Confirm & mark ready'}</Button></div>
   </StaffDialog>
 }

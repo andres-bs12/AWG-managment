@@ -455,6 +455,7 @@ test('handover with balance due requires confirmation and can mark paid before h
   expect(fixture.mutations.some(entry => entry.path.endsWith('/handed-over'))).toBe(false)
   await axe(page)
   await dialog.getByRole('button', { name: 'Not yet', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Mark picked up', exact: true })).toBeFocused()
   expect(fixture.original.handedOver).toBe(false)
   await page.getByRole('button', { name: 'Mark picked up', exact: true }).click()
   await dialog.getByRole('radio', { name: 'Cash', exact: true }).locator('..').click()
@@ -709,8 +710,10 @@ test('leaving a created sale is explicit, the QR stays reachable from payment, a
 
 test('mock: one finished ornament, Deliver now, Paid in cash completes the sale', async ({ page }) => {
   await page.goto('/staff/login')
+  // The demo email is prefilled, so the password has focus.
+  await expect(page.getByLabel('Password', { exact: true })).toBeFocused()
   await page.getByLabel('Password', { exact: true }).fill('gaby')
-  await page.getByRole('button', { name: 'Enter', exact: true }).click()
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.locator('div[data-staff-page]')).toBeVisible()
   await navigation(page, '/staff/sales/new')
   await page.getByRole('button', { name: /Add finished product/ }).click()
