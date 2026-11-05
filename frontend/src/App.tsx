@@ -3,7 +3,8 @@ import { AuthProvider } from './auth/AuthContext'
 import { LocaleProvider } from './i18n/LocaleContext'
 import { PublicLayout } from './layouts/PublicLayout'
 import { StaffGuard, StaffLayout } from './layouts/StaffLayout'
-import { BuyPlaceholderPage } from './pages/public/BuyPlaceholderPage'
+import { BuyPage } from './pages/public/BuyPage'
+import { BuyThanksPage } from './pages/public/BuyThanksPage'
 import { FormPage } from './pages/public/FormPage'
 import { HomePage } from './pages/public/HomePage'
 import { TrackPage } from './pages/public/TrackPage'
@@ -24,7 +25,8 @@ export default function App() {
           <Routes>
             <Route element={<PublicLayout />}>
               <Route path="/" element={<HomePage />} />
-              <Route path="/buy" element={<BuyPlaceholderPage />} />
+              <Route path="/buy" element={<BuyPage />} />
+              <Route path="/buy/thanks" element={<BuyThanksPage />} />
               <Route path="/track" element={<TrackPage />} />
               <Route path="/track/:code" element={<TrackPage />} />
               <Route path="/form/:token" element={<FormPage />} />

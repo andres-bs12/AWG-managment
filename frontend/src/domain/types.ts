@@ -2,7 +2,7 @@
 
 export type PaymentState = 'unpaid' | 'deposit' | 'paid'
 export type PaymentMethod = 'cash' | 'card'
-export type OrnamentColor = 'red' | 'grey'
+export type OrnamentColor = 'red' | 'grey' | 'green' | 'white'
 export type ItemKind = 'custom' | 'finished'
 export type ProductionStatus = 'not_started' | 'in_progress' | 'finished'
 export type DeliveryKind = 'market' | 'vienna'
@@ -265,3 +265,39 @@ export type MoveSuggestion = {
   to: { date: string; startHour: number; endHour: number }
   freedSlot: { date: string; startHour: number; endHour: number }
 }
+
+export type ShopConfig = {
+  enabled: boolean
+  customPrice: number
+  finishedPrice?: number
+  nameExtra: number
+  deliveryFee: number
+  maxItems: number
+  colors: ShopColorOption[]
+}
+
+export type ShopColorOption = { color: OrnamentColor; inStock: boolean }
+
+export type ShopDeliveryDate = { date: string; weekday: string }
+
+export type ShopItemInput = {
+  kind: 'custom'
+  withName: boolean
+  color?: OrnamentColor
+  petName?: string
+  backName?: string
+  note?: string
+  photos: Photo[]
+}
+
+export type ShopCheckoutInput = {
+  customerName: string
+  email: string
+  phone: string
+  address: Address
+  deliveryDate: string
+  acceptTerms: boolean
+  items: ShopItemInput[]
+}
+
+export type ShopCheckoutResult = { orderCode: string; formToken: string; checkoutUrl: string }

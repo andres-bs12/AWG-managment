@@ -6,6 +6,9 @@ import type {
   Order,
   OrderItem,
   Photo,
+  ShopCheckoutInput,
+  ShopConfig,
+  ShopDeliveryDate,
   TrackView,
 } from '../../domain/types'
 
@@ -172,6 +175,26 @@ function buildFormData(payload: CustomerFormPayload): FormData {
   return form
 }
 
+function buildCheckoutFormData(input: ShopCheckoutInput): FormData {
+  const form = new FormData()
+  const reduced = {
+    ...input,
+    items: input.items.map((item) => ({
+      ...item,
+      photos: item.photos.map((photo) => ({ id: photo.id, name: photo.name })),
+    })),
+  }
+  form.append('payload', new Blob([JSON.stringify(reduced)], { type: 'application/json' }))
+  for (const item of input.items) {
+    for (const photo of item.photos) {
+      if (photo.dataUrl.startsWith('data:')) {
+        form.append(`photo-${photo.id}`, dataUrlToBlob(photo.dataUrl), photo.name)
+      }
+    }
+  }
+  return form
+}
+
 const enc = encodeURIComponent
 
 export const httpApi: Api = {
@@ -263,5 +286,17 @@ export const httpApi: Api = {
   },
   uploads: {
     toPhoto: (file) => fileToPhoto(file),
+  },
+  shop: {
+    getConfig: () => request<ShopConfig>('/api/shop/config'),
+    listDeliveryDates: (items) => request<ShopDeliveryDate[]>('/api/shop/delivery-dates', jsonInit('POST', { items })),
+    checkout: async (input) => {
+      const result = await request<{ orderCode: string; formToken: string; checkoutUrl: string }>(
+        '/api/shop/checkout',
+        { method: 'POST', body: buildCheckoutFormData(input) },
+      )
+      rememberFormToken(result.orderCode, result.formToken)
+      return result
+    },
   },
 }

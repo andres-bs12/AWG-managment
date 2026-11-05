@@ -13,6 +13,11 @@ import type {
   Photo,
   PaymentMethod,
   PaymentState,
+  ShopCheckoutInput,
+  ShopCheckoutResult,
+  ShopConfig,
+  ShopDeliveryDate,
+  ShopItemInput,
   StaffUser,
   TrackView,
 } from '../domain/types'
@@ -96,6 +101,13 @@ export type UploadService = {
   toPhoto: (file: File) => Promise<Photo>
 }
 
+export type ShopService = {
+  getConfig: () => Promise<ShopConfig>
+  listDeliveryDates: (items: Pick<ShopItemInput, 'kind' | 'withName'>[]) => Promise<ShopDeliveryDate[]>
+  /** Creates the order and a Stripe Checkout session; the browser then redirects to `checkoutUrl`. */
+  checkout: (input: ShopCheckoutInput) => Promise<ShopCheckoutResult>
+}
+
 export type Api = {
   auth: AuthService
   markets: MarketService
@@ -105,4 +117,5 @@ export type Api = {
   tracking: TrackingService
   forms: FormService
   uploads: UploadService
+  shop: ShopService
 }

@@ -15,10 +15,10 @@ export function Field({ label, htmlFor, hint, error, children }: Props) {
       <label className={styles.label} htmlFor={htmlFor}>
         {label}
       </label>
-      {hint ? <p className={styles.hint}>{hint}</p> : null}
+      {hint ? <p className={styles.hint} id={`${htmlFor}-hint`}>{hint}</p> : null}
       <div className={styles.control}>{children}</div>
       {error ? (
-        <p className={styles.error} role="alert">
+        <p className={styles.error} id={`${htmlFor}-error`} role="alert">
           {error}
         </p>
       ) : null}

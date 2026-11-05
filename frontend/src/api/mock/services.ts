@@ -53,6 +53,21 @@ async function fileToPhoto(file: File): Promise<Photo> {
   }
 }
 
+function nextDeliveryDates(count: number): { date: string; weekday: string }[] {
+  const out: { date: string; weekday: string }[] = []
+  const day = new Date()
+  day.setHours(12, 0, 0, 0)
+  while (out.length < count) {
+    day.setDate(day.getDate() + 1)
+    const dow = day.getDay()
+    if (dow === 3 || dow === 5) {
+      const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+      out.push({ date: iso, weekday: dow === 3 ? 'Wednesday' : 'Friday' })
+    }
+  }
+  return out
+}
+
 export const mockApi: Api = {
   auth: {
     login: (email, password) => later(() => mockLogin(email, password), 280),
@@ -109,5 +124,31 @@ export const mockApi: Api = {
   },
   uploads: {
     toPhoto: (file) => fileToPhoto(file),
+  },
+  shop: {
+    getConfig: () =>
+      later(() => ({
+        enabled: true,
+        customPrice: 49.99,
+        nameExtra: 12.99,
+        deliveryFee: 0,
+        maxItems: 10,
+        colors: [
+          { color: 'red', inStock: true },
+          { color: 'grey', inStock: true },
+          { color: 'green', inStock: false },
+          { color: 'white', inStock: false },
+        ],
+      }), 80),
+    listDeliveryDates: (items) => later(() => (items.length ? nextDeliveryDates(6) : []), 120),
+    checkout: (input) =>
+      later(() => {
+        if (!input.items.length) throw new Error('Add at least one ornament.')
+        if (input.items.some((item) => item.kind !== 'custom')) throw new Error('Only custom ornaments can be ordered online.')
+        if (!input.acceptTerms) throw new Error('Please accept the terms.')
+        if (!input.deliveryDate) throw new Error('Choose a delivery day.')
+        const code = `WEB${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
+        return { orderCode: code, formToken: `mock-${code}`, checkoutUrl: `/buy/thanks?code=${code}` }
+      }, 500),
   },
 }
