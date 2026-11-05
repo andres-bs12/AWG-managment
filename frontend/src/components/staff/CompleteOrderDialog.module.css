@@ -100,3 +100,6 @@
     width: 100%;
   }
 }
+
+.nativeDialog { border: 0; border-radius: 16px; padding: 24px; max-width: min(520px, calc(100vw - 32px)); color: var(--staff-ink); box-shadow: 0 16px 48px #0004; }
+.nativeDialog::backdrop { background: rgba(14, 30, 32, .65); }

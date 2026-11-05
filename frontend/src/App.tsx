@@ -10,6 +10,8 @@ const BuyThanksPage = lazy(() => import('./pages/public/BuyThanksPage').then(mod
 const FormPage = lazy(() => import('./pages/public/FormPage').then(module => ({ default: module.FormPage })))
 import { HomePage } from './pages/public/HomePage'
 const TrackPage = lazy(() => import('./pages/public/TrackPage').then(module => ({ default: module.TrackPage })))
+const InventoryPage = lazy(() => import('./pages/staff/InventoryPage').then(module => ({ default: module.InventoryPage })))
+const PaintingDaysPage = lazy(() => import('./pages/staff/PaintingDaysPage').then(module => ({ default: module.PaintingDaysPage })))
 const AgendaPage = lazy(() => import('./pages/staff/AgendaPage').then(module => ({ default: module.AgendaPage })))
 const DeliveriesPage = lazy(() => import('./pages/staff/DeliveriesPage').then(module => ({ default: module.DeliveriesPage })))
 const LoginPage = lazy(() => import('./pages/staff/LoginPage').then(module => ({ default: module.LoginPage })))
@@ -44,6 +46,8 @@ export default function App() {
             <Route element={<StaffGuard />}>
               <Route element={<StaffLayout />}>
                 <Route path="/staff/password" element={<ChangePasswordPage />} />
+                <Route path="/staff/inventory" element={<InventoryPage />} />
+                <Route path="/staff/painting-days" element={<PaintingDaysPage />} />
                 <Route path="/staff/agenda" element={<AgendaPage />} />
                 <Route path="/staff/deliveries" element={<DeliveriesPage />} />
                 <Route path="/staff/markets" element={<MarketsPage />} />

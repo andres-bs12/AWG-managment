@@ -368,7 +368,7 @@ export function AgendaPage() {
     }
   }
 
-  if (loadError) return <section><h1>Agenda</h1><p role="alert">{loadError}</p><Button tone="staff" onClick={() => setRetry(value => value + 1)}>Try again</Button></section>
+  if (loadError) return <section><h1>Agenda</h1><ButtonLink to="/staff/painting-days" tone="staff" variant="secondary">Painting days</ButtonLink><p role="alert">{loadError}</p><Button tone="staff" onClick={() => setRetry(value => value + 1)}>Try again</Button></section>
   if (!day) return <p role="status">{date ? 'No days scheduled.' : 'Loading agenda…'}</p>
 
   const height = (day.marketDay.closeHour - day.marketDay.openHour) * HOUR_H
@@ -385,7 +385,7 @@ export function AgendaPage() {
   return (
     <section style={{ '--hour-h': `${HOUR_H}px` } as CSSProperties}>
       <div className={styles.head}>
-        <h1>Agenda</h1>
+        <h1>Agenda</h1><ButtonLink to="/staff/painting-days" tone="staff" variant="secondary">Painting days</ButtonLink>
         <p className={styles.context}>
           {day.market.name} · {formatDateLabel(day.marketDay.date)}
         </p>

@@ -1,11 +1,13 @@
 import styles from '../BuyPage.module.css'
 import type { BuyStepProps } from './shared'
+import { useLocale } from '../../../i18n/LocaleContext'
 import { Button } from '../../../components/ui/Button'
 
-export function BuyDateStep({ t, draft, dates, datesState, setDatesRetry, patch, formatDate, err, described }: Pick<BuyStepProps, 't' | 'draft' | 'dates' | 'datesState' | 'setDatesRetry' | 'patch' | 'formatDate' | 'err' | 'described'>) {
+export function BuyDateStep({ t, draft, config, dates, datesState, setDatesRetry, patch, formatDate, err, described }: Pick<BuyStepProps, 't' | 'draft' | 'config' | 'dates' | 'datesState' | 'setDatesRetry' | 'patch' | 'formatDate' | 'err' | 'described'>) {
+  const { locale } = useLocale()
   return (<>
     <p>
-      {t('shopDateLead')}</p>
+      {t('shopDateLead')}</p><p>{t('shopSeasonEnd', { date: new Intl.DateTimeFormat(locale === 'de' ? 'de-AT' : 'en-GB', { day: 'numeric', month: 'long' }).format(new Date(`${config.seasonEnd}T12:00:00`)) })}</p>
     <p className={styles.muted} role="status">
       {datesState === 'loading' ? t('shopDatesLoading') : datesState === 'error' ? t('shopDatesError') : datesState === 'ready' && !dates.length ? t('shopDatesNone') : datesState === 'ready' ? t('shopDatesReady', { n: dates.length }) : t('shopDatesNeedItems')}</p>
     {datesState === 'error' && <Button variant="secondary" onClick={() => setDatesRetry((value) => value + 1)}>

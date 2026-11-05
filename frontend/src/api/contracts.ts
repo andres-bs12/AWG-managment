@@ -1,4 +1,5 @@
 import type {
+  InventoryItem, PaintingDay,
   Address,
   AgendaDay,
   CapacityResult,
@@ -86,6 +87,7 @@ export type PaymentService = {
     orderId: string,
     state: PaymentState,
     method?: PaymentMethod | null,
+    amountPaid?: number,
   ) => Promise<Order>
 }
 
@@ -104,6 +106,7 @@ export type UploadService = {
 }
 
 export type ShopService = {
+  joinWaitlist: (email: string, locale: 'de' | 'en') => Promise<void>
   getConfig: () => Promise<ShopConfig>
   listDeliveryDates: (items: Pick<ShopItemInput, 'kind' | 'withName'>[]) => Promise<ShopDeliveryDate[]>
   /** Creates the order and a Stripe Checkout session; the browser then redirects to `checkoutUrl`. */
@@ -111,6 +114,8 @@ export type ShopService = {
 }
 
 export type Api = {
+  inventory: { list: () => Promise<InventoryItem[]>; update: (id: string, quantity: number) => Promise<InventoryItem> }
+  paintingDays: { list: (from: string, to: string) => Promise<PaintingDay[]>; update: (date: string, open: boolean, maxPaintings: number) => Promise<PaintingDay> }
   auth: AuthService
   markets: MarketService
   agenda: AgendaService

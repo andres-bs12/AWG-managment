@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useMockStoreVersion } from '../../api/mock/useMockStore'
+import dialogStyles from '../../components/staff/CompleteOrderDialog.module.css'
 import { CompleteOrderDialog } from '../../components/staff/CompleteOrderDialog'
 import { OrderItemCard } from '../../components/staff/OrderItemCard'
 import { OrderPaymentPanel } from '../../components/staff/OrderPaymentPanel'
@@ -173,7 +174,7 @@ function OrderDetail({ id }: { id: string }) {
           {order.handedOver ? <p className={styles.muted}>{deliveryItem ? 'Delivered to the customer.' : 'Picked up at the stall.'}</p> : <p className={styles.muted}>{allFinished ? (deliveryItem ? 'Ready to deliver.' : 'Ready for pickup.') : `${items.filter(item => item.productionStatus !== 'finished').length} still to finish.`}</p>}
           {deliveryItem ? <ButtonLink tone="staff" fullWidth to={deliveryTo} variant={allFinished && !order.handedOver ? 'primary' : 'secondary'}>Open delivery run</ButtonLink> : <Button tone="staff" fullWidth variant={allFinished && !order.handedOver ? 'primary' : 'secondary'} disabled={busy || (!order.handedOver && !allFinished)} onClick={() => { void runAction(() => api.orders.setHandedOver(id, !order.handedOver), order.handedOver ? 'Pickup undone.' : 'Marked as picked up.') }}>{order.handedOver ? 'Undo pickup' : 'Mark picked up'}</Button>}
         </section>
-        <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method) => runAction(() => api.payments.setPaymentState(id, state, method), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} />
+        <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method, amount) => runAction(() => api.payments.setPaymentState(id, state, method, amount), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} />
         <details className={styles.panel}>
           <summary>Customer contact</summary>
           <dl className={styles.contacts}>
@@ -205,7 +206,7 @@ function OrderDetail({ id }: { id: string }) {
 function CancelOrderDialog({ busy, card, onClose, onConfirm }: { busy: boolean; card: boolean; onClose: () => void; onConfirm: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => { ref.current?.showModal() }, [])
-  return <dialog ref={ref} aria-labelledby="cancel-title" onCancel={event => { event.preventDefault(); if (!busy) onClose() }}>
+  return <dialog className={dialogStyles.nativeDialog} ref={ref} aria-labelledby="cancel-title" onCancel={event => { event.preventDefault(); if (!busy) onClose() }}>
     <h2 id="cancel-title">Cancel order?</h2>
     <p>The order will be deleted. Painting time and stock will be released. This cannot be undone.</p>
     {card && <p>If this order was paid online, the refund must be done manually in Stripe.</p>}

@@ -8,13 +8,14 @@ import styles from './OrderPaymentPanel.module.css'
 type Props = {
   order: Order
   busy: boolean
-  onSetState: (state: PaymentState, method: PaymentMethod | null) => Promise<boolean>
+  onSetState: (state: PaymentState, method: PaymentMethod | null, amountPaid?: number) => Promise<boolean>
 }
 
 export function OrderPaymentPanel({ order, busy, onSetState }: Props) {
   const { paid, remaining } = paymentSummary(order)
   const [method, setMethod] = useState<PaymentMethod | null>(order.paymentMethod)
-  const depositAmount = Math.round((order.total / 2) * 100) / 100
+  const [deposit, setDeposit] = useState(String(Math.round((order.total / 2) * 100) / 100))
+  const [error, setError] = useState('')
 
   return (
     <section className={styles.panel} aria-labelledby="payment-heading">
@@ -30,7 +31,7 @@ export function OrderPaymentPanel({ order, busy, onSetState }: Props) {
           <legend>Method (optional)</legend>
           {(['cash', 'card'] as const).map(value => <label key={value}><input type="radio" name="payment-method" value={value} checked={method === value} onChange={() => setMethod(value)} />{value === 'cash' ? 'Cash' : 'Card'}</label>)}
         </fieldset>
-        {order.paymentState === 'unpaid' ? <Button tone="staff" variant="secondary" fullWidth disabled={busy} onClick={() => void onSetState('deposit', method)}>Mark deposit (50% · {formatEur(depositAmount)})</Button> : null}
+        {order.paymentState === 'unpaid' ? <><label>Deposit received (€) <input type="number" min="0.01" step="0.01" value={deposit} disabled={busy} onChange={event => { setDeposit(event.target.value); setError('') }} aria-invalid={Boolean(error)} /></label>{error && <p role="alert">{error}</p>}<Button tone="staff" variant="secondary" fullWidth disabled={busy} onClick={() => { const amount = Number(deposit); if (!deposit.trim() || !Number.isFinite(amount) || amount <= 0 || amount >= order.total) { setError('Enter an amount greater than zero and less than the total.'); return } void onSetState('deposit', method, amount) }}>Mark deposit</Button></> : null}
         <Button tone="staff" fullWidth disabled={busy} onClick={() => void onSetState('paid', method)}>{busy ? 'Saving…' : 'Mark paid'}</Button>
       </div> : order.paymentMethod ? <p className={styles.legacy}>Paid · {order.paymentMethod === 'cash' ? 'Cash' : 'Card'}</p> : null}
     </section>

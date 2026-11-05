@@ -45,6 +45,7 @@ export function StaffLayout() {
             <ButtonLink to="/staff/deliveries" tone="staff" variant="ghost" selected={onDeliveries}>
               Deliveries
             </ButtonLink>
+            <ButtonLink to="/staff/inventory" tone="staff" variant="ghost" selected={location.pathname.startsWith('/staff/inventory')}>Stock</ButtonLink>
             <ButtonLink to="/staff/markets" tone="staff" variant="ghost" selected={onMarkets}>
               Markets
             </ButtonLink>

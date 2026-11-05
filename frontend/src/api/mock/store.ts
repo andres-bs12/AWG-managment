@@ -1,5 +1,6 @@
 import { paymentSummary } from '../../lib/paymentSummary'
 import type {
+  InventoryItem, PaintingDay,
   Address,
   AgendaDay,
   AgendaDelivery,
@@ -52,7 +53,10 @@ function readStored(): MockState | null {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as MockState
-    if (isCurrentSeed(parsed)) return parsed
+    if (isCurrentSeed(parsed)) {
+      for (const order of parsed.orders) { if (/^ABS10[0-7]$/.test(order.code)) order.code = `AWG0${order.code.slice(3)}`; if (order.code === 'AWG000') order.code = 'AWG0000' }
+      return parsed
+    }
   } catch {
     /* use seed */
   }
@@ -133,7 +137,11 @@ function todayDay(): MarketDay {
 
 function dayByDate(date: string, marketId?: string): MarketDay | undefined {
   const rows = state.marketDays.filter((d) => d.date === date && (!marketId || d.marketId === marketId))
-  if (!rows.length) return undefined
+  if (!rows.length) {
+    const home = state.markets.find(m => m.kind === 'home')
+    if (!home || (marketId && marketId !== home.id)) return undefined
+    return { id: `home-${date}`, marketId: home.id, date, openHour: 10, closeHour: 13, isToday: false }
+  }
   if (marketId) return rows[0]
   const rank = (day: MarketDay) => (state.markets.find((m) => m.id === day.marketId)?.kind === 'market' ? 0 : 1)
   return rows.slice().sort((a, b) => rank(a) - rank(b))[0]
@@ -146,6 +154,31 @@ function blocksForDay(dayId: string): TimeBlock[] {
     .sort((a, b) => a.startHour - b.startHour)
 }
 
+export function listInventory(): InventoryItem[] {
+  return state.inventory ??= [...(['red', 'grey', 'green', 'white'] as const).map(color => ({ id: `custom-${color}`, kind: 'custom' as const, color, quantity: 3 })), { id: 'finished', kind: 'finished', color: null, quantity: 10 }]
+}
+export function updateInventory(id: string, quantity: number): InventoryItem {
+  if (!Number.isInteger(quantity) || quantity < 0 || quantity > 10000) throw new Error('Quantity must be between 0 and 10000.')
+  const item = listInventory().find(row => row.id === id); if (!item) throw new Error('Stock item not found.')
+  item.quantity = quantity; emit(); return { ...item }
+}
+export function paintingDay(date: string): PaintingDay {
+  const settings = state.paintingDays?.[date] ?? { open: true, maxPaintings: 2 }
+  const ids = new Set(state.marketDays.filter(day => day.date === date).map(day => day.id))
+  const booked = state.blocks.filter(block => ids.has(block.marketDayId) && state.items.some(item => item.id === block.orderItemId && item.kind === 'custom')).length
+  return { date, ...settings, booked }
+}
+export function updatePaintingDay(date: string, open: boolean, maxPaintings: number): PaintingDay {
+  if (!Number.isInteger(maxPaintings) || maxPaintings < 0 || maxPaintings > 10) throw new Error('Maximum must be between 0 and 10.')
+  state.paintingDays ??= {}; state.paintingDays[date] = { open, maxPaintings }; emit(); return paintingDay(date)
+}
+export function joinWaitlist(email: string) { state.waitlist ??= []; if (!state.waitlist.includes(email.toLowerCase())) state.waitlist.push(email.toLowerCase()); emit() }
+export function makeOrderCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let code: string
+  do { code = 'AWG' + Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('') } while (state.orders.some(order => order.code === code))
+  return code
+}
+
 export function findFreeSlot(
   date: string,
   durationHours: number,
@@ -155,6 +188,9 @@ export function findFreeSlot(
   ignoreBlockId?: string,
   beforeHour?: number,
 ): CapacityResult {
+  const setting = paintingDay(date)
+  const ignored = ignoreBlockId && state.blocks.some(block => block.id === ignoreBlockId && state.marketDays.some(day => day.id === block.marketDayId && day.date === date)) ? 1 : 0
+  if (!setting.open || setting.booked - ignored + extraBusy.length >= setting.maxPaintings) return { ok: false, slot: null, remainingHours: 0, message: 'Painting day is closed or full.' }
   const day = dayByDate(date, marketId) ?? dayByDate(date)
   if (!day) {
     return { ok: false, slot: null, remainingHours: 0, message: 'No market day on that date.' }
@@ -567,6 +603,7 @@ export function moveBlock(blockId: string, date: string, startHour: number) {
   ) {
     throw new Error(`This session must finish before pickup at ${formatHour(item.delivery.pickupHour)}`)
   }
+  if (!state.marketDays.some(row => row.id === day.id)) state.marketDays.push(day)
   block.marketDayId = day.id
   block.startHour = startHour
   block.endHour = end
@@ -622,7 +659,7 @@ export function createSale(input: CreateSaleInput): Order {
     email: (input.email ?? '').trim(),
   }
   const orderId = uid('ord')
-  const code = `AWG${Math.floor(100 + Math.random() * 900)}`
+  const code = makeOrderCode()
   const createdItems: OrderItem[] = []
   const createdBlocks: TimeBlock[] = []
 
@@ -687,6 +724,12 @@ export function createSale(input: CreateSaleInput): Order {
     }
   }
 
+  for (const block of createdBlocks) {
+    if (!state.marketDays.some(day => day.id === block.marketDayId)) {
+      const date = block.marketDayId.replace(/^home-/, ''); const day = dayByDate(date); if (day) state.marketDays.push(day)
+    }
+  }
+  if (destination && !state.marketDays.some(day => day.id === destination.id)) state.marketDays.push(destination)
   const order: Order = {
     id: orderId,
     customerId: customer.id,
@@ -695,6 +738,7 @@ export function createSale(input: CreateSaleInput): Order {
     formToken: uid('frm'),
     paymentState: 'unpaid',
     paymentMethod: null,
+    amountPaid: 0,
     total: createdItems.reduce((sum, item) => sum + item.cost, 0),
     createdAt: new Date().toISOString(),
     itemIds: createdItems.map((item) => item.id),
@@ -715,8 +759,11 @@ export function createSale(input: CreateSaleInput): Order {
   return order
 }
 
-export function setPaymentState(orderId: string, paymentState: PaymentState, method?: PaymentMethod | null) {
+export function setPaymentState(orderId: string, paymentState: PaymentState, method?: PaymentMethod | null, amountPaid?: number) {
   const order = requireOrder(orderId)
+  const amount = paymentState === 'paid' ? order.total : paymentState === 'unpaid' ? 0 : amountPaid ?? Math.round(order.total * 50) / 100
+  if (!Number.isFinite(amount) || (paymentState === 'deposit' && (amount <= 0 || amount >= order.total))) throw new Error('Deposit must be greater than zero and less than the total.')
+  order.amountPaid = amount
   order.paymentState = paymentState
   if (method !== undefined) order.paymentMethod = method
   emit()
@@ -739,6 +786,7 @@ export function recordPayment(orderId: string, amount: number, method: PaymentMe
   if (!entries.length && totalPaid > 0) order.paymentOpeningBalance = totalPaid
   order.paymentEntries = [...entries, entry]
   const nextPaid = totalPaid + paid
+  order.amountPaid = nextPaid
   order.paymentState = nextPaid >= order.total - 0.001 ? 'paid' : 'deposit'
   order.paymentMethod = method
   emit()
@@ -908,6 +956,7 @@ export function findMoveSuggestion(input: {
   beforeHour?: number
 }): MoveSuggestion | null {
   const targetDay = dayByDate(input.date)
+  if (!paintingDay(input.date).open || paintingDay(input.date).booked > paintingDay(input.date).maxPaintings) return null
   if (!targetDay || input.date > input.handoffDate || input.date < todayDay().date || input.durationHours <= 0) return null
 
   for (const block of blocksForDay(targetDay.id)) {

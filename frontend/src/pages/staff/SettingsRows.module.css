@@ -1,0 +1,9 @@
+.page { max-width: 800px; margin: 0 auto; padding: 1rem; }
+.list { display: grid; gap: .75rem; margin: 1.5rem 0; }
+.row { background: white; border: 1px solid #d5dfe0; border-radius: .75rem; padding: 1rem; display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.row[data-low='true'] { border-color: #c57b23; background: #fff7e8; }
+.name { flex: 1 1 180px; font-weight: 700; }
+.stepper { display: flex; align-items: center; gap: .3rem; }
+.stepper button { min-width: 44px; min-height: 44px; font-size: 1.3rem; cursor: pointer; }
+.stepper input { width: 5rem; min-height: 44px; text-align: center; font-size: 1.1rem; }
+.error { color: #a02a22; flex-basis: 100%; margin: 0; }

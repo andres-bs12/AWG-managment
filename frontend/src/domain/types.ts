@@ -66,6 +66,7 @@ export type Order = {
   paymentState: PaymentState
   paymentMethod: PaymentMethod | null
   total: number
+  amountPaid?: number
   createdAt: string
   itemIds: string[]
   /** True once staff marks market pickup / Vienna handoff as done. Drives Track `delivered`. */
@@ -266,7 +267,12 @@ export type MoveSuggestion = {
   freedSlot: { date: string; startHour: number; endHour: number }
 }
 
+export type InventoryItem = { id: string; kind: ItemKind; color: OrnamentColor | null; quantity: number }
+export type PaintingDay = { date: string; open: boolean; maxPaintings: number; booked: number }
+
 export type ShopConfig = {
+  seasonEnd: string
+  seasonOver: boolean
   enabled: boolean
   customPrice: number
   finishedPrice?: number

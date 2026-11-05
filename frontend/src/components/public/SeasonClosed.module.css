@@ -1,0 +1,8 @@
+.closed { max-width: 680px; text-align: center; }
+.sky { height: 150px; overflow: hidden; position: relative; background: linear-gradient(#9cd9e9, #d8f1f1); border-radius: 16px; margin-bottom: 1.5rem; }
+.sleigh { position: absolute; width: 180px; top: 25px; left: 32%; animation: fly 9s ease-in-out infinite alternate; }
+@keyframes fly { from { transform: translate(-45%, 18px) rotate(-4deg); } to { transform: translate(65%, -18px) rotate(-9deg); } }
+.form { display: flex; justify-content: center; gap: .5rem; flex-wrap: wrap; margin-top: .5rem; }
+.form input { min-height: 44px; padding: .6rem; max-width: 100%; }
+.privacy { font-size: .85rem; }
+@media (prefers-reduced-motion: reduce) { .sleigh { animation: none; } }

@@ -1,6 +1,7 @@
 import type { Api } from '../contracts'
 import type { Photo } from '../../domain/types'
 import {
+  listInventory, updateInventory, paintingDay, updatePaintingDay, joinWaitlist, makeOrderCode,
   checkCapacity,
   cancelOrder,
   mockChangePassword,
@@ -55,22 +56,30 @@ async function fileToPhoto(file: File): Promise<Photo> {
   }
 }
 
-function nextDeliveryDates(count: number): { date: string; weekday: string }[] {
+function nextDeliveryDates(itemCount: number) {
   const out: { date: string; weekday: string }[] = []
-  const day = new Date()
-  day.setHours(12, 0, 0, 0)
-  while (out.length < count) {
+  const day = new Date(); day.setHours(12, 0, 0, 0)
+  while (out.length < 6) {
     day.setDate(day.getDate() + 1)
-    const dow = day.getDay()
-    if (dow === 3 || dow === 5) {
-      const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
-      out.push({ date: iso, weekday: dow === 3 ? 'Wednesday' : 'Friday' })
+    const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+    if (iso > '2026-12-24') break
+    const stall = listMarketDays().some(row => row.date === iso && listMarkets().some(m => m.id === row.marketId && m.kind === 'market'))
+    if (iso === '2026-12-24' || day.getDay() === 3 || (day.getDay() === 5 && !stall)) {
+      let available = 0; const paint = new Date(); paint.setHours(12, 0, 0, 0)
+      while (paint < day) {
+        const date = `${paint.getFullYear()}-${String(paint.getMonth() + 1).padStart(2, '0')}-${String(paint.getDate()).padStart(2, '0')}`
+        const setting = paintingDay(date); if (setting.open) available += Math.max(0, setting.maxPaintings - setting.booked)
+        paint.setDate(paint.getDate() + 1)
+      }
+      if (available >= itemCount) out.push({ date: iso, weekday: new Intl.DateTimeFormat('en', { weekday: 'long' }).format(day) })
     }
   }
   return out
 }
 
 export const mockApi: Api = {
+  inventory: { list: () => later(() => listInventory().map(row => ({ ...row }))), update: (id, quantity) => later(() => updateInventory(id, quantity)) },
+  paintingDays: { list: (from, to) => later(() => { const dates = []; const d = new Date(`${from}T12:00:00Z`); while (d.toISOString().slice(0, 10) <= to && dates.length < 62) { dates.push(paintingDay(d.toISOString().slice(0, 10))); d.setUTCDate(d.getUTCDate() + 1) } return dates }), update: (date, open, max) => later(() => updatePaintingDay(date, open, max)) },
   auth: {
     login: (email, password) => later(() => mockLogin(email, password), 280),
     me: (token) => later(() => mockMe(token), 40),
@@ -116,7 +125,7 @@ export const mockApi: Api = {
       }),
   },
   payments: {
-    setPaymentState: (orderId, state, method) => later(() => setPaymentState(orderId, state, method)),
+    setPaymentState: (orderId, state, method, amountPaid) => later(() => setPaymentState(orderId, state, method, amountPaid)),
   },
   tracking: {
     getByCode: (code) => later(() => getTrackByCode(code), 420),
@@ -130,28 +139,28 @@ export const mockApi: Api = {
     toPhoto: (file) => fileToPhoto(file),
   },
   shop: {
+    joinWaitlist: (email) => later(() => joinWaitlist(email)),
     getConfig: () =>
       later(() => ({
         enabled: true,
+        seasonEnd: '2026-12-24',
+        seasonOver: new Date() >= new Date('2026-12-25T00:00:00'),
         customPrice: 49.99,
         nameExtra: 12.99,
         deliveryFee: 0,
         maxItems: 10,
         colors: [
-          { color: 'red', inStock: true },
-          { color: 'grey', inStock: true },
-          { color: 'green', inStock: false },
-          { color: 'white', inStock: false },
+          ...listInventory().filter(row => row.kind === 'custom' && row.color).map(row => ({ color: row.color!, inStock: row.quantity > 0 })),
         ],
       }), 80),
-    listDeliveryDates: (items) => later(() => (items.length ? nextDeliveryDates(6) : []), 120),
+    listDeliveryDates: (items) => later(() => (items.length ? nextDeliveryDates(items.length) : []), 120),
     checkout: (input) =>
       later(() => {
         if (!input.items.length) throw new Error('Add at least one ornament.')
         if (input.items.some((item) => item.kind !== 'custom')) throw new Error('Only custom ornaments can be ordered online.')
         if (!input.acceptTerms) throw new Error('Please accept the terms.')
         if (!input.deliveryDate) throw new Error('Choose a delivery day.')
-        const code = `WEB${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
+        const code = makeOrderCode()
         return { orderCode: code, formToken: `mock-${code}`, checkoutUrl: `/buy/thanks?code=${code}` }
       }, 500),
   },

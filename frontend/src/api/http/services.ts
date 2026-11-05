@@ -198,6 +198,8 @@ function buildCheckoutFormData(input: ShopCheckoutInput): FormData {
 const enc = encodeURIComponent
 
 export const httpApi: Api = {
+  inventory: { list: () => request('/api/inventory', {}, staff), update: (id, quantity) => request(`/api/inventory/${enc(id)}`, jsonInit('PATCH', { quantity }), staff) },
+  paintingDays: { list: (from, to) => request(`/api/painting-days?from=${enc(from)}&to=${enc(to)}`, {}, staff), update: (date, open, maxPaintings) => request(`/api/painting-days/${enc(date)}`, jsonInit('PATCH', { open, maxPaintings }), staff) },
   auth: {
     login: (email, password) =>
       request('/api/staff/login', jsonInit('POST', { email, password })),
@@ -253,10 +255,10 @@ export const httpApi: Api = {
       request(`/api/orders/${enc(orderId)}/handed-over`, jsonInit('PATCH', { handedOver }), staff),
   },
   payments: {
-    setPaymentState: (orderId, state, method) =>
+    setPaymentState: (orderId, state, method, amountPaid) =>
       request(
         `/api/orders/${enc(orderId)}/payment-state`,
-        jsonInit('PATCH', { state, method: method ?? null }),
+        jsonInit('PATCH', { state, method: method ?? null, amountPaid }),
         staff,
       ),
   },
@@ -290,6 +292,7 @@ export const httpApi: Api = {
     toPhoto: (file) => fileToPhoto(file),
   },
   shop: {
+    joinWaitlist: (email, locale) => request('/api/shop/waitlist', jsonInit('POST', { email, locale })),
     getConfig: () => request<ShopConfig>('/api/shop/config'),
     listDeliveryDates: (items) => request<ShopDeliveryDate[]>('/api/shop/delivery-dates', jsonInit('POST', { items })),
     checkout: async (input) => {

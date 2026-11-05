@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
+import { SeasonClosed } from '../../components/public/SeasonClosed'
 import { OrnamentLoader } from '../../components/public/OrnamentLoader'
 import { Button } from '../../components/ui/Button'
 import type { Photo, ShopConfig, ShopDeliveryDate } from '../../domain/types'
@@ -53,10 +54,10 @@ export function BuyPage() {
 
   const signature = draft.items.map((item) => `${item.color}:${item.withName ? 1 : 0}`).join(',')
   useEffect(() => {
-    if (!config?.enabled || !signature) return
+    if (!config?.enabled || config.seasonOver) return
     let active = true
     const timer = window.setTimeout(() => setDatesState('loading'), 0)
-    const items = signature.split(',').map((entry) => ({ kind: 'custom' as const, withName: entry.endsWith(':1') }))
+    const items = signature ? signature.split(',').map((entry) => ({ kind: 'custom' as const, withName: entry.endsWith(':1') })) : [{ kind: 'custom' as const, withName: false }]
     api.shop.listDeliveryDates(items).then((list) => {
       window.clearTimeout(timer)
       if (!active) return
@@ -70,13 +71,14 @@ export function BuyPage() {
       setDatesState('error')
     })
     return () => { active = false; window.clearTimeout(timer) }
-  }, [signature, config?.enabled, datesRetry])
+  }, [signature, config?.enabled, config?.seasonOver, datesRetry])
 
   const dateFmt = useMemo(() => new Intl.DateTimeFormat(locale === 'de' ? 'de-AT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), [locale])
   const formatDate = (date: string) => dateFmt.format(new Date(`${date}T12:00:00`))
   const stepLabels = [t('shopStepItems'), t('shopStepPet'), t('shopStepDate'), t('shopStepContact'), t('shopStepPay')]
   if (configFailed) return <div className={panel.panel}><h1>{t('shopTitle')}</h1><p role="alert">{t('shopLoadError')}</p><Button onClick={() => { setConfigFailed(false); setConfigRetry((value) => value + 1) }}>{t('shopRetry')}</Button></div>
   if (!config) return <div className={panel.panel}><OrnamentLoader /></div>
+  if (config.seasonOver || (datesState === 'ready' && dates.length === 0)) return <SeasonClosed />
   if (!config.enabled) return <div className={panel.panel}><h1>{t('shopSoonTitle')}</h1><p className={panel.lead}>{t('shopSoonBody')}</p></div>
 
   const shopConfig = config

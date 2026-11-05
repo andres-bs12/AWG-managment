@@ -68,6 +68,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
       inputRef.current?.focus()
       return
     }
+    if (!/^AWG[A-Z0-9]{4,6}$/i.test(next)) { setLocalError(t('trackNotFound')); inputRef.current?.focus(); return }
     setLocalError('')
     setBusy(true)
     try {
@@ -146,7 +147,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
               autoComplete="off"
               autoCapitalize="characters"
               spellCheck={false}
-              placeholder="AWG-2026"
+              placeholder="AWGK7Q2MX"
               disabled={busy}
               aria-invalid={shownError ? 'true' : 'false'}
               value={code}

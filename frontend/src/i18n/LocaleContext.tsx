@@ -6,6 +6,7 @@ type Dictionary = Record<string, string>
 
 const messages: Record<Locale, Dictionary> = {
   en: {
+    seasonClosedTitle: 'Santa has already left!', seasonClosedBody: 'Orders are closed for this year. Leave your email and we will let you know when orders open next year.', waitlistEmail: 'Email address', waitlistSubmit: 'Join the waitlist', waitlistSuccess: 'You are on the waitlist. Thank you!', waitlistError: 'Could not join the waitlist. Please try again.', waitlistPrivacy: 'We use your email to tell you when orders reopen. See our', shopSeasonEnd: 'Last delivery: {date}',
     impressum: 'Legal notice', terms: 'Terms and conditions', privacy: 'Privacy policy', legalPreparing: 'This text is being prepared.',
     shopTermsBefore: 'I accept the ', shopTermsAfter: ' and the cancellation policy.', shopPrivacyBefore: 'See our ',
 
@@ -173,6 +174,7 @@ const messages: Record<Locale, Dictionary> = {
     shopThanksNoCode: 'We could not find your order code. Check the confirmation email from Stripe.',
   },
   de: {
+    seasonClosedTitle: 'Santa ist schon losgeflogen!', seasonClosedBody: 'Bestellungen sind für dieses Jahr geschlossen. Hinterlasse deine E-Mail und wir sagen dir Bescheid, wenn die Bestellungen nächstes Jahr öffnen.', waitlistEmail: 'E-Mail-Adresse', waitlistSubmit: 'Auf die Warteliste', waitlistSuccess: 'Du stehst auf der Warteliste. Danke!', waitlistError: 'Die Anmeldung hat nicht geklappt. Bitte versuche es erneut.', waitlistPrivacy: 'Wir verwenden deine E-Mail, um dich über den Bestellstart zu informieren. Mehr in unserer', shopSeasonEnd: 'Letzte Lieferung: {date}',
     impressum: 'Impressum', terms: 'AGB', privacy: 'Datenschutz', legalPreparing: 'Dieser Text wird gerade vorbereitet.',
     shopTermsBefore: 'Ich akzeptiere die ', shopTermsAfter: ' und die Widerrufsbelehrung.', shopPrivacyBefore: 'Siehe auch ',
 
