@@ -2,7 +2,7 @@
 .bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--staff-surface); border-bottom: 1px solid var(--staff-line); }
 .brand { font-weight: 700; display: flex; gap: var(--space-2); align-items: baseline; }
 .brand span { color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
-.search { display: flex; gap: var(--space-2); flex: 1; min-width: min(100%, var(--layout-postcode-max)); }
+.search { display: flex; gap: var(--space-2); flex: 1 1 12em; /* em: with large text the search wraps to its own row instead of shrinking */ min-width: min(100%, 12em); }
 .search input { min-width: 0; width: 100%; min-height: var(--size-control-staff); padding: var(--space-2) var(--space-3); border: 1px solid var(--color-control-border); border-radius: var(--radius-control); color: var(--staff-ink); background: var(--staff-surface); }
 .desktopNav { display: flex; gap: var(--space-2); }
 .main { max-width: var(--layout-staff-max); padding: var(--space-4) var(--space-4) calc(var(--size-staff-tabs) + var(--space-6) + env(safe-area-inset-bottom)); margin: 0 auto; min-width: 0; }

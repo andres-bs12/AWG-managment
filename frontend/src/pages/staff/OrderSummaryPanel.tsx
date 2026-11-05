@@ -26,7 +26,7 @@ export function OrderSummaryPanel({ items, markets, days, orderCode, prices }: P
         {items.map((item, index) => (
           <li key={item.id}>
             <div className={styles.row}>
-              <strong><span className={styles.colorDot} data-color={item.color} role="img" aria-label={`${item.color} colour`} />{itemLabel(item, index)}</strong>
+              <strong>{item.kind === 'custom' ? <span className={styles.colorDot} data-color={item.color} role="img" aria-label={`${item.color} colour`} /> : null}{itemLabel(item, index)}</strong>
               <span>{prices ? formatEur(itemCost(item.kind, item.withName, prices), 'en') : 'Loading price…'}</span>
             </div>
             <p>{deliveryLabel(item, markets, days)}</p>

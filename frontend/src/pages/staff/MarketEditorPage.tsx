@@ -312,7 +312,7 @@ function MarketEditor() {
               onChange={(event) => changeFinish(event.target.value)}
             />
           </Field>
-          <Field label="Season cost" htmlFor="market-cost" hint="Euros for the whole season">
+          <Field label="Season cost (€, whole season)" htmlFor="market-cost">
             <input
               id="market-cost"
               className={styles.input}
