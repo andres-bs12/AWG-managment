@@ -299,6 +299,9 @@ export type ShopColorOption = { color: OrnamentColor; finish: CustomFinish; inSt
 
 export type ShopDeliveryDate = { date: string; weekday: string }
 
+/** A stall day the customer can pick a web order up at (painting happens before it). */
+export type ShopPickupDay = { date: string; weekday: string; marketName: string; stall?: number | null; openTime: string; closeTime: string }
+
 export type ShopItemInput = {
   kind: 'custom'
   withName: boolean
@@ -314,8 +317,12 @@ export type ShopCheckoutInput = {
   customerName: string
   email: string
   phone: string
-  address: Address
+  /** Required for Vienna delivery; omitted for market pickup. */
+  address?: Address
   deliveryDate: string
+  deliveryKind?: DeliveryKind
+  /** Arrival time at the stall ('HH:mm'), market pickup only. */
+  pickupTime?: string
   acceptTerms: boolean
   items: ShopItemInput[]
 }

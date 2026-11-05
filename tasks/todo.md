@@ -2,6 +2,8 @@
 
 ## Hecho
 
+- [x] 2026-11-05 · Task 8 — implementación QR de dos pantallas y componentes compartidos con `/buy`, DE/EN, errores/foco, borrador/fotos y estados de enlace; suite `e2e/form.spec.ts` escrita. Validación de navegador pendiente; ver `docs/task8-form-handoff.md`.
+
 - [x] Frontend v1 con mocks (agenda, venta, pedido, form, Track) y pulido UX staff
 - [x] Docs condensados en `docs/README.md`
 - [x] 2026-11-04 · Sprint 1 — Backend completo: dominio alineado al contrato del front, servicios portados del mock (agenda, capacidad, sugerencias, ventas, mercados, días de casa, Track, formulario con fotos), auth staff, rate limit, CORS, lock de agenda, 30 tests de integración.
@@ -15,6 +17,10 @@
 - [x] 2026-11-05 · Sprint 5 — auditoría final doble (Claude + Codex: UI, UX, seguridad; `tasks/audit-final.md`), arreglos backend y frontend con revisión cruzada, códigos de error estables, ventas idempotentes, revisión de pagos, cabeceras de seguridad, fuentes locales.
 
 ## Pendiente (ver `tasks/preguntas-pendientes.md` para decisiones del dueño)
+
+- [ ] Fix b-2 / Task 8: resolver el solapamiento de la barra fija con radios del calendario móvil (axe `target-size`), sin debilitar los checks; Claude debe regenerar y revisar las nueve referencias, repetir los 193 casos y comprobar ratón, teclado y táctil. El resultado comunicado fue 190/193; las trazas también muestran el fallo axe móvil. Ver `docs/ux-validation.md`.
+
+- [ ] Seguimiento histórico Fix b-1 / Task 8: Claude debe repetir la suite de 193 ejecuciones, validar el foco y envío del código postal con ratón, teclado y táctil, y regenerar y revisar las nueve referencias visuales eliminadas por instrucción del dueño. Revisar DE/EN, axe, recarga, enlaces, varias Kugeln/finished, 360×640/reflow/zoom y regresiones de `/buy`. Handoff en `docs/task8-form-handoff.md`.
 
 - [ ] Task 7B: Claude debe ejecutar la suite actualizada (incluido `e2e/design-system.spec.ts`), revisar capturas DE/EN a 360/768/1280 px, la guía `/dev/design` y reflow/zoom del calendario. Implementación terminada; handoff en `docs/task7b-handoff.md`. Mantener checks de accesibilidad y no aceptar capturas automáticamente.
 
@@ -36,5 +42,3 @@
 - [ ] Task 5A: Claude debe ejecutar los nueve casos escritos de `e2e/success.spec.ts` en 360/768/1280 px (pago, espera, calendario, SEQ, cancelación y privacidad). No ejecutados aquí; revisar también el conflicto previo de tipos Playwright/axe en `helpers.ts:45`. El mock ya expone métricas en memoria para probar privacidad sin omitir casos.
 - [ ] Task 5B: Claude debe ejecutar los siete casos escritos de `e2e/keyboard-availability.spec.ts`: teclado completo de escritorio, Tab/Shift+Tab sin controles ocultos ni solapados, fecha agotada y opciones agotadas DE/EN, fallo de red al reconsultar. Verificar los arreglos de foco, Enter y recuperación de calendario a 360/768/1280 px. Build y lint pasan; Playwright no se ejecutó por instrucción del dueño. Persiste el conflicto previo de tipos Playwright/axe en `helpers.ts:45`.
 - [ ] Task 5C: Claude debe ejecutar los siete casos completos de `e2e/journey-deep.spec.ts` en los cuatro proyectos (incluido movimiento reducido): checkout multipart exacto DE/EN, dos adornos/retirada, nombre/giro/precio, latencia, historial y recarga. Sin omisiones; cinco muestras de color y de la opción de nombre por proyecto, mediana < 100 ms (medición desde el clic en el documento, sin demora del driver/táctil). Verificar el historial nuevo de las tres pantallas y que recargar vuelve al diseño para reañadir fotos. Sin ejecutar Playwright aquí por instrucción del dueño; no se modificaron otros specs. La comprobación TypeScript del spec solo informa del conflicto previo de tipos Playwright/axe en `helpers.ts:45`.
-
-- [ ] Fix a-3: Claude debe repetir normalmente los 149 casos de Playwright con las nueve referencias recién regeneradas ya presentes. Resultado externo: 146 aciertos; solo faltaban las referencias de los tres casos visuales. Las trazas lo confirman y cada referencia coincide byte a byte con su imagen actual; las nueve se inspeccionaron. No borrarlas otra vez ni usar actualización automática: comparar y diagnosticar cualquier diferencia. Build/lint y 12 pruebas Node pasan; sin cambios de app/tests ni ejecución de Playwright aquí. Límites de las capturas y seguimiento en `docs/ux-validation.md`. Sustituye el seguimiento de Fix a-2.

@@ -30,7 +30,7 @@ export function PublicLayout() {
   }, [intro])
 
   return (
-    <div className={`${styles.shell} ${quiet ? styles.quiet : ''}`} onFocus={(event) => {
+    <div data-public-scroll className={`${styles.shell} ${quiet ? styles.quiet : ''}`} onFocus={(event) => {
       const target = event.target
       const shell = event.currentTarget
       // Forms handle their sticky overlays themselves. Header and footer links

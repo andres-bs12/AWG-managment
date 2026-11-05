@@ -5,8 +5,8 @@ import { CatFace, DogFace } from './PetFaces'
 import styles from './OrnamentPreview.module.css'
 import { SegmentedControl } from '../ui/SegmentedControl'
 
-type Shade = 'red' | 'green' | 'beige'
-const SHADES: Shade[] = ['red', 'green', 'beige']
+type Shade = 'red' | 'green' | 'beige' | 'grey' | 'white' | 'unknown'
+const SHADES: Shade[] = ['red', 'green', 'beige', 'grey', 'white', 'unknown']
 const COLOR_KEYS = { red: 'colorRed', green: 'colorGreen', beige: 'colorBeige', grey: 'colorGrey', white: 'colorWhite' } as const
 
 /**
@@ -22,16 +22,16 @@ function script(name: string) {
 
 export type OrnamentSide = 'front' | 'back'
 
-export function OrnamentPreview({ item, static: isStatic = false, side: chosenSide, onSideChange }: { item: BuyItem; static?: boolean; side?: OrnamentSide; onSideChange?: (side: OrnamentSide) => void }) {
+export function OrnamentPreview({ item, static: isStatic = false, side: chosenSide, onSideChange, readOnly = false }: { item: Pick<BuyItem, 'color' | 'finish' | 'withName' | 'backName'>; static?: boolean; side?: OrnamentSide; onSideChange?: (side: OrnamentSide) => void; readOnly?: boolean }) {
   const { t } = useLocale()
   // null = follow the name option (show the back while a name is on); a click pins a side.
   const [side, setSide] = useState<OrnamentSide | null>(null)
   const [paused, setPaused] = useState(false)
   const instance = useId()
   const showBack = !isStatic && item.withName && (chosenSide ?? side ?? 'back') === 'back'
-  const shade: Shade = item.color === 'red' || item.color === 'green' ? item.color : 'beige'
-  const colorLabel = item.color ? t(COLOR_KEYS[item.color]) : t('previewNoColor')
-  const finishLabel = item.finish ? t(item.finish === 'shiny' ? 'finishShiny' : 'finishMatte') : t('previewNoFinish')
+  const shade: Shade = item.color || (isStatic || readOnly ? 'unknown' : 'beige')
+  const colorLabel = item.color ? `${t(COLOR_KEYS[item.color])}${item.color === 'grey' || item.color === 'white' ? ` · ${t('legacyColour')}` : ''}` : t(isStatic || readOnly ? 'colorUnknown' : 'previewNoColor')
+  const finishLabel = item.finish ? t(item.finish === 'shiny' ? 'finishShiny' : 'finishMatte') : t(isStatic || readOnly ? 'formFinishUnknown' : 'previewNoFinish')
   const name = item.withName && item.backName ? item.backName : t('previewNoName')
   const disc = `var(--portrait-${shade})`
   const sideName = `side-${instance}`
@@ -46,9 +46,9 @@ export function OrnamentPreview({ item, static: isStatic = false, side: chosenSi
             <clipPath id={`${svgId}-ball`}><circle cx="100" cy="132" r="88"/></clipPath>
             {/* Fixed light from the upper left: the ball keeps its volume while the artwork turns. */}
             <radialGradient id={`${svgId}-shade`} cx="38%" cy="32%" r="72%">
-              <stop offset="0" stopColor="white" stopOpacity=".22"/>
-              <stop offset=".55" stopColor="white" stopOpacity="0"/>
-              <stop offset="1" stopColor="black" stopOpacity=".28"/>
+              <stop offset="0" stopColor="var(--art-white)" stopOpacity=".22"/>
+              <stop offset=".55" stopColor="var(--art-white)" stopOpacity="0"/>
+              <stop offset="1" stopColor="var(--art-black)" stopOpacity=".28"/>
             </radialGradient>
           </defs>
           <path d="M86 19a14 14 0 0 1 28 0" fill="none" className={styles.hook} strokeWidth="5"/>

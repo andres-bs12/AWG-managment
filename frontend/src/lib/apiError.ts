@@ -10,6 +10,8 @@ const messages: Record<string, [string, string]> = {
   FORM_LOCKED: ['Painting has started or the order was handed over. Changes are no longer possible.', 'Die Bemalung hat begonnen oder die Bestellung wurde übergeben. Änderungen sind nicht mehr möglich.'],
   POSTAL_OUTSIDE_VIENNA: ['Please enter a Vienna postal code (1010–1230).', 'Bitte gib eine Wiener Postleitzahl (1010–1230) ein.'],
   DELIVERY_DAY_INVALID: ['Please choose an available delivery date.', 'Bitte wähle einen verfügbaren Liefertermin.'],
+  PICKUP_DAY_INVALID: ['Please choose an available market day.', 'Bitte wähle einen verfügbaren Markttag.'],
+  PICKUP_TIME_INVALID: ['Please choose an arrival time while the stall is open.', 'Bitte wähle eine Uhrzeit, zu der der Stand geöffnet ist.'],
   DAY_FULL: ['This day is full. Please choose another date.', 'Dieser Tag ist ausgebucht. Bitte wähle einen anderen Termin.'],
   RATE_LIMITED: ['Too many requests. Please try again later.', 'Zu viele Anfragen. Bitte versuche es später erneut.'],
   STOCK_CHANGED: ['Stock changed. Please reload and review your selection.', 'Der Bestand hat sich geändert. Bitte lade die Seite neu und überprüfe deine Auswahl.'],

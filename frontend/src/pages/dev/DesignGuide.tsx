@@ -115,7 +115,7 @@ function ShopFixture() {
     described: key => state === 'error' ? `${key}-error` : undefined,
     photoErrors: state === 'upload-error' ? { [active.uid]: t('photoInvalid') } : {},
     addFiles: async uid => patchItem(uid, { photos: Array.from({ length: Math.min(6, photos + 1) }, (_, i) => ({ id: `guide-photo-${i}`, name: 'reference.png', dataUrl: referencePhoto })) }),
-    dates: state === 'empty' ? [] : guideDates, datesState: state === 'loading' ? 'loading' : state === 'network-error' ? 'error' : 'ready', setDatesRetry,
+    dates: state === 'empty' ? [] : guideDates, datesState: state === 'loading' ? 'loading' : state === 'network-error' ? 'error' : 'ready', setDatesRetry, pickupDays: [], pickupState: 'idle',
     formatDate: date => new Intl.DateTimeFormat(locale === 'de' ? 'de-AT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${date}T12:00:00`)),
     serverError: state === 'error' ? t('shopCheckoutError') : '',
   }
@@ -129,7 +129,7 @@ function ShopFixture() {
       {screen === 'design' && <><OrnamentPreview key={item.uid} item={{ ...item, ...preview }} /><BuyItemsStep {...shared} activeUid={active.uid} preview={setPreview} onJoinWaitlist={noJoin} /></>}
       {screen === 'pet' && <BuyPetStep {...shared} activeUid={active.uid} />}
       {screen === 'delivery' && <><BuyDateStep {...shared} /><BuyContactStep {...shared} validFields={[]} validateField={() => {}} /></>}
-      {screen === 'review' && <BuyReviewStep {...shared} total={itemsTotal} itemsTotal={itemsTotal} changed="" go={index => setScreen(index < 2 ? 'design' : 'delivery')} />}
+      {screen === 'review' && <BuyReviewStep {...shared} total={itemsTotal} deliveryFee={0} itemsTotal={itemsTotal} changed="" go={index => setScreen(index < 2 ? 'design' : 'delivery')} />}
     </>}</div>)}
     <div className={buy.actions}><Button variant="secondary">{t('back')}</Button><Button size="lg">{t('shopPayStripe')} · <AnimatedPrice value={itemsTotal} locale={locale} /></Button></div>
   </section>

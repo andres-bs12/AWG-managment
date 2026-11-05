@@ -69,3 +69,13 @@
 :global([data-field-grid]) > .field > .hint { grid-row: 2; }
 :global([data-field-grid]) > .field > .control { grid-row: 3; }
 :global([data-field-grid]) > .field > .error { grid-row: 4; }
+
+:global([data-public-page]) .field { margin-bottom: 0; max-width: var(--layout-field-max); }
+:global([data-public-page]) :global([data-field-grid]) > .field { margin-bottom: var(--space-5); }
+:global([data-public-page]) .label { font-size: var(--type-label-size); line-height: var(--type-label-line); font-weight: var(--type-label-weight); }
+:global([data-public-page]) .hint { color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
+:global([data-public-page]) .control :is(input, textarea, select) { min-height: var(--size-control); padding: var(--space-3); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-surface-raised); color: var(--color-text); }
+:global([data-public-page]) .control textarea { min-height: var(--size-textarea-min); }
+:global([data-public-page]) .control :is(input, textarea, select):disabled { background: var(--color-disabled-surface); color: var(--color-disabled-text); }
+:global([data-public-page]) .error { color: var(--color-error); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
+:global([data-public-page]) .invalid :is(input, textarea, select) { border-color: var(--color-error); }

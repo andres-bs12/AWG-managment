@@ -18,6 +18,7 @@ import type {
   ShopCheckoutResult,
   ShopConfig,
   ShopDeliveryDate,
+  ShopPickupDay,
   ShopItemInput,
   StaffUser,
   TrackView,
@@ -111,6 +112,7 @@ export type ShopService = {
   joinWaitlist: (email: string, locale: 'de' | 'en') => Promise<void>
   getConfig: () => Promise<ShopConfig>
   listDeliveryDates: (items: Pick<ShopItemInput, 'kind' | 'withName'>[]) => Promise<ShopDeliveryDate[]>
+  listPickupDays: (items: Pick<ShopItemInput, 'kind' | 'withName'>[]) => Promise<ShopPickupDay[]>
   /** Creates the order and a Stripe Checkout session; the browser then redirects to `checkoutUrl`. */
   checkout: (input: ShopCheckoutInput) => Promise<ShopCheckoutResult>
   abandonCheckout: (code: string) => Promise<void>

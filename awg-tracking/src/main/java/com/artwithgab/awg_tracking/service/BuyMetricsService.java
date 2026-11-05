@@ -15,8 +15,8 @@ import java.util.Set;
 public class BuyMetricsService {
     private static final Set<String> EVENTS = Set.of("buy_view", "buy_step", "buy_choice", "buy_photo_added", "buy_validation_error", "buy_pay_click", "buy_seq");
     private static final Set<String> STEPS = Set.of("", "design", "delivery", "review");
-    private static final Set<String> FIELDS = Set.of("", "color", "finish", "name", "photos", "date", "customerName", "email", "phone", "line1", "postalCode", "terms");
-    private static final Set<String> VALUES = Set.of("", "red", "green", "beige", "shiny", "matte", "on", "off", "1", "2", "3", "4", "5", "6", "7", "required", "invalid");
+    private static final Set<String> FIELDS = Set.of("", "color", "finish", "name", "photos", "date", "delivery", "pickupTime", "customerName", "email", "phone", "line1", "postalCode", "terms");
+    private static final Set<String> VALUES = Set.of("", "red", "green", "beige", "shiny", "matte", "on", "off", "vienna", "market", "1", "2", "3", "4", "5", "6", "7", "required", "invalid");
     private final BuyMetricRepository repository;
     private final CalendarService calendar;
     private final Clock clock;

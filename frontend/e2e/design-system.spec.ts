@@ -88,10 +88,14 @@ for (const locale of ['de', 'en'] as const) {
     await choose(page); await pet(page); await next(page).click()
     const date = page.getByRole('radio', { name: locale === 'de' ? 'Mittwoch, 23. Dezember 2026' : 'Wednesday 23 December 2026', exact: true })
     await date.locator('..').click()
-    await expect(page.locator('[data-selected-date] > span').first()).toHaveText(locale === 'de' ? 'Gewählt: Mi, 23. Dez · abends' : 'Selected: Wed, 23 Dec · evening')
+    await expect(page.locator('[data-selected-date]')).toHaveAttribute('data-selected', 'true')
+    await expect(page.locator('[data-selected-date] > span')).toHaveText(locale === 'de' ? 'Mi, 23. Dez · abends' : 'Wed, 23 Dec · evening')
+    // One shortcut only: the earliest date, above the full calendar.
+    await expect(page.locator('[class*="dateCard"][aria-pressed]')).toHaveCount(1)
     await expect(page.locator('[class*="dateCard"][aria-pressed="true"]')).toHaveCount(0)
-    await page.locator('[class*="dateCard"][aria-pressed]').first().click()
+    await page.locator('[class*="dateCard"][aria-pressed]').click()
     await expect(page.locator('[class*="dateCard"][aria-pressed="true"]')).toHaveCount(1)
+    await expect(page.locator('[data-selected-date] > span')).toHaveText(locale === 'de' ? 'Mi, 2. Dez · abends' : 'Wed, 2 Dec · evening')
     await expect(date).not.toBeChecked()
   })
 
@@ -103,12 +107,14 @@ for (const locale of ['de', 'en'] as const) {
     // pet() starts at the first substep; return there without losing the name.
     if (mobile(page)) await page.getByRole('tab').click()
     await pet(page); await review(page)
-    for (const name of locale === 'de' ? ['Farbe ändern', 'Oberfläche ändern', 'Fotos ändern', 'Name ändern', 'Liefertag ändern', 'Adresse ändern', 'Kontakt ändern'] : ['Change colour', 'Change finish', 'Change photos', 'Change name', 'Change delivery day', 'Change address', 'Change contact']) await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
+    // One "Ändern" per card, next to its title; its accessible name says what it opens.
+    for (const name of locale === 'de' ? ['Kugel Luna ändern', 'Lieferung ändern', 'Kontakt ändern'] : ['Change ornament Luna', 'Change delivery', 'Change contact']) await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
+    await expect(page.locator('section[class*="card"] button')).toHaveCount(3)
     await expect(page.getByRole('button', { name: /^(Ändern|Change)$/ })).toHaveCount(0)
     await expect(page.locator('[data-preview="static"] input, [data-preview="static"] fieldset')).toHaveCount(0)
     const columns = await page.locator('section > dl[class*="rows"] > div').evaluateAll(rows => rows.map(row => {
-      const [label, value, action] = [...row.children].map(child => child.getBoundingClientRect())
-      return { label: label.left, value: value.left, action: action.right }
+      const [label, value] = [...row.children].map(child => child.getBoundingClientRect())
+      return { label: label.left, value: value.left }
     }))
     expect(columns.length).toBeGreaterThan(5)
     for (const row of columns) expect(row).toEqual(columns[0])

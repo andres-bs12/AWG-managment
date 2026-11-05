@@ -3,35 +3,54 @@ import styles from '../BuyPage.module.css'
 import type { BuyStepProps } from './shared'
 import { formatEur } from '../../../lib/money'
 import { OrnamentPreview } from '../../../components/public/OrnamentPreview'
-import { ReviewCard } from '../../../components/public/ReviewCard'
+import { ReviewCard, ReviewThumbs } from '../../../components/public/ReviewCard'
 import { colorKeys } from './shared'
+import { pickupPlace, useCompactDate } from './BuyDateStep'
 
-export function BuyReviewStep({ t, draft, config, itemPrice, formatDate, patch, err, described, serverError, go, itemsTotal, total, changed }: Pick<BuyStepProps, 't' | 'draft' | 'config' | 'itemPrice' | 'formatDate' | 'patch' | 'err' | 'described' | 'serverError'> & { go: (step: number, uid?: string, substep?: number, field?: string) => void; itemsTotal: number; total: number; changed: string }) {
+type Props = Pick<BuyStepProps, 't' | 'draft' | 'config' | 'itemPrice' | 'formatDate' | 'patch' | 'err' | 'described' | 'serverError' | 'pickupDays'> & {
+  go: (step: number, uid?: string, substep?: number, field?: string) => void
+  itemsTotal: number
+  deliveryFee: number
+  total: number
+  changed: string
+}
+
+export function BuyReviewStep({ t, draft, config, itemPrice, formatDate, patch, err, described, serverError, pickupDays, go, itemsTotal, deliveryFee, total, changed }: Props) {
   const { locale } = useLocale()
-  const change = (key: string, step: number, uid?: string, substep?: number) => {
-    const item = draft.items.findIndex(entry => entry.uid === uid)
-    return <button type="button" className={styles.linkBtn} aria-label={uid && draft.items.length > 1 ? t('editItem', { action: t(key), item: t('ornamentN', { n: item + 1 }) }) : undefined} onClick={() => go(step, uid, substep, uid ? `${({ editColour: 'color', editFinish: 'finish', editPhotos: 'photos-block', editPet: 'pet', editName: 'back' } as Record<string, string>)[key]}-${uid}` : step === 2 ? 'buy-date' : step === 4 ? 'buy-line1' : 'buy-name')}>{t(key)}</button>
-  }
+  const compactDate = useCompactDate()
+  const pickup = draft.deliveryKind === 'market'
+  const day = pickup ? pickupDays.find(entry => entry.date === draft.deliveryDate) : undefined
   return <>
-    {draft.items.map((item, index) => <ReviewCard key={item.uid} title={t('ornamentN', { n: index + 1 })} changed={changed === item.uid} rows={[
-      { label: t('shopColour'), value: item.color && t(colorKeys[item.color]), action: change('editColour', 0, item.uid, 0) },
-      { label: t('shopFinish'), value: item.finish && t(item.finish === 'shiny' ? 'finishShiny' : 'finishMatte'), action: change('editFinish', 0, item.uid, 0) },
-      { label: t('petName'), value: item.petName, action: change('editPet', 0, item.uid, 2) },
-      { label: t('formPhotos'), value: t('photosCount', { n: item.photos.length }), action: change('editPhotos', 0, item.uid, 2) },
-      ...(item.withName ? [{ label: t('shopNameExtraLine'), value: <>{item.backName}<br /><span className={styles.price}>+{formatEur(itemPrice(item) - config.customPrice, locale)}</span></>, action: change('editName', 0, item.uid, 1) }] : []),
-    ]}>
-      <div className={styles.reviewProduct}><div className={styles.reviewPreview}><OrnamentPreview item={item} static /></div><p>{item.petName}</p><strong className={styles.price}>{formatEur(config.customPrice, locale)}</strong></div>
-    </ReviewCard>)}
-    <ReviewCard title={t('shopStepDate')} changed={changed === 'delivery'} rows={[
-      { label: t('shopStepDate'), value: <>{draft.deliveryDate && formatDate(draft.deliveryDate)} · {t('eveningShort')}</>, action: change('editDate', 2) },
-      { label: t('addressHeading'), value: <>{draft.line1}<br />{draft.line2 && <>{draft.line2}<br /></>}{draft.postalCode} Wien</>, action: change('editReviewAddress', 4) },
-    ]} />
-    <ReviewCard title={t('contactHeading')} changed={changed === 'contact'} rows={[
-      { label: t('yourName'), value: draft.customerName, action: change('editContact', 3) },
-      { label: t('email'), value: draft.email },
-      { label: t('phone'), value: draft.phone },
-    ]} />
-    <section className={styles.reviewCard}><h3>{t('shopTotal')}</h3><dl className={styles.totals}><div><dt>{t('shopItemsTotal')}</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{config.deliveryFee ? formatEur(config.deliveryFee, locale) : t('shopFree')}</dd></div><div><dt>{t('shopTotal')}</dt><dd><strong>{formatEur(total, locale)}</strong></dd></div></dl></section>
+    {draft.items.map((item, index) => {
+      const title = t('ornamentN', { n: index + 1 })
+      return <ReviewCard key={item.uid} title={title} changed={changed === item.uid}
+        action={{ label: t('change'), ariaLabel: t('editOrnamentNamed', { name: item.petName.trim() || title }), onClick: () => go(0, item.uid, 0, `color-${item.uid}`) }}
+        rows={[
+          { label: t('reviewLook'), value: [item.color && t(colorKeys[item.color]), item.finish && t(item.finish === 'shiny' ? 'finishShiny' : 'finishMatte')].filter(Boolean).join(' · ') },
+          ...(item.withName ? [{ label: t('shopNameExtraLine'), value: <>{item.backName} <span className={styles.price}>+{formatEur(itemPrice(item) - config.customPrice, locale)}</span></> }] : []),
+          ...(item.note.trim() ? [{ label: t('noteLabel'), value: item.note }] : []),
+        ]}>
+        <div className={styles.reviewProduct}><div className={styles.reviewPreview}><OrnamentPreview item={item} static /></div><p>{item.petName}</p><strong className={styles.price}>{formatEur(config.customPrice, locale)}</strong></div>
+        <ReviewThumbs photos={item.photos} alt={i => t('photoAlt', { n: i + 1, name: item.petName || t('yourPet') })} />
+      </ReviewCard>
+    })}
+    <ReviewCard title={pickup ? t('methodMarket') : t('methodVienna')} changed={changed === 'delivery'}
+      action={{ label: t('change'), ariaLabel: t('editDeliveryShort'), onClick: () => go(2, undefined, undefined, 'buy-date') }}
+      rows={pickup ? [
+        { label: t('yourDate'), value: day ? `${compactDate(day.date)} · ${t('timeOClock', { time: draft.pickupTime })}` : formatDate(draft.deliveryDate) },
+        ...(day ? [{ label: t('pickupDayHeading'), value: pickupPlace(day, t) }] : []),
+      ] : [
+        { label: t('yourDate'), value: draft.deliveryDate ? `${compactDate(draft.deliveryDate)} · ${t('eveningShort')}` : '' },
+        { label: t('addressHeading'), value: <>{draft.line1}<br />{draft.line2 && <>{draft.line2}<br /></>}{draft.postalCode} Wien</> },
+      ]} />
+    <ReviewCard title={t('contactHeading')} changed={changed === 'contact'}
+      action={{ label: t('change'), ariaLabel: t('editContactShort'), onClick: () => go(3, undefined, undefined, 'buy-name') }}
+      rows={[
+        { label: t('yourName'), value: draft.customerName },
+        { label: t('email'), value: draft.email },
+        { label: t('phone'), value: draft.phone },
+      ]} />
+    <section className={styles.reviewCard}><h3>{t('shopTotal')}</h3><dl className={styles.totals}><div><dt>{t('shopItemsTotal')}</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{deliveryFee ? formatEur(deliveryFee, locale) : t('shopFree')}</dd></div><div><dt>{t('shopTotal')}</dt><dd><strong>{formatEur(total, locale)}</strong></dd></div></dl></section>
     <p className={styles.afterPayment}>{t('afterPayment')}</p>
     <div className={styles.terms}><div className={styles.inset}><p>{t('personalisedNoReturn')}</p>{draft.items.some(item => item.withName) && <p>{t('nameNonRefund')}</p>}</div>
     <div className={styles.check}><input id="buy-terms" aria-labelledby="buy-terms-label" type="checkbox" checked={draft.acceptTerms} aria-invalid={!!err('buy-terms')} aria-describedby={described('buy-terms')} onChange={event => patch({ acceptTerms: event.target.checked })} /><label id="buy-terms-label" htmlFor="buy-terms">{t('shopTermsBefore')}<a href="/agb" target="_blank" rel="noopener noreferrer">{t('terms')}</a>{t('shopTermsAfter')} {t('shopPrivacyBefore')}<a href="/datenschutz" target="_blank" rel="noopener noreferrer">{t('privacy')}</a>.</label></div>

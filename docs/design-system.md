@@ -239,7 +239,7 @@ All gaps are measured from the rendered edge of one element to the next. The tab
 | `--layout-calendar-max` | `420px` | Month grid |
 | `--layout-gutter` | `16px`; `24px` at 768px; `32px` at 1280px | Responsive root alias |
 | `--layout-header-height` | `64px` | Minimum header height; allow content growth |
-| `--layout-sticky-gap` | `16px` | Desktop sticky top offset |
+| `--layout-sticky-gap` | `0px` | Gap between the scrollport and the docked mobile action bar (none: the bar continues the card) |
 | `--touch`, `--touch-lg` | `44px`, `56px` | Minimum target; large primary button |
 | `--size-control` | `48px` | Default input/select/button height; min-height, not fixed multiline height |
 | `--size-textarea-min` | `96px` | Resizable textarea |
@@ -388,7 +388,8 @@ Paths below are relative to `frontend/src/`. **Existing** is the current impleme
 |---|---|
 | Anatomy/sizes | Optional h3/header action, body; 16px mobile/24px desktop padding, 12px radius, 1px decorative border, opaque raised surface, no nested shadow. Product/cart variant alone may use cart blue. Header→body 16px; card→card 16px. |
 | Review alignment | Product row grid: `var(--size-review-art) minmax(0,1fr) max-content`, 12px column gap, top alignment. Amount right aligned, tabular, no wrap. Name surcharge, metadata and edit actions use the **same parent columns/subgrid**, starting in column 2, amounts in column 3. Never fake alignment with `margin-left:calc(56px + gap)`. At narrow text zoom, price may move below content in column 2, aligned end, without clipping. |
-| Change actions | Visible and accessible text always names the target: “Farbe ändern”, “Oberfläche ändern”, “Fotos ändern”, “Liefertag ändern”, “Adresse ändern”, “Kontakt ändern”, with item number when multiple. EN “Change colour”, etc. No bare “Ändern” even if an aria-label expands it. Return to the exact field/substep, retain answers, then offer Return to review. |
+| Change actions (owner decision 2026-11-05) | **One** “Ändern”/“Change” per card, in the header next to the title (`ReviewCard` `action`). Its accessible name contains the visible word and names the section: “Kugel Luna ändern” / “Change ornament Luna”, “Lieferung ändern”, “Kontakt ändern”. It opens the whole section (ornament → its tab, first substep; delivery/contact → screen 2 at that field). Never one button per attribute. The button keeps a 44px target with negative block margins so the header stays one text line high. |
+| Compact rows | Combine attributes (“Farbe & Oberfläche: Rot · Glänzend”); never repeat what the product row already shows (the pet name); photos are thumbnails without a heading. Phones: label (muted, hint size) above value; from 768px two aligned columns 2fr/3fr. |
 | States/do/don't | Card itself is static, unless explicitly a ChoiceCard. Changed row may fade once (200ms); it must not become selected green. Show ornament, colour + finish, pet, separate name surcharge, delivery, contact and totals accurately. Fixed order facts in `/form` are read-only with explicit text, not disabled controls. No live preview buttons or duplicated disclaimer in review. |
 
 ### 7.10 Multiple-item tabs and add action
@@ -407,10 +408,11 @@ Paths below are relative to `frontend/src/`. **Existing** is the current impleme
 
 | Contract | Rule |
 |---|---|
-| Anatomy/sizes | Visible date legend, next three API dates as cards, month grid starting Monday, one selected-date summary and optional help/error. Date cards min-height `--size-date-card` (88px), padding 12px, gap 12px. Calendar max 420px, seven equal columns, **44×44px targets**, 4px row gap, no inline gap at the narrowest layout. Card list→calendar 24px; month heading→grid 16px; calendar→summary 16px. |
+| Delivery method (owner decision 2026-11-05) | The delivery screen starts with two C1 choice cards: “Lieferung in Wien” (Mi & Fr abends · fee) and “Abholung am Markt” (kostenlos). Vienna = earliest card + calendar + address. Market = stall days as C1 cards grouped under one quiet market heading (“Rathausplatz · Stand 12”, said once, never on every card; card = “Sa, 28. Nov” + “12:00–19:00 Uhr”), 2 columns on phones, 3 from 768px, 4 from 1024px; then “Wann kommst du?” time chips every 30 min from opening until 30 min before closing (4 columns on phones, 7 from 768px, text-only chips with tabular numbers); contact fields only, no address, no fee. Switching method clears date and time. Choice card inset 16px = padding + border (1px → 2px never shifts text). |
+| Anatomy/sizes | Visible date legend, **one** “Frühester Termin” shortcut card (owner decision 2026-11-05: never three near-duplicate shortcuts), month grid starting Monday, one selected-date card and optional error. Date card min-height `--size-date-card` (88px), padding 12px. Calendar max 420px, seven equal columns, **44×44px targets**, 4px row gap, no inline gap at the narrowest layout. Card list→calendar 24px; month heading→grid 16px; calendar→summary 16px. |
 | One selection | One ISO date state drives cards and grid. No independent preselection; earliest card gets an “Earliest” text label, not selection styling. Cards are shortcut buttons (`aria-pressed` synchronized with state), calendar uses native radios with one name. Choosing either updates both, including the persistent summary. No duplicated competing radio sets. |
 | States | CMP0, same C1 selection (2px green boundary + tint) in date cards and calendar day. Unavailable days have readable muted text, no target/focus. Available unselected days have control-border outline; “available” is not green-filled. Loading skeletons reserve dimensions; fetch error has Retry; zero dates has waitlist/recovery action. |
-| Summary/semantics | Always reserve one summary line: “Liefertag wählen” before selection; “Mi, 2. Dez · abends” after selection. Full weekday/date/year in the radio accessible name and review when needed; use an additional visually hidden summary description when the compact visible line omits the year. Announce selected-date summary politely; keep calendar selection visible even if the chosen date is outside the first three cards. Allow wrapping at zoom. |
+| Summary/semantics | The choice is shown in a “Dein Termin” card below the calendar/time chips: dashed neutral placeholder (“Wähle einen Tag im Kalender”) before a choice, C1 selected style after (“Mi, 2. Dez · abends” or “Rathausplatz · Sa, 28. Nov · 15:30 Uhr”). No stray (?) under the lead paragraph: the lead says the constraint in one sentence. Full weekday/date/year in the radio accessible name and review when needed; use an additional visually hidden summary description when the compact visible line omits the year. Announce selected-date summary politely; keep calendar selection visible even if the chosen date is outside the first three cards. Allow wrapping at zoom. |
 | Do/don't | Render API dates, including approved exceptions, never infer eligibility just from weekdays. No invented hour range, fake reservation or navigation to empty months. At insufficient width use accessible date list with same state. Never erase a disappeared date silently: explain and offer another while preserving other answers. |
 
 ### 7.12 Photo tiles and plus tile
@@ -439,7 +441,8 @@ Paths below are relative to `frontend/src/`. **Existing** is the current impleme
 
 | Contract | Rule |
 |---|---|
-| Anatomy/sizes | Current total + secondary Back + one primary Continue/Pay, 12px gap, wrapping label-safe layout; raised surface, shadow-1. Padding and safe area follow §4.2. No fixed height. |
+| Anatomy/sizes | Current total + secondary Back + one primary Continue/Pay, 12px gap, wrapping label-safe layout. Padding and safe area follow §4.2. No fixed height. |
+| Docked / stuck (owner decision 2026-11-05) | Below 1024px the docked bar is the card's own bottom row: exactly the card's border-box width, flush with the screen bottom, top corners `--radius-panel`, bottom corners square, `--shadow-up`, and the scrollport ends exactly at its top (`--layout-sticky-gap: 0`), so nothing ever sits underneath it. Inner padding equals the card padding so buttons line up with the content. When the end of the card scrolls into view the bar returns to the flow as the card's last row (`data-stuck`): 1px `--color-border` divider on top, bottom corners equal the card radius, no shadow. The switch keeps every content position. Never a “pill inside a pill”. |
 | States | Bar static; buttons CMP0, total Price contract. Busy primary preserves size and prevents duplicate checkout. Error summary stays in task, never hidden beneath bar. Selection is not applicable to container. |
 | Do/don't | Below 1024px sticky only when enough room; measure and reserve actual height, test keyboard. Hide duplicate preview/cart total in that viewport. Review breakdown may show the total and the pay label may include it; these are meaningful review/payment contexts, not multiple floating counters. No duplicate primary button or conflicting padding overrides. |
 
@@ -804,3 +807,19 @@ Build public AWG UI with warm opaque surfaces, one dark-green selection treatmen
 Public consumers must continue to follow this specification. The implemented shared components are `components/public/ItemTabs`, `ReviewCard`, `WaitlistSignup`, `components/ui/HelpTip` and the public native-radio branch of `SegmentedControl`. The existing staff branch is retained. `/dev/design` is lazy-loaded only in development, outside authentication, with synthetic fixtures and injected local actions. It is not linked from the public shell. Browser verification remains pending; see [Task 7B handoff](task7b-handoff.md).
 
 Additional centralized rendering dimensions preserve the existing preview geometry: `--preview-perspective:800px`, `--preview-glint-shift:90px` (illustration transform only). The development gallery adds `--guide-frame-height:440px` for isolated component frames and `--guide-zoom-size:2rem` for its text-zoom fixture. These values live only in `tokens.css`; they are not new public spacing steps.
+
+### Task 8 implementation token additions (2026-11-05)
+
+These exact tokens support the existing globe turn and truthful read-only legacy orders. They do not add purchasable colours. Browser validation remains pending.
+
+| Token | Exact value | Role |
+|---|---|---|
+| `--preview-turn-shift` | `110px` | Existing globe artwork travel, now centralized |
+| `--preview-script-size` | `40px` | Existing SVG back-name script size |
+| `--art-white` | `#ffffff` | Existing globe highlight, artwork only |
+| `--art-black` | `#000000` | Existing globe shade, artwork only |
+| `--ornament-grey` / `--portrait-grey` | `#9ca3af` / `#7b8390` | Explicit legacy grey artwork |
+| `--ornament-white` / `--portrait-white` | `#f5f5f4` / `#dededb` | Explicit legacy white artwork |
+| `--portrait-unknown` | `var(--color-disabled-surface)` | Neutral unrecorded order colour; never a beige selection |
+
+The layer tokens already specified in §6 are now present in `tokens.css`. Shared `PublicPage`, `PageHeader`, `StickyActions`, `InsetNote`, `PhotoTiles`, `ContactFields`, `OptionalNote`, `OrderTimeline` and `PublicState` implementations live in `components/public/`. The shop and QR form use these production components rather than importing each other's page CSS. Fixed Vienna city text is “Wien”; the QR payload retains the existing server city value. Public field styles are scoped with `data-public-page` so staff consumers retain their styling.

@@ -10,6 +10,6 @@ export default defineConfig({
     { name: 'mobile', use: { viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true }, testIgnore: /reduced-motion/ },
     { name: 'tablet', use: { viewport: { width: 768, height: 1024 } }, testIgnore: /reduced-motion/ },
     { name: 'desktop', use: { viewport: { width: 1280, height: 900 } }, testIgnore: /reduced-motion/ },
-    { name: 'reducedMotion', use: { viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' }, testMatch: /reduced-motion|journey-deep/ },
+    { name: 'reducedMotion', use: { viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' }, testMatch: /reduced-motion|journey-deep|form/ },
   ],
 })

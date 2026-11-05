@@ -9,6 +9,10 @@
 .ball[data-color='red'] { fill: var(--ornament-red); }
 .ball[data-color='green'] { fill: var(--ornament-green); }
 .ball[data-color='beige'] { fill: var(--ornament-beige); }
+.ball[data-color='grey'] { fill: var(--ornament-grey); }
+.ball[data-color='white'] { fill: var(--ornament-white); }
+.ball[data-color='unknown'] { fill: var(--color-disabled-surface); stroke: var(--color-control-border); stroke-width: var(--icon-stroke); }
+
 .shade { pointer-events: none; }
 
 /* Turning the ornament like a globe (owner, 2026-11-05): the ball never changes shape; the
@@ -20,11 +24,11 @@
   transition: transform var(--dur-flip) cubic-bezier(0.45, 0, 0.55, 1), opacity var(--dur-flip) cubic-bezier(0.45, 0, 0.55, 1);
 }
 .front { transform: none; opacity: 1; }
-.back { transform: translateX(110px) scaleX(0.15); opacity: 0; font: 600 40px var(--font-script); fill: var(--ornament-name-light); }
-.turn[data-back='true'] .front { transform: translateX(-110px) scaleX(0.15); opacity: 0; }
+.back { transform: translateX(var(--preview-turn-shift)) scaleX(0.15); opacity: 0; font: var(--type-label-weight) var(--preview-script-size) var(--font-script); fill: var(--ornament-name-light); }
+.turn[data-back='true'] .front { transform: translateX(calc(-1 * var(--preview-turn-shift))) scaleX(0.15); opacity: 0; }
 .turn[data-back='true'] .back { transform: none; opacity: 1; }
 /* White fails on beige (2.33:1): the name is dark brown there. */
-.back[data-color='beige'] { fill: var(--ornament-name-dark); }
+.back:is([data-color='beige'], [data-color='grey'], [data-color='white'], [data-color='unknown']) { fill: var(--ornament-name-dark); }
 .dog { animation: pets var(--dur-pet-cycle) ease-in-out infinite; }
 .glint { animation: glint var(--dur-enter) ease-out both; }
 

@@ -86,3 +86,7 @@ Los e-mails se envían en segundo plano después de guardar el cambio. Si el SMT
 ## Retención de datos
 
 Cada noche (03:30, hora de Viena) el backend borra las fotos y los datos personales (nombre, e-mail, teléfono, dirección, nombre de la mascota, nota) de los pedidos entregados hace más de 60 días. Los pedidos que nunca se entregaron se borran al cumplir un año. Se conservan el código, las fechas, los adornos y los importes para la contabilidad. El enlace del formulario deja de funcionar 30 días después de la entrega. Las inscripciones a la lista de espera sin confirmar se borran a los 7 días. Los plazos se cambian con `RETENTION_FORM_LINK_DAYS`, `RETENTION_PERSONAL_DATA_DAYS`, `RETENTION_STALE_ORDER_DAYS` y `RETENTION_WAITLIST_UNCONFIRMED_DAYS`; confírmalos con tu asesor.
+
+## Client IP and rate limits
+
+nginx overwrites `X-Forwarded-For` with the address it sees, so clients cannot spoof it. When the stack runs behind another TLS proxy or load balancer, add `set_real_ip_from <proxy CIDR>;` and `real_ip_header X-Forwarded-For;` to `frontend/nginx.conf`. Without them, every visitor shares the proxy's address and therefore one rate-limit bucket. Keep `FORWARD_HEADERS=native` on the backend only when nginx is the sole entry point.

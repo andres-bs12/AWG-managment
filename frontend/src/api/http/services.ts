@@ -11,6 +11,7 @@ import type {
   ShopCheckoutInput,
   ShopConfig,
   ShopDeliveryDate,
+  ShopPickupDay,
   TrackView,
 } from '../../domain/types'
 
@@ -307,6 +308,7 @@ export const httpApi: Api = {
     joinWaitlist: (email, locale) => request('/api/shop/waitlist', jsonInit('POST', { email, locale })),
     getConfig: () => request<ShopConfig>('/api/shop/config'),
     listDeliveryDates: (items) => request<ShopDeliveryDate[]>('/api/shop/delivery-dates', jsonInit('POST', { items })),
+    listPickupDays: (items) => request<ShopPickupDay[]>('/api/shop/pickup-days', jsonInit('POST', { items })),
     checkout: async (input) => {
       const result = await request<{ orderCode: string; formToken: string; checkoutUrl: string }>(
         '/api/shop/checkout',

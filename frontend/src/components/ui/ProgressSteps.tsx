@@ -6,6 +6,6 @@ export function ProgressSteps({ labels, current, label, compact = false }: { lab
       <span className={styles.dot} aria-hidden="true">{index < current ? '✓' : index + 1}</span>
       <span className={styles.label}>{text}</span>
     </li>)}</ol>
-    {compact ? <p>{label}</p> : null}
+    {compact ? <p>{label} · {labels[current]}</p> : null}
   </nav>
 }

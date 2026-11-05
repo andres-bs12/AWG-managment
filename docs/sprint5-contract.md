@@ -4,7 +4,7 @@ Source: tasks/audit-final.md. Backend by Claude, frontend by Codex; each reviews
 
 ## Errors
 Every non-2xx body: `{ status, message, code?, field? }`.
-- `code` (stable, for client-side localisation): `VALIDATION`, `NOT_FOUND`, `ORDER_NOT_FOUND`, `FORM_LOCKED`, `POSTAL_OUTSIDE_VIENNA`, `DELIVERY_DAY_INVALID`, `DAY_FULL`, `RATE_LIMITED`, `STOCK_CHANGED`, `OUT_OF_STOCK`, `PHOTO_INVALID` (field `photos`), `PAYMENT_PENDING`, `SHOP_CLOSED`, `TOO_MANY_OPEN_CHECKOUTS`, `PAYMENT_PROVIDER`, `UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT`, `BAD_REQUEST`.
+- `code` (stable, for client-side localisation): `VALIDATION`, `NOT_FOUND`, `ORDER_NOT_FOUND`, `FORM_LOCKED`, `POSTAL_OUTSIDE_VIENNA`, `DELIVERY_DAY_INVALID`, `PICKUP_DAY_INVALID` (field `deliveryDate`), `PICKUP_TIME_INVALID` (field `pickupTime`), `DAY_FULL`, `RATE_LIMITED`, `STOCK_CHANGED`, `OUT_OF_STOCK`, `PHOTO_INVALID` (field `photos`), `PAYMENT_PENDING`, `SHOP_CLOSED`, `TOO_MANY_OPEN_CHECKOUTS`, `PAYMENT_PROVIDER`, `UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT`, `BAD_REQUEST`.
 - `field` (for `VALIDATION`): the request property path, e.g. `items[0].petName`, `address.postalCode`, `customerName`.
 - The frontend shows a localized text for known codes (DE/EN) next to the field when `field` is set, and falls back to `message`.
 
@@ -12,6 +12,7 @@ Every non-2xx body: `{ status, message, code?, field? }`.
 - `POST /api/orders` accepts header `Idempotency-Key: <uuid>`. Repeating the same key returns the SAME order (200 instead of 201) and does not create or deduct anything again. The frontend generates one key per sale draft (kept until the sale succeeds) and also disables the button while sending.
 
 ## Staff sale delivery days
+- A market pickup (`deliveryKind: 'market'`, from `POST /api/shop/pickup-days`) has no address and no fee; `deliveryDate` must be an offered stall day (400 `PICKUP_DAY_INVALID`) and `pickupTime` ('HH:mm') a half hour from opening until 30 minutes before closing (400 `PICKUP_TIME_INVALID`).
 - A Vienna delivery (`deliveryKind: 'vienna'`) must be on Wed/Fri or the season end (24 Dec), not on a stall day, not after the season end → 400 `DELIVERY_DAY_INVALID`. The wizard should only offer those days.
 
 ## Customer form (`/api/forms/{token}`)

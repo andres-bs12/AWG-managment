@@ -6,7 +6,7 @@
  */
 
 .shop {
-  width: min(760px, 92vw);
+  width: min(var(--layout-form-max), calc(100% - 2 * var(--layout-gutter)));
 }
 
 /* ── Page-level messages ─────────────────────────────────────────────── */
@@ -15,73 +15,6 @@
   margin: 0 0 var(--space-4);
   padding: var(--space-1) 0 var(--space-1) var(--space-4);
   border-left: 4px solid var(--public-muted);
-}
-
-/* ── Stepper ─────────────────────────────────────────────────────────── */
-
-.progress {
-  display: flex;
-  margin: var(--space-5) 0 0;
-  padding: 0 0 var(--space-5);
-  border-bottom: 1px solid var(--snow-2);
-  list-style: none;
-}
-
-.progress li {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--public-muted);
-  font-size: var(--fs-small);
-  line-height: 1.2;
-  text-align: center;
-}
-
-.progress li:not(:first-child)::before {
-  content: '';
-  position: absolute;
-  top: 14px;
-  right: 50%;
-  width: 100%;
-  height: 2px;
-  background: var(--snow-2);
-}
-
-.progress li[data-done='true']:not(:first-child)::before,
-.progress li[aria-current='step']:not(:first-child)::before {
-  background: var(--green-deep);
-}
-
-.progress li span {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--snow);
-  color: var(--night);
-  font-weight: 700;
-}
-
-.progress li[aria-current='step'] {
-  color: var(--night);
-  font-weight: 700;
-}
-
-.progress li[aria-current='step'] span {
-  background: var(--night);
-  color: #fff;
-}
-
-.progress li[data-done='true'] span {
-  background: var(--green-deep);
-  color: #fff;
 }
 
 /* ── Step: title, intro, sections ────────────────────────────────────── */
@@ -167,20 +100,7 @@
 
 /* ── Supporting text ─────────────────────────────────────────────────── */
 
-/* Inset text (GOV.UK): related information that is not the main task. Neutral, sparing. */
-.inset {
-  margin: 0 0 var(--space-5);
-  padding: var(--space-1) 0 var(--space-1) var(--space-4);
-  border-left: 4px solid var(--snow-2);
-}
-
-.inset p {
-  margin: 0;
-}
-
-.inset p + p {
-  margin-top: var(--space-2);
-}
+.inset { composes: inset from '../../components/public/PublicForm.module.css'; margin: 0 0 var(--space-5); }
 
 .muted {
   margin: var(--space-2) 0 0;
@@ -486,126 +406,6 @@
   margin-bottom: 0;
 }
 
-/* ── Step 2: photos ──────────────────────────────────────────────────── */
-
-.photoBlock {
-  margin-bottom: var(--space-5);
-}
-
-.photoBlock > .label + .muted {
-  margin-top: var(--space-1);
-}
-
-.photoRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
-}
-
-.photoRow img {
-  display: block;
-  width: 76px;
-  height: 76px;
-  object-fit: cover;
-  border-radius: var(--radius);
-}
-
-.thumb {
-  position: relative;
-  display: inline-block;
-}
-
-.thumb button {
-  position: absolute;
-  top: -10px;
-  right: -10px;
-  display: grid;
-  place-items: center;
-  width: var(--touch);
-  height: var(--touch);
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: 0;
-  cursor: pointer;
-}
-
-.thumb button::before {
-  content: '×';
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--night);
-  color: #fff;
-  font-size: 1.1rem;
-}
-
-.photoAdd {
-  display: grid;
-  place-items: center;
-  width: 76px;
-  height: 76px;
-  border: 2px dashed var(--public-muted);
-  border-radius: var(--radius);
-  background: #fff;
-  color: var(--night);
-  font-size: 2rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.photoAdd:hover {
-  border-color: var(--night);
-}
-
-/* Optional note: a text button with a chevron that points down when closed and up when open. */
-.noteToggle summary {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--touch);
-  color: var(--color-text);
-  font-weight: 600;
-  list-style: none;
-  cursor: pointer;
-}
-
-.noteToggle summary::-webkit-details-marker {
-  display: none;
-}
-
-.noteToggle summary::after {
-  content: '';
-  width: var(--space-2);
-  height: var(--space-2);
-  margin-top: calc(-1 * var(--space-1));
-  border-right: var(--border-control) solid currentColor;
-  border-bottom: var(--border-control) solid currentColor;
-  transform: rotate(45deg);
-  transition: transform var(--dur-change) var(--ease-enter), margin var(--dur-change) var(--ease-enter);
-}
-
-.noteToggle[open] summary::after {
-  margin-top: var(--space-1);
-  transform: rotate(-135deg);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .noteToggle summary::after { transition: none; }
-}
-
-.noteToggle summary:focus-visible {
-  outline: none;
-  box-shadow: var(--focus);
-}
-
-.noteToggle[open] summary {
-  margin-bottom: var(--space-2);
-}
-
 /* ── Step 3: delivery calendar ───────────────────────────────────────── */
 
 .calendarField {
@@ -838,16 +638,7 @@
   font-weight: 700;
 }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-6);
-}
-
-.actions button {
-  flex: 1;
-}
+.actions { min-width: 0; }
 
 .stripeLine {
   flex-basis: 100%;
@@ -864,32 +655,18 @@
 }
 
 .linkBtn:focus-visible,
-.thumb button:focus-visible,
 .help:focus-visible,
-.photoAdd:focus-visible,
 .day:has(input:focus-visible) {
   outline: none;
   box-shadow: var(--focus);
 }
 
 @media (max-width: 500px) {
-  .progress li { font-size: 0.7rem; }
+
   .card,
   .reviewCard { padding: var(--space-4); }
   .productArt { flex-basis: 56px; width: 56px; height: 64px; }
   .cart { display: none; }
-  .actions {
-    position: sticky;
-    bottom: 0;
-    z-index: 5;
-    align-items: center;
-    margin: var(--space-5) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
-    padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom));
-    /* Full panel width; soft corners matching the panel (no 90° corners anywhere). */
-    border-radius: var(--radius-panel);
-    background: var(--color-surface-raised);
-    box-shadow: 0 -4px 12px rgba(21, 32, 51, 0.13);
-  }
   .actions button { flex: 1 1 auto; min-width: 0; }
   .mobileTotal:not([hidden]) {
     display: flex;
@@ -924,7 +701,7 @@
   .design[data-substep='2'] .choiceGroup, .design[data-substep='2'] .nameGroup { display: none; }
 }
 @media (min-width: 1024px) {
-  .shop:has(.design) { width: min(var(--layout-configurator-max), 92vw); }
+  .shop:has(.design) { width: min(var(--layout-configurator-max), calc(100% - 2 * var(--layout-gutter))); }
   /* Preview 5/12, options 7/12; the preview column is sticky and vertically centred. */
   .design { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-6); align-items: start; }
   .previewPane { top: var(--space-4); display: grid; align-content: center; gap: var(--space-4); min-height: calc(100svh - 2 * var(--space-4)); max-height: calc(100svh - 2 * var(--space-4)); padding: 0; }
@@ -936,7 +713,7 @@
 
 @media (max-width: 1023px) {
   .cart { display: none; }
-  .actions { position: sticky; bottom: 0; z-index: 5; align-items: center; padding: var(--space-3); border-radius: var(--radius-panel); background: var(--color-surface-raised); box-shadow: 0 -4px 12px rgba(21, 32, 51, 0.13); }
+
   .mobileTotal:not([hidden]) { display: flex; flex-direction: column; font-size: var(--fs-small); }
 }
 /* Keep labels and photo guidance at full contrast throughout the entrance. */
@@ -952,7 +729,7 @@
 .dateCard:focus-visible { outline: none; box-shadow: var(--focus); }
 .dateSkeleton { background: var(--color-disabled-surface); }
 @media (min-width: 768px) { .dateCards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.formGrid input[data-valid='true'] { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4 10l4 4 8-9' fill='none' stroke='%232f6b3f' stroke-width='2'/%3E%3C/svg%3E"); background-size: 20px; background-position: right .75rem center; background-repeat: no-repeat; padding-right: 2.5rem; }
+
 .reviewProduct { display: grid; grid-template-columns: var(--size-review-art) minmax(0, 1fr) max-content; gap: var(--space-3); align-items: start; }
 .reviewPreview { width: var(--size-review-art); }
 .afterPayment { margin: var(--space-5) 0; max-width: var(--measure-prose); }
@@ -962,7 +739,7 @@
 .shop button:active { transform: scale(.97); }
 @media (prefers-reduced-motion: reduce) { .shop button { transition: none; } .shop button:active { transform: none; } }
 .thanksPreview { width: 150px; margin: 1rem auto; }
-.thanksTimeline { display: grid; gap: .75rem; margin: 1.5rem 0; padding-left: 1.5rem; }
+
 .seq { border: 0; padding: 1.5rem 0; }
 .seq legend { font-weight: 700; }
 .seq div { display: flex; flex-wrap: wrap; gap: .5rem; }
@@ -970,10 +747,6 @@
 .reviewItem[data-changed='true'], .reviewCard[data-changed='true'] { animation: reviewed 450ms ease-out; }
 @keyframes reviewed { from { opacity: .55; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .reviewItem[data-changed='true'], .reviewCard[data-changed='true'] { animation: none; } }
-.progress li[aria-current='step'] span { animation: progress-enter 200ms ease-out; }
-@keyframes progress-enter { from { opacity: .6; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) { .progress li[aria-current='step'] span { animation: none; } }
-
 /* Keep seven non-overlapping targets at 360px; a measured narrow container becomes a date list. */
 @media (max-width: 767px) {
   .calendarField { margin-inline: calc(-1 * var(--space-4)); }
@@ -988,6 +761,37 @@
 .dateConfirmation { min-height: calc(var(--type-body-size) * var(--type-body-line)); color: var(--color-text); }
 .chip[data-disabled='true'] { border-color: var(--color-control-border); }
 
-.photoBlock:focus-visible { outline: none; box-shadow: var(--focus); }
 
 .waitlist { display: grid; gap: var(--space-3); }
+
+/* ── Delivery screen: method choice, pickup days, arrival time (docs/design-system.md C1) ── */
+.methodGroup { min-width: 0; margin: 0 0 var(--space-6); padding: 0; border: 0; }
+.groupLegend { margin: 0 0 var(--space-3); padding: 0; font-weight: var(--type-label-weight); }
+.sectionLead { margin: 0 0 var(--space-4); max-width: var(--measure-prose); color: var(--color-text-muted); }
+/* Two-line selectable card. Inset 16px from the outer edge; padding = inset − border, so the
+   1px → 2px selected border never shifts the text. */
+.choiceCards, .pickupDays { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+.choiceCard { position: relative; display: grid; align-content: center; gap: var(--space-1); min-height: var(--size-control); padding: calc(var(--space-4) - var(--border-thin)); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-surface-raised); color: var(--color-text); cursor: pointer; }
+.choiceCard strong { font-weight: var(--type-label-weight); }
+.choiceCard span { color: var(--color-text-muted); font-size: var(--type-hint-size); }
+.choiceCard[data-selected='true'] { padding: calc(var(--space-4) - var(--border-control)); border: var(--border-control) solid var(--color-selected); background: var(--color-selected-surface); }
+.choiceCard[data-selected='true'] span { color: var(--color-text); }
+@media (hover: hover) { .choiceCard:hover:not([data-selected='true']) { background: var(--color-selection-hover); } }
+.choiceCard:has(input:focus-visible) { box-shadow: var(--focus); }
+.pickupDays .dateSkeleton { min-height: var(--size-date-card); border-radius: var(--radius-control); }
+/* One heading per market, then its days: the market name is said once, never on every card. */
+.pickupMarket { display: grid; gap: var(--space-3); }
+.pickupMarket + .pickupMarket { margin-top: var(--space-5); }
+.pickupMarket h3 { margin: 0; font-size: var(--type-body-size); font-weight: var(--type-body-weight); color: var(--color-text-muted); }
+.pickupDays { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 768px) { .choiceCards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pickupDays { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .pickupDays { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* Times are text-only chips: symmetric 16px inset, four columns on a phone so rows align. */
+.timeRow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+.timeChip { justify-content: center; padding: 0 calc(var(--space-2) - var(--border-thin)); font-variant-numeric: tabular-nums; }
+.timeChip[data-selected='true'] { padding: 0 calc(var(--space-2) - var(--border-control)); }
+@media (min-width: 768px) { .timeRow { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
+/* The chosen date, said once and unmistakably (C1 when chosen, neutral placeholder before). */
+.selectedDate { display: grid; gap: var(--space-1); margin: var(--space-4) 0 0; padding: calc(var(--space-4) - var(--border-thin)); border: var(--border-thin) dashed var(--color-control-border); border-radius: var(--radius-control); color: var(--color-text-muted); }
+.selectedDate small { font-size: var(--type-hint-size); font-weight: var(--type-label-weight); }
+.selectedDate[data-selected='true'] { padding: calc(var(--space-4) - var(--border-control)); border: var(--border-control) solid var(--color-selected); background: var(--color-selected-surface); color: var(--color-text); font-weight: var(--type-label-weight); }

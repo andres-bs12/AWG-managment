@@ -99,7 +99,7 @@ for (const locale of ['de', 'en'] as const) {
     // Reference photos must stay in the thumbnail gallery, outside the SVG.
     await expect(preview(page).locator('image, img')).toHaveCount(0)
     await expect(preview(page).locator('svg')).toBeVisible()
-    await expect(page.getByRole('button', { name: locale === 'de' ? 'Foto hinzufügen' : 'Add photo', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: locale === 'de' ? 'Foto hinzufügen, 1 von 6' : 'Add photo, 1 of 6', exact: true })).toBeVisible()
     await fillDelivery(page)
     await next(page).click()
     const total = config.customPrice + config.nameExtra + config.deliveryFee

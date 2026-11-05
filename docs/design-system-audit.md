@@ -268,3 +268,15 @@ The largest consistency gaps are competing selection palettes, unowned spacing b
 ## Task 7B source follow-up (2026-11-05)
 
 Codex independently reviewed Claude's uncommitted core before implementing Task 7B. Source fixes, retained measurements, component inventory and external verification are recorded in [Task 7B handoff](task7b-handoff.md). Review rows, static review previews, date selection/summary, shared finish/city help, readable sold-out choices and the DEV guide now have implementations. Additional tab activation/panel references, per-item preview side state, radio focus and `fill` animation issues were corrected. The existing staff SegmentedControl branch remains unchanged. Browser-dependent audit rows remain open until Claude verifies the updated suite and screenshots; the older snapshot anchors above must not be treated as current source locations.
+
+
+## Task 8 source follow-up (2026-11-05)
+
+The QR form migration is implemented, with browser evidence still pending. Source changes address Q01–Q15 through shared page/header/progress, photos, contact/address, notes, review, linked error summary/focus, sticky actions and explicit link states. The two-screen orchestration, expiry handling, draft recovery and fixed order facts are documented in [Task 8 handoff](task8-form-handoff.md). Read-only legacy grey/white and unknown values have explicit previews; QR completion claims saved details only. `PhotoTiles`, `ContactFields`, `OptionalNote`, page/header, progress and action components are consumed by both shop and QR flows. `ReviewCard`, public SegmentedControl and HelpTip are reused. Server contract, mock seed and legal text remain unchanged.
+
+These are source-level implementations, not closed visual/accessibility findings. Claude must run the changed and existing suites, inspect the three widths plus reduced motion/reflow/zoom and review screenshot differences. All unresolved browser-dependent rows remain open. Preserve the nine existing PNG references; no automatic regeneration or acceptance was performed.
+
+
+## Fix b-2 follow-up (2026-11-05)
+
+The mobile trace reports calendar radio targets partially obscured by the sticky action bar (axe `target-size`); this remains open. The owner requested removal of outdated PNG references for regeneration and visual review. Earlier instructions to preserve those references are historical.

@@ -2,6 +2,31 @@
 
 Read AGENTS.md, docs/design-system.md and memory rules first. The owner wants a **perfect UX** on `/buy` (online shop, all devices) and `/form/:token` (QR flow at the stall: phones + iPad Air 11" 820×1180), then staff, then security. They will review everything by eye.
 
+## Status 13:50 (Claude)
+
+- **Codex is rate-limited until 16:03.** The Codex runners (runner8/9/10) were stopped. Claude implemented task 9 itself:
+  - market pickup frontend;
+  - one-shortcut delivery calendar with a "Dein Termin" card;
+  - PLZ/Ort alignment;
+  - sticky bar spanning the card that merges at the end (`data-stuck`);
+  - one Edit per review card (/buy and /form);
+  - new spec `e2e/pickup.spec.ts`.
+- **Next:** task 10 items 2–8 (Claude or Codex after 16:03), then the parallel UX review, staff (t11), and security (rerun `sec1.txt` with Codex once its limit resets).
+- **Reviewer rule:** Claude wrote t9, so Codex must review it.
+- **Frontend security audit (Claude subagent):** `tasks/audit-results/security-frontend-claude-2026-11-05.md`.
+  - Fixed by Claude:
+    - L1: `?cancelled=` is only honoured for this browser's pending checkout.
+    - L2: the checkout URL must be Stripe or same-origin.
+    - L3: logout clears local state first.
+    - L4: `.ics` text is escaped.
+    - L6: nginx overwrites `X-Forwarded-For`.
+    - The `/assets/` headers.
+  - Still open:
+    - M1: form tokens persisted in `localStorage` without expiry, also on the staff device.
+    - L5: production builds must fail unless the data source is http.
+    - L7: the Playwright upgrade.
+  - The backend security audit is still to do: rerun `run7/sec1.txt` with Codex.
+
 ## Running infrastructure
 
 Background Codex chain, started by the Claude session. Status log and prompts live in:

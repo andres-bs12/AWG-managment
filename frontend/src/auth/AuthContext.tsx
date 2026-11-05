@@ -45,10 +45,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
-    await api.auth.logout()
+    // Start the server call while the token is still readable, then clear local state first so a
+    // network error never leaves a shared stall device signed in (or with a sale draft behind).
+    const request = api.auth.logout().catch(() => {})
     localStorage.removeItem(TOKEN_KEY)
+    try { sessionStorage.removeItem('awg-sale-draft') } catch { /* storage unavailable */ }
     setToken(null)
     setUser(null)
+    await request
   }, [])
 
   const value = useMemo(

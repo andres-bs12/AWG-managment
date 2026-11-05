@@ -11,6 +11,12 @@
   color: var(--snow);
 }
 
+/* Docked actions occupy their own viewport space, below the clipped scrollport. */
+.shell[data-docked-actions='true'] {
+  height: calc(100% - var(--public-sticky-bottom) - var(--layout-sticky-gap));
+  min-height: 0;
+}
+
 /** Routes with a reading panel on top: the scene stays, the drama goes down. */
 .quiet .main {
   padding-bottom: 8px;

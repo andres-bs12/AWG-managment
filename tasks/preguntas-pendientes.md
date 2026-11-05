@@ -10,6 +10,11 @@ Actualizado 2026-11-05 con tus respuestas y con lo que encontró la auditoría f
 4. **Datos legales.** Todavía pendientes. Los borradores de `/impressum`, `/agb` y `/datenschutz` tienen marcadores `[…]`. El asesor debe revisar también: el botón "Zahlungspflichtig bestellen", que los adornos personalizados no se pueden devolver (§ 18 FAGG) y los plazos de borrado (60 días después de la entrega; las facturas, 7 años).
 5. **Stock por acabado.** Supuse que las bases brillantes y mate son piezas distintas, así que el stock se lleva por color y acabado (6 filas). Si el acabado se aplica después sobre la misma base, avísame y lo cambio a stock solo por color.
 6. **Textos de los acabados.** Puse "Glänzend: spiegelt das Licht, kräftige Farben. Matt: weich und samtig, ohne Spiegelungen." Revisa que describan bien tus adornos (idealmente con una foto de cada uno).
+7. **Capacidad de pintura.** AGENTS.md dice lunes, martes y jueves 3 huecos (10–13) y miércoles y viernes 2 huecos (10–12). El servidor, en cambio, limita por defecto a 2 pinturas por día, cualquier día y también en días de puesto (`awg.painting.default-max-paintings=2`). ¿Qué regla vale? ¿Los días de puesto también permiten pintar?
+8. **Cancelar pedidos pagados.** Hoy, cancelar borra el pedido por completo y no queda registro para la contabilidad. Propuesta: guardar el pedido como "cancelado" (con fecha y motivo) en lugar de borrarlo. ¿Te parece?
+9. **Cambios después de la venta.** Hoy, cambiar el día de recogida, el color o quitar el nombre obliga a cancelar y vender de nuevo. ¿Quieres poder editar la venta? Si es así, ¿qué se puede cambiar?
+10. **Entrega por adorno.** "Entregado" se marca por pedido. Un pedido con una Kugel recogida en el mercado y otra enviada a Viena no se puede marcar bien. ¿Lo pasamos a "entregado" por adorno?
+11. **Recogida en el mercado (tienda web).** La implementé con hora de llegada cada 30 min, desde que abre el puesto hasta 30 min antes de cerrar, sin costo de envío y desde el primer día de mercado. Tu mensaje se cortó en "porque de pronto se puede…". ¿Hay un límite de recogidas por hora o alguna otra regla?
 
 ## Resueltas (2026-11-05, segunda ronda)
 

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { open, choose, pet, next } from './helpers'
+import { open, choose, pet, next, axe, expectActionClearance } from './helpers'
 
 test('contact fields have labels, single-column spacing and aligned postcode and city', async ({ page }) => {
   await open(page); await choose(page); await pet(page); await next(page).click()
@@ -26,6 +26,36 @@ test('visible controls have 44px touch targets', async ({ page }) => {
     return box.width < 44 || box.height < 44 ? [{ text: node.textContent?.trim(), width: box.width, height: box.height }] : []
   }))
   expect(failures).toEqual([])
+})
+
+test('bottom actions reserve scroll space across resize, short viewports and QR navigation', async ({ page }) => {
+  await open(page); await choose(page); await pet(page); await next(page).click()
+  await expectActionClearance(page)
+  await page.setViewportSize({ width: 360, height: 640 })
+  await expectActionClearance(page)
+  const shell = page.locator('[data-public-scroll]')
+  // Scroll through the calendar without focusing a control: clearance must not depend on focus repair.
+  for (const fraction of [0, 0.3, 0.6, 1]) {
+    await shell.evaluate((node, value) => { node.scrollTop = value * (node.scrollHeight - node.clientHeight) }, fraction)
+    await expectActionClearance(page)
+    await axe(page)
+  }
+  await page.setViewportSize({ width: 360, height: 240 })
+  await expectActionClearance(page, 'flow')
+  await page.setViewportSize({ width: 768, height: 1024 })
+  await expectActionClearance(page)
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await expectActionClearance(page)
+  await page.setViewportSize({ width: 360, height: 640 })
+  await expectActionClearance(page)
+  await page.locator('header a').first().click()
+  await expect(page).toHaveURL('/')
+  await expect(shell).not.toHaveAttribute('data-docked-actions')
+  expect(await shell.evaluate(node => node.style.getPropertyValue('--public-sticky-bottom'))).toBe('')
+  await page.goto('/form/frm-wait')
+  await expect(page.locator('#form-heading')).toBeVisible()
+  await expectActionClearance(page)
+  await axe(page)
 })
 
 test('ordinary contact fields follow the spacing scale', async ({ page }) => {

@@ -46,3 +46,18 @@ export async function axe(page: Page) {
   expect(results.violations).toEqual([])
 }
 
+export async function expectActionClearance(page: Page, mode = mobile(page) ? 'docked' : 'flow') {
+  await expect.poll(() => page.locator('[data-sticky-actions]').evaluate((bar, expected) => {
+    const shell = bar.closest('[data-public-scroll]')!
+    const viewport = shell.getBoundingClientRect()
+    const actions = bar.getBoundingClientRect()
+    if (expected === 'flow') return getComputedStyle(bar).position === 'static'
+      && !shell.hasAttribute('data-docked-actions') && !(bar as HTMLElement).dataset.docked
+    const inside = actions.left >= 0 && actions.right <= innerWidth && actions.bottom <= innerHeight + 0.5
+    // At the end of the card the bar returns to the flow as the card's last row.
+    if ((bar as HTMLElement).dataset.stuck === 'true') return getComputedStyle(bar).position === 'static' && inside
+    // Docked: the scrollport ends exactly where the bar starts, so nothing can sit underneath it.
+    return getComputedStyle(bar).position === 'fixed' && viewport.bottom <= actions.top + 0.5 && inside
+  }, mode)).toBe(true)
+}
+

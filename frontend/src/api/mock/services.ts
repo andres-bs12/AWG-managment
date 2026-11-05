@@ -88,6 +88,25 @@ function nextDeliveryDates(itemCount: number) {
   return out
 }
 
+const hhmm = (hour: number) => `${String(Math.floor(hour)).padStart(2, '0')}:${String(Math.round((hour % 1) * 60)).padStart(2, '0')}`
+
+/** Stall days from the mock markets with enough painting capacity before them (mirrors ShopService.pickupDays). */
+function nextPickupDays(itemCount: number) {
+  const today = new Date(); today.setHours(12, 0, 0, 0)
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return listMarketDays()
+    .flatMap(row => { const market = listMarkets().find(m => m.id === row.marketId && m.kind === 'market'); return market ? [{ row, market }] : [] })
+    .filter(({ row }) => row.date > iso(today) && row.date <= '2026-12-24' && row.closeHour - row.openHour >= 1)
+    .sort((a, b) => a.row.date.localeCompare(b.row.date))
+    .filter(({ row }) => {
+      let available = 0; const paint = new Date(today)
+      while (iso(paint) < row.date) { const setting = paintingDay(iso(paint)); if (setting.open) available += Math.max(0, setting.maxPaintings - setting.booked); paint.setDate(paint.getDate() + 1) }
+      return available >= itemCount
+    })
+    .slice(0, 12)
+    .map(({ row, market }) => ({ date: row.date, weekday: new Intl.DateTimeFormat('en', { weekday: 'long' }).format(new Date(`${row.date}T12:00:00`)), marketName: market.name, stall: market.stall, openTime: hhmm(row.openHour), closeTime: hhmm(row.closeHour) }))
+}
+
 const saleKeys = new Map<string, import('../../domain/types').Order>()
 
 export const mockApi: Api = {
@@ -179,12 +198,21 @@ export const mockApi: Api = {
         ],
       }), 80),
     listDeliveryDates: (items) => later(() => (items.length ? nextDeliveryDates(items.length) : []), 120),
+    listPickupDays: (items) => later(() => (items.length ? nextPickupDays(items.length) : []), 120),
     checkout: (input) =>
       later(() => {
         if (!input.items.length) throw new Error('Add at least one ornament.')
         if (input.items.some((item) => item.kind !== 'custom')) throw new Error('Only custom ornaments can be ordered online.')
         if (!input.acceptTerms) throw new Error('Please accept the terms.')
         if (!input.deliveryDate) throw new Error('Choose a delivery day.')
+        if (input.deliveryKind === 'market') {
+          const day = nextPickupDays(input.items.length).find(entry => entry.date === input.deliveryDate)
+          if (!day) throw Object.assign(new Error('Choose an available market day.'), { code: 'PICKUP_DAY_INVALID', field: 'deliveryDate' })
+          const time = input.pickupTime ?? ''
+          if (!/^\d{2}:(00|30)$/.test(time) || time < day.openTime || time > hhmm(Number(day.closeTime.slice(0, 2)) + Number(day.closeTime.slice(3)) / 60 - 0.5)) throw Object.assign(new Error('Choose an arrival time while the stall is open.'), { code: 'PICKUP_TIME_INVALID', field: 'pickupTime' })
+          return createMockCheckout(input)
+        }
+        if (!input.address) throw Object.assign(new Error('Address is required.'), { code: 'VALIDATION', field: 'address' })
         return createMockCheckout(input)
       }, 500),
   },

@@ -1,4 +1,4 @@
-import type { OrnamentColor, CustomFinish, Photo } from '../domain/types'
+import type { OrnamentColor, CustomFinish, DeliveryKind, Photo } from '../domain/types'
 
 export const BUY_DRAFT_KEY = 'awg-buy-draft'
 
@@ -22,7 +22,10 @@ export type BuyDraft = {
   line1: string
   line2: string
   postalCode: string
+  deliveryKind: DeliveryKind
   deliveryDate: string
+  /** Arrival time at the stall ('HH:mm'), market pickup only. */
+  pickupTime: string
   acceptTerms: boolean
 }
 
@@ -31,7 +34,7 @@ export function newItem(): BuyItem {
 }
 
 const emptyDraft = (): BuyDraft => ({
-  items: [newItem()], customerName: '', email: '', phone: '', line1: '', line2: '', postalCode: '', deliveryDate: '', acceptTerms: false,
+  items: [newItem()], customerName: '', email: '', phone: '', line1: '', line2: '', postalCode: '', deliveryKind: 'vienna', deliveryDate: '', pickupTime: '', acceptTerms: false,
 })
 
 export function loadBuyDraft(): BuyDraft {
@@ -45,6 +48,8 @@ export function loadBuyDraft(): BuyDraft {
     return {
       ...emptyDraft(), ...parsed,
       items: items.length ? items : [newItem()],
+      deliveryKind: parsed.deliveryKind === 'market' ? 'market' : 'vienna',
+      pickupTime: typeof parsed.pickupTime === 'string' && /^\d{2}:\d{2}$/.test(parsed.pickupTime) ? parsed.pickupTime : '',
       acceptTerms: false,
     }
   } catch {

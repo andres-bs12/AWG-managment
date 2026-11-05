@@ -307,7 +307,9 @@ export function createMockCheckout(input: ShopCheckoutInput) {
     id: uid('orn'), orderId, kind: 'custom', petName: item.petName ?? '', withName: item.withName,
     color: item.color ?? 'red', finish: item.finish, backName: item.backName ?? '', note: item.note ?? '',
     cost: itemCost('custom', item.withName), productionStatus: 'not_started', photos: item.photos,
-    formComplete: true, delivery: { kind: 'vienna', address: input.address, deliveryDate: input.deliveryDate },
+    formComplete: true, delivery: input.deliveryKind === 'market'
+      ? { kind: 'market', marketDayId: state.marketDays.find(day => day.date === input.deliveryDate && state.markets.some(m => m.id === day.marketId && m.kind === 'market'))?.id, marketId: state.marketDays.find(day => day.date === input.deliveryDate)?.marketId, pickupHour: input.pickupTime ? Number(input.pickupTime.slice(0, 2)) + Number(input.pickupTime.slice(3)) / 60 : null }
+      : { kind: 'vienna', address: input.address, deliveryDate: input.deliveryDate },
   }))
   const order: Order = { id: orderId, customerId: customer.id, code, trackToken: uid('trk'), formToken: token,
     paymentState: 'paid', paymentMethod: 'card', amountPaid: items.reduce((sum, item) => sum + item.cost, 0), total: items.reduce((sum, item) => sum + item.cost, 0),

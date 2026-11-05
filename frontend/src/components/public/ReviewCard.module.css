@@ -1,10 +1,22 @@
 .card { display: grid; gap: var(--space-4); margin-bottom: var(--space-4); padding: var(--space-4); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-raised); color: var(--color-text); }
-.card > h3[id] { margin: 0; font-family: var(--font-display); font-size: var(--type-h3-size); line-height: var(--type-h3-line); font-weight: var(--type-h3-weight); letter-spacing: var(--type-h3-tracking); }
-.rows { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); column-gap: var(--space-3); row-gap: var(--space-2); margin: 0; }
-.row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: baseline; column-gap: var(--space-3); }
+/* Title and its single Edit share one row; the button keeps a 44px target without growing the card
+   (negative margins equal to its own padding keep the text aligned to the card's inner edge). */
+.header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: var(--touch); margin-block: calc((var(--type-h3-line) * var(--type-h3-size) - var(--touch)) / 2); }
+.header h3 { margin: 0; min-width: 0; font-family: var(--font-display); font-size: var(--type-h3-size); line-height: var(--type-h3-line); font-weight: var(--type-h3-weight); letter-spacing: var(--type-h3-tracking); overflow-wrap: anywhere; }
+.edit { flex: none; min-width: var(--touch); min-height: var(--touch); margin-inline-end: calc(-1 * var(--space-2)); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-small); background: transparent; color: var(--color-text); font: inherit; font-weight: var(--type-button-weight); text-decoration: underline; text-underline-offset: var(--space-1); cursor: pointer; }
+@media (hover: hover) { .edit:hover { background: var(--color-selection-hover); } }
+.edit:focus-visible { outline: none; box-shadow: var(--focus); }
+.rows { display: grid; gap: var(--space-3); margin: 0; }
+/* Phones: label above value (long German labels never squeeze the answer). From 768px: two aligned columns. */
+.row { display: grid; gap: var(--space-1); }
 .row dt, .row dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.row dt { font-weight: var(--type-label-weight); }
+.row dt { color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
 .row dd { font-size: var(--type-body-size); line-height: var(--type-body-line); }
-.action { justify-self: end; text-align: end; }
-.action button { max-width: 100%; text-align: end; }
+@media (min-width: 768px) {
+  .rows { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); column-gap: var(--space-4); row-gap: var(--space-2); }
+  .row { grid-template-columns: subgrid; grid-column: 1 / -1; align-items: baseline; gap: 0; }
+  .row dt { font-size: var(--type-body-size); line-height: var(--type-body-line); }
+}
+.thumbs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.thumbs img { width: var(--size-review-art); height: var(--size-review-art); border-radius: var(--radius-small); object-fit: cover; }
 @media (min-width: 768px) { .card { padding: var(--space-5); } }

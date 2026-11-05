@@ -124,7 +124,7 @@ test.describe('desktop keyboard checkout', () => {
     await expect(backName).toBeFocused()
     await expect(backName).toHaveValue('LUNA')
     await typeInto(page, page.locator('input[id^="pet-"]'), 'Luna')
-    await tabTo(page, page.getByRole('button', { name: 'Foto hinzufügen', exact: true }))
+    await tabTo(page, page.getByRole('button', { name: 'Foto hinzufügen, 0 von 6', exact: true }))
     const chooser = page.waitForEvent('filechooser')
     await page.keyboard.press('Enter')
     // Playwright supplies the file to the native chooser opened with Enter;
@@ -198,7 +198,7 @@ test('Tab and Shift+Tab exclude hidden substeps, collapsed notes and the native 
   }
   await tabTo(page, page.locator('input[id^="pet-"]'))
   await tab(page)
-  await expect(page.getByRole('button', { name: 'Foto hinzufügen', exact: true })).toBeFocused()
+  await expect(page.getByRole('button', { name: 'Foto hinzufügen, 0 von 6', exact: true })).toBeFocused()
   await tab(page)
   await expect(page.locator('summary')).toBeFocused()
   await expect(page.locator('textarea[id^="note-"]')).toBeHidden()
@@ -308,7 +308,8 @@ for (const locale of ['de', 'en'] as const) {
     await expect(page.locator('form')).toContainText('Luna')
     await expect(page.locator('form')).toContainText('LUNA')
     // Inspect the in-memory photo and note by reopening their exact editor.
-    await page.getByRole('button', { name: locale === 'de' ? 'Tierdaten ändern' : 'Change pet details', exact: true }).click()
+    await page.getByRole('button', { name: locale === 'de' ? 'Kugel Luna ändern' : 'Change ornament Luna', exact: true }).click()
+    if (mobile(page)) { await next(page).click(); await next(page).click() }
     await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
     await expect(page.getByRole('img', { name: /^(Foto|Photo) 1 (von|of) Luna$/ })).toBeVisible()
     await page.locator('summary').click()
