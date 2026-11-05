@@ -1,6 +1,6 @@
 import { keepFormFocusVisible } from '../../lib/publicFormFocus'
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { CustomerFormView, OrderItem } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
@@ -10,17 +10,16 @@ import { formDraftKey, restoreFormDraft, serializeFormDraft, type FormDraft, typ
 import { PublicPage, PageHeader, PublicState, ErrorSummary, StickyActions } from '../../components/public/PublicForm'
 import shell from '../../components/public/PublicForm.module.css'
 import { ContactFields, type ContactValues } from '../../components/public/ContactFields'
-import { OrderTimeline } from '../../components/public/OrderTimeline'
 import { OrnamentLoader } from '../../components/public/OrnamentLoader'
 import { MAX_PHOTOS } from '../../components/public/PhotoTiles'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
-import { FormItems, FormEditHelp } from './form/FormItems'
+import { FormItems } from './form/FormItems'
 import { FormReview } from './form/FormReview'
 import styles from './FormPage.module.css'
 
-type Step = 'details' | 'review' | 'done'
+type Step = 'details' | 'review'
 type Terminal = 'expired' | 'invalid' | 'locked' | null
 const empty: FormDraft = { customerName: '', phone: '', email: '', address: { line1: '', line2: '', postalCode: '', city: 'Wien' }, items: [] }
 function targets(view: CustomerFormView): OrderItem[] {
@@ -63,8 +62,7 @@ function CustomerForm({ token }: { token: string }) {
   const [reading, setReading] = useState(0)
   const [sending, setSending] = useState(false)
   const [storageError, setStorageError] = useState(false)
-  const [orderCode, setOrderCode] = useState('')
-  const [copyMessage, setCopyMessage] = useState('')
+  const navigate = useNavigate()
   const sendingRef = useRef(false)
   const uploads = useRef(new Set<string>())
   const focusRequest = useRef<string | null>('form-heading')
@@ -83,13 +81,13 @@ function CustomerForm({ token }: { token: string }) {
   }, [token, retry])
 
   useEffect(() => {
-    if (loading || !view || terminal || step === 'done') return
+    if (loading || !view || terminal) return
     try { sessionStorage.setItem(formDraftKey(token), serializeFormDraft(draft)) } catch { const timer = window.setTimeout(() => setStorageError(true), 0); return () => window.clearTimeout(timer) }
   }, [draft, token, view, loading, step, terminal])
 
   useEffect(() => {
     if (loading) return
-    if (terminal || !view || step === 'done') { const title = document.querySelector<HTMLElement>('main h1'); if (title) { title.tabIndex = -1; title.focus() }; return }
+    if (terminal || !view) { const title = document.querySelector<HTMLElement>('main h1'); if (title) { title.tabIndex = -1; title.focus() }; return }
     const id = focusRequest.current
     if (id) {
       const field = document.getElementById(id) ?? document.getElementById(id.replace('photos-', 'photos-block-'))
@@ -100,7 +98,7 @@ function CustomerForm({ token }: { token: string }) {
   }, [loading, terminal, step, errors, serverField, view])
 
   useEffect(() => {
-    const title = loading ? t('formTitle') : terminal ? t(`form${terminal === 'expired' ? 'Expired' : terminal === 'invalid' ? 'Invalid' : 'Locked'}Title`) : step === 'done' ? t('formSavedTitle') : step === 'review' ? t('formReviewStep') : t('formTitle')
+    const title = loading ? t('formTitle') : terminal ? t(`form${terminal === 'expired' ? 'Expired' : terminal === 'invalid' ? 'Invalid' : 'Locked'}Title`) : step === 'review' ? t('formReviewStep') : t('formTitle')
     document.title = `${title} · ${t('brand')}`
   }, [loading, terminal, step, t])
 
@@ -181,7 +179,8 @@ function CustomerForm({ token }: { token: string }) {
         items: draft.items.map(({ orderItemId, petName, backName, note, photos }) => ({ orderItemId, petName, backName, note, photos })),
       })
       try { sessionStorage.removeItem(formDraftKey(token)) } catch { setStorageError(true) }
-      setOrderCode(result.orderCode); setStep('done')
+      // The Track page already shows the order state: go there and confirm the save once.
+      void navigate(`/track/${encodeURIComponent(result.orderCode)}`, { state: { formSaved: true } })
     } catch (error) {
       const terminal = terminalFor(error)
       if (terminal) { setTerminal(terminal); setIssue(error); return }
@@ -202,12 +201,6 @@ function CustomerForm({ token }: { token: string }) {
     {!terminal && <Button onClick={() => { setLoading(true); setIssue(null); setTerminal(null); focusRequest.current = 'form-heading'; setRetry(value => value + 1) }}>{t('shopRetry')}</Button>}
     {view && terminal === 'locked' ? <ButtonLink to={`/track/${encodeURIComponent(view.orderCode)}`}>{t('goTrack')}</ButtonLink> : <ButtonLink to="/">{t('backHome')}</ButtonLink>}
   </PublicState>
-  if (step === 'done') return <PublicPage variant="status" className={styles.form}>
-    <PageHeader title={t('formSavedTitle')}><p>{t('formSavedBody')}</p></PageHeader>
-    <OrderTimeline labels={[t('formSavedTitle'), t('paintingTimeline'), <>{t('formHandoffTimeline')}{handoffs.map(line => <p key={line}>{line}</p>)}</>]} />
-    <div className={styles.code}><span>{t('trackCode')}</span><strong>{orderCode || view.orderCode}</strong><Button variant="secondary" onClick={() => { void navigator.clipboard.writeText(orderCode || view.orderCode).then(() => setCopyMessage('copiedCode')).catch(() => setCopyMessage('copyFailed')) }}>{t('copyCode')}</Button><span role="status">{copyMessage && t(copyMessage)}</span></div>
-    <ButtonLink to={`/track/${encodeURIComponent(orderCode || view.orderCode)}`} fullWidth>{t('goTrack')}</ButtonLink>
-  </PublicPage>
 
   const stepLabels = [t('formOrnaments'), t('formReviewStep')]
   return <form data-public-page className={`${shell.page} ${styles.form}`} noValidate onFocus={keepFormFocusVisible} onSubmit={event => { event.preventDefault(); if (uploads.current.size) return; if (step === 'review') void submit(); else if (!showErrors(validate())) { setErrors({}); setServerField(null); focusRequest.current = 'form-heading'; setStep('review') } }}>
@@ -219,7 +212,7 @@ function CustomerForm({ token }: { token: string }) {
       <h2 ref={heading} id="form-heading" tabIndex={-1}>{step === 'details' ? stepLabels[0] : stepLabels[1]}</h2>
       <ErrorSummary errors={displayedErrors} labels={labels} onFocus={id => { const control = document.getElementById(id) ?? document.getElementById(id.replace('photos-', 'photos-block-')); const details = control?.closest('details'); if (details) details.open = true; control?.focus() }} />
       {step === 'details' ? <>
-        <FormEditHelp />
+        <p className={styles.muted}>{t('formCanEdit')}</p>
         <FormItems items={view.items ?? [view.item]} draft={draft.items} errors={displayedErrors} photoErrors={Object.fromEntries(Object.entries(photoErrors).map(([id, key]) => [id, key ? t(key) : '']))} patch={patchItem} addFiles={addFiles} validate={validateField} />
         <ContactFields prefix="form" values={{ ...draft, ...draft.address, line2: draft.address.line2 ?? '' }} onChange={patchContact} error={id => displayedErrors[id]} onBlur={validateField} withAddress={view.needsAddress} announceErrors={false} validFields={validFields} deliveryPhone={view.needsAddress} />
       </> : <FormReview view={view} draft={draft} handoffs={handoffs} edit={edit} />}

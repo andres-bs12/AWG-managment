@@ -7,5 +7,4 @@
 .progress li[aria-current] { color: var(--color-selected); font-weight: var(--type-label-weight); }
 .progress li[aria-current] .dot { border-color: var(--color-selected); background: var(--color-selected-surface); }
 .progress li[data-complete='true'] .dot { background: var(--color-selected); border-color: var(--color-selected); color: var(--color-on-primary); }
-.progress p { font-size: var(--type-hint-size); color: var(--color-text-muted); margin: var(--space-3) 0 0; }
-@media (max-width: 767px) { .progress[data-compact='true'] .label { position: absolute; width: var(--border-thin); height: var(--border-thin); clip-path: inset(50%); overflow: hidden; } }
+.label { overflow-wrap: anywhere; hyphens: auto; }

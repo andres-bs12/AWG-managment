@@ -69,8 +69,11 @@ for (const locale of ['de', 'en'] as const) {
     await expect(page.locator('input[id^="back-"]')).toHaveValue('Luna')
     await expect(page.locator('textarea')).toHaveValue('Please keep the white patch.')
     await next(page).click(); await next(page).click()
-    await expect(page.getByRole('heading', { level: 1, name: locale === 'de' ? 'Angaben gespeichert' : 'Details saved' })).toBeVisible()
-    await expect(page.locator('a[href="/track/AWG0000"]')).toBeVisible()
+    // A successful send goes straight to Track, which confirms the save once.
+    await expect(page).toHaveURL(/\/track\/AWG0000$/)
+    await expect(page.getByRole('status').filter({ hasText: locale === 'de' ? 'Danke! Deine Angaben sind gespeichert.' : 'Thank you! Your details are saved.' })).toBeVisible()
+    // Let the Track card finish its entrance before checking contrast.
+    await page.locator('section[aria-live]').evaluate(card => Promise.all(card.getAnimations().map(animation => animation.finished)))
     await axe(page); await noOverflow(page)
     const after = await page.evaluate(async formToken => {
       const path = '/src/api/client.ts'; const { api } = await import(path)
@@ -173,7 +176,7 @@ test('completes the QR form by keyboard with visible, unobscured focus', async (
   await expect(page.locator('#form-heading')).toHaveText('Prüfen & absenden')
   await axe(page); await noOverflow(page)
   await tabTo(page, next(page)); await page.keyboard.press('Space')
-  await expect(page.getByRole('heading', { level: 1, name: 'Angaben gespeichert' })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: 'Danke! Deine Angaben sind gespeichert.' })).toBeVisible()
   await axe(page)
 })
 
@@ -222,7 +225,7 @@ test('two ornaments keep fixed variants, independent details and the bought name
   await page.getByRole('button', { name: 'Kugel Otto ändern', exact: true }).click()
   await expect(page.locator(`#pet-${second.id}`)).toBeFocused()
   await next(page).click(); await next(page).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'Angaben gespeichert' })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: 'Danke! Deine Angaben sind gespeichert.' })).toBeVisible()
   const saved = await page.evaluate(async formToken => {
     const path = '/src/api/client.ts'; const { api } = await import(path)
     return api.forms.getForm(formToken)
@@ -253,4 +256,66 @@ test('server field rejection returns to the exact control; expiry during submit 
   await expect(page.getByRole('heading', { level: 1, name: 'Dieser Link ist abgelaufen' })).toBeVisible()
   await expect(page.locator('form')).toHaveCount(0)
   await axe(page); await noOverflow(page)
+})
+
+test('review cards are compact: one Ändern per card, colour and finish on one line', async ({ page }) => {
+  await openForm(page); await fillForm(page)
+  await next(page).click()
+  await expect(page.locator('#form-heading')).toHaveText('Prüfen & absenden')
+  // Each review card has at most one button: its single Ändern next to the title.
+  for (const card of await page.locator('section[class*="card"]').all()) expect(await card.getByRole('button').count()).toBeLessThanOrEqual(1)
+  await expect(page.getByRole('button', { name: /ändern/ })).toHaveCount(2)
+  // Colour and finish share one row ("Rot · Glänzend"), never two rows.
+  await expect(page.getByText('Farbe & Oberfläche', { exact: true })).toHaveCount(1)
+  await expect(page.locator('dt').filter({ hasText: /^(Farbe|Oberfläche)$/ })).toHaveCount(0)
+  await expect(page.getByText(/Fotos deines Tiers/)).toHaveCount(0)
+  await axe(page); await noOverflow(page)
+})
+
+test('the stepper names each section once and the step count is only for screen readers', async ({ page }) => {
+  await openForm(page)
+  const nav = page.getByRole('navigation', { name: 'Schritt 1 von 2' })
+  await expect(nav).toBeVisible()
+  await expect(nav.getByText('Deine Kugel(n)', { exact: true })).toBeVisible()
+  await expect(nav.getByText('Prüfen & absenden', { exact: true })).toBeVisible()
+  await expect(page.getByText(/Schritt 1 von 2/)).toHaveCount(0)
+})
+
+test('photo remove control is a small corner glyph with a full-size touch target', async ({ page }) => {
+  await openForm(page)
+  await page.locator('input[type="file"]').setInputFiles(photo)
+  const tile = page.getByRole('img', { name: /Foto 1/ })
+  await expect(tile).toBeVisible()
+  const geometry = await tile.evaluate(img => {
+    const button = img.parentElement!.querySelector('button')!
+    const glyph = button.querySelector('span')!
+    const t = img.getBoundingClientRect(), b = button.getBoundingClientRect(), g = glyph.getBoundingClientRect()
+    const overlap = Math.max(0, Math.min(t.right, g.right) - Math.max(t.left, g.left)) * Math.max(0, Math.min(t.bottom, g.bottom) - Math.max(t.top, g.top))
+    return { glyph: g.width, hit: [b.width, b.height], covered: overlap / (t.width * t.height), outsideRight: g.right - t.right }
+  })
+  expect(geometry.glyph).toBe(24)
+  expect(geometry.hit[0]).toBeGreaterThanOrEqual(44); expect(geometry.hit[1]).toBeGreaterThanOrEqual(44)
+  expect(geometry.covered).toBeLessThanOrEqual(0.2)
+  expect(geometry.outsideRight).toBeGreaterThan(0)
+  await axe(page)
+})
+
+test('works at 200% text size without horizontal scroll or overlapping controls', async ({ page }) => {
+  await openForm(page)
+  await page.evaluate(() => { document.documentElement.style.fontSize = '200%' })
+  await fillForm(page)
+  await noOverflow(page)
+  const overlaps = await page.evaluate(() => {
+    const boxes = [...document.querySelectorAll('main input:not([type=file]), main button, main textarea')].filter(node => node.checkVisibility()).map(node => node.getBoundingClientRect())
+    let count = 0
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], b = boxes[j]
+      if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) count++
+    }
+    return count
+  })
+  expect(overlaps).toBe(0)
+  await next(page).click()
+  await expect(page.locator('#form-heading')).toHaveText('Prüfen & absenden')
+  await noOverflow(page)
 })

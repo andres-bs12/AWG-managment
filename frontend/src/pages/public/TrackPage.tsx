@@ -2,7 +2,7 @@ import { apiError } from '../../lib/apiError'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import { OrderReceipt } from '../../components/public/OrderReceipt'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { GiftBoxReady } from '../../components/public/GiftBoxReady'
 import { PaintingOrnament } from '../../components/public/PaintingOrnament'
@@ -26,6 +26,8 @@ export function TrackPage() {
   const { t, locale } = useLocale()
   const { code: codeParam } = useParams()
   const navigate = useNavigate()
+  // Arriving from the QR form: confirm the save once, here where the order state is shown.
+  const formSaved = !!(useLocation().state as { formSaved?: boolean } | null)?.formSaved
   const timers = useRef<number[]>([])
 
   const [fetchPhase, setPhase] = useState<Phase>(codeParam ? 'checking' : 'idle')
@@ -156,6 +158,7 @@ export function TrackPage() {
           </div>
 
           <div className={styles.details}>
+            {formSaved && <p className={styles.savedBanner} role="status">{t('formSavedBanner')}</p>}
             <span
               className={`${styles.chip} ${
                 status === 'preparing' ? styles.chipWork : status === 'delivered' ? styles.chipDone : styles.chipReady

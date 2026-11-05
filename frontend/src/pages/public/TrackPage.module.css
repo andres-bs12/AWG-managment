@@ -403,3 +403,6 @@
     animation: none;
   }
 }
+
+/* One-time confirmation after the QR form was sent (C1 success surface, no icon). */
+.savedBanner { margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border-radius: var(--radius-control); background: var(--color-success-surface); color: var(--color-text); font-weight: var(--type-label-weight); }

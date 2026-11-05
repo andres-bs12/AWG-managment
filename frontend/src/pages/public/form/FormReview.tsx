@@ -17,7 +17,8 @@ export function FormReview({ view, draft, handoffs, edit }: { view: CustomerForm
       const item = draft.items.find(row => row.orderItemId === source.id)
       const details = item ?? source
       const title = t('ornamentN', { n: index + 1 })
-      const look = [source.color ? `${t(colorKeys[source.color])}${source.color === 'grey' || source.color === 'white' ? ` (${t('legacyColour')})` : ''}` : t('colorUnknown'), source.finish ? t(source.finish === 'shiny' ? 'finishShiny' : 'finishMatte') : t('formFinishUnknown')].join(' · ')
+      // Colour and finish on one line; an order without either says so once, not twice.
+      const look = [source.color && `${t(colorKeys[source.color])}${source.color === 'grey' || source.color === 'white' ? ` (${t('legacyColour')})` : ''}`, source.finish && t(source.finish === 'shiny' ? 'finishShiny' : 'finishMatte')].filter(Boolean).join(' · ') || t('formFinishUnknown')
       return <ReviewCard key={source.id} title={title}
         action={item ? { label: editLabel, ariaLabel: t('editOrnamentNamed', { name: details.petName?.trim() || title }), onClick: () => edit(`pet-${source.id}`) } : undefined}
         rows={[

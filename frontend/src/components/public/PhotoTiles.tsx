@@ -34,7 +34,7 @@ export function PhotoTiles({ uid, petName, photos, needsReload, error, fileError
         <button type="button" className={styles.remove} disabled={reading} aria-label={t('shopRemovePhoto', { name: photo.name })} onClick={() => {
           onRemove(photo.id)
           restoreFocus()
-        }}>×</button>
+        }}><span aria-hidden="true">×</span></button>
       </span>)}
       {photos.length < MAX_PHOTOS && <button type="button" id={id} className={styles.add} aria-label={t('addPhotoCount', { n: photos.length, max: MAX_PHOTOS })} aria-describedby={description} aria-invalid={!!error || !!fileError} aria-disabled={reading} aria-busy={reading} onClick={() => { if (!busy.current) picker.current?.click() }}>{reading ? <span className={styles.reading}>{t('photoReading')}</span> : '+'}</button>}
     </div>

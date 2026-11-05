@@ -119,6 +119,8 @@
   --size-review-art: 76px;
   --size-date-card: 88px;
   --size-photo: 76px;
+  /* Visible glyph of the photo remove control; its hit area stays --touch. */
+  --size-remove-glyph: 24px;
   --size-preview-mobile: 140px;
   --size-preview-desktop: 280px;
   --size-preview-success: 150px;

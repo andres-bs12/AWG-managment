@@ -71,3 +71,48 @@ Objetivos iniciales para contrastar tras dos semanas: vista → clic de pago ≥
 # Fix b-1 — pendiente de validación
 
 Claude informó 189/193 casos aprobados: tres fallos visuales y un fallo de foco del código postal en escritorio. Se evita que la validación al perder foco desplace el botón durante la pulsación de ratón; el envío sigue validando y enfocando el primer error. El caso E2E también comprueba el enlace del resumen. Por instrucción del dueño se eliminaron las nueve referencias PNG existentes: regenerarlas y revisarlas visualmente, sin relajar axe. Repetir los 193 casos y comprobar el envío con ratón, teclado y táctil. Build, lint (advertencias existentes) y 15 pruebas Node pasan; Playwright no se ejecutó aquí. Este seguimiento sustituye las instrucciones anteriores de conservar las referencias.
+
+## Moderated usability protocol — QR form at the stall (`/form/:token`)
+
+**Goal:** confirm that customers can complete the QR form unaided on their own phone and on the stall iPad Air 11" (820×1180 portrait). This includes older customers.
+
+**Participants:**
+- 5 people.
+- At least 2 aged 60+.
+- At least 1 who rarely shops online.
+- A mix of German and English speakers.
+- Each person uses their own phone for one round and the stall iPad for the other. Alternate the order.
+
+**Setup:**
+- A real order created in staff, with the QR card printed as at the stall.
+- Two pet photos on the participant's phone; on the iPad, use the bundled demo photos.
+- The moderator stays silent and helps only after 60 s of being stuck. Record each intervention.
+
+**Tasks** (read aloud, one at a time):
+1. Scan the QR code and open the form.
+2. Add your pet's name and two photos.
+3. Check that the colour, finish and name match what you bought, then change the pet name.
+4. Send the details.
+5. A day later, find your order again (Track code or link).
+
+**Success criteria:**
+- Each task completed without help by at least 4 of 5 participants.
+- The full form completed in under 4 minutes on a phone.
+- No mis-tap that removes a photo by mistake.
+- Every participant correctly states when their ornament is handed over after reading the Track page.
+
+**After each task:** ask the SEQ, "How easy was this?" on a 1–7 scale. The target median is ≥ 6, and any task with a median below 5 is a finding.
+
+**What to observe and note:**
+- Hesitation over 5 s.
+- Reading text aloud or re-reading it.
+- Zooming or pinching.
+- Mis-taps, especially the photo remove control and the stepper.
+- Scrolling past the sticky action bar.
+- Confusion about payment ("Do I pay here?").
+- Whether the Track page after sending is understood as "done".
+- Text size changes in iOS or Android accessibility settings: test at least one participant with large system text.
+
+**Report:**
+- Record each finding with its severity (blocker / major / minor), screen, quote and suggested fix.
+- Retest the fixed screens with 2 new participants.
