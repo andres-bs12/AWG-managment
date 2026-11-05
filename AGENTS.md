@@ -1,6 +1,6 @@
 # Contexto del proyecto — ArtWithGab (AWG)
 
-**Actualizado:** 2026-11-04  
+**Actualizado:** 2026-11-05  
 **Propósito de este archivo:** memoria persistente para el dueño del proyecto y los agentes que trabajen en este repositorio.
 
 ## Instrucción de mantenimiento
@@ -29,7 +29,7 @@ ArtWithGab es una herramienta para registrar ventas y coordinar la producción y
 - Capacidad de pintura en casa: lunes, martes y jueves, 3 huecos entre 10:00–13:00; miércoles y viernes, 2 huecos entre 10:00–12:00. Un bloque suele durar 60 minutos, unos 75 si incluye nombre.
 - El idioma del staff es inglés; la experiencia pública es alemán/inglés.
 - La UI accede a datos solo mediante `frontend/src/api/`. El mock es la fuente predeterminada (`VITE_DATA_SOURCE=mock`); también existe implementación HTTP.
-- Emails/notificaciones, dashboard e inventario en la UI no forman parte de la fase actual. No inventes IDs (`fileKey`/`nodeId`) de Figma ni confirmes que se envió una notificación si no existe integración real.
+- Dashboard no forma parte de la fase actual. Los e-mails existen pero dependen de SMTP; el stock se edita en `/staff/inventory`. No inventes IDs (`fileKey`/`nodeId`) de Figma ni confirmes que se envió una notificación si no existe integración real.
 - No incluyas secretos en commits.
 
 ## Modelo de dominio acordado
@@ -90,7 +90,14 @@ Paquete `com.artwithgab.awg_tracking` (con guion bajo; no cambiarlo). Capas: `mo
 - Toda operación que reserva tiempo de pintura toma el lock de fila `ScheduleLock` (evita doble reserva y sobreventa de stock).
 - Los precios los calcula el servidor (`awg.pricing.*`).
 - Pedidos web `PENDING` ocupan horas pero se ocultan en Agenda/Entregas hasta que Stripe confirma.
-- Arranque: `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev` (datos demo y usuarios demo). Tests: `./mvnw test` (40 tests).
+- Arranque: `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev` (datos demo y usuarios demo). Tests: `./mvnw test` (63 tests).
+- Esquema con Flyway (`db/migration/V1..V3`), `ddl-auto=validate`; los tests usan H2 sin Flyway. Un cambio de entidad necesita una migración nueva.
+- Errores `{status, message, code, field}` con códigos estables (`docs/sprint5-contract.md`); el front los traduce con `frontend/src/lib/apiError.ts`.
+- Ventas del staff idempotentes (`Idempotency-Key`). Pago Stripe con importe distinto → `checkoutStatus=REVIEW` (no se libera; el staff lo resuelve al anotar el pago). Cancelar/abandonar cierra la sesión de Stripe (`expireOrReconcile`).
+- Stock editable con `expectedQuantity` (409 `STOCK_CHANGED`), días de pintura (`PaintingDay`, máximo 2 por defecto), fin de temporada `awg.shop.season-end` (24-dic), lista de espera.
+- E-mails al dueño y al cliente por evento de pedido (`NotificationService`, tras commit, asíncrono); sin `MAIL_HOST` no se envía nada.
+- Contraseñas iniciales del staff: mínimo 10 caracteres fuera de dev. Fotos JPEG/PNG se decodifican antes de guardarse.
+- Despliegue: `docker-compose.yml` + `docs/deploy.md`; nginx con cabeceras de seguridad y sin registrar enlaces `/form/`.
 - Las auditorías usan Codex CLI (`codex exec -s read-only`) como revisor independiente además de subagentes.
 
 ## Tienda pública
@@ -100,4 +107,6 @@ Paquete `com.artwithgab.awg_tracking` (con guion bajo; no cambiarlo). Capas: `mo
 
 ## Estado y siguientes tareas
 
-Rama `feat/backend-domain`, subida a GitHub. Backlog en `tasks/todo.md`; decisiones abiertas del dueño en `tasks/preguntas-pendientes.md` (colores, stock, festivos, coste de envío, notificaciones, claves Stripe, textos legales, longitud del código, despliegue, Flyway).
+Rama `feat/backend-domain` (PR #2 a `main`), subida a GitHub. Sprints 1–5 terminados, incluida la auditoría final doble (`tasks/audit-final.md`, resultados en `tasks/audit-results/`). Backlog en `tasks/todo.md`; decisiones abiertas del dueño en `tasks/preguntas-pendientes.md` (Stripe, SMTP, despliegue, datos legales, colores, caducidad de enlaces, retención, lista de espera).
+
+Forma de trabajo acordada: Codex CLI (`gpt-6.1-terra`, esfuerzo high para implementar, medium/high para auditar; siempre `< /dev/null`) para frontend y revisiones; Claude para backend delicado, integración y pruebas en navegador. Nunca audita el mismo LLM que escribió el código.
