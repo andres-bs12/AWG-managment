@@ -28,9 +28,13 @@
   gap: var(--space-2);
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  scroll-snap-type: x proximity;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--space-2);
   scrollbar-width: thin;
   padding: var(--space-2);
+  /* Chips are sized from the track width so only whole days are visible (n per row). */
+  container-type: inline-size;
+  --chips: 2;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -71,3 +75,12 @@
 .tools { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
 .tools .legend { margin: 0; margin-right: auto; }
 .tools select { min-height: var(--touch); max-width: 55%; padding: var(--space-2); border: 1px solid var(--color-control-border); border-radius: var(--radius); background: var(--staff-surface); color: var(--staff-ink); font: inherit; }
+
+.chip { flex: 0 0 calc((100cqi - (var(--chips) - 1) * var(--space-2)) / var(--chips)); min-width: 0; padding-inline: var(--space-2); }
+.chip[data-selected='true'], .chip[data-selected='true']:hover, .chip[data-selected='true']:active { padding-inline: calc(var(--space-2) - var(--border-thin)); }
+@container (min-width: 252px) { .chip { --chips: 3; } }
+@container (min-width: 336px) { .chip { --chips: 4; } }
+@container (min-width: 420px) { .chip { --chips: 5; } }
+@container (min-width: 504px) { .chip { --chips: 6; } }
+@container (min-width: 588px) { .chip { --chips: 7; } }
+@container (min-width: 672px) { .chip { --chips: 8; } }

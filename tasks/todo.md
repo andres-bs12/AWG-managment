@@ -26,7 +26,6 @@
 - [ ] Staff UX — pendiente tras los arreglos del 2026-11-05 (informes `tasks/audit-results/staff-ux-*`):
   - P2 que quedan (el resto se hizo el 2026-11-05):
     - venta: estado vacío con tarjetas grandes de «Añadir» (#12), resumen con «Delivery» sin día (#13) y espacio vertical en móvil (#27);
-    - agenda: chips del DayStrip completos con scroll-snap (P2-4);
     - prioridad visual de los pedidos web en entregas (P2-10, falta la marca «Web»; el nombre del cliente ya se muestra).
   - HSTS se verifica en el proxy TLS real. Sigue abierto el conflicto de tipos Playwright/axe en `e2e/helpers.ts:45`.
   - Revisión cruzada de Codex del trabajo de staff (commits desde `0a891f5`): pendiente, programada para las 19:23.
