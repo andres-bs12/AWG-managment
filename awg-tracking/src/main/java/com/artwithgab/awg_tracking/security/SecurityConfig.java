@@ -52,21 +52,21 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/photos/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/shop/config").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/shop/delivery-dates", "/api/shop/checkout", "/api/shop/waitlist", "/api/shop/stripe/webhook").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/shop/delivery-dates", "/api/shop/checkout", "/api/shop/waitlist", "/api/shop/stripe/webhook", "/api/shop/checkout/*/abandon").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/**").hasRole("STAFF")
                         .anyRequest().denyAll())
                 .exceptionHandling(e -> e
-                        .authenticationEntryPoint((req, res, ex) -> json(res, 401, "Sign in again."))
-                        .accessDeniedHandler((req, res, ex) -> json(res, 403, "Not allowed.")))
+                        .authenticationEntryPoint((req, res, ex) -> json(res, 401, "Sign in again.", "UNAUTHORIZED"))
+                        .accessDeniedHandler((req, res, ex) -> json(res, 403, "Not allowed.", "FORBIDDEN")))
                 .addFilterBefore(new BearerTokenFilter(authService), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
-    private static void json(jakarta.servlet.http.HttpServletResponse res, int status, String message) throws java.io.IOException {
+    private static void json(jakarta.servlet.http.HttpServletResponse res, int status, String message, String code) throws java.io.IOException {
         res.setStatus(status);
         res.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        res.getWriter().write("{\"status\":" + status + ",\"message\":\"" + message + "\"}");
+        res.getWriter().write("{\"status\":" + status + ",\"message\":\"" + message + "\",\"code\":\"" + code + "\"}");
     }
 
     @Bean

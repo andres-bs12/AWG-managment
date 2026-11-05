@@ -32,8 +32,13 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<OrderDto> createSale(@Valid @RequestBody CreateSaleRequest body) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.createSale(body));
+    public ResponseEntity<OrderDto> createSale(@Valid @RequestBody CreateSaleRequest body,
+                                               @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        if (idempotencyKey != null && !idempotencyKey.matches("[A-Za-z0-9_-]{8,64}")) {
+            throw new com.artwithgab.awg_tracking.exception.BadRequestException("Invalid Idempotency-Key.").code("VALIDATION").field("Idempotency-Key");
+        }
+        OrderService.SaleResult result = orderService.createSale(body, idempotencyKey);
+        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(result.order());
     }
 
     @PatchMapping("/{id}/items/{itemId}/status")

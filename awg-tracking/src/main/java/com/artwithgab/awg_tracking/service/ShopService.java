@@ -84,6 +84,25 @@ public class ShopService {
         return end == null ? LocalDate.of(2026, 12, 24) : end;
     }
 
+    /**
+     * The customer came back from Stripe without paying: close the Stripe page and free the slots
+     * and stock now instead of after the expiry. Needs the order's form token (kept by the buyer's
+     * browser). No-op when the order is already paid, under review or gone.
+     */
+    @Transactional
+    public void abandon(String code, String formToken) {
+        calendarService.lockSchedule();
+        Optional<Order> found = orderRepository.findByCodeIgnoreCase(code == null ? "" : code.trim());
+        if (found.isEmpty()) return;
+        Order order = found.get();
+        if (!TrackingService.ownsOrder(order, formToken)) {
+            throw new com.artwithgab.awg_tracking.exception.ForbiddenException("This checkout belongs to another browser.");
+        }
+        if (!order.isAwaitingPayment()) return;
+        if (order.getStripeSessionId() != null) stripe.expireSession(order.getStripeSessionId());
+        release(order);
+    }
+
     /** Stores a waitlist e-mail once (repeat sign-ups are silently accepted). */
     @Transactional
     public void joinWaitlist(String email, String locale) {
@@ -183,9 +202,15 @@ public class ShopService {
     @Transactional
     public CheckoutResponse checkout(CheckoutRequest req, Map<String, MultipartFile> files) {
         if (!isOpen()) throw new StripeClient.ShopUnavailableException();
-        if (!ViennaAddress.isViennaPostal(req.address().postalCode())) throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).");
+        // Unpaid checkouts hold painting time and stock; cap how many can be open at once.
+        if (orderRepository.countByCheckoutStatus(CheckoutStatus.PENDING) >= Math.max(1, props.shop().maxOpenCheckouts())) {
+            throw new com.artwithgab.awg_tracking.exception.TooManyRequestsException()
+                    .code("TOO_MANY_OPEN_CHECKOUTS");
+        }
+        if (!ViennaAddress.isViennaPostal(req.address().postalCode())) throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).")
+                .code("POSTAL_OUTSIDE_VIENNA").field("address.postalCode");
         if (!CalendarRules.isViennaDay(req.deliveryDate()) && !req.deliveryDate().equals(seasonEnd())) {
-            throw new BadRequestException("Deliveries are on Wednesday or Friday.");
+            throw new BadRequestException("Deliveries are on Wednesday or Friday.").code("DELIVERY_DAY_INVALID").field("deliveryDate");
         }
 
         calendarService.lockSchedule();
@@ -194,7 +219,7 @@ public class ShopService {
         if (req.deliveryDate().isBefore(today.plusDays(Math.max(1, props.shop().leadDays())))
                 || req.deliveryDate().isAfter(today.plusDays(props.shop().maxDaysAhead()))
                 || !isDeliveryDay(s, req.deliveryDate())) {
-            throw new BadRequestException("Choose one of the offered delivery days.");
+            throw new BadRequestException("Choose one of the offered delivery days.").code("DELIVERY_DAY_INVALID").field("deliveryDate");
         }
 
         // Validate items before reserving anything.
@@ -214,7 +239,7 @@ public class ShopService {
         List<ShopItemRequest> customs = req.items().stream().filter(i -> i.kind() == ItemKind.CUSTOM)
                 .sorted(Comparator.comparing((ShopItemRequest i) -> i.withName() ? 0 : 1)).toList();
         List<HourSpanDto> slots = plan(s, req.deliveryDate(), durations(customs));
-        if (slots == null) throw new ConflictException("That delivery day just filled up. Choose another day.");
+        if (slots == null) throw new ConflictException("That delivery day just filled up. Choose another day.").code("DAY_FULL").field("deliveryDate");
 
         Customer customer = new Customer();
         customer.setName(req.customerName().trim());
@@ -384,6 +409,11 @@ public class ShopService {
         if (session.path("amount_total").asLong(-1) != expectedCents || !"eur".equalsIgnoreCase(session.path("currency").asString(""))) {
             log.error("Stripe amount mismatch for order {}: got {} {}", order.getCode(),
                     session.path("amount_total").asLong(-1), session.path("currency").asString(""));
+            // Keep the order (it may be paid) but stop the automatic release; staff checks it in Stripe.
+            if (order.getCheckoutStatus() == CheckoutStatus.PENDING) {
+                order.setCheckoutStatus(CheckoutStatus.REVIEW);
+                events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.PAYMENT_REVIEW));
+            }
             return;
         }
         order.setCheckoutStatus(CheckoutStatus.CONFIRMED);

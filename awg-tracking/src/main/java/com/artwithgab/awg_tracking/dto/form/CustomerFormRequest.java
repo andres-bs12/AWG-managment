@@ -16,6 +16,8 @@ public record CustomerFormRequest(
         @NotBlank @Size(max = 120) String customerName,
         @NotBlank @Size(max = 40) String phone,
         @NotBlank @Email @Size(max = 200) String email,
-        @NotEmpty @Size(max = 20) @Valid List<ItemFormRequest> items
+        @NotEmpty @Size(max = 20) @Valid List<ItemFormRequest> items,
+        /** Required when the order has a Vienna delivery (see CustomerFormViewDto.needsAddress). */
+        @Valid com.artwithgab.awg_tracking.dto.common.AddressDto address
 ) {
 }

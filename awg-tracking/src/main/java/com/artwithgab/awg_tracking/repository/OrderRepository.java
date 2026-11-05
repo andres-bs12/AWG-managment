@@ -20,6 +20,10 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     boolean existsByCustomerId(UUID customerId);
 
+    Optional<Order> findByIdempotencyKey(String idempotencyKey);
+
+    long countByCheckoutStatus(com.artwithgab.awg_tracking.enums.CheckoutStatus status);
+
     boolean existsByCode(String code);
 
     /** Web orders still waiting for Stripe after their checkout expired. */

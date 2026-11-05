@@ -22,6 +22,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.*;
 
+@lombok.extern.slf4j.Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService {
@@ -38,6 +39,8 @@ public class OrderService {
     private final org.springframework.context.ApplicationEventPublisher events;
     private final com.artwithgab.awg_tracking.repository.StoredPhotoRepository photoRepository;
     private final PhotoStorageService photoStorage;
+    private final com.artwithgab.awg_tracking.config.AwgProperties props;
+    private final com.artwithgab.awg_tracking.payment.StripeClient stripe;
 
     Order findOrderOrThrow(UUID id) {
         return orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
@@ -54,7 +57,7 @@ public class OrderService {
     public OrderDto getOrderByCode(String code) {
         return orderRepository.findByCodeIgnoreCase(code.trim())
                 .map(mapper::order)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found. Check the code."));
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found. Check the code.").code("ORDER_NOT_FOUND"));
     }
 
     @Transactional(readOnly = true)
@@ -73,9 +76,30 @@ public class OrderService {
      * server-side prices, stock deduction, painting slot checks and the optional planned move of
      * another block (re-validated so a stale suggestion is rejected).
      */
+    /** Result of a staff sale: created=false when the Idempotency-Key was already used. */
+    public record SaleResult(OrderDto order, boolean created) {
+    }
+
     @Transactional
     public OrderDto createSale(CreateSaleRequest req) {
+        return createSale(req, null).order();
+    }
+
+    /**
+     * Same as createSale, but a repeated idempotencyKey (double tap, retry after a lost response)
+     * returns the order created the first time instead of selling twice. Checked under the schedule lock.
+     */
+    @Transactional
+    public SaleResult createSale(CreateSaleRequest req, String idempotencyKey) {
         calendarService.lockSchedule();
+        if (idempotencyKey != null) {
+            Optional<Order> existing = orderRepository.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) return new SaleResult(mapper.order(existing.get()), false);
+        }
+        return new SaleResult(doCreateSale(req, idempotencyKey), true);
+    }
+
+    private OrderDto doCreateSale(CreateSaleRequest req, String idempotencyKey) {
         AgendaService.Snapshot s = agendaService.snapshot();
         CalendarIndex index = s.index();
 
@@ -105,7 +129,7 @@ public class OrderService {
         }
 
         Customer customer = new Customer();
-        customer.setName(trimOr(req.customerName(), "Walk-in"));
+        customer.setName(trimOr(req.customerName(), Customer.PLACEHOLDER_NAME));
         customer.setPhone(trimOr(req.phone(), ""));
         customer.setEmail(trimOr(req.email(), ""));
         customerRepository.save(customer);
@@ -149,8 +173,18 @@ public class OrderService {
             } else {
                 throw new BadRequestException(row.deliveryKind() == DeliveryKind.MARKET ? "Choose a pickup day" : "Choose a delivery day");
             }
-            if (row.deliveryKind() == DeliveryKind.DELIVERY && !CalendarRules.isViennaDay(handoff)) {
-                throw new BadRequestException("Vienna deliveries are on Wednesday or Friday");
+            if (row.deliveryKind() == DeliveryKind.DELIVERY) {
+                LocalDate seasonEnd = props.shop().seasonEnd();
+                boolean lastDay = handoff.equals(seasonEnd);
+                if (!CalendarRules.isViennaDay(handoff) && !lastDay) {
+                    throw new BadRequestException("Vienna deliveries are on Wednesday or Friday").code("DELIVERY_DAY_INVALID");
+                }
+                if (seasonEnd != null && handoff.isAfter(seasonEnd)) {
+                    throw new BadRequestException("The last Vienna delivery of the season is on " + seasonEnd + ".").code("DELIVERY_DAY_INVALID");
+                }
+                if (index.marketDayOn(handoff).isPresent()) {
+                    throw new BadRequestException("That day is a market day: the stall has priority. Choose another delivery day.").code("DELIVERY_DAY_INVALID");
+                }
             }
             if (handoff.isBefore(index.today())) throw new BadRequestException("That pickup day has already passed");
             item.setHandoffDate(handoff);
@@ -211,6 +245,7 @@ public class OrderService {
             moving.setPaintStart(to.atTime(Hours.toTime(move.to().startHour())));
             moving.setPaintEnd(to.atTime(Hours.toTime(move.to().endHour())));
         }
+        order.setIdempotencyKey(idempotencyKey);
         orderRepository.save(order);
         events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.SALE_CREATED));
         return mapper.order(order);
@@ -221,7 +256,7 @@ public class OrderService {
     @Transactional
     public OrderDto updatePaymentState(UUID orderId, PaymentState state, PaymentMethod method, BigDecimal amountPaid) {
         Order order = findOrderOrThrow(orderId);
-        if (order.isAwaitingPayment()) throw new ConflictException("This web order is waiting for its online payment.");
+        if (order.isAwaitingPayment()) throw new ConflictException("This web order is waiting for its online payment.").code("PAYMENT_PENDING");
         BigDecimal total = order.getTotal();
         BigDecimal received = switch (state) {
             case UNPAID -> BigDecimal.ZERO;
@@ -278,6 +313,13 @@ public class OrderService {
         calendarService.lockSchedule();
         Order order = findOrderOrThrow(orderId);
         if (order.isHandedOver()) throw new ConflictException("This order was already handed over.");
+        if (order.isAwaitingPayment() && order.getStripeSessionId() != null) {
+            // Close the Stripe page first so the customer cannot pay an order that no longer exists.
+            stripe.expireSession(order.getStripeSessionId());
+        } else if (order.getStripeSessionId() != null) {
+            log.warn("Cancelled web order {} (Stripe session {}): refund it in Stripe if it was paid",
+                    order.getCode(), order.getStripeSessionId());
+        }
         events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.CANCELLED));
         deleteAndRestock(order);
     }

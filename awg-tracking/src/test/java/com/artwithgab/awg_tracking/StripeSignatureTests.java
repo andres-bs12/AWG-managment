@@ -23,7 +23,7 @@ class StripeSignatureTests {
     private final StripeClient client = new StripeClient(
             new AwgProperties("Europe/Vienna", null, null, null, null, null, null,
                     new AwgProperties.Shop(true, "http://localhost", "sk_test_dummy", SECRET, BigDecimal.ZERO, 30, 1, 45,
-                            java.time.LocalDate.of(2026, 12, 24)), null),
+                            java.time.LocalDate.of(2026, 12, 24), 15), null),
             new tools.jackson.databind.ObjectMapper(),
             Clock.fixed(Instant.ofEpochSecond(NOW), ZoneOffset.UTC));
 

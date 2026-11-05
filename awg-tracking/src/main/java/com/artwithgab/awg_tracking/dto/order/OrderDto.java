@@ -24,6 +24,7 @@ public record OrderDto(
         String createdAt,
         List<String> itemIds,
         boolean handedOver,
+        boolean paymentReview,
         List<Object> paymentEntries
 ) {
 }

@@ -5,3 +5,10 @@
 # Local photo uploads
 awg-tracking/data/
 tasks/.agent-heartbeat
+
+# Environment files with secrets (examples stay tracked)
+.env
+.env.*
+!.env.deploy.example
+!.env.example
+!frontend/.env.example

@@ -67,7 +67,8 @@ public class ShopController {
         if (!violations.isEmpty()) {
             var v = violations.iterator().next();
             String msg = v.getMessage();
-            throw new BadRequestException(msg != null && !msg.isEmpty() && Character.isUpperCase(msg.charAt(0)) ? msg : "Invalid " + v.getPropertyPath() + ": " + msg);
+            throw new BadRequestException(msg != null && !msg.isEmpty() && Character.isUpperCase(msg.charAt(0)) ? msg : "Invalid " + v.getPropertyPath() + ": " + msg)
+                    .code("VALIDATION").field(v.getPropertyPath().toString());
         }
         Map<String, MultipartFile> files = new HashMap<>();
         request.getFileMap().forEach((name, file) -> {
@@ -75,6 +76,13 @@ public class ShopController {
         });
         if (files.size() > 60) throw new BadRequestException("Too many photos.");
         return shopService.checkout(payload, files);
+    }
+
+    @PostMapping("/checkout/{code}/abandon")
+    public ResponseEntity<Void> abandon(@PathVariable String code, HttpServletRequest request) {
+        rateLimiter.check("shop-abandon", request.getRemoteAddr(), 10);
+        shopService.abandon(code, request.getHeader("X-Form-Token"));
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/waitlist")

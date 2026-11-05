@@ -31,7 +31,8 @@ public class NotificationService {
                 + "\nTotal: " + event.total() + " EUR\nAmount paid: " + event.amountPaid() + " EUR\nPayment: " + event.paymentState()
                 + "\nAddress: " + event.address() + "\nItems:\n" + event.items() + "\nTrack: " + link;
         send(properties.mail().ownerEmail(), subject, ownerBody);
-        if (event.kind() != OrderNotification.Kind.FORM_SUBMITTED) {
+        boolean ownerOnly = event.kind() == OrderNotification.Kind.FORM_SUBMITTED || event.kind() == OrderNotification.Kind.PAYMENT_REVIEW;
+        if (!ownerOnly) {
             String body = greeting("Hallo", event.customerName()) + event.kind().german + ".\nBestellung: " + event.code()
                     + "\nGesamt: " + event.total() + " EUR · Bezahlt: " + event.amountPaid() + " EUR\nVerfolge deine Bestellung: " + link + "\n\nVielen Dank!\nArtWithGab\n\n---\n\n" + greeting("Hello", event.customerName()) + event.kind().english + ".\nOrder: " + event.code() + "\nTotal: " + event.total() + " EUR · Paid: " + event.amountPaid() + " EUR\nTrack your order: " + link + "\n\nThank you!\nArtWithGab";
             send(event.customerEmail(), subject, body);

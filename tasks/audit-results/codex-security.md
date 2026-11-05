@@ -1,0 +1,40 @@
+La revisión estática encontró riesgos prioritarios en la protección de los enlaces de formulario, la disponibilidad de la tienda y la cancelación de pedidos pagados. No modifiqué archivos ni ejecuté pruebas que escriban en el repositorio.
+
+1. **Alta · `/form/:token` y `/api/forms/{token}` · [frontend/nginx.conf](/Users/andresbejarano/dev/AWG%20Tracking/frontend/nginx.conf:8), [FormService.java](/Users/andresbejarano/dev/AWG%20Tracking/awg-tracking/src/main/java/com/artwithgab/awg_tracking/service/FormService.java:31)**  
+   El token completo viaja en la ruta tanto de la página como de la API. La configuración de nginx no excluye esas solicitudes del registro de acceso; el formato predeterminado registra la línea de solicitud. Quien pueda leer esos registros obtiene un enlace que permite consultar los datos del cliente y modificar el formulario hasta que comience la pintura. **Corrección:** evitar registrar rutas que contienen credenciales en nginx y en cualquier proxy externo, y migrar el secreto fuera de la ruta de la API; definir también expiración o revocación del token.
+
+2. **Alta · `/api/shop/checkout` · [ShopController.java](/Users/andresbejarano/dev/AWG%20Tracking/awg-tracking/src/main/java/com/artwithgab/awg_tracking/controller/ShopController.java:49), [ShopService.java](/Users/andresbejarano/dev/AWG%20Tracking/awg-tracking/src/main/java/com/artwithgab/awg_tracking/service/ShopService.java:225)**  
+   Una solicitud pública válida puede reservar hasta diez adornos, stock y bloques de pintura durante al menos 32 minutos sin completar el pago. El límite es de cinco solicitudes por minuto por IP, pero no limita las reservas activas ni exige prueba de intención de compra. Varias sesiones abandonadas pueden agotar la disponibilidad e impedir ventas legítimas. **Corrección:** limitar reservas pendientes por cliente y globalmente, aplicar protección contra automatización y monitorear la proporción de sesiones abandonadas. Mantener la liberación segura al consultar Stripe.
+
+3. **Alta · Cancelación de pedidos web · [OrderService.java](/Users/andresbejarano/dev/AWG%20Tracking/awg-tracking/src/main/java/com/artwithgab/awg_tracking/service/OrderService.java:272)**  
+   Cancelar elimina el pedido, sus fotos y, si corresponde, el cliente; el comentario indica que los reembolsos de tarjeta se hacen manualmente en Stripe. El código no registra que el reembolso se haya realizado ni conserva el pedido cancelado para conciliarlo. Un pedido pagado puede desaparecer de la aplicación mientras el dinero sigue cobrado. **Corrección:** conservar un registro de cancelación con el identificador de Stripe y el estado del reembolso; exigir y registrar la conciliación manual o implementar un flujo de reembolso verificable.
+
+4. **Media · Disponibilidad de agenda y pagos · [ShopService.java](/Users/andresbejarano/dev/AWG%20Tracking/awg-tracking/src/main/java/com/artwithgab/awg_tracking/service/ShopService.java:191), [StripeClient.java](/Users/andresbejarano/dev/AWG%20Tracking/awg-tracking/src/main/java/com/artwithgab/awg_tracking/payment/StripeClient.java:39)**  
+   El checkout toma el bloqueo global de agenda y lo conserva durante la escritura de fotos y la llamada a Stripe; la llamada admite hasta 5 segundos de conexión y 15 de lectura. La limpieza también consulta Stripe mientras mantiene ese bloqueo. Si Stripe está lento, las operaciones que necesitan el mismo bloqueo, incluidos otros checkouts y cambios de agenda, quedan esperando. **Corrección:** separar la reserva transaccional de las llamadas externas, usando estados intermedios e idempotencia, y mantener las transacciones con bloqueo lo más cortas posible.
+
+5. **Media · Seguridad del documento frontend · [frontend/nginx.conf](/Users/andresbejarano/dev/AWG%20Tracking/frontend/nginx.conf:17), [SecurityConfig.java](/Users/andresbejarano/dev/AWG%20Tracking/awg-tracking/src/main/java/com/artwithgab/awg_tracking/security/SecurityConfig.java:44), [AuthContext.tsx](/Users/andresbejarano/dev/AWG%20Tracking/frontend/src/auth/AuthContext.tsx:40)**  
+   Spring configura CSP para sus respuestas, pero nginx sirve el documento de React y no configura CSP ni otras cabeceras de seguridad para él. El token de staff permanece en `localStorage`, accesible a JavaScript; un XSS futuro o script comprometido podría leerlo durante su vigencia. No identifiqué aquí un XSS explotable. **Corrección:** servir una CSP adecuada para el frontend y cabeceras como `X-Content-Type-Options` y `Referrer-Policy`; considerar sesiones en cookies `HttpOnly`, `Secure` y `SameSite`, con protección CSRF apropiada.
+
+6. **Media · SMTP · [application.properties](/Users/andresbejarano/dev/AWG%20Tracking/awg-tracking/src/main/resources/application.properties:62)**  
+   La configuración activa STARTTLS, pero no lo exige. Con un servidor o conexión que no lo ofrezca, la configuración no impide el envío sin TLS; las notificaciones contienen nombre, correo, dirección y detalles del pedido. **Corrección:** exigir STARTTLS con `mail.smtp.starttls.required=true`, validar la identidad del servidor y comprobar la configuración con el proveedor SMTP antes de activar las notificaciones.
+
+7. **Media · Registro de errores · [GlobalExceptionHandler.java](/Users/andresbejarano/dev/AWG%20Tracking/awg-tracking/src/main/java/com/artwithgab/awg_tracking/controller/GlobalExceptionHandler.java:51)**  
+   Ante una violación de integridad se registra el mensaje completo de la causa de base de datos. Ese mensaje puede incluir valores de filas o claves, por ejemplo un correo duplicado. La respuesta HTTP sí es genérica, pero los datos pueden terminar en los registros. **Corrección:** registrar el tipo de error y un identificador de correlación sin valores de entrada; restringir acceso y retención de logs.
+
+8. **Baja · Límite de solicitudes · [RateLimiter.java](/Users/andresbejarano/dev/AWG%20Tracking/awg-tracking/src/main/java/com/artwithgab/awg_tracking/security/RateLimiter.java:19)**  
+   Los contadores viven en memoria por proceso. Solo se eliminan entradas vencidas cuando el mapa supera 50.000 claves y una solicitud pasa el límite; no existe un máximo estricto de claves activas. Además, cada instancia tendría contadores independientes. Un volumen alto de direcciones distintas puede aumentar memoria y reducir la eficacia del límite al escalar. **Corrección:** usar almacenamiento con expiración y capacidad acotada, compartido entre instancias, y complementar con límites en el proxy.
+
+**Qué está bien**
+
+- Las rutas `/api/**` no públicas requieren rol de staff; el cambio de dirección exige además el token largo del formulario.
+- Las sesiones de staff usan tokens aleatorios de 256 bits, almacenados con hash y vencimiento; el cambio de contraseña revoca las demás sesiones.
+- Stripe verifica HMAC y ventana temporal; la confirmación comprueba estado pagado, importe y moneda. Checkout, webhook y limpieza comparten el bloqueo de agenda.
+- Las fotos usan nombres aleatorios, comprobación de firma de archivo y `nosniff`; los precios se calculan en el servidor.
+- PostgreSQL y el backend no publican puertos en Compose; el backend corre como usuario no root y hay instrucciones de respaldo.
+
+**No pude probar**
+
+- No hice pruebas en vivo, abrí navegador ni creé pedidos, conforme a la restricción de esta auditoría.
+- No ejecuté Maven ni compilaciones: generan archivos y el entorno es de solo lectura. Tampoco comprobé la cadena real de proxies, TLS, Stripe o SMTP en despliegue.
+- No ejecuté `npm audit` ni contrasté dependencias contra una base de vulnerabilidades: el acceso de red está restringido. Por tanto, no afirmo que las versiones estén libres de vulnerabilidades conocidas.
+- No verifiqué mediante ejecución el comportamiento efectivo de `X-Forwarded-For` con el proxy externo. Debe comprobarse que el proxy de borde descarte las cabeceras reenviadas proporcionadas por el cliente antes de confiar en ellas.

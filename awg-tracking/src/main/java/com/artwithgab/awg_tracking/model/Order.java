@@ -90,6 +90,14 @@ public class Order {
     private BigDecimal deliveryFee;
 
     /** True while a web order waits for payment: it holds slots but is hidden from agenda lists. */
+    /** Client-generated key of a staff sale, so a double tap or retry returns the same order. */
+    @Column(unique = true, length = 64)
+    private String idempotencyKey;
+
+    public boolean isPaymentReview() {
+        return checkoutStatus == CheckoutStatus.REVIEW;
+    }
+
     public boolean isAwaitingPayment() {
         return source == OrderSource.WEB && checkoutStatus == CheckoutStatus.PENDING;
     }

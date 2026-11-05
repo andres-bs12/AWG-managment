@@ -79,7 +79,7 @@ public class PublicController {
         Set<ConstraintViolation<CustomerFormRequest>> violations = validator.validate(payload);
         if (!violations.isEmpty()) {
             var v = violations.iterator().next();
-            throw new BadRequestException("Invalid " + v.getPropertyPath() + ": " + v.getMessage());
+            throw new BadRequestException("Invalid " + v.getPropertyPath() + ": " + v.getMessage()).code("VALIDATION").field(v.getPropertyPath().toString());
         }
         Map<String, MultipartFile> files = new HashMap<>();
         request.getFileMap().forEach((name, file) -> {

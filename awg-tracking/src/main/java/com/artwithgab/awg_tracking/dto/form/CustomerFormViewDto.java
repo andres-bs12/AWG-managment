@@ -19,6 +19,9 @@ public record CustomerFormViewDto(
         boolean withName,
         boolean alreadySubmitted,
         CustomerDto customer,
-        OrderItemDto item
+        OrderItemDto item,
+        boolean needsAddress,
+        com.artwithgab.awg_tracking.dto.common.AddressDto address,
+        boolean editable
 ) {
 }

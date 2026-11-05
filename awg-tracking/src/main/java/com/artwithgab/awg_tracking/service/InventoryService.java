@@ -24,9 +24,13 @@ public class InventoryService {
 
     /** Gaby sets the count after painting more bases or finished ornaments. */
     @org.springframework.transaction.annotation.Transactional
-    public com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto setQuantity(java.util.UUID id, int quantity) {
+    public com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto setQuantity(java.util.UUID id, int quantity, Integer expectedQuantity) {
         Inventory row = inventoryRepository.findById(id)
                 .orElseThrow(() -> new com.artwithgab.awg_tracking.exception.ResourceNotFoundException("Stock row not found"));
+        if (expectedQuantity != null && expectedQuantity != row.getQuantity()) {
+            throw new ConflictException("The stock changed meanwhile (now " + row.getQuantity() + "). Check it and save again.")
+                    .code("STOCK_CHANGED");
+        }
         row.setQuantity(quantity);
         return view(row);
     }
@@ -44,7 +48,7 @@ public class InventoryService {
         if (inventory.getQuantity() <= 0) {
             throw new ConflictException(item.getItemKind() == ItemKind.CUSTOM
                     ? "Out of stock: " + item.getCustomColor().name().toLowerCase() + " ornaments"
-                    : "Out of stock: finished ornaments");
+                    : "Out of stock: finished ornaments").code("OUT_OF_STOCK");
         }
         inventory.setQuantity(inventory.getQuantity() - 1);
         item.setInventory(inventory);

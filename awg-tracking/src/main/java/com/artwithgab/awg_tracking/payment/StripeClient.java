@@ -99,6 +99,23 @@ public class StripeClient {
         }
     }
 
+    /**
+     * Expires an open Checkout Session so it can no longer be paid. Fails (502) when Stripe cannot
+     * be reached or the session is no longer open (e.g. it was just paid).
+     */
+    public void expireSession(String sessionId) {
+        if (!isConfigured()) throw new ShopUnavailableException();
+        if (!sessionId.matches("^cs_[A-Za-z0-9_]+$")) throw new IllegalArgumentException("Bad session id");
+        try {
+            restClient.post().uri("/checkout/sessions/{id}/expire", sessionId)
+                    .header("Authorization", "Bearer " + props.shop().stripeSecretKey())
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientException e) {
+            throw new PaymentProviderException();
+        }
+    }
+
     /** Fetches a Checkout Session (status, payment_status, amount_total, currency). */
     public JsonNode retrieveSession(String sessionId) {
         if (!isConfigured()) throw new ShopUnavailableException();

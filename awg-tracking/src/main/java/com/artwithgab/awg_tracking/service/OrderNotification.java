@@ -17,7 +17,8 @@ public record OrderNotification(Kind kind, String code, String customerName, Str
         HANDED_OVER("Order handed over", "Deine Bestellung wurde übergeben", "Your order has been handed over"),
         CANCELLED("Order cancelled", "Deine Bestellung wurde storniert", "Your order has been cancelled"),
         ADDRESS_CHANGED("Delivery address changed", "Deine Lieferadresse wurde geändert", "Your delivery address has changed"),
-        FORM_SUBMITTED("Customer form submitted", "", "");
+        FORM_SUBMITTED("Customer form submitted", "", ""),
+        PAYMENT_REVIEW("Stripe payment needs review (amount/currency mismatch)", "", "");
         final String owner, german, english;
         Kind(String owner, String german, String english) { this.owner = owner; this.german = german; this.english = english; }
     }

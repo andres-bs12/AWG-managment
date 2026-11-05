@@ -18,7 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class FormTrackApiTests extends ApiTestSupport {
 
-    private static final byte[] JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 16, 'J', 'F', 'I', 'F', 0, 1, 1, 0, 0, 1};
+    private static final byte[] JPEG = TestImages.jpeg();
 
     private record Created(String orderId, String code, String formToken, String itemId) {
     }
@@ -123,5 +123,38 @@ class FormTrackApiTests extends ApiTestSupport {
         mvc.perform(withIp(get("/api/track/" + vienna.code())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.delivery.address").doesNotExist());
+    }
+
+    private MvcResult submitWithAddress(Created c, Map<String, Object> address) throws Exception {
+        Map<String, Object> payload = new java.util.LinkedHashMap<>(Map.of(
+                "customerName", "Maria Muster", "phone", "+43 660 1234567", "email", "maria@example.com",
+                "items", List.of(Map.of("orderItemId", c.itemId(), "petName", "Bella", "backName", "bella",
+                        "photos", List.of(Map.of("id", "p1", "name", "bella.jpg"))))));
+        if (address != null) payload.put("address", address);
+        var req = multipart("/api/forms/" + c.formToken())
+                .file(new MockMultipartFile("payload", "payload", "application/json", json(payload).getBytes()))
+                .file(new MockMultipartFile("photo-p1", "bella.jpg", "image/jpeg", JPEG));
+        return mvc.perform(withIp(req)).andReturn();
+    }
+
+    @Test
+    void viennaFormNeedsAnAddressInVienna() throws Exception {
+        Created c = customOrder(login(), "vienna", WED, null, 11.5);
+        mvc.perform(withIp(get("/api/forms/" + c.formToken())))
+                .andExpect(jsonPath("$.needsAddress").value(true))
+                .andExpect(jsonPath("$.editable").value(true));
+
+        MvcResult none = submitWithAddress(c, null);
+        assertEquals(400, none.getResponse().getStatus());
+        assertEquals("address", this.<String>read(none, "$.field"));
+
+        MvcResult linz = submitWithAddress(c, Map.of("line1", "Hauptplatz 1", "postalCode", "4020", "city", "Linz"));
+        assertEquals(400, linz.getResponse().getStatus());
+        assertEquals("POSTAL_OUTSIDE_VIENNA", this.<String>read(linz, "$.code"));
+
+        MvcResult ok = submitWithAddress(c, Map.of("line1", "Neubaugasse 1", "postalCode", "1070", "city", "Wien"));
+        assertEquals(200, ok.getResponse().getStatus(), ok.getResponse().getContentAsString());
+        mvc.perform(withIp(get("/api/forms/" + c.formToken())))
+                .andExpect(jsonPath("$.address.postalCode").value("1070"));
     }
 }

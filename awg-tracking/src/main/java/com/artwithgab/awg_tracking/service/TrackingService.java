@@ -54,7 +54,8 @@ public class TrackingService {
         }
         if (order.isHandedOver()) throw new ConflictException("This order was already delivered");
         if (!com.artwithgab.awg_tracking.support.ViennaAddress.isViennaPostal(address.postalCode())) {
-            throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).");
+            throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).")
+                    .code("POSTAL_OUTSIDE_VIENNA").field("postalCode");
         }
         order.setDeliveryAddress(OrderService.toAddress(address));
         events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.ADDRESS_CHANGED));
@@ -73,10 +74,10 @@ public class TrackingService {
 
     private Order find(String code) {
         if (code == null || !code.trim().matches("(?i)AWG[A-Z0-9]{4,6}")) {
-            throw new ResourceNotFoundException("Order not found. Check the code.");
+            throw new ResourceNotFoundException("Order not found. Check the code.").code("ORDER_NOT_FOUND");
         }
         return orderRepository.findByCodeIgnoreCase(code.trim())
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found. Check the code."));
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found. Check the code.").code("ORDER_NOT_FOUND"));
     }
 
     private TrackViewDto view(Order order, boolean includeAddress) {
@@ -85,8 +86,9 @@ public class TrackingService {
         OrderItem first = items.isEmpty() ? null : items.getFirst();
         String status = order.isHandedOver() ? "delivered"
                 : items.stream().allMatch(i -> i.getProductionStatus() == ProductionStatus.FINISHED) ? "ready" : "preparing";
-        String name = order.getCustomer().getName();
-        String firstName = name == null || name.isBlank() ? "there" : name.trim().split("\\s+")[0];
+        // Empty when unknown: the client shows a generic greeting in its own language.
+        String name = order.getCustomer().publicName();
+        String firstName = name.isEmpty() ? "" : name.split("\\s+")[0];
         TrackWhenDto when = first == null ? new TrackWhenDto("unknown", null, null, null, null) : mapper.when(first, index);
         return new TrackViewDto(
                 order.getTotal(),

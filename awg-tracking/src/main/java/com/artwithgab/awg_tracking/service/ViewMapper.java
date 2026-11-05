@@ -81,6 +81,7 @@ public class ViewMapper {
                 o.getCreatedAt().toString(),
                 o.getOrderItems().stream().map(i -> i.getId().toString()).toList(),
                 o.isHandedOver(),
+                o.isPaymentReview(),
                 List.of());
     }
 

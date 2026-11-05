@@ -50,8 +50,26 @@ public class FormService {
                 order.getCode(),
                 items.stream().anyMatch(OrderItem::isWithName),
                 order.isFormSubmitted(),
-                mapper.customer(order.getCustomer()),
-                mapper.item(main, index));
+                publicCustomer(order.getCustomer()),
+                mapper.item(main, index),
+                needsAddress(order),
+                mapper.address(order.getDeliveryAddress()),
+                isEditable(order));
+    }
+
+    private com.artwithgab.awg_tracking.dto.common.CustomerDto publicCustomer(Customer c) {
+        var dto = mapper.customer(c);
+        return new com.artwithgab.awg_tracking.dto.common.CustomerDto(dto.id(), c.publicName(), dto.phone(), dto.email());
+    }
+
+    private static boolean needsAddress(Order order) {
+        return order.getOrderItems().stream().anyMatch(i -> i.getDeliveryKind() == com.artwithgab.awg_tracking.enums.DeliveryKind.DELIVERY);
+    }
+
+    /** The customer may change the form until painting starts and the order is not handed over. */
+    private static boolean isEditable(Order order) {
+        return !order.isHandedOver() && order.getOrderItems().stream()
+                .noneMatch(i -> i.getItemKind() == ItemKind.CUSTOM && i.getProductionStatus() != ProductionStatus.NOT_STARTED);
     }
 
     /**
@@ -62,13 +80,26 @@ public class FormService {
     @Transactional
     public SubmitFormResponse submit(String token, CustomerFormRequest payload, Map<String, MultipartFile> files) {
         Order order = find(token);
-        if (order.getOrderItems().stream().anyMatch(i -> i.getItemKind() == ItemKind.CUSTOM && i.getProductionStatus() != ProductionStatus.NOT_STARTED)) {
-            throw new ConflictException("Painting has already started. Contact us to change the details.");
+        if (!isEditable(order)) {
+            throw new ConflictException("Painting has already started. Contact us to change the details.").code("FORM_LOCKED");
         }
         Customer customer = order.getCustomer();
         customer.setName(payload.customerName().trim());
         customer.setPhone(payload.phone().trim());
         customer.setEmail(payload.email().trim());
+        if (needsAddress(order)) {
+            if (payload.address() == null || payload.address().line1() == null || payload.address().line1().isBlank()) {
+                if (order.getDeliveryAddress() == null) {
+                    throw new BadRequestException("Add the delivery address in Vienna.").code("VALIDATION").field("address");
+                }
+            } else {
+                if (!com.artwithgab.awg_tracking.support.ViennaAddress.isViennaPostal(payload.address().postalCode())) {
+                    throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).")
+                            .code("POSTAL_OUTSIDE_VIENNA").field("address.postalCode");
+                }
+                order.setDeliveryAddress(OrderService.toAddress(payload.address()));
+            }
+        }
 
         Map<UUID, ItemFormRequest> byItem = new HashMap<>();
         for (ItemFormRequest row : payload.items()) byItem.put(row.orderItemId(), row);

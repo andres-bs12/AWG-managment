@@ -36,7 +36,8 @@ public record AwgProperties(
     }
 
     /** Stock created on a fresh database: per custom color (bases ready to paint) and finished ornaments. */
-    public record Bootstrap(List<StaffAccount> staff, int initialCustomStock, int initialFinishedStock, boolean demoMarkets) {
+    public record Bootstrap(List<StaffAccount> staff, int initialCustomStock, int initialFinishedStock, boolean demoMarkets,
+                            boolean allowWeakPasswords) {
     }
 
     /**
@@ -45,7 +46,7 @@ public record AwgProperties(
      */
     public record Shop(boolean enabled, String publicBaseUrl, String stripeSecretKey, String stripeWebhookSecret,
                        BigDecimal deliveryFee, int checkoutMinutes, int leadDays, int maxDaysAhead,
-                       java.time.LocalDate seasonEnd) {
+                       java.time.LocalDate seasonEnd, int maxOpenCheckouts) {
     }
 
     /** E-mail notifications; nothing is sent while spring.mail.host is empty. */

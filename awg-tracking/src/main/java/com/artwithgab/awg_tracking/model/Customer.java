@@ -19,6 +19,14 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 public class Customer {
+    /** Name stored for stall sales before the customer fills the form; never shown publicly. */
+    public static final String PLACEHOLDER_NAME = "Walk-in";
+
+    /** The real name, or "" while it is still the stall placeholder. */
+    public String publicName() {
+        return name == null || PLACEHOLDER_NAME.equals(name.trim()) ? "" : name.trim();
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

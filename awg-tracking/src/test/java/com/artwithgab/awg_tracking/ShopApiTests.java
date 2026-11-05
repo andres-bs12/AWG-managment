@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** Web shop: Vienna-only delivery days from real capacity, Stripe checkout and webhook (Stripe mocked). */
 @TestPropertySource(properties = "awg.shop.enabled=true")
 class ShopApiTests extends ApiTestSupport {
-    private static final byte[] JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 1, 2, 3, 4};
+    private static final byte[] JPEG = TestImages.jpeg();
 
     @MockitoBean
     StripeClient stripe;
@@ -146,7 +146,41 @@ class ShopApiTests extends ApiTestSupport {
     void wrongAmountDoesNotConfirm() throws Exception {
         String code = read(checkout("1070", "2026-12-02", 1), "$.orderCode");
         webhook("checkout.session.completed", "paid", 1);
-        assertThat(orderRepository.findByCodeIgnoreCase(code).orElseThrow().isAwaitingPayment()).isTrue();
+        var order = orderRepository.findByCodeIgnoreCase(code).orElseThrow();
+        // Not confirmed and not released: staff must check it in Stripe.
+        assertThat(order.isPaymentReview()).isTrue();
+        assertThat(order.getPaymentState().name()).isEqualTo("UNPAID");
+        webhook("checkout.session.expired", "unpaid", 0);
+        assertThat(orderRepository.findByCodeIgnoreCase(code)).isPresent();
+        mvc.perform(get("/api/orders/" + order.getId()).header("Authorization", bearer(login())))
+                .andExpect(jsonPath("$.paymentReview").value(true));
+    }
+
+    @Test
+    void abandonReleasesThePendingCheckout() throws Exception {
+        int stockBefore = inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.GREY).orElseThrow().getQuantity();
+        MvcResult res = checkout("1070", "2026-12-02", 1);
+        String code = read(res, "$.orderCode");
+        String formToken = read(res, "$.formToken");
+        // Without the token (or with another one) nothing happens.
+        mvc.perform(withIp(post("/api/shop/checkout/" + code + "/abandon"))).andExpect(status().isForbidden());
+        mvc.perform(withIp(post("/api/shop/checkout/" + code + "/abandon")).header("X-Form-Token", "wrong-token-wrong-token"))
+                .andExpect(status().isForbidden());
+        assertThat(orderRepository.findByCodeIgnoreCase(code)).isPresent();
+
+        mvc.perform(withIp(post("/api/shop/checkout/" + code + "/abandon")).header("X-Form-Token", formToken))
+                .andExpect(status().isNoContent());
+        assertThat(orderRepository.findByCodeIgnoreCase(code)).isEmpty();
+        org.mockito.Mockito.verify(stripe).expireSession("cs_test_1");
+        assertThat(inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.GREY).orElseThrow().getQuantity())
+                .isEqualTo(stockBefore);
+    }
+
+    @Test
+    void outsideViennaReturnsCodeAndField() throws Exception {
+        MvcResult res = checkout("4020", "2026-12-02", 1);
+        assertThat(this.<String>read(res, "$.code")).isEqualTo("POSTAL_OUTSIDE_VIENNA");
+        assertThat(this.<String>read(res, "$.field")).isEqualTo("address.postalCode");
     }
 
     @Test

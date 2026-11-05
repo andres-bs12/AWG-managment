@@ -75,8 +75,9 @@ public class Bootstrap implements ApplicationRunner {
             if (account.email() == null || account.email().isBlank()) continue;
             String email = account.email().trim().toLowerCase(Locale.ROOT);
             if (staffUserRepository.findByEmail(email).isPresent()) continue;
-            if (account.password() == null || account.password().length() < 4) {
-                log.warn("Staff account {} skipped: set its password through the environment", email);
+            int minLength = props.bootstrap().allowWeakPasswords() ? 4 : 10;
+            if (account.password() == null || account.password().length() < minLength) {
+                log.warn("Staff account {} skipped: set a password of at least {} characters through the environment", email, minLength);
                 continue;
             }
             StaffUser user = new StaffUser();

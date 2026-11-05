@@ -24,6 +24,6 @@ public class InventoryController {
 
     @PatchMapping("/{id}")
     public InventoryItemDto update(@PathVariable UUID id, @Valid @RequestBody UpdateInventoryRequest body) {
-        return inventoryService.setQuantity(id, body.quantity());
+        return inventoryService.setQuantity(id, body.quantity(), body.expectedQuantity());
     }
 }

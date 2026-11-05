@@ -46,6 +46,8 @@ public class PhotoStorageService {
         String[] type = detect(Arrays.copyOf(head, read));
         if (type == null) throw new BadRequestException("Photos must be JPEG, PNG, WebP or HEIC images.");
 
+        checkDecodable(file, type[0]);
+
         String key = UUID.randomUUID() + "." + type[1];
         try {
             Path dir = root();
@@ -105,6 +107,33 @@ public class PhotoStorageService {
             Files.deleteIfExists(path);
         } catch (IOException ignored) {
             // An orphan file on disk is harmless.
+        }
+    }
+
+    /**
+     * JPEG/PNG must really be images with sane dimensions (rejects a fake signature and huge
+     * "decompression bomb" sizes). WebP/HEIC cannot be decoded by the JDK and are checked by signature only.
+     */
+    private static void checkDecodable(MultipartFile file, String contentType) {
+        if (!contentType.equals("image/jpeg") && !contentType.equals("image/png")) return;
+        try (InputStream in = file.getInputStream();
+             javax.imageio.stream.ImageInputStream iis = javax.imageio.ImageIO.createImageInputStream(in)) {
+            var readers = javax.imageio.ImageIO.getImageReaders(iis);
+            if (!readers.hasNext()) throw new BadRequestException("A photo could not be read. Add it again.");
+            javax.imageio.ImageReader reader = readers.next();
+            try {
+                reader.setInput(iis, true, true);
+                int w = reader.getWidth(0);
+                int h = reader.getHeight(0);
+                if (w < 1 || h < 1 || w > 12000 || h > 12000 || (long) w * h > 80_000_000L) {
+                    throw new BadRequestException("A photo is too large. Use a smaller image.");
+                }
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException | RuntimeException e) {
+            if (e instanceof BadRequestException b) throw b;
+            throw new BadRequestException("A photo could not be read. Add it again.");
         }
     }
 
