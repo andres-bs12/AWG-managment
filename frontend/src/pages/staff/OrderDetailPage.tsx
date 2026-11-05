@@ -124,7 +124,7 @@ function OrderDetail({ id }: { id: string }) {
         setActionError('')
         void navigator.clipboard.writeText(formUrl).then(() => setCopied(true)).catch(() => setActionError('Could not copy. Open the customer form to share its link.'))
       }}>{copied ? 'Link copied' : 'Copy form link'}</Button>
-      <span role="status" className={styles.muted}>{copied ? 'Link copied to clipboard.' : 'Tap the QR to show it to the customer.'}</span>
+      <span role="status" className={styles.muted}>{copied ? 'Link copied to clipboard.' : ''}</span>
     </div>
   </div>
 

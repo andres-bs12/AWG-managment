@@ -66,6 +66,7 @@
 .addRow {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
   margin: var(--space-2) 0 var(--space-1);
 }
@@ -83,17 +84,22 @@
 
 .check {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
   min-height: var(--size-control-staff);
-  margin: var(--space-2) 0 var(--space-4);
+  margin: var(--space-2) 0 0;
   font-weight: 600;
+}
+
+/* The hint belongs to the checkbox: under its label text, then the usual gap to the next group. */
+.check + .hint {
+  margin: 0 0 var(--space-4) calc(var(--space-5) + var(--space-3));
 }
 
 .check input {
   width: var(--space-5);
   height: var(--space-5);
-  margin-top: var(--border-control);
+  margin: 0;
   flex-shrink: 0;
 }
 

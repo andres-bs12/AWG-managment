@@ -558,11 +558,12 @@ export function NewSalePage() {
     done: 'Sale recorded',
   }
 
+  // Plain step names: "1 Item" read like a quantity.
   const stepLabels = !draft.items.length
-    ? ['1 Item']
+    ? ['Items']
     : onlyFinished
-      ? ['1 Item', '2 Pay']
-      : ['1 Item', '2 Pickup', '3 QR & payment']
+      ? ['Items', 'Hand over & pay']
+      : ['Items', 'Pickup', 'QR & payment']
 
   function stepOn(index: number) {
     if (!draft.items.length || phase === 'items') return index === 0
@@ -581,7 +582,7 @@ export function NewSalePage() {
           <h1>New sale</h1>
           <p className={styles.steps}>
             {stepLabels.map((label, index) => (
-              <span key={label} data-on={stepOn(index) ? 'true' : 'false'}>
+              <span key={label} data-on={stepOn(index) ? 'true' : 'false'} aria-current={stepOn(index) && phase !== 'done' ? 'step' : undefined}>
                 {label}
               </span>
             ))}
@@ -846,7 +847,6 @@ function ItemsStep({
 }) {
   return (
     <>
-      <p>Finished stock: {stockLabel(inventory.find(row => row.kind === 'finished')?.quantity ?? 0)}</p>
       {items.length === 0 ? (
         <StaffActions className={styles.actions} total={prices ? draftTotal(items, prices) : null}>
           <Button tone="staff" variant="secondary" size="lg" fullWidth onClick={() => onAdd('custom')}>
@@ -855,6 +855,7 @@ function ItemsStep({
           <Button tone="staff" variant="secondary" size="lg" fullWidth onClick={() => onAdd('finished')}>
             + Add finished product
           </Button>
+          <p className={styles.hint}>Finished stock: {stockLabel(inventory.find(row => row.kind === 'finished')?.quantity ?? 0)}</p>
         </StaffActions>
       ) : (
         <>
@@ -874,9 +875,10 @@ function ItemsStep({
               {item.kind === 'custom' ? (
                 <>
                   <label className={styles.check}>
-                    <input type="checkbox" aria-label={`Add name on ornament · ${prices ? formatEur(prices.nameExtra, 'en') : 'Price unavailable'}`} checked={item.withName} onChange={() => onToggleName(item)} />
-                    {`Add name on ornament · ${prices ? formatEur(prices.nameExtra, 'en') : 'Price unavailable'} (text comes from the customer form)`}
+                    <input type="checkbox" aria-describedby={`name-hint-${item.id}`} checked={item.withName} onChange={() => onToggleName(item)} />
+                    {`Name on ornament · +${prices ? formatEur(prices.nameExtra, 'en') : 'price unavailable'}`}
                   </label>
+                  <p className={styles.hint} id={`name-hint-${item.id}`}>The customer types the name in the form.</p>
                   <SegmentedControl
                     legend="Colour"
                     name={`colour-${item.id}`}
@@ -884,8 +886,7 @@ function ItemsStep({
                     onChange={(color) => onColor(item, color)}
                     options={(['red', 'green', 'beige'] as const).map(color => { const quantity = inventory.filter(row => row.kind === 'custom' && row.color === color).reduce((sum, row) => sum + row.quantity, 0); return { value: color, color, label: color[0].toUpperCase() + color.slice(1), hint: stockLabel(quantity), disabled: quantity === 0 } })}
                   />
-                  <HelpTip label="Explain finishes">Shiny reflects light. Matte has no glossy reflection. Stock refers to unpainted bases.</HelpTip>
-                  <SegmentedControl legend="Finish" name={`finish-${item.id}`} value={item.finish ?? 'shiny'} onChange={finish => onFinish(item, finish)} options={(['shiny', 'matte'] as const).map(finish => { const quantity = inventory.find(row => row.kind === 'custom' && row.color === item.color && row.finish === finish)?.quantity ?? 0; return { value: finish, label: finish === 'shiny' ? 'Shiny' : 'Matte', hint: stockLabel(quantity), disabled: quantity === 0 } })} />
+                  <SegmentedControl legend="Finish" help={<HelpTip label="Explain finishes">Shiny reflects light. Matte has no glossy reflection. Stock refers to unpainted bases.</HelpTip>} name={`finish-${item.id}`} value={item.finish ?? 'shiny'} onChange={finish => onFinish(item, finish)} options={(['shiny', 'matte'] as const).map(finish => { const quantity = inventory.find(row => row.kind === 'custom' && row.color === item.color && row.finish === finish)?.quantity ?? 0; return { value: finish, label: finish === 'shiny' ? 'Shiny' : 'Matte', hint: stockLabel(quantity), disabled: quantity === 0 } })} />
                   <SegmentedControl
                     legend="Paint time"
                     name={`duration-${item.id}`}
@@ -905,6 +906,7 @@ function ItemsStep({
             <Button tone="staff" variant="secondary" onClick={() => onAdd('finished')}>
               + Add finished
             </Button>
+            <span className={styles.hint}>Finished stock: {stockLabel(inventory.find(row => row.kind === 'finished')?.quantity ?? 0)}</span>
           </div>
           <StaffActions className={styles.actions} total={prices ? draftTotal(items, prices) : null}>
             <Button tone="staff" size="lg" onClick={onContinue}>

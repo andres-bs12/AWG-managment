@@ -3,6 +3,7 @@ import { Button } from '../ui/Button'
 import { Field } from '../ui/Field'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { InsetNote } from '../public/PublicForm'
+import { StaffDialog } from './StaffDialog'
 import type { Order, PaymentMethod, PaymentState } from '../../domain/types'
 import { formatEur } from '../../lib/money'
 import { paymentSummary } from '../../lib/paymentSummary'
@@ -16,15 +17,21 @@ export function OrderPaymentPanel({ order, busy, onSetState }: Props) {
   const [state, setState] = useState<PaymentState>('paid')
   const [correction, setCorrection] = useState<PaymentState>('unpaid')
   const [error, setError] = useState('')
+  const [confirming, setConfirming] = useState<PaymentState | null>(null)
   const pending = order.checkoutStatus === 'pending'
   const amount = Number(deposit.replace(',', '.'))
   function update(next: PaymentState, correcting = false) {
     setError('')
     if (next === 'deposit' && (!deposit.trim() || !Number.isFinite(amount) || amount <= 0 || amount >= order.total)) { setError('Enter an amount greater than zero and less than the total.'); return }
-    if (correcting && !window.confirm(`Change the recorded payment to ${next}${next === 'deposit' ? ` · ${formatEur(amount, 'en')}` : ''}?`)) return
+    if (correcting) { setConfirming(next); return }
     void onSetState(next, method, next === 'deposit' ? amount : undefined)
   }
-  const methodField = <SegmentedControl legend="Method (optional)" name="payment-method" value={method} onChange={setMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} />
+  function confirmCorrection() {
+    const next = confirming
+    setConfirming(null)
+    if (next) void onSetState(next, method, next === 'deposit' ? amount : undefined)
+  }
+  const methodField = <SegmentedControl legend="Method" name="payment-method" value={method} onChange={setMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} />
   const depositField = (id: string) => <Field label="Deposit received (€)" htmlFor={id}><input id={id} inputMode="decimal" value={deposit} disabled={busy} onChange={event => { setDeposit(event.target.value); setError('') }} /></Field>
   return <section className={styles.panel} aria-labelledby="payment-heading">
     <div className={styles.heading}><h2 id="payment-heading">Payment</h2><span>{remaining === 0 ? 'Paid' : order.paymentState === 'deposit' ? 'Deposit' : 'Unpaid'}</span></div>
@@ -32,9 +39,10 @@ export function OrderPaymentPanel({ order, busy, onSetState }: Props) {
     {pending ? <InsetNote><p>Waiting for online payment. Check Stripe; staff cannot record a payment while Checkout is pending.</p></InsetNote> : <>
       {remaining > 0 && <div className={styles.collect}>
         <p>Record payment after checking the money arrived.</p>
-        <SegmentedControl legend="Record payment" name="record-state" value={state} onChange={setState} options={[{ value: 'paid', label: 'Paid' }, ...(order.paymentState === 'unpaid' ? [{ value: 'deposit' as const, label: 'Deposit' }] : [])]} />
-        {methodField}{state === 'deposit' && depositField('payment-deposit')}
-        <Button tone="staff" fullWidth disabled={busy} onClick={() => update(state)}>{busy ? 'Saving…' : state === 'deposit' ? `Mark deposit · ${formatEur(Number.isFinite(amount) ? amount : 0, 'en')}` : `Mark paid · ${formatEur(remaining, 'en')}`}</Button>
+        {/* A deposit order can only become paid: a one-option choice would look like a selected button. */}
+        {order.paymentState === 'unpaid' ? <SegmentedControl legend="Record payment" name="record-state" value={state} onChange={setState} options={[{ value: 'paid', label: 'Paid' }, { value: 'deposit', label: 'Deposit' }]} /> : null}
+        {methodField}{!method && <p>Choose cash or card to record a payment.</p>}{state === 'deposit' && depositField('payment-deposit')}
+        <Button tone="staff" fullWidth disabled={busy || !method} onClick={() => update(state)}>{busy ? 'Saving…' : state === 'deposit' ? `Mark deposit · ${formatEur(Number.isFinite(amount) ? amount : 0, 'en')}` : `Mark paid · ${formatEur(remaining, 'en')}`}</Button>
       </div>}
       <details className={styles.collect}><summary>Correct payment</summary>
         <p>Use after checking the payment record. Corrections replace the recorded amount.</p>
@@ -44,5 +52,10 @@ export function OrderPaymentPanel({ order, busy, onSetState }: Props) {
       </details>
     </>}
     {error && <p role="alert">{error}</p>}
+    {confirming && <StaffDialog title="Correct payment?" busy={busy} onClose={() => setConfirming(null)}>
+      <p>Change the recorded payment of {order.code} to <strong>{confirming}{confirming === 'deposit' ? ` · ${formatEur(amount, 'en')}` : ''}</strong>. This replaces the recorded amount.</p>
+      <Button tone="staff" variant="secondary" disabled={busy} onClick={() => setConfirming(null)}>Not yet</Button>
+      <Button tone="staff" disabled={busy} onClick={confirmCorrection}>Correct to {confirming}</Button>
+    </StaffDialog>}
   </section>
 }
