@@ -1,3 +1,4 @@
+import { useLocale } from '../../../i18n/LocaleContext'
 import styles from '../BuyPage.module.css'
 import type { BuyStepProps } from './shared'
 import { Button } from '../../../components/ui/Button'
@@ -7,6 +8,7 @@ import { formatEur } from '../../../lib/money'
 import { colorKeys } from './shared'
 
 export function BuyItemsStep({ t, draft, config, itemPrice, patch, patchItem, err, described }: Pick<BuyStepProps, 't' | 'draft' | 'config' | 'itemPrice' | 'patch' | 'patchItem' | 'err' | 'described'>) {
+  const { locale } = useLocale()
   return (<>
     <div className={styles.product}>
       <svg
@@ -40,7 +42,7 @@ export function BuyItemsStep({ t, draft, config, itemPrice, patch, patchItem, er
         <h3>
           {t('shopProduct')}</h3>
         <strong>
-          {formatEur(config.customPrice)}</strong>
+          {formatEur(config.customPrice, locale)}</strong>
         <p>
           {t('shopCustomHint')}</p>
         <p>
@@ -50,7 +52,7 @@ export function BuyItemsStep({ t, draft, config, itemPrice, patch, patchItem, er
         <h3>
           {t('ornamentN', { n: index + 1 })}</h3>
         <span className={styles.price}>
-          {formatEur(itemPrice(item))}</span>
+          {formatEur(itemPrice(item), locale)}</span>
         {draft.items.length > 1 && <button
 
           type="button"
@@ -109,7 +111,7 @@ export function BuyItemsStep({ t, draft, config, itemPrice, patch, patchItem, er
 
           onChange={(event) => patchItem(item.uid, { withName: event.target.checked })} />
         <span>
-          {t('shopNameOnBack', { price: formatEur(config.nameExtra) })}</span></label>
+          {t('shopNameOnBack', { price: formatEur(config.nameExtra, locale) })}</span></label>
       {item.withName && <Field
 
         label={t('backName')}

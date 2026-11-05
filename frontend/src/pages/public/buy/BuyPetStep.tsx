@@ -75,7 +75,7 @@ export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, a
         {err(`photos-${item.uid}`)}</p>}{photoErrors[item.uid] && <p className={styles.error} role="alert">
           {photoErrors[item.uid]}</p>}
     </div>
-    <Field label={t('note')} htmlFor={`note-${item.uid}`}>
+    <Field label={t('note')} htmlFor={`note-${item.uid}`} error={err(`note-${item.uid}`)}>
       <textarea
 
         id={`note-${item.uid}`} maxLength={1000}

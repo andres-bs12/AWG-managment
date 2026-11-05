@@ -7,12 +7,14 @@ import styles from './SettingsRows.module.css'
 
 function localDate(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` }
 export function PaintingDaysPage() {
+  const [seasonEndDate, setSeasonEndDate] = useState('2026-12-24')
+  useEffect(() => { let active = true; api.shop.getConfig().then(config => { if (active) setSeasonEndDate(config.seasonEnd) }).catch(() => {}); return () => { active = false } }, [])
   const [days, setDays] = useState<PaintingDay[]>([]); const [error, setError] = useState('')
   const [offset, setOffset] = useState(0); const [retry, setRetry] = useState(0); const [loading, setLoading] = useState(true)
   const today = new Date(); today.setHours(12, 0, 0, 0); today.setDate(today.getDate() - ((today.getDay() + 6) % 7))
   const start = new Date(today); start.setDate(start.getDate() + offset * 28)
   const end = new Date(start); end.setDate(end.getDate() + 27)
-  const seasonEnd = new Date('2026-12-24T12:00:00'); if (end > seasonEnd) end.setTime(seasonEnd.getTime())
+  const seasonEnd = new Date(`${seasonEndDate}T12:00:00`); if (end > seasonEnd) end.setTime(seasonEnd.getTime())
   const from = localDate(start); const to = localDate(end)
   useEffect(() => { let active = true; if (from > to) return; api.paintingDays.list(from, to).then(rows => { if (active) { setDays(rows); setError('') } }).catch(() => { if (active) setError('Could not load painting days.') }).finally(() => { if (active) setLoading(false) }); return () => { active = false } }, [from, to, retry])
   const weeks = Array.from({ length: Math.ceil(days.length / 7) }, (_, index) => days.slice(index * 7, index * 7 + 7))

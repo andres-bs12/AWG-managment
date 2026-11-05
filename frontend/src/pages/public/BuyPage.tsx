@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button'
 import type { Photo, ShopConfig, ShopDeliveryDate } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
 import { loadBuyDraft, saveBuyDraft, type BuyDraft, type BuyItem } from '../../lib/buyDraft'
+import { apiError } from '../../lib/apiError'
 import { formatEur } from '../../lib/money'
 import styles from './BuyPage.module.css'
 import panel from './Panel.module.css'
@@ -88,10 +89,10 @@ export function BuyPage() {
   const total = draft.items.length ? itemsTotal + shopConfig.deliveryFee : 0
   const err = (key: string) => errors[key]
   const described = (key: string, hint = false) => [hint ? `${key}-hint` : '', err(key) ? `${key}-error` : ''].filter(Boolean).join(' ') || undefined
-  function patch(partial: Partial<BuyDraft>) { setDraft((current) => ({ ...current, ...partial })); const fields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', postalCode: 'buy-postal', deliveryDate: 'buy-date', acceptTerms: 'buy-terms' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[fields[key]]); return next }); setServerError('') }
+  function patch(partial: Partial<BuyDraft>) { setDraft((current) => ({ ...current, ...partial })); const fields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', line2: 'buy-line2', postalCode: 'buy-postal', deliveryDate: 'buy-date', acceptTerms: 'buy-terms' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[fields[key]]); return next }); setServerError('') }
   function patchItem(uid: string, partial: Partial<BuyItem>) {
     setDraft((current) => ({ ...current, items: current.items.map((item) => item.uid === uid ? { ...item, ...partial } : item) }))
-    const fields: Record<string, string> = { color: 'color', backName: 'back', petName: 'pet', photos: 'photos' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[`${fields[key]}-${uid}`]); return next }); setServerError('')
+    const fields: Record<string, string> = { color: 'color', backName: 'back', petName: 'pet', note: 'note', photos: 'photos' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[`${fields[key]}-${uid}`]); return next }); setServerError('')
   }
   function validate(currentStep: number) {
     const found: Record<string, string> = {}
@@ -157,8 +158,8 @@ export function BuyPage() {
       })
       window.location.assign(result.checkoutUrl)
     } catch (error) {
-      const problem = error as { code?: string; field?: string }; const field = problem.field ?? ''; const match = field.match(/^items\[(\d+)\]\.(\w+)/); const item = match ? draft.items[Number(match[1])] : undefined; const itemFields: Record<string, [number, string]> = { petName: [1, 'pet'], photos: [1, 'photos'], color: [0, 'color'], backName: [0, 'back'] }; const simple: Record<string, [number, string]> = { customerName: [3, 'buy-name'], email: [3, 'buy-email'], phone: [3, 'buy-phone'], 'address.line1': [3, 'buy-line1'], 'address.postalCode': [3, 'buy-postal'], deliveryDate: [2, 'buy-date'] }; const target = match && item && itemFields[match[2]] ? [itemFields[match[2]][0], `${itemFields[match[2]][1]}-${item.uid}`] as const : simple[field];
-      if (target) { go(target[0]); showErrors({ [target[1]]: problem.code === 'POSTAL_OUTSIDE_VIENNA' ? t('shopPostalInvalid') : t('required') }) } else setServerError(problem.code === 'DAY_FULL' ? t('shopDatesNone') : t('shopCheckoutError'))
+      const problem = apiError(error, locale, t('shopCheckoutError')); const field = problem.field ?? ''; const match = field.match(/^items\[(\d+)\]\.(\w+)/); const item = match ? draft.items[Number(match[1])] : undefined; const itemFields: Record<string, [number, string]> = { petName: [1, 'pet'], photos: [1, 'photos'], color: [0, 'color'], backName: [0, 'back'], note: [1, 'note'] }; const simple: Record<string, [number, string]> = { customerName: [3, 'buy-name'], email: [3, 'buy-email'], phone: [3, 'buy-phone'], 'address.line1': [3, 'buy-line1'], 'address.line2': [3, 'buy-line2'], 'address.city': [3, 'buy-city'], address: [3, 'buy-line1'], 'address.postalCode': [3, 'buy-postal'], deliveryDate: [2, 'buy-date'] }; const target = match && item && itemFields[match[2]] ? [itemFields[match[2]][0], `${itemFields[match[2]][1]}-${item.uid}`] as const : simple[field];
+      if (target) { go(target[0]); showErrors({ [target[1]]: problem.text }) } else setServerError(problem.text)
       busyRef.current = false; setBusy(false)
     }
   }
@@ -177,7 +178,7 @@ export function BuyPage() {
       {step === 3 && <BuyContactStep {...stepProps} />}
       {step === 4 && <BuyReviewStep {...stepProps} />}
     </section>
-    <aside className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><dl aria-live="polite"><div><dt>{t('shopItemsTotal')} ({draft.items.length})</dt><dd>{formatEur(itemsTotal)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{config.deliveryFee ? formatEur(config.deliveryFee) : t('shopFree')}</dd></div><div className={styles.cartTotal}><dt>{t('shopTotal')}</dt><dd>{formatEur(total)}</dd></div></dl></aside>
-    <div className={styles.actions}><div className={styles.mobileTotal}><span>{t('shopTotal')}</span><strong>{formatEur(total)}</strong></div>{step > 0 && <Button variant="secondary" disabled={busy} onClick={() => go(step - 1)}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 4 ? busy ? t('shopPaying') : t('shopPayStripe') : t('continue')}</Button></div>
+    <aside className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><dl aria-live="polite"><div><dt>{t('shopItemsTotal')} ({draft.items.length})</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{config.deliveryFee ? formatEur(config.deliveryFee, locale) : t('shopFree')}</dd></div><div className={styles.cartTotal}><dt>{t('shopTotal')}</dt><dd>{formatEur(total, locale)}</dd></div></dl></aside>
+    <div className={styles.actions}><div className={styles.mobileTotal}><span>{t('shopTotal')}</span><strong>{formatEur(total, locale)}</strong></div>{step > 0 && <Button variant="secondary" disabled={busy} onClick={() => go(step - 1)}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 4 ? busy ? t('shopPaying') : t('shopPayStripe') : t('continue')}</Button></div>
   </form>
 }

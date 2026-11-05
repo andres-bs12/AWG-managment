@@ -65,7 +65,7 @@ export function BuyContactStep({ t, draft, patch, err, described }: Pick<BuyStep
         aria-describedby={described('buy-line1')}
 
         onChange={(event) => patch({ line1: event.target.value })} /></Field>
-    <Field label={t('shopLine2')} htmlFor="buy-line2">
+    <Field label={t('shopLine2')} htmlFor="buy-line2" error={err('buy-line2')}>
       <input
 
         id="buy-line2"
@@ -101,7 +101,7 @@ export function BuyContactStep({ t, draft, patch, err, described }: Pick<BuyStep
         aria-describedby={described('buy-postal', true)}
 
         onChange={(event) => patch({ postalCode: event.target.value.replace(/\D/g, '') })} /></Field>
-    <Field label={t('shopCity')} htmlFor="buy-city">
+    <Field label={t('shopCity')} htmlFor="buy-city" error={err('buy-city')}>
       <input id="buy-city" value="Wien" readOnly /></Field>
   </>)
 }

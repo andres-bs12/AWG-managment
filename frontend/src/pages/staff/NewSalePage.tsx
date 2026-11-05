@@ -47,11 +47,11 @@ function clampPaintMinutes(value: number): number {
   return Math.min(MAX_PAINT_MINUTES, Math.max(MIN_PAINT_MINUTES, Math.round(value)))
 }
 
-function fillDayRefs(item: DraftItem, days: MarketDay[], markets: Market[]): DraftItem {
+function fillDayRefs(item: DraftItem, days: MarketDay[], markets: Market[], seasonEnd: string): DraftItem {
   if (item.delivery.mode === 'now') return item
   if (item.delivery.mode === 'vienna') {
     const date = item.delivery.pickupDate
-    const eligible = days.filter(d => (isViennaWeekday(d.date) || d.date.endsWith('-12-24')) && d.date <= '2026-12-24' && !days.some(other => other.date === d.date && markets.find(m => m.id === other.marketId)?.kind === 'market'))
+    const eligible = days.filter(d => (isViennaWeekday(d.date) || d.date === seasonEnd) && d.date <= seasonEnd && !days.some(other => other.date === d.date && markets.find(m => m.id === other.marketId)?.kind === 'market'))
     const md = eligible.find(d => d.id === item.delivery.marketDayId) ?? eligible.find(d => d.date === date)
     if (!md) return item
     return {
@@ -99,6 +99,7 @@ export function NewSalePage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [draft, setDraft] = useState<SaleDraft>(() => buildDraftFromParams(params))
+  const [seasonEnd, setSeasonEnd] = useState('2026-12-24')
   const [markets, setMarkets] = useState<Market[]>([])
   const [days, setDays] = useState<MarketDay[]>([])
   const [agendaDays, setAgendaDays] = useState<AgendaDay[]>([])
@@ -113,20 +114,23 @@ export function NewSalePage() {
   const [payState, setPayState] = useState<PaymentState>('paid')
   const [depositAmount, setDepositAmount] = useState('')
   const [paidNote, setPaidNote] = useState('')
-  const paramKey = `${params.get('date')}|${params.get('start')}|${params.get('end')}|${params.get('placeItem')}|${params.get('fresh')}`
 
+  // Rebuild the draft only when the sale-relevant query values change (not on every new params object).
+  const paramKey = `${params.get('date')}|${params.get('start')}|${params.get('end')}|${params.get('placeItem')}|${params.get('fresh')}`
   useEffect(() => {
     setDraft(buildDraftFromParams(params))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramKey])
 
   useEffect(() => {
-    void Promise.all([api.markets.listMarkets(), api.markets.listMarketDays(), api.agenda.listDays()]).then(([m, d, agenda]) => {
+    void Promise.all([api.markets.listMarkets(), api.markets.listMarketDays(), api.agenda.listDays(), api.shop.getConfig().then(c => c.seasonEnd).catch(() => '2026-12-24')]).then(([m, d, agenda, end]) => {
+      setSeasonEnd(end)
       setMarkets(m)
       setDays(d)
       setAgendaDays(agenda)
       if (d.length) setDraft((current) => ({
         ...current,
-        items: current.items.map((item) => fillDayRefs(item, d, m)),
+        items: current.items.map((item) => fillDayRefs(item, d, m, end)),
       }))
     })
   }, [])
@@ -150,6 +154,8 @@ export function NewSalePage() {
   const order = draft.order
   const formUrl = order ? `${window.location.origin}/form/${order.formToken}` : ''
 
+  const itemsRef = useRef(draft.items)
+  useEffect(() => { itemsRef.current = draft.items }, [draft.items])
   const suggestKey = draft.items
     .map((item) =>
       [
@@ -172,7 +178,7 @@ export function NewSalePage() {
     async function loadSuggestions() {
       const next: Record<string, CapacityResult> = {}
       const planned = new Map<string, { date: string; startHour: number; endHour: number }>()
-      for (const item of draft.items) {
+      for (const item of itemsRef.current) {
         if (item.kind === 'custom' && item.paintDate && item.paintStart != null && item.paintEnd != null) {
           planned.set(item.id, { date: item.paintDate, startHour: item.paintStart, endHour: item.paintEnd })
         }
@@ -182,8 +188,8 @@ export function NewSalePage() {
           .filter(([id, slot]) => id !== itemId && slot.date === date)
           .map(([, slot]) => ({ startHour: slot.startHour, endHour: slot.endHour }))
       const handoffKey = (item: DraftItem) => `${item.delivery.pickupDate ?? today?.date ?? ''}|${String(item.delivery.pickupHour ?? 99).padStart(5, '0')}`
-      const customCount = draft.items.filter((item) => item.kind === 'custom').length
-      const toPlan = draft.items
+      const customCount = itemsRef.current.filter((item) => item.kind === 'custom').length
+      const toPlan = itemsRef.current
         .filter((item) => item.kind === 'custom' && !item.slotLocked && item.paintStart == null)
         .sort((a, b) => handoffKey(a).localeCompare(handoffKey(b)))
       for (const item of toPlan) {
@@ -252,7 +258,7 @@ export function NewSalePage() {
 
   useEffect(() => {
     if (phase !== 'delivery' || !hasCustom) return
-    const locked = draft.items.filter(
+    const locked = itemsRef.current.filter(
       (item) =>
         item.kind === 'custom' &&
         item.slotLocked &&
@@ -320,7 +326,7 @@ export function NewSalePage() {
   function addItem(kind: 'custom' | 'finished') {
     setDraft((current) => {
       const next = kind === 'custom' ? makeCustom({ delivery: { mode: 'market', pickupDate: today?.date } }) : makeFinished()
-      const items = [...current.items.map((item) => item.plannedMove ? { ...item, plannedMove: undefined, slotLocked: false, paintDate: undefined, paintStart: undefined, paintEnd: undefined } : item), fillDayRefs(next, days, markets)]
+      const items = [...current.items.map((item) => item.plannedMove ? { ...item, plannedMove: undefined, slotLocked: false, paintDate: undefined, paintStart: undefined, paintEnd: undefined } : item), fillDayRefs(next, days, markets, seasonEnd)]
       const mixedNow = items.some((i) => i.kind === 'custom') && items.some((i) => i.kind === 'finished')
       return { ...current, items, differentPickups: current.differentPickups || mixedNow }
     })
@@ -595,6 +601,7 @@ export function NewSalePage() {
                     markets={markets}
                     marketDays={marketDays}
                     allDays={days}
+                    seasonEnd={seasonEnd}
                     agendaDays={agendaDays}
                     today={today}
                     suggestions={suggestions}
@@ -876,6 +883,7 @@ function DeliveryCard({
   markets,
   marketDays,
   allDays,
+  seasonEnd,
   agendaDays,
   today,
   suggestions,
@@ -893,6 +901,7 @@ function DeliveryCard({
   markets: Market[]
   marketDays: MarketDay[]
   allDays: MarketDay[]
+  seasonEnd: string
   agendaDays: AgendaDay[]
   today?: MarketDay
   suggestions: Record<string, CapacityResult>
@@ -933,7 +942,7 @@ function DeliveryCard({
     : today?.marketId
   const daysOfMarket = marketDays.filter((d) => !chosenMarketId || d.marketId === chosenMarketId)
   const futureDays = marketDays.filter((d) => (today ? d.date > today.date : !d.isToday))
-  const viennaDays = allDays.filter((d) => (isViennaWeekday(d.date) || d.date.endsWith('-12-24')) && d.date <= '2026-12-24' && (!today || d.date >= today.date) && !marketDays.some(m => m.date === d.date))
+  const viennaDays = allDays.filter((d) => (isViennaWeekday(d.date) || d.date === seasonEnd) && d.date <= seasonEnd && (!today || d.date >= today.date) && !marketDays.some(m => m.date === d.date))
   const viennaDay = viennaDays.find((d) => d.id === item.delivery.marketDayId) ??
     viennaDays.find((d) => d.date === item.delivery.pickupDate)
   const mixedMarkets = new Set(futureDays.map((d) => d.marketId)).size > 1

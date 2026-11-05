@@ -1,9 +1,11 @@
+import { useLocale } from '../../../i18n/LocaleContext'
 import styles from '../BuyPage.module.css'
 import type { BuyStepProps } from './shared'
 import { formatEur } from '../../../lib/money'
 import { colorKeys } from './shared'
 
 export function BuyReviewStep({ t, draft, itemPrice, formatDate, patch, err, described, serverError }: Pick<BuyStepProps, 't' | 'draft' | 'itemPrice' | 'formatDate' | 'patch' | 'err' | 'described' | 'serverError'>) {
+  const { locale } = useLocale()
   return (<>
     <div className={styles.review}>
       {draft.items.map((item, index) => <div className={styles.reviewItem} key={item.uid}>
@@ -11,7 +13,7 @@ export function BuyReviewStep({ t, draft, itemPrice, formatDate, patch, err, des
           <h3>
             {t('ornamentN', { n: index + 1 })}</h3>
           <strong>
-            {formatEur(itemPrice(item))}</strong></div>
+            {formatEur(itemPrice(item), locale)}</strong></div>
         <p>
           {t('shopColour')}: {item.color && t(colorKeys[item.color])}</p>
         <p>

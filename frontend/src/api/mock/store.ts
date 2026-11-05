@@ -1,6 +1,6 @@
 import { paymentSummary } from '../../lib/paymentSummary'
 import type {
-  InventoryItem, PaintingDay,
+  InventoryItem, PaintingDay, ShopCheckoutInput,
   Address,
   AgendaDay,
   AgendaDelivery,
@@ -271,6 +271,53 @@ export function cancelOrder(id: string) {
   state.items = state.items.filter((item) => item.orderId !== id)
   state.orders = state.orders.filter((entry) => entry.id !== id)
   emit()
+}
+
+export function createMockCheckout(input: ShopCheckoutInput) {
+  const inventory = listInventory()
+  const counts = new Map<string, number>()
+  for (const item of input.items) {
+    const id = `custom-${item.color ?? 'red'}`
+    counts.set(id, (counts.get(id) ?? 0) + 1)
+  }
+  for (const [id, count] of counts) {
+    if ((inventory.find(row => row.id === id)?.quantity ?? 0) < count) throw Object.assign(new Error('Out of stock.'), { code: 'OUT_OF_STOCK' })
+  }
+  const customer: Customer = { id: uid('cus'), name: input.customerName, email: input.email, phone: input.phone }
+  const orderId = uid('ord')
+  const code = makeOrderCode()
+  const token = uid('frm')
+  const items: OrderItem[] = input.items.map(item => ({
+    id: uid('orn'), orderId, kind: 'custom', petName: item.petName ?? '', withName: item.withName,
+    color: item.color ?? 'red', backName: item.backName ?? '', note: item.note ?? '',
+    cost: itemCost('custom', item.withName), productionStatus: 'not_started', photos: item.photos,
+    formComplete: true, delivery: { kind: 'vienna', address: input.address },
+  }))
+  const order: Order = { id: orderId, customerId: customer.id, code, trackToken: uid('trk'), formToken: token,
+    paymentState: 'unpaid', paymentMethod: null, amountPaid: 0, total: items.reduce((sum, item) => sum + item.cost, 0),
+    createdAt: new Date().toISOString(), itemIds: items.map(item => item.id), handedOver: false, paymentEntries: [] }
+  for (const [id, count] of counts) inventory.find(row => row.id === id)!.quantity -= count
+  state.customers.push(customer); state.orders.push(order); state.items.push(...items)
+  ;(state.pendingCheckouts ??= {})[code] = token
+  emit()
+  try { localStorage.setItem(`awg-form-token:${code}`, token) } catch { /* storage unavailable */ }
+  return { orderCode: code, formToken: token, checkoutUrl: `/buy/thanks?code=${code}` }
+}
+
+export function abandonMockCheckout(code: string) {
+  const token = state.pendingCheckouts?.[code]
+  let suppliedToken: string | null = null
+  try { suppliedToken = localStorage.getItem(`awg-form-token:${code.toUpperCase()}`) } catch { /* storage unavailable */ }
+  if (!token || suppliedToken !== token) return
+  const order = state.orders.find(row => row.code === code && row.formToken === token)
+  if (!token || !order || order.paymentState !== 'unpaid') return
+  for (const item of state.items.filter(row => row.orderId === order.id)) {
+    const stock = listInventory().find(row => row.kind === item.kind && row.color === item.color)
+    if (stock) stock.quantity++
+  }
+  delete state.pendingCheckouts![code]
+  state.customers = state.customers.filter(row => row.id !== order.customerId)
+  cancelOrder(order.id)
 }
 
 export function mockLogin(email: string, password: string): { token: string; user: StaffUser } {

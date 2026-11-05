@@ -186,7 +186,7 @@ function OrderDetail({ id }: { id: string }) {
           </dl>
         </details>
         {hasForm && !formWaiting ? <details className={styles.panel}><summary>Customer form <span className={styles.muted}>Completed</span></summary>{formContent}</details> : null}
-        <Button tone="staff" variant="secondary" disabled={busy} onClick={() => setCancelOpen(true)}>Cancel order</Button>
+        <Button tone="staff" variant="danger" disabled={busy} onClick={() => setCancelOpen(true)}>Cancel order</Button>
         <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
       </aside>
     </div>

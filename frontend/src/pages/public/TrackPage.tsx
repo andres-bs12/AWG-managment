@@ -1,3 +1,4 @@
+import { apiError } from '../../lib/apiError'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import { OrderReceipt } from '../../components/public/OrderReceipt'
 import { useEffect, useRef, useState } from 'react'
@@ -37,6 +38,7 @@ export function TrackPage() {
   const [saved, setSaved] = useState(false)
   const [savingAddress, setSavingAddress] = useState(false)
   const [addressError, setAddressError] = useState('')
+  const [addressField, setAddressField] = useState('')
 
   useEffect(() => {
     if (!codeParam) return
@@ -68,10 +70,10 @@ export function TrackPage() {
           }, MIN_WIPE_MS),
         )
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return
         setLoaded(null)
-        setError(t('trackNotFound'))
+        setError(apiError(err, locale, t('trackNotFound')).text)
         setPhase('done')
         setDialogOpen(true)
       })
@@ -81,7 +83,7 @@ export function TrackPage() {
       timers.current.forEach(window.clearTimeout)
       timers.current = []
     }
-  }, [codeParam, reloadKey, t])
+  }, [codeParam, reloadKey, t, locale])
 
   /** Without a code in the URL there is nothing to show, whatever a previous lookup left behind. */
   const phase: Phase = codeParam ? fetchPhase : 'idle'
@@ -92,13 +94,17 @@ export function TrackPage() {
     if (!view || savingAddress) return
     setSavingAddress(true)
     setAddressError('')
+    setAddressField('')
     try {
       const next = await api.tracking.updateViennaAddress(view.code, addr)
       setLoaded(next)
       setEditing(false)
       setSaved(true)
-    } catch {
-      setAddressError(t('addressSaveError'))
+    } catch (err) {
+      const problem = apiError(err, locale, t('addressSaveError'))
+      const field = problem.field?.replace(/^address\./, '') ?? ''
+      setAddressField(['line1', 'line2', 'postalCode', 'city'].includes(field) ? field : '')
+      setAddressError(problem.text)
     } finally {
       setSavingAddress(false)
     }
@@ -188,31 +194,31 @@ export function TrackPage() {
                   </>
                 ) : (
                   <div>
-                    <Field label={t('street')} htmlFor="line1">
+                    <Field label={t('street')} htmlFor="line1" error={addressField === 'line1' ? addressError : undefined}>
                       <input
                         id="line1"
                         value={addr.line1}
                         onChange={(e) => setAddr({ ...addr, line1: e.target.value })}
                       />
                     </Field>
-                    <Field label={t('extra')} htmlFor="line2">
+                    <Field label={t('extra')} htmlFor="line2" error={addressField === 'line2' ? addressError : undefined}>
                       <input
                         id="line2"
                         value={addr.line2 ?? ''}
                         onChange={(e) => setAddr({ ...addr, line2: e.target.value })}
                       />
                     </Field>
-                    <Field label={t('postal')} htmlFor="postal">
+                    <Field label={t('postal')} htmlFor="postal" error={addressField === 'postalCode' ? addressError : undefined}>
                       <input
                         id="postal"
                         value={addr.postalCode}
                         onChange={(e) => setAddr({ ...addr, postalCode: e.target.value })}
                       />
                     </Field>
-                    <Field label={t('city')} htmlFor="city">
+                    <Field label={t('city')} htmlFor="city" error={addressField === 'city' ? addressError : undefined}>
                       <input id="city" value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} />
                     </Field>
-                    {addressError ? <p role="alert" className={styles.addressError}>{addressError}</p> : null}
+                    {addressError && !addressField ? <p role="alert" className={styles.addressError}>{addressError}</p> : null}
                     <Button fullWidth disabled={savingAddress} onClick={() => void saveAddress()}>
                       {savingAddress ? t('saving') : t('saveAddress')}
                     </Button>

@@ -1,3 +1,4 @@
+import { apiError } from '../../lib/apiError'
 import type { Api } from '../contracts'
 import type {
   AgendaDay,
@@ -24,7 +25,7 @@ export class HttpError extends Error {
   code?: string
   field?: string
   constructor(message: string, status: number, code?: string, field?: string) {
-    super(message)
+    super(apiError({ code, message }, 'en', message).text)
     this.status = status
     this.code = code
     this.field = field

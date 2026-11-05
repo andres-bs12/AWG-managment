@@ -1,3 +1,4 @@
+import { apiError } from '../../lib/apiError'
 import { formatDateLabel, formatHour } from '../../lib/time'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react'
@@ -143,8 +144,8 @@ export function FormPage() {
         const restored = saved ? parseDraft(saved, itemIds) : null
         setDraft(restored ?? draftFromView(data))
       })
-      .catch(() => {
-        if (!cancelled) setError(locale === 'de' ? 'Das Formular konnte nicht geladen werden. Bitte versuche es erneut.' : 'Could not load the form. Please try again.')
+      .catch((err) => {
+        if (!cancelled) setError(apiError(err, locale, locale === 'de' ? 'Das Formular konnte nicht geladen werden. Bitte versuche es erneut.' : 'Could not load the form. Please try again.').text)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -296,10 +297,15 @@ export function FormPage() {
       setOrderCode(result.orderCode)
       setStep('done')
     } catch (err) {
-      const { code, field } = err as { code?: string; field?: string }
-      const addressFields: Record<string, string> = { 'address.line1': 'line1', 'address.postalCode': 'postalCode', 'address.city': 'city', address: 'line1' }
-      if (field && addressFields[field]) { setStep('contact'); setFieldError({ [addressFields[field]]: code === 'POSTAL_OUTSIDE_VIENNA' ? t('shopPostalInvalid') : t('required') }); return }
-      setError(code === 'FORM_LOCKED' ? (locale === 'de' ? 'Die Bemalung hat begonnen. Änderungen sind nicht mehr möglich.' : 'Painting has started. Changes are no longer possible.') : (locale === 'de' ? 'Das Formular konnte nicht gespeichert werden. Bitte prüfe deine Angaben und versuche es erneut.' : 'Could not save the form. Please check your details and try again.'))
+      const problem = apiError(err, locale, locale === 'de' ? 'Das Formular konnte nicht gespeichert werden.' : 'Could not save the form.')
+      const field = problem.field ?? ''
+      const match = field.match(/^items\[(\d+)\]\.(\w+)/)
+      const item = match ? draft.items[Number(match[1])] : undefined
+      const itemFields: Record<string, Step> = { petName: 'names', backName: 'extras', note: 'extras', photos: 'photos' }
+      const contactFields: Record<string, string> = { customerName: 'customerName', email: 'email', phone: 'phone', 'address.line1': 'line1', 'address.line2': 'line2', 'address.postalCode': 'postalCode', 'address.city': 'city', address: 'line1' }
+      if (match && item && itemFields[match[2]]) { setStep(itemFields[match[2]]); setFieldError({ [`${match[2]}:${item.orderItemId}`]: problem.text }) }
+      else if (contactFields[field]) { setStep('contact'); setFieldError({ [contactFields[field]]: problem.text }) }
+      else setError(problem.text)
     } finally {
       sendLock.current = false
       setSending(false)
@@ -440,7 +446,7 @@ export function FormPage() {
           <h1>{t('formContact')}</h1>
           {view?.needsAddress ? <>
             <Field label={t('shopStreet')} htmlFor="form-line1" error={fieldError.line1}><input id="form-line1" maxLength={200} value={draft.address.line1} onChange={e => { setDraft(d => ({ ...d, address: { ...d.address, line1: e.target.value } })); setFieldError(x => ({ ...x, line1: '' })) }} /></Field>
-            <Field label={t('shopLine2')} htmlFor="form-line2"><input id="form-line2" maxLength={200} value={draft.address.line2 ?? ''} onChange={e => setDraft(d => ({ ...d, address: { ...d.address, line2: e.target.value } }))} /></Field>
+            <Field label={t('shopLine2')} htmlFor="form-line2" error={fieldError.line2}><input id="form-line2" maxLength={200} value={draft.address.line2 ?? ''} onChange={e => setDraft(d => ({ ...d, address: { ...d.address, line2: e.target.value } }))} /></Field>
             <Field label={t('shopPostal')} htmlFor="form-postal" error={fieldError.postalCode}><input id="form-postal" maxLength={4} inputMode="numeric" value={draft.address.postalCode} onChange={e => { setDraft(d => ({ ...d, address: { ...d.address, postalCode: e.target.value } })); setFieldError(x => ({ ...x, postalCode: '' })) }} /></Field>
             <Field label={t('shopCity')} htmlFor="form-city" error={fieldError.city}><input id="form-city" maxLength={120} value={draft.address.city} onChange={e => { setDraft(d => ({ ...d, address: { ...d.address, city: e.target.value } })); setFieldError(x => ({ ...x, city: '' })) }} /></Field>
           </> : null}
@@ -484,7 +490,7 @@ export function FormPage() {
                         />
                       </Field>
                     ) : null}
-                    <Field label={t('note')} htmlFor={`note-${item.orderItemId}`}>
+                    <Field label={t('note')} htmlFor={`note-${item.orderItemId}`} error={fieldError[`note:${item.orderItemId}`]}>
                       <textarea id={`note-${item.orderItemId}`} maxLength={1000} value={item.note} onChange={(e) => patchItem(item.orderItemId, { note: e.target.value })} />
                     </Field>
                   </section>
@@ -502,7 +508,7 @@ export function FormPage() {
                       />
                     </Field>
                   ) : null}
-                  <Field label={t('note')} htmlFor="note">
+                  <Field label={t('note')} htmlFor="note" error={fieldError[`note:${single.orderItemId}`]}>
                     <textarea id="note" maxLength={1000} value={single.note} onChange={(e) => patchItem(single.orderItemId, { note: e.target.value })} />
                   </Field>
                 </>

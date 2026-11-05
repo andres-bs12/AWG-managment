@@ -1,3 +1,4 @@
+import { apiError } from '../../lib/apiError'
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/client'
@@ -18,7 +19,7 @@ const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabi
 
 /** Mount only while the pop-up should be visible — mounting is what resets and focuses it. */
 export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Props) {
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
   const titleId = useId()
   const hintId = useId()
   const cardRef = useRef<HTMLDivElement>(null)
@@ -74,8 +75,8 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
     try {
       await api.tracking.getByCode(next)
       onSubmit(next)
-    } catch {
-      setLocalError(t('trackNotFound'))
+    } catch (err) {
+      setLocalError(apiError(err, locale, t('trackNotFound')).text)
       inputRef.current?.focus()
     } finally {
       setBusy(false)

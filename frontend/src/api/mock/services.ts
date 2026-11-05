@@ -1,7 +1,8 @@
 import type { Api } from '../contracts'
 import type { Photo } from '../../domain/types'
 import {
-  listInventory, updateInventory, paintingDay, updatePaintingDay, joinWaitlist, makeOrderCode,
+  createMockCheckout, abandonMockCheckout,
+  listInventory, updateInventory, paintingDay, updatePaintingDay, joinWaitlist,
   checkCapacity,
   cancelOrder,
   mockChangePassword,
@@ -141,7 +142,7 @@ export const mockApi: Api = {
     toPhoto: (file) => fileToPhoto(file),
   },
   shop: {
-    abandonCheckout: () => later(() => undefined),
+    abandonCheckout: (code) => later(() => abandonMockCheckout(code)),
     joinWaitlist: (email) => later(() => joinWaitlist(email)),
     getConfig: () =>
       later(() => ({
@@ -163,8 +164,7 @@ export const mockApi: Api = {
         if (input.items.some((item) => item.kind !== 'custom')) throw new Error('Only custom ornaments can be ordered online.')
         if (!input.acceptTerms) throw new Error('Please accept the terms.')
         if (!input.deliveryDate) throw new Error('Choose a delivery day.')
-        const code = makeOrderCode()
-        return { orderCode: code, formToken: `mock-${code}`, checkoutUrl: `/buy/thanks?code=${code}` }
+        return createMockCheckout(input)
       }, 500),
   },
 }

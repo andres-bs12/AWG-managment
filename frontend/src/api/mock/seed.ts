@@ -31,6 +31,7 @@ export const STAFF_ACCOUNTS: Array<StaffUser & { password: string }> = [
 ]
 
 export type MockState = {
+  pendingCheckouts?: Record<string, string>
   inventory?: import('../../domain/types').InventoryItem[]
   paintingDays?: Record<string, { open: boolean; maxPaintings: number }>
   waitlist?: string[]

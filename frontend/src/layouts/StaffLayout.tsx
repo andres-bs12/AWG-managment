@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { Button } from '../components/ui/Button'
 import { ButtonLink } from '../components/ui/ButtonLink'
@@ -22,6 +22,7 @@ export function StaffGuard() {
 
 export function StaffLayout() {
   const { user, logout } = useAuth()
+  const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
   const onAgenda = location.pathname.startsWith('/staff/agenda')
   const onDeliveries = location.pathname.startsWith('/staff/deliveries')
@@ -38,6 +39,8 @@ export function StaffLayout() {
       {onPaint ? null : (
         <header className={styles.bar}>
           <p className={styles.brand}>AWG</p>
+          <button className={styles.menuToggle} type="button" aria-expanded={menuOpen} aria-controls="staff-menu" onClick={() => setMenuOpen(open => !open)}>Menu</button>
+          <div id="staff-menu" className={`${styles.menu} ${menuOpen ? styles.menuOpen : ''}`} onClick={(event) => { if ((event.target as HTMLElement).closest('a')) setMenuOpen(false) }}>
           <nav className={styles.nav} aria-label="Staff">
             <ButtonLink to="/staff/agenda" tone="staff" variant="ghost" selected={onAgenda}>
               Agenda
@@ -59,6 +62,7 @@ export function StaffLayout() {
             <Button tone="staff" variant="ghost" className={styles.logout} onClick={() => void logout()}>
               Log out
             </Button>
+          </div>
           </div>
         </header>
       )}

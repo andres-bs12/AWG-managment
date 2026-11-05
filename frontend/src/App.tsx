@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { OrnamentLoader } from './components/public/OrnamentLoader'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { LocaleProvider } from './i18n/LocaleContext'
 import { PublicLayout } from './layouts/PublicLayout'
@@ -24,12 +24,17 @@ const PaintPage = lazy(() => import('./pages/staff/PaintPage').then(module => ({
 const ChangePasswordPage = lazy(() => import('./pages/staff/ChangePasswordPage').then(module => ({ default: module.ChangePasswordPage })))
 const LegalPage = lazy(() => import('./pages/public/LegalPage').then(module => ({ default: module.LegalPage })))
 
+function RouteFallback() {
+  const { pathname } = useLocation()
+  return pathname.startsWith('/staff') ? <p role="status" style={{ minHeight: '100vh', margin: 0, padding: 24, background: 'var(--staff-bg)', color: 'var(--staff-ink)' }}>Loading…</p> : <OrnamentLoader />
+}
+
 export default function App() {
   return (
     <LocaleProvider>
       <AuthProvider>
         <BrowserRouter>
-          <Suspense fallback={<OrnamentLoader />}>
+          <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route element={<PublicLayout />}>
               <Route path="/" element={<HomePage />} />
