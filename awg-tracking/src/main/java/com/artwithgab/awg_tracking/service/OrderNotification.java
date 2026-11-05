@@ -8,7 +8,7 @@ import java.util.stream.Stream;
 /** A complete snapshot taken while the order is still attached to its transaction. */
 public record OrderNotification(Kind kind, String code, String customerName, String customerEmail,
                                 BigDecimal total, BigDecimal amountPaid, String paymentState,
-                                String address, String items) {
+                                String address, String items, String orderId) {
     public enum Kind {
         WEB_PAID("Web order paid", "Deine Online-Bestellung wurde bezahlt", "Your online order has been paid"),
         SALE_CREATED("Stall sale created", "Deine Bestellung wurde aufgenommen", "Your order has been placed"),
@@ -32,6 +32,7 @@ public record OrderNotification(Kind kind, String code, String customerName, Str
                 i.getNote(), i.getDeliveryKind(), i.getHandoffDate(), i.getPickUpTime(), i.getPaintStart(), i.getCost()))
                 .collect(Collectors.joining("\n"));
         return new OrderNotification(kind, order.getCode(), order.getCustomer().getName(), order.getCustomer().getEmail(),
-                order.getTotal(), order.getAmountPaid(), String.valueOf(order.getPaymentState()), address, items);
+                order.getTotal(), order.getAmountPaid(), String.valueOf(order.getPaymentState()), address, items,
+                order.getId() == null ? null : order.getId().toString());
     }
 }

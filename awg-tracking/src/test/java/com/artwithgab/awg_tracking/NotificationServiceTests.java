@@ -74,7 +74,7 @@ class NotificationServiceTests {
         NotificationService service = new NotificationService(provider, properties);
         ReflectionTestUtils.setField(service, "host", "");
         service.onOrderNotification(new OrderNotification(OrderNotification.Kind.CANCELLED, "AWG1234", "Customer", "customer@example.com",
-                BigDecimal.TEN, BigDecimal.ZERO, "UNPAID", "", ""));
+                BigDecimal.TEN, BigDecimal.ZERO, "UNPAID", "", "", null));
         verifyNoInteractions(mail);
     }
 }

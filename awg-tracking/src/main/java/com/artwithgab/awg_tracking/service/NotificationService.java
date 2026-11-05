@@ -29,7 +29,10 @@ public class NotificationService {
         String subject = "ArtWithGab: " + event.kind().owner + " - " + event.code();
         String ownerBody = "Order: " + event.code() + "\nCustomer: " + event.customerName() + "\nEmail: " + event.customerEmail()
                 + "\nTotal: " + event.total() + " EUR\nAmount paid: " + event.amountPaid() + " EUR\nPayment: " + event.paymentState()
-                + "\nAddress: " + event.address() + "\nItems:\n" + event.items() + "\nTrack: " + link;
+                + "\nAddress: " + event.address() + "\nItems:\n" + event.items() + "\nTrack: " + link
+                // Staff detail page (the only way to open an order kept off the agenda, e.g. a payment review).
+                + (event.orderId() == null || event.kind() == OrderNotification.Kind.CANCELLED ? ""
+                        : "\nStaff: " + properties.shop().publicBaseUrl().replaceAll("/+$", "") + "/staff/orders/" + event.orderId());
         send(properties.mail().ownerEmail(), subject, ownerBody);
         boolean ownerOnly = event.kind() == OrderNotification.Kind.FORM_SUBMITTED || event.kind() == OrderNotification.Kind.PAYMENT_REVIEW;
         if (!ownerOnly) {
