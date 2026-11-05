@@ -58,6 +58,8 @@ Tipos UI de referencia: `frontend/src/domain/types.ts` (la UI mock aún guarda a
 
 ## Tienda web
 
+Días de entrega: miércoles o viernes que no sean día de puesto (en viernes de mercado manda el puesto). La pintura se busca en la semana previa, empezando por el día más cercano a la entrega. Stripe solo acepta tarjeta, así que una sesión completada siempre está pagada; `async_payment_failed` y `expired` liberan el pedido. Mientras el pago web está pendiente, el staff no puede cambiar su estado de pago.
+
 Online **solo se venden adornos personalizados** (decisión del dueño, 2026-11-04); el servidor rechaza `finished`. `GET /api/shop/config` devuelve precios y `colors` (`{color, inStock}` según el inventario).
 
 1. `/buy` es una tienda por pasos: 1 adorno(s) (color disponible + nombre opcional detrás) → 2 tu mascota (nombre y fotos) → 3 día de entrega (`POST /api/shop/delivery-dates`) → 4 dirección y contacto → 5 resumen y pago.

@@ -54,6 +54,11 @@ public class PhotoStorageService {
         } catch (IOException e) {
             throw new IllegalStateException("Could not store photo", e);
         }
+        // Files are not transactional: drop the new file if the surrounding transaction rolls back.
+        Path written = root().resolve(key);
+        afterCompletion(committed -> {
+            if (!committed) deleteQuietly(written);
+        });
         StoredPhoto photo = new StoredPhoto();
         photo.setOriginalName(sanitizeName(displayName != null ? displayName : file.getOriginalFilename()));
         photo.setContentType(type[0]);
@@ -71,13 +76,36 @@ public class PhotoStorageService {
         return new PhotoFile(path, photo.getContentType());
     }
 
+    /** Removes the row now and the file only once the transaction commits (a rollback keeps both). */
     public void delete(StoredPhoto photo) {
-        try {
-            Files.deleteIfExists(root().resolve(photo.getStorageKey()).normalize());
-        } catch (IOException ignored) {
-            // Orphan file on disk is harmless; the row is removed anyway.
-        }
         photoRepository.delete(photo);
+        Path path = root().resolve(photo.getStorageKey()).normalize();
+        afterCompletion(committed -> {
+            if (committed) deleteQuietly(path);
+        });
+    }
+
+    /** Runs the action after the current transaction finishes, or right away (as committed) without one. */
+    private static void afterCompletion(java.util.function.Consumer<Boolean> action) {
+        if (!org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.accept(true);
+            return;
+        }
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        action.accept(status == STATUS_COMMITTED);
+                    }
+                });
+    }
+
+    private static void deleteQuietly(Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException ignored) {
+            // An orphan file on disk is harmless.
+        }
     }
 
     /** Removes only the file on disk (used when the surrounding transaction rolls back). */

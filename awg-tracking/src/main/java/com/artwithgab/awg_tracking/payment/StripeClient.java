@@ -65,6 +65,8 @@ public class StripeClient {
         var shop = props.shop();
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("mode", "payment");
+        // Cards only: payment is known at once, so a completed session is always a paid one.
+        form.add("payment_method_types[]", "card");
         form.add("client_reference_id", orderId);
         form.add("metadata[orderId]", orderId);
         form.add("metadata[orderCode]", orderCode);

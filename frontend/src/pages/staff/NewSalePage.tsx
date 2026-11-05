@@ -47,7 +47,7 @@ function clampPaintMinutes(value: number): number {
   return Math.min(MAX_PAINT_MINUTES, Math.max(MIN_PAINT_MINUTES, Math.round(value)))
 }
 
-function fillDayRefs(item: DraftItem, days: MarketDay[]): DraftItem {
+function fillDayRefs(item: DraftItem, days: MarketDay[], markets: Market[]): DraftItem {
   if (item.delivery.mode === 'vienna') {
     const date = item.delivery.pickupDate
     const md =
@@ -67,7 +67,10 @@ function fillDayRefs(item: DraftItem, days: MarketDay[]): DraftItem {
     }
   }
   const date = item.delivery.pickupDate || item.paintDate
-  const pickupDays = days.filter((d) => isMarketPickupWeekday(d.date))
+  // Pickups happen at a stall: never on a home (painting) day.
+  const pickupDays = days.filter(
+    (d) => isMarketPickupWeekday(d.date) && markets.find((m) => m.id === d.marketId)?.kind === 'market',
+  )
   const md =
     pickupDays.find((d) => d.id === item.delivery.marketDayId) ??
     pickupDays.find((d) => d.date === date) ??
@@ -127,9 +130,9 @@ export function NewSalePage() {
     if (!days.length) return
     setDraft((current) => ({
       ...current,
-      items: current.items.map((item) => fillDayRefs(item, days)),
+      items: current.items.map((item) => fillDayRefs(item, days, markets)),
     }))
-  }, [days])
+  }, [days, markets])
 
   useEffect(() => {
     if (draft.phase === 'done' || (!draft.items.length && !draft.placingItemId)) {
@@ -320,7 +323,7 @@ export function NewSalePage() {
   function addItem(kind: 'custom' | 'finished') {
     setDraft((current) => {
       const next = kind === 'custom' ? makeCustom({ delivery: { mode: 'market', pickupDate: today?.date } }) : makeFinished()
-      const items = [...current.items.map((item) => item.plannedMove ? { ...item, plannedMove: undefined, slotLocked: false, paintDate: undefined, paintStart: undefined, paintEnd: undefined } : item), fillDayRefs(next, days)]
+      const items = [...current.items.map((item) => item.plannedMove ? { ...item, plannedMove: undefined, slotLocked: false, paintDate: undefined, paintStart: undefined, paintEnd: undefined } : item), fillDayRefs(next, days, markets)]
       const mixedNow = items.some((i) => i.kind === 'custom') && items.some((i) => i.kind === 'finished')
       return { ...current, items, differentPickups: current.differentPickups || mixedNow }
     })

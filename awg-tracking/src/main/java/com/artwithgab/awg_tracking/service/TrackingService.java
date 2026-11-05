@@ -52,6 +52,9 @@ public class TrackingService {
             throw new BadRequestException("This order is not delivered in Vienna");
         }
         if (order.isHandedOver()) throw new ConflictException("This order was already delivered");
+        if (!com.artwithgab.awg_tracking.support.ViennaAddress.isViennaPostal(address.postalCode())) {
+            throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).");
+        }
         order.setDeliveryAddress(OrderService.toAddress(address));
         return view(order, true);
     }

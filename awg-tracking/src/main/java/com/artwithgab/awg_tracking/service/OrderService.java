@@ -137,6 +137,9 @@ public class OrderService {
             MarketDay handoffDay = index.byId(row.marketDayId()).orElse(null);
             LocalDate handoff;
             if (handoffDay != null) {
+                if (row.deliveryKind() == DeliveryKind.MARKET && handoffDay.getMarket().getKind() != MarketKind.MARKET) {
+                    throw new BadRequestException("Choose a market day for the pickup");
+                }
                 handoff = handoffDay.getDate();
             } else if (!custom && row.deliveryKind() == DeliveryKind.MARKET) {
                 handoff = index.today(); // finished ornament handed over on the spot
@@ -213,6 +216,7 @@ public class OrderService {
     @Transactional
     public OrderDto updatePaymentState(UUID orderId, PaymentState state, PaymentMethod method) {
         Order order = findOrderOrThrow(orderId);
+        if (order.isAwaitingPayment()) throw new ConflictException("This web order is waiting for its online payment.");
         order.setPaymentState(state);
         if (state == PaymentState.UNPAID) order.setPaymentMethod(null);
         else if (method != null) order.setPaymentMethod(method);

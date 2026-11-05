@@ -36,6 +36,7 @@ public class HomeDayService {
     private final OrderItemRepository orderItemRepository;
     private final AwgProperties props;
     private final Clock clock;
+    private final com.artwithgab.awg_tracking.repository.ScheduleLockRepository scheduleLockRepository;
 
     @Transactional
     public Market ensureHomeMarket() {
@@ -48,8 +49,20 @@ public class HomeDayService {
         });
     }
 
+    /** Keeps the home-day horizon moving forward while the server runs for weeks. */
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 15 3 * * *", zone = "Europe/Vienna")
+    @Transactional
+    public void syncDaily() {
+        if (scheduleLockRepository.lockById(com.artwithgab.awg_tracking.model.ScheduleLock.ID).isEmpty()) return;
+        doSync();
+    }
+
     @Transactional
     public void sync() {
+        doSync();
+    }
+
+    private void doSync() {
         Market home = ensureHomeMarket();
         LocalDate today = LocalDate.now(clock);
         List<MarketDay> all = marketDayRepository.findAllWithMarket();

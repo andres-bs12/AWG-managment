@@ -14,6 +14,7 @@ import com.artwithgab.awg_tracking.repository.OrderRepository;
 import com.artwithgab.awg_tracking.repository.StoredPhotoRepository;
 import com.artwithgab.awg_tracking.support.CalendarRules;
 import com.artwithgab.awg_tracking.support.Hours;
+import com.artwithgab.awg_tracking.support.ViennaAddress;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -42,8 +43,6 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class ShopService {
-    /** Vienna postal codes: 1010–1230 (districts 1–23). */
-    private static final String VIENNA_POSTAL = "^1(0[1-9]|1[0-9]|2[0-3])0$";
     private static final double CUSTOM_HOURS = 1.0;
     private static final double CUSTOM_WITH_NAME_HOURS = 1.25;
     public static final int MAX_ITEMS = 10;
@@ -96,12 +95,17 @@ public class ShopService {
         LocalDate first = s.index().today().plusDays(Math.max(1, props.shop().leadDays()));
         LocalDate last = s.index().today().plusDays(props.shop().maxDaysAhead());
         for (LocalDate d = first; !d.isAfter(last); d = d.plusDays(1)) {
-            if (!CalendarRules.isViennaDay(d) || s.index().dayByDate(d).isEmpty()) continue;
+            if (!isDeliveryDay(s, d)) continue;
             if (plan(s, d, durations) != null) {
                 out.add(new DeliveryDateDto(d.toString(), d.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH).toLowerCase(Locale.ROOT)));
             }
         }
         return out;
+    }
+
+    /** Wed/Fri with a calendar day, and not a stall day: on market Fridays the stall has priority. */
+    private static boolean isDeliveryDay(AgendaService.Snapshot s, LocalDate d) {
+        return CalendarRules.isViennaDay(d) && s.index().dayByDate(d).isPresent() && s.index().marketDayOn(d).isEmpty();
     }
 
     /**
@@ -114,8 +118,9 @@ public class ShopService {
         List<HourSpanDto> slots = new ArrayList<>();
         for (double duration : durations) {
             HourSpanDto found = null;
-            for (LocalDate date : CalendarRules.paintDatesToTry(delivery, notBefore)) {
-                if (!date.isBefore(delivery)) continue;
+            // Any painting day in the week before delivery, closest to the delivery first, so early
+            // slots stay free for stall customers.
+            for (LocalDate date = delivery.minusDays(1); !date.isBefore(notBefore) && date.isAfter(delivery.minusDays(8)); date = date.minusDays(1)) {
                 var result = agendaService.findFreeSlot(s, date, duration, null, null,
                         taken.getOrDefault(date, List.of()), null, null);
                 if (result.ok() && result.slot() != null) {
@@ -148,8 +153,7 @@ public class ShopService {
     @Transactional
     public CheckoutResponse checkout(CheckoutRequest req, Map<String, MultipartFile> files) {
         if (!isOpen()) throw new StripeClient.ShopUnavailableException();
-        String postal = req.address().postalCode().trim();
-        if (!postal.matches(VIENNA_POSTAL)) throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).");
+        if (!ViennaAddress.isViennaPostal(req.address().postalCode())) throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).");
         if (!CalendarRules.isViennaDay(req.deliveryDate())) throw new BadRequestException("Deliveries are on Wednesday or Friday.");
 
         calendarService.lockSchedule();
@@ -157,7 +161,7 @@ public class ShopService {
         LocalDate today = s.index().today();
         if (req.deliveryDate().isBefore(today.plusDays(Math.max(1, props.shop().leadDays())))
                 || req.deliveryDate().isAfter(today.plusDays(props.shop().maxDaysAhead()))
-                || s.index().dayByDate(req.deliveryDate()).isEmpty()) {
+                || !isDeliveryDay(s, req.deliveryDate())) {
             throw new BadRequestException("Choose one of the offered delivery days.");
         }
 
@@ -194,7 +198,9 @@ public class ShopService {
         order.setCreatedAt(now);
         order.setSource(OrderSource.WEB);
         order.setCheckoutStatus(CheckoutStatus.PENDING);
-        order.setCheckoutExpiresAt(now.plusSeconds(60L * Math.max(30, props.shop().checkoutMinutes())));
+        // Stripe needs expires_at >= 30 min after the session is created; the buffer covers photo
+        // writes and the API call that happen after this timestamp.
+        order.setCheckoutExpiresAt(now.plusSeconds(60L * Math.max(30, props.shop().checkoutMinutes()) + 120));
         order.setPaymentState(PaymentState.UNPAID);
         order.setFormSubmitted(true);
         order.setDeliveryAddress(OrderService.toAddress(req.address()));
@@ -299,7 +305,7 @@ public class ShopService {
             case "checkout.session.completed", "checkout.session.async_payment_succeeded" -> {
                 if (order.getCheckoutStatus() == CheckoutStatus.PENDING) confirmIfPaid(order, session);
             }
-            case "checkout.session.expired" -> {
+            case "checkout.session.expired", "checkout.session.async_payment_failed" -> {
                 if (order.getCheckoutStatus() == CheckoutStatus.PENDING) release(order);
             }
             default -> {

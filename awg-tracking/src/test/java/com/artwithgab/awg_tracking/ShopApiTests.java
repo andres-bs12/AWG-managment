@@ -85,25 +85,25 @@ class ShopApiTests extends ApiTestSupport {
 
     @Test
     void deliveryDaysAreWedOrFriWithPaintingTimeBefore() throws Exception {
-        // Today is Tue 24: Wed 25 has no painting day before it (from tomorrow), Fri 27 does.
+        // Today is Tue 24: Wed 25 has no painting day before it (from tomorrow); Fri 27 is a stall day.
         List<String> d = dates(List.of(Map.of("kind", "custom", "withName", true)));
         assertThat(d).isNotEmpty().doesNotContain("2026-11-25");
-        assertThat(d.getFirst()).isEqualTo("2026-11-27");
+        assertThat(d.getFirst()).isEqualTo("2026-12-02");
         assertThat(d).allSatisfy(x -> assertThat(java.time.LocalDate.parse(x).getDayOfWeek())
                 .isIn(java.time.DayOfWeek.WEDNESDAY, java.time.DayOfWeek.FRIDAY));
     }
 
     @Test
-    void fullWeekPushesTheFirstDayLater() throws Exception {
-        // Wed 25 (2 h) + Thu 26 (3 h) = 5 hours before Fri 27; six ornaments do not fit.
-        List<Map<String, Object>> six = new ArrayList<>();
-        for (int i = 0; i < 6; i++) six.add(Map.of("kind", "custom", "withName", false));
-        assertThat(dates(six)).doesNotContain("2026-11-27");
+    void marketFridaysAreNotOfferedAndCannotBeBooked() throws Exception {
+        // Rathausplatz runs Fri-Sun from 27 Nov to 21 Dec: the stall has priority on those Fridays.
+        assertThat(dates(List.of(Map.of("kind", "custom", "withName", false))))
+                .doesNotContain("2026-11-27", "2026-12-04", "2026-12-11", "2026-12-18");
+        assertThat(checkout("1070", "2026-11-27", 1).getResponse().getStatus()).isEqualTo(400);
     }
 
     @Test
     void outsideViennaIsRejected() throws Exception {
-        MvcResult res = checkout("4020", "2026-11-27", 1);
+        MvcResult res = checkout("4020", "2026-12-02", 1);
         assertThat(res.getResponse().getStatus()).isEqualTo(400);
         assertThat(res.getResponse().getContentAsString()).contains("only deliver inside Vienna");
     }
@@ -111,7 +111,7 @@ class ShopApiTests extends ApiTestSupport {
     @Test
     void paidCheckoutAppearsInAgendaAndDeliveries() throws Exception {
         int stockBefore = inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.GREY).orElseThrow().getQuantity();
-        MvcResult res = checkout("1070", "2026-11-27", 2);
+        MvcResult res = checkout("1070", "2026-12-02", 2);
         assertThat(res.getResponse().getStatus()).isEqualTo(200);
         String code = read(res, "$.orderCode");
         assertThat((String) read(res, "$.checkoutUrl")).startsWith("https://checkout.stripe.test/");
@@ -119,7 +119,7 @@ class ShopApiTests extends ApiTestSupport {
         assertThat(order.isAwaitingPayment()).isTrue();
         assertThat(order.getOrderItems()).allSatisfy(i -> {
             assertThat(i.getPaintStart()).isNotNull();
-            assertThat(i.getPaintEnd().toLocalDate()).isBefore(java.time.LocalDate.of(2026, 11, 27));
+            assertThat(i.getPaintEnd().toLocalDate()).isBefore(java.time.LocalDate.of(2026, 12, 2));
             assertThat(i.getPhotos()).hasSize(1);
         });
         assertThat(inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.GREY).orElseThrow().getQuantity())
@@ -127,7 +127,7 @@ class ShopApiTests extends ApiTestSupport {
 
         String token = login();
         // Pending: hidden from the delivery list.
-        mvc.perform(get("/api/agenda/days/2026-11-27").header("Authorization", bearer(token)))
+        mvc.perform(get("/api/agenda/days/2026-12-02").header("Authorization", bearer(token)))
                 .andExpect(jsonPath("$.deliveries[?(@.orderCode=='" + code + "')]").isEmpty());
 
         long cents = order.getTotal().movePointRight(2).longValueExact();
@@ -136,13 +136,13 @@ class ShopApiTests extends ApiTestSupport {
         assertThat(paid.isAwaitingPayment()).isFalse();
         assertThat(paid.getPaymentState().name()).isEqualTo("PAID");
 
-        mvc.perform(get("/api/agenda/days/2026-11-27").header("Authorization", bearer(token)))
+        mvc.perform(get("/api/agenda/days/2026-12-02").header("Authorization", bearer(token)))
                 .andExpect(jsonPath("$.deliveries[?(@.orderCode=='" + code + "')].methodLabel").value(org.hamcrest.Matchers.hasItem("Vienna · Wed/Fri")));
     }
 
     @Test
     void wrongAmountDoesNotConfirm() throws Exception {
-        String code = read(checkout("1070", "2026-11-27", 1), "$.orderCode");
+        String code = read(checkout("1070", "2026-12-02", 1), "$.orderCode");
         webhook("checkout.session.completed", "paid", 1);
         assertThat(orderRepository.findByCodeIgnoreCase(code).orElseThrow().isAwaitingPayment()).isTrue();
     }
@@ -150,7 +150,7 @@ class ShopApiTests extends ApiTestSupport {
     @Test
     void expiredCheckoutReleasesSlotsAndStock() throws Exception {
         int stockBefore = inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.GREY).orElseThrow().getQuantity();
-        String code = read(checkout("1070", "2026-11-27", 1), "$.orderCode");
+        String code = read(checkout("1070", "2026-12-02", 1), "$.orderCode");
         webhook("checkout.session.expired", "unpaid", 0);
         assertThat(orderRepository.findByCodeIgnoreCase(code)).isEmpty();
         assertThat(inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, CustomColor.GREY).orElseThrow().getQuantity())
@@ -180,7 +180,7 @@ class ShopApiTests extends ApiTestSupport {
 
     @Test
     void cleanupConfirmsAPaidSessionWhoseWebhookIsLate() throws Exception {
-        String code = read(checkout("1070", "2026-11-27", 1), "$.orderCode");
+        String code = read(checkout("1070", "2026-12-02", 1), "$.orderCode");
         var order = orderRepository.findByCodeIgnoreCase(code).orElseThrow();
         order.setCheckoutExpiresAt(java.time.Instant.parse("2026-01-01T00:00:00Z"));
         orderRepository.save(order);
@@ -197,7 +197,7 @@ class ShopApiTests extends ApiTestSupport {
                 .thenThrow(new StripeClient.PaymentProviderException());
         java.nio.file.Path dir = java.nio.file.Path.of(props.uploads().dir());
         long before = java.nio.file.Files.exists(dir) ? countFiles(dir) : 0;
-        MvcResult res = checkout("1070", "2026-11-27", 1);
+        MvcResult res = checkout("1070", "2026-12-02", 1);
         assertThat(res.getResponse().getStatus()).isEqualTo(502);
         // DB rows roll back with the request transaction (not observable here: tests run inside one);
         // files on disk are not transactional, so they must be cleaned up explicitly.
@@ -208,5 +208,25 @@ class ShopApiTests extends ApiTestSupport {
         try (var s = java.nio.file.Files.walk(dir)) {
             return s.filter(java.nio.file.Files::isRegularFile).count();
         }
+    }
+
+    @Test
+    void staffCannotChangePaymentOfAPendingWebOrder() throws Exception {
+        String code = read(checkout("1070", "2026-12-02", 1), "$.orderCode");
+        var order = orderRepository.findByCodeIgnoreCase(code).orElseThrow();
+        mvc.perform(patch("/api/orders/" + order.getId() + "/payment-state").header("Authorization", bearer(login()))
+                        .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("state", "paid", "method", "cash"))))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void trackAddressMustStayInVienna() throws Exception {
+        MvcResult res = checkout("1070", "2026-12-02", 1);
+        String code = read(res, "$.orderCode");
+        String token = read(res, "$.formToken");
+        mvc.perform(withIp(patch("/api/track/" + code + "/address")).header("X-Form-Token", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("line1", "Hauptplatz 1", "city", "Linz", "postalCode", "4020"))))
+                .andExpect(status().isBadRequest());
     }
 }
