@@ -35,6 +35,8 @@ public class OrderService {
     private final AgendaService agendaService;
     private final ViewMapper mapper;
     private final Clock clock;
+    private final com.artwithgab.awg_tracking.repository.StoredPhotoRepository photoRepository;
+    private final PhotoStorageService photoStorage;
 
     Order findOrderOrThrow(UUID id) {
         return orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
@@ -242,6 +244,32 @@ public class OrderService {
         if (order.isHandedOver() && order.getOrderItems().stream().anyMatch(i -> i.getProductionStatus() != ProductionStatus.FINISHED)) {
             order.setHandedOver(false);
         }
+    }
+
+    /**
+     * Staff cancellation: deletes the order, returns its stock and frees its painting time.
+     * Card refunds for paid web orders are done by hand in Stripe.
+     */
+    @Transactional
+    public void cancelOrder(UUID orderId) {
+        calendarService.lockSchedule();
+        Order order = findOrderOrThrow(orderId);
+        if (order.isHandedOver()) throw new ConflictException("This order was already handed over.");
+        deleteAndRestock(order);
+    }
+
+    /** Deletes an order with its photos, puts its ornaments back in stock and drops an orphan customer. */
+    void deleteAndRestock(Order order) {
+        for (OrderItem item : order.getOrderItems()) {
+            if (item.getInventory() != null) item.getInventory().setQuantity(item.getInventory().getQuantity() + 1);
+            Set<UUID> ids = new HashSet<>();
+            item.getPhotos().forEach(p -> ids.add(p.getPhotoId()));
+            if (!ids.isEmpty()) photoRepository.findByIdIn(ids).forEach(photoStorage::delete);
+        }
+        Customer customer = order.getCustomer();
+        orderRepository.delete(order);
+        orderRepository.flush();
+        if (customer != null && !orderRepository.existsByCustomerId(customer.getId())) customerRepository.delete(customer);
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────

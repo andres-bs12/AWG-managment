@@ -11,7 +11,6 @@ import com.artwithgab.awg_tracking.model.*;
 import com.artwithgab.awg_tracking.payment.StripeClient;
 import com.artwithgab.awg_tracking.repository.CustomerRepository;
 import com.artwithgab.awg_tracking.repository.OrderRepository;
-import com.artwithgab.awg_tracking.repository.StoredPhotoRepository;
 import com.artwithgab.awg_tracking.support.CalendarRules;
 import com.artwithgab.awg_tracking.support.Hours;
 import com.artwithgab.awg_tracking.support.ViennaAddress;
@@ -55,10 +54,10 @@ public class ShopService {
     private final OrderCodeGenerator codeGenerator;
     private final OrderRepository orderRepository;
     private final CustomerRepository customerRepository;
-    private final StoredPhotoRepository photoRepository;
     private final com.artwithgab.awg_tracking.repository.InventoryRepository inventoryRepository;
     private final PhotoStorageService photoStorage;
     private final StripeClient stripe;
+    private final OrderService orderService;
     private final Clock clock;
 
     public boolean isOpen() {
@@ -362,15 +361,7 @@ public class ShopService {
 
     /** Deletes an unpaid web order and gives back its stock, slots and photos. */
     void release(Order order) {
-        for (OrderItem item : order.getOrderItems()) {
-            if (item.getInventory() != null) item.getInventory().setQuantity(item.getInventory().getQuantity() + 1);
-            Set<UUID> ids = new HashSet<>();
-            item.getPhotos().forEach(p -> ids.add(p.getPhotoId()));
-            if (!ids.isEmpty()) photoRepository.findByIdIn(ids).forEach(photoStorage::delete);
-        }
-        Customer customer = order.getCustomer();
-        orderRepository.delete(order);
-        customerRepository.delete(customer);
+        orderService.deleteAndRestock(order);
         log.info("Released unpaid web order {}", order.getCode());
     }
 

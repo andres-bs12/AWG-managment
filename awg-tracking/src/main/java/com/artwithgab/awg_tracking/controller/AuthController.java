@@ -36,6 +36,15 @@ public class AuthController {
         return mapper.staff(user);
     }
 
+    @PostMapping("/staff/password")
+    public ResponseEntity<Void> changePassword(@AuthenticationPrincipal StaffUser user,
+                                               @Valid @RequestBody com.artwithgab.awg_tracking.dto.auth.ChangePasswordRequest body,
+                                               HttpServletRequest request) {
+        rateLimiter.check("password", request.getRemoteAddr(), 5);
+        authService.changePassword(user, BearerTokenFilter.token(request), body.currentPassword(), body.newPassword());
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/staff/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request) {
         authService.logout(BearerTokenFilter.token(request));

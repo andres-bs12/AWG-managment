@@ -17,6 +17,10 @@ public interface StaffSessionRepository extends JpaRepository<StaffSession, UUID
     int deleteExpired(Instant now);
 
     @Modifying
+    @Query("delete from StaffSession s where s.staffUser.id = :userId and s.tokenHash <> :keepHash")
+    int deleteOtherSessions(java.util.UUID userId, String keepHash);
+
+    @Modifying
     @Query("delete from StaffSession s where s.tokenHash = :tokenHash")
     int deleteByTokenHash(String tokenHash);
 }

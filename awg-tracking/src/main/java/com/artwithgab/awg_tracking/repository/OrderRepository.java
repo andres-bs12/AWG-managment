@@ -18,6 +18,8 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("select o from Order o join fetch o.customer where o.formToken = :formToken")
     Optional<Order> findByFormToken(String formToken);
 
+    boolean existsByCustomerId(UUID customerId);
+
     boolean existsByCode(String code);
 
     /** Web orders still waiting for Stripe after their checkout expired. */

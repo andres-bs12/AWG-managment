@@ -48,6 +48,12 @@ public class OrderController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/cancel")
+    public org.springframework.http.ResponseEntity<Void> cancel(@PathVariable UUID id) {
+        orderService.cancelOrder(id);
+        return org.springframework.http.ResponseEntity.noContent().build();
+    }
+
     @PatchMapping("/{id}/payment-state")
     public OrderDto setPaymentState(@PathVariable UUID id, @Valid @RequestBody PaymentStateRequest body) {
         return orderService.updatePaymentState(id, body.state(), body.method());

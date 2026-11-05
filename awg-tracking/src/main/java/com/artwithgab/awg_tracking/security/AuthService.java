@@ -59,6 +59,24 @@ public class AuthService {
         return new AuthResponse(token, mapper.staff(user.get()));
     }
 
+    /**
+     * Changes the signed-in user's password and signs out their other sessions. A wrong current
+     * password is a 400, not a 401, so the client does not treat it as an expired session.
+     */
+    @Transactional
+    public void changePassword(StaffUser principal, String currentToken, String currentPassword, String newPassword) {
+        StaffUser user = staffUserRepository.findById(principal.getId())
+                .orElseThrow(() -> new UnauthorizedException("Sign in again."));
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new com.artwithgab.awg_tracking.exception.BadRequestException("Current password is wrong.");
+        }
+        if (newPassword.length() < 10) {
+            throw new com.artwithgab.awg_tracking.exception.BadRequestException("Use at least 10 characters.");
+        }
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        sessionRepository.deleteOtherSessions(user.getId(), currentToken == null ? "" : hash(currentToken));
+    }
+
     @Transactional(readOnly = true)
     public Optional<StaffUser> authenticate(String token) {
         if (token == null || token.isBlank() || token.length() > 100) return Optional.empty();
