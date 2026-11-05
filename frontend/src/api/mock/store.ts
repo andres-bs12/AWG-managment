@@ -37,8 +37,7 @@ const listeners = new Set<() => void>()
 function isCurrentSeed(parsed: MockState): boolean {
   return (
     parsed.seedRevision === SEED_REVISION &&
-    Array.isArray(parsed.orders) &&
-    parsed.orders.some((order) => order.code === 'ABS100')
+    Array.isArray(parsed.orders)
   )
 }
 
@@ -213,9 +212,33 @@ export function findFreeSlot(
   }
 }
 
+const PASSWORDS_KEY = 'awg-mock-passwords'
+
+function mockPasswords(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(PASSWORDS_KEY) || '{}') as Record<string, string> } catch { return {} }
+}
+
+export function mockChangePassword(currentPassword: string, newPassword: string) {
+  const token = localStorage.getItem('awg-staff-token')
+  const account = STAFF_ACCOUNTS.find((entry) => token?.startsWith(`mock.${entry.id}.`))
+  if (!account || (mockPasswords()[account.id] ?? account.password) !== currentPassword) throw new Error('Current password is wrong.')
+  if (newPassword.length < 10) throw new Error('Use at least 10 characters.')
+  localStorage.setItem(PASSWORDS_KEY, JSON.stringify({ ...mockPasswords(), [account.id]: newPassword }))
+}
+
+export function cancelOrder(id: string) {
+  const order = requireOrder(id)
+  if (order.handedOver) throw new Error('Cannot cancel an order that has been handed over.')
+  const itemIds = new Set(state.items.filter((item) => item.orderId === id).map((item) => item.id))
+  state.blocks = state.blocks.filter((block) => !block.orderItemId || !itemIds.has(block.orderItemId))
+  state.items = state.items.filter((item) => item.orderId !== id)
+  state.orders = state.orders.filter((entry) => entry.id !== id)
+  emit()
+}
+
 export function mockLogin(email: string, password: string): { token: string; user: StaffUser } {
   const row = STAFF_ACCOUNTS.find(
-    (a) => a.email.toLowerCase() === email.trim().toLowerCase() && a.password === password,
+    (a) => a.email.toLowerCase() === email.trim().toLowerCase() && (mockPasswords()[a.id] ?? a.password) === password,
   )
   if (!row) throw new Error('Unknown account. Use Gaby or Andres.')
   const user: StaffUser = { id: row.id, name: row.name, email: row.email }

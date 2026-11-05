@@ -6,6 +6,9 @@ type Dictionary = Record<string, string>
 
 const messages: Record<Locale, Dictionary> = {
   en: {
+    impressum: 'Legal notice', terms: 'Terms and conditions', privacy: 'Privacy policy', legalPreparing: 'This text is being prepared.',
+    shopTermsBefore: 'I accept the ', shopTermsAfter: ' and the cancellation policy.', shopPrivacyBefore: 'See our ',
+
     colorUnknown: 'Colour not recorded',
     reviewLead: 'Make sure everything is right before it goes to Gaby.',
     reviewOrnament: 'Your ornament', reviewDetails: 'Your details', reviewOrder: 'Pickup and payment',
@@ -170,6 +173,9 @@ const messages: Record<Locale, Dictionary> = {
     shopThanksNoCode: 'We could not find your order code. Check the confirmation email from Stripe.',
   },
   de: {
+    impressum: 'Impressum', terms: 'AGB', privacy: 'Datenschutz', legalPreparing: 'Dieser Text wird gerade vorbereitet.',
+    shopTermsBefore: 'Ich akzeptiere die ', shopTermsAfter: ' und die Widerrufsbelehrung.', shopPrivacyBefore: 'Siehe auch ',
+
     colorUnknown: 'Farbe nicht erfasst',
     reviewLead: 'Prüfe alles, bevor es an Gaby geht.',
     reviewOrnament: 'Deine Kugel', reviewDetails: 'Deine Daten', reviewOrder: 'Abholung und Zahlung',

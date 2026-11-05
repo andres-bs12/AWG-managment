@@ -54,6 +54,7 @@ export function StaffLayout() {
           </nav>
           <div className={styles.who}>
             <span className={styles.whoName}>{user?.name}</span>
+            <ButtonLink to="/staff/password" tone="staff" variant="ghost">Change password</ButtonLink>
             <Button tone="staff" variant="ghost" className={styles.logout} onClick={() => void logout()}>
               Log out
             </Button>

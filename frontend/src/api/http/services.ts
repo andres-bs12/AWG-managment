@@ -203,6 +203,7 @@ export const httpApi: Api = {
       request('/api/staff/login', jsonInit('POST', { email, password })),
     me: (token) => request('/api/staff/me', {}, { token }),
     logout: () => request('/api/staff/logout', { method: 'POST' }, staff),
+    changePassword: (currentPassword, newPassword) => request('/api/staff/password', jsonInit('POST', { currentPassword, newPassword }), { auth: true, handle401: false }),
   },
   markets: {
     listMarkets: () => request('/api/markets', {}, staff),
@@ -241,6 +242,7 @@ export const httpApi: Api = {
       return bundle
     },
     createSale: (input) => request('/api/orders', jsonInit('POST', input), staff),
+    cancelOrder: (id) => request(`/api/orders/${enc(id)}/cancel`, { method: 'POST' }, staff),
     setItemStatus: (orderId, itemId, status) =>
       request(
         `/api/orders/${enc(orderId)}/items/${enc(itemId)}/status`,

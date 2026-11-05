@@ -49,7 +49,7 @@ export function BuyReviewStep({ t, draft, itemPrice, formatDate, patch, err, des
 
         onChange={(event) => patch({ acceptTerms: event.target.checked })} />
       <span>
-        {t('shopTerms')}</span></label>
+        {t('shopTermsBefore')}<a href="/agb" target="_blank" rel="noopener noreferrer">{t('terms')}</a>{t('shopTermsAfter')} {t('shopPrivacyBefore')}<a href="/datenschutz" target="_blank" rel="noopener noreferrer">{t('privacy')}</a>.</span></label>
     {err('buy-terms') && <p className={styles.error} id="buy-terms-error" role="alert">
       {err('buy-terms')}</p>}
     {serverError && <p className={styles.error} role="alert">

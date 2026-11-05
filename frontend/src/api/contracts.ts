@@ -31,6 +31,7 @@ export type AuthService = {
   login: (email: string, password: string) => Promise<AuthResult>
   me: (token: string) => Promise<StaffUser>
   logout: () => Promise<void>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>
 }
 
 export type MarketService = {
@@ -70,6 +71,7 @@ export type OrderService = {
     blocks: import('../domain/types').TimeBlock[]
   }>
   createSale: (input: CreateSaleInput) => Promise<Order>
+  cancelOrder: (orderId: string) => Promise<void>
   setItemStatus: (
     orderId: string,
     itemId: string,

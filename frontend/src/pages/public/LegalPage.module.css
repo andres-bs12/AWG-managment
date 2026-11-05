@@ -1,0 +1,1 @@
+.page { width: min(680px, calc(100% - 32px)); margin: 32px auto; padding: 24px; background: rgba(255, 255, 255, 0.94); color: var(--public-ink); border-radius: var(--radius); }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useMockStoreVersion } from '../../api/mock/useMockStore'
 import { CompleteOrderDialog } from '../../components/staff/CompleteOrderDialog'
@@ -25,6 +25,7 @@ export function OrderDetailPage() {
 function OrderDetail({ id }: { id: string }) {
   const version = useMockStoreVersion()
   const location = useLocation()
+  const navigate = useNavigate()
   const navigationState = location.state as { from?: string; itemId?: string } | undefined
   const [bundle, setBundle] = useState<Bundle | null>(null)
   const [days, setDays] = useState<MarketDay[]>([])
@@ -32,6 +33,7 @@ function OrderDetail({ id }: { id: string }) {
   const [actionError, setActionError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
   const actionLock = useRef(false)
   const [copied, setCopied] = useState(false)
   const [retry, setRetry] = useState(0)
@@ -111,6 +113,20 @@ function OrderDetail({ id }: { id: string }) {
     if (ok) setPendingCompleteItemId(null)
   }
 
+  async function cancelOrder() {
+    if (actionLock.current) return
+    actionLock.current = true
+    setBusy(true)
+    setActionError('')
+    try {
+      await api.orders.cancelOrder(id)
+      navigate('/staff/agenda', { replace: true })
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not cancel order.')
+      setCancelOpen(false)
+    } finally { actionLock.current = false; setBusy(false) }
+  }
+
   const formContent = <div className={styles.share}>
     <QrCode value={formUrl} size={180} />
     <div className={styles.shareActions}>
@@ -167,9 +183,11 @@ function OrderDetail({ id }: { id: string }) {
           </dl>
         </details>
         {hasForm && !formWaiting ? <details className={styles.panel}><summary>Customer form <span className={styles.muted}>Completed</span></summary>{formContent}</details> : null}
+        <Button tone="staff" variant="secondary" disabled={busy} onClick={() => setCancelOpen(true)}>Cancel order</Button>
         <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
       </aside>
     </div>
+    {cancelOpen && <CancelOrderDialog busy={busy} card={order.paymentMethod === 'card' && order.paymentState !== 'unpaid'} onClose={() => setCancelOpen(false)} onConfirm={() => { void cancelOrder() }} />}
     {pendingCompleteItemId ? (
       <CompleteOrderDialog
         orderCode={order.code}
@@ -182,4 +200,16 @@ function OrderDetail({ id }: { id: string }) {
       />
     ) : null}
   </article>
+}
+
+function CancelOrderDialog({ busy, card, onClose, onConfirm }: { busy: boolean; card: boolean; onClose: () => void; onConfirm: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null)
+  useEffect(() => { ref.current?.showModal() }, [])
+  return <dialog ref={ref} aria-labelledby="cancel-title" onCancel={event => { event.preventDefault(); if (!busy) onClose() }}>
+    <h2 id="cancel-title">Cancel order?</h2>
+    <p>The order will be deleted. Painting time and stock will be released. This cannot be undone.</p>
+    {card && <p>If this order was paid online, the refund must be done manually in Stripe.</p>}
+    <Button tone="staff" variant="secondary" disabled={busy} onClick={onClose}>Keep order</Button>{' '}
+    <Button tone="staff" variant="danger" disabled={busy} onClick={onConfirm}>{busy ? 'Cancelling…' : 'Cancel order'}</Button>
+  </dialog>
 }

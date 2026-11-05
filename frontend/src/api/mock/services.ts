@@ -2,6 +2,8 @@ import type { Api } from '../contracts'
 import type { Photo } from '../../domain/types'
 import {
   checkCapacity,
+  cancelOrder,
+  mockChangePassword,
   createSale,
   findMoveSuggestion,
   getAgendaDay,
@@ -73,6 +75,7 @@ export const mockApi: Api = {
     login: (email, password) => later(() => mockLogin(email, password), 280),
     me: (token) => later(() => mockMe(token), 40),
     logout: () => later(() => mockLogout(), 40),
+    changePassword: (current, next) => later(() => mockChangePassword(current, next)),
   },
   markets: {
     listMarkets: () => later(() => listMarkets()),
@@ -102,6 +105,7 @@ export const mockApi: Api = {
     getOrderByCode: (code) => later(() => getOrderByCode(code)),
     getOrderBundle: (id) => later(() => getOrderBundle(id)),
     createSale: (input) => later(() => createSale(input), 320),
+    cancelOrder: (id) => later(() => cancelOrder(id)),
     setItemStatus: (orderId, itemId, status) =>
       later(() => {
         setItemStatus(orderId, itemId, status)

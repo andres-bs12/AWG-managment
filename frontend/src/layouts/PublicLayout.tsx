@@ -65,6 +65,11 @@ export function PublicLayout() {
       </main>
       <footer className={styles.footer}>
         <p className={styles.note}>{t('footerNote')}</p>
+        <nav className={styles.legal} aria-label={t('impressum')}>
+          <Link to="/impressum">{t('impressum')}</Link>
+          <Link to="/agb">{t('terms')}</Link>
+          <Link to="/datenschutz">{t('privacy')}</Link>
+        </nav>
         <a className={styles.social} href="https://instagram.com/artwithgab" rel="noreferrer" target="_blank">
           <svg className={styles.socialIcon} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <rect x="3.2" y="3.2" width="17.6" height="17.6" rx="5.2" fill="none" stroke="currentColor" strokeWidth="1.9" />

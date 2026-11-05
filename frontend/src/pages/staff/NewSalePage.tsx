@@ -123,16 +123,12 @@ export function NewSalePage() {
       setMarkets(m)
       setDays(d)
       setAgendaDays(agenda)
+      if (d.length) setDraft((current) => ({
+        ...current,
+        items: current.items.map((item) => fillDayRefs(item, d, m)),
+      }))
     })
   }, [])
-
-  useEffect(() => {
-    if (!days.length) return
-    setDraft((current) => ({
-      ...current,
-      items: current.items.map((item) => fillDayRefs(item, days, markets)),
-    }))
-  }, [days, markets])
 
   useEffect(() => {
     if (draft.phase === 'done' || (!draft.items.length && !draft.placingItemId)) {
@@ -733,10 +729,11 @@ function CustomMinutesField({
   onDuration: (item: DraftItem, preset: DurationPreset, customMinutes?: number) => void
 }) {
   const [text, setText] = useState(String(item.durationMinutes))
-
-  useEffect(() => {
+  const [lastItem, setLastItem] = useState({ id: item.id, minutes: item.durationMinutes })
+  if (lastItem.id !== item.id || lastItem.minutes !== item.durationMinutes) {
+    setLastItem({ id: item.id, minutes: item.durationMinutes })
     setText(String(item.durationMinutes))
-  }, [item.id, item.durationMinutes])
+  }
 
   function commit(raw: string) {
     const minutes = clampPaintMinutes(Number.parseInt(raw, 10))

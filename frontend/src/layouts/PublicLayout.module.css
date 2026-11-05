@@ -181,3 +181,6 @@
 .footer { flex-wrap: wrap; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); margin-top: auto; }
 .note { white-space: normal; overflow: visible; }
 .social { min-height: var(--touch); }
+
+.legal { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.legal a { color: var(--public-ink); font-weight: 700; }
