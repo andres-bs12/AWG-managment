@@ -20,7 +20,12 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     List<Order> findByHandedOverAtBeforeAndAnonymizedAtIsNull(java.time.Instant cutoff);
 
-    List<Order> findByHandedOverFalseAndAnonymizedAtIsNullAndCreatedAtBefore(java.time.Instant cutoff);
+    /** Not handed over, not erased, and no item's handoff date on or after {@code day}. */
+    @Query("select o from Order o where o.handedOver = false and o.anonymizedAt is null and not exists "
+            + "(select i from OrderItem i where i.order = o and i.handoffDate >= :day)")
+    List<Order> findStaleUnhandedBefore(@org.springframework.data.repository.query.Param("day") java.time.LocalDate day);
+
+    List<Order> findByCustomerId(UUID customerId);
 
     boolean existsByCustomerId(UUID customerId);
 

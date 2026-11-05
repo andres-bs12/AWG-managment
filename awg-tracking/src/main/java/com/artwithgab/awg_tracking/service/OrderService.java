@@ -147,6 +147,12 @@ public class OrderService {
         BigDecimal total = BigDecimal.ZERO;
         int position = 0;
 
+        for (int n = 0; n < req.items().size(); n++) {
+            CreateSaleItemRequest check = req.items().get(n);
+            if (check.kind() == ItemKind.CUSTOM && check.color() != null && !check.color().isOffered()) {
+                throw new BadRequestException("This color is no longer sold.").code("VALIDATION").field("items[" + n + "].color");
+            }
+        }
         for (CreateSaleItemRequest row : req.items()) {
             OrderItem item = new OrderItem();
             boolean custom = row.kind() == ItemKind.CUSTOM;

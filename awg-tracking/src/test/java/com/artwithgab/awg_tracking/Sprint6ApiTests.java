@@ -170,9 +170,30 @@ class Sprint6ApiTests extends ApiTestSupport {
             assertThat(erased.getCustomer().getPhone()).isEmpty();
             assertThat(erased.getDeliveryAddress()).isNull();
             assertThat(erased.getOrderItems()).allSatisfy(i -> assertThat(i.getPetName()).isEmpty());
-            assertThat(erased.getFormToken()).isNotEqualTo(oldToken);
             assertThat(erased.getTotal()).isPositive();
         });
+        mvc.perform(withIp(get("/api/forms/" + oldToken)))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("FORM_EXPIRED"));
+    }
+
+    @Test
+    void staffCannotSellColorsNoLongerOffered() throws Exception {
+        String token = login();
+        var item = customItem(false, null, null, null, "market", null, null);
+        item.put("color", "grey");
+        MvcResult res = sale(token, item);
+        assertThat(res.getResponse().getStatus()).isEqualTo(400);
+        assertThat(this.<String>read(res, "$.field")).isEqualTo("items[0].color");
+    }
+
+    @Test
+    void repeatedWaitlistSignUpsDoNotResendWithinAnHour() throws Exception {
+        String email = "again-" + UUID.randomUUID() + "@example.com";
+        for (int i = 0; i < 2; i++) {
+            mvc.perform(withIp(post("/api/shop/waitlist")).contentType(MediaType.APPLICATION_JSON)
+                    .content(json(Map.of("email", email, "locale", "en")))).andExpect(status().isNoContent());
+        }
+        assertThat(waitlist.findByEmail(email).orElseThrow().getLastSentAt()).isEqualTo(clock.instant());
     }
 
     @Test

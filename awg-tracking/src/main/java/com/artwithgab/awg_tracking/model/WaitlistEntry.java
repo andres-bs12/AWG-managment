@@ -35,4 +35,7 @@ public class WaitlistEntry {
     private String token;
 
     private Instant confirmedAt;
+
+    /** Last confirmation e-mail; repeat sign-ups resend at most once per hour. */
+    private Instant lastSentAt;
 }

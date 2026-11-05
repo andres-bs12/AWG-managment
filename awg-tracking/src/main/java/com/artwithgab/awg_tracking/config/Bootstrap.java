@@ -53,6 +53,8 @@ public class Bootstrap implements ApplicationRunner {
     private void seedInventory() {
         int qty = props.bootstrap().initialCustomStock();
         // One stock row per offered color and finish; rows of colors no longer sold are kept as they are.
+        // On an existing install, combinations added later start at 0 until staff counts them.
+        boolean fresh = inventoryRepository.findByItemKind(ItemKind.CUSTOM).isEmpty();
         for (CustomColor color : CustomColor.values()) {
             if (!color.isOffered()) continue;
             for (com.artwithgab.awg_tracking.enums.CustomFinish finish : com.artwithgab.awg_tracking.enums.CustomFinish.values()) {
@@ -61,7 +63,7 @@ public class Bootstrap implements ApplicationRunner {
                     row.setItemKind(ItemKind.CUSTOM);
                     row.setCustomColor(color);
                     row.setCustomFinish(finish);
-                    row.setQuantity(qty);
+                    row.setQuantity(fresh ? qty : 0);
                     inventoryRepository.save(row);
                 }
             }

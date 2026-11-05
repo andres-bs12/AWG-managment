@@ -21,6 +21,7 @@ import java.util.UUID;
  * Stores reference photos on local disk. The type is detected from the file's magic bytes
  * (the client's Content-Type and file name are never trusted) and the file name on disk is random.
  */
+@lombok.extern.slf4j.Slf4j
 @Service
 @RequiredArgsConstructor
 public class PhotoStorageService {
@@ -100,6 +101,29 @@ public class PhotoStorageService {
                         action.accept(status == STATUS_COMMITTED);
                     }
                 });
+    }
+
+    /**
+     * Deletes files in the upload folder that no photo row points to and that are older than a day
+     * (e.g. a delete whose after-commit cleanup failed). Run by the nightly retention job.
+     */
+    public int sweepOrphanFiles() {
+        Path dir = root();
+        if (!Files.isDirectory(dir)) return 0;
+        java.time.Instant cutoff = clock.instant().minus(java.time.Duration.ofDays(1));
+        int deleted = 0;
+        try (var files = Files.list(dir)) {
+            for (Path path : (Iterable<Path>) files::iterator) {
+                if (!Files.isRegularFile(path)) continue;
+                if (Files.getLastModifiedTime(path).toInstant().isAfter(cutoff)) continue;
+                if (photoRepository.existsByStorageKey(path.getFileName().toString())) continue;
+                Files.deleteIfExists(path);
+                deleted++;
+            }
+        } catch (IOException e) {
+            log.warn("Photo cleanup failed; will retry next night", e);
+        }
+        return deleted;
     }
 
     private static void deleteQuietly(Path path) {

@@ -9,4 +9,6 @@ import java.util.UUID;
 
 public interface StoredPhotoRepository extends JpaRepository<StoredPhoto, UUID> {
     List<StoredPhoto> findByIdIn(Collection<UUID> ids);
+
+    boolean existsByStorageKey(String storageKey);
 }

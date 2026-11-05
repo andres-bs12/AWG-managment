@@ -119,7 +119,10 @@ public class ShopService {
         var existing = waitlistRepository.findByEmail(normalized);
         if (existing.isPresent()) {
             var entry = existing.get();
-            if (entry.getConfirmedAt() == null) {
+            Instant now = clock.instant();
+            // Cooldown per address, so repeated sign-ups cannot flood someone's inbox.
+            if (entry.getConfirmedAt() == null && (entry.getLastSentAt() == null || entry.getLastSentAt().isBefore(now.minusSeconds(3600)))) {
+                entry.setLastSentAt(now);
                 events.publishEvent(new WaitlistConfirmation(entry.getEmail(), lang, entry.getToken()));
             }
             return;
@@ -129,6 +132,7 @@ public class ShopService {
         entry.setLocale(lang);
         entry.setCreatedAt(clock.instant());
         entry.setToken(codeGenerator.generateFormToken());
+        entry.setLastSentAt(entry.getCreatedAt());
         try {
             waitlistRepository.saveAndFlush(entry);
         } catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
