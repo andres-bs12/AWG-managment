@@ -42,6 +42,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
+        // Tests run on H2; the PostgreSQL migrations are checked against a real database instead.
+        "spring.flyway.enabled=false",
         "awg.bootstrap.demo-markets=true",
         "awg.bootstrap.staff[0].name=Gaby",
         "awg.bootstrap.staff[0].email=gaby@artwithgab.com",
