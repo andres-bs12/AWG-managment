@@ -1,4 +1,5 @@
 import '@fontsource-variable/baloo-2'
+import '@fontsource-variable/dancing-script'
 import '@fontsource/ibm-plex-sans/400.css'
 import '@fontsource/ibm-plex-sans/600.css'
 import '@fontsource/ibm-plex-sans/700.css'

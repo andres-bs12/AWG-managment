@@ -1,0 +1,8 @@
+.root { display: contents; }
+.trigger { display: inline-grid; place-items: center; flex: none; width: var(--touch); height: var(--touch); padding: 0; border: 0; border-radius: var(--radius-small); background: transparent; color: var(--color-text); font: inherit; cursor: pointer; }
+@media (hover: hover) { .trigger:hover { background: var(--color-selection-hover); } }
+.trigger:focus-visible { outline: none; box-shadow: var(--focus); }
+.trigger:active { transform: scale(var(--motion-press-scale)); }
+.panel { display: block; min-width: 0; width: 100%; flex-basis: 100%; grid-column: 1 / -1; max-width: var(--measure-hint); padding: var(--space-4); margin-top: var(--space-2); border-radius: var(--radius-small); background: var(--color-surface-raised); color: var(--color-text); font-size: var(--type-hint-size); font-weight: var(--type-hint-weight); line-height: var(--type-hint-line); overflow-wrap: anywhere; }
+.panel[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .trigger:active { transform: none; } }

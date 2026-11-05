@@ -5,7 +5,8 @@ for (const locale of ['de', 'en']) test(`checkout captures complete ${locale.toU
   await open(page, locale)
   // Observe the mock service boundary; mock mode does not create a network request.
   await page.evaluate(async () => {
-    const { api } = await import('/src/api/client.ts')
+    const path = '/src/api/client.ts'
+    const { api } = await import(path)
     api.shop.checkout = async (input: unknown) => { (window as unknown as { checkout: unknown }).checkout = input; return new Promise<never>(() => {}) }
   })
   await choose(page)
@@ -30,12 +31,12 @@ test('two ornaments retain independent choices', async ({ page }) => {
   await page.locator('#buy-add').click()
   await choose(page, /^(Rot|Red)$/, /^(Matt|Matte)$/)
   await pet(page, 'Max')
-  await page.getByRole('button', { name: /^(Kugel|Ornament) 1$/ }).click()
+  await page.getByRole('tab', { name: 'Luna' }).click()
   await expect(page.getByRole('radio', { name: /^(Rot|Red)$/ })).toBeChecked()
   await expect(page.getByRole('radio', { name: /^(Glänzend|Shiny)$/ })).toBeChecked()
   if (mobile(page)) { await next(page).click(); await next(page).click() }
   await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
-  await page.getByRole('button', { name: /^(Kugel|Ornament) 2$/ }).click()
+  await page.getByRole('tab', { name: 'Max' }).click()
   await expect(page.getByRole('radio', { name: /^(Matt|Matte)$/ })).toBeChecked()
   if (mobile(page)) { await next(page).click(); await next(page).click() }
   await expect(page.locator('input[id^="pet-"]')).toHaveValue('Max')

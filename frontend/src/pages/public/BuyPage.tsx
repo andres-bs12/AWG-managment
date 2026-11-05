@@ -3,17 +3,18 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { SeasonClosed } from '../../components/public/SeasonClosed'
 import { AnimatedPrice } from '../../components/public/AnimatedPrice'
-import { OrnamentPreview } from '../../components/public/OrnamentPreview'
+import { OrnamentPreview, type OrnamentSide } from '../../components/public/OrnamentPreview'
 import { OrnamentLoader } from '../../components/public/OrnamentLoader'
 import { Button } from '../../components/ui/Button'
 import type { Photo, ShopConfig, ShopDeliveryDate } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
-import { loadBuyDraft, saveBuyDraft, type BuyDraft, type BuyItem } from '../../lib/buyDraft'
+import { loadBuyDraft, newItem, saveBuyDraft, type BuyDraft, type BuyItem } from '../../lib/buyDraft'
 import { apiError } from '../../lib/apiError'
 import { formatEur } from '../../lib/money'
 import styles from './BuyPage.module.css'
 import panel from './Panel.module.css'
 import { MAX_PHOTOS } from './buy/shared'
+import { ItemTabs } from '../../components/public/ItemTabs'
 import { BuyItemsStep } from './buy/BuyItemsStep'
 import { BuyPetStep } from './buy/BuyPetStep'
 import { BuyDateStep } from './buy/BuyDateStep'
@@ -40,6 +41,7 @@ export function BuyPage() {
   const [returnReview, setReturnReview] = useState(false)
   const [substep, setSubstep] = useState(0)
   const [activeUid, setActiveUid] = useState(draft.items[0].uid)
+  const [sides, setSides] = useState<Record<string, OrnamentSide>>({})
   const [dates, setDates] = useState<ShopDeliveryDate[]>([])
   const [datesState, setDatesState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [datesRetry, setDatesRetry] = useState(0)
@@ -120,6 +122,7 @@ export function BuyPage() {
   const described = (key: string, hint = false) => [hint ? `${key}-hint` : '', err(key) ? `${key}-error` : ''].filter(Boolean).join(' ') || undefined
   function patch(partial: Partial<BuyDraft>) { const changedFields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', postalCode: 'buy-postal' }; setValidFields(current => current.filter(id => !Object.keys(partial).some(key => changedFields[key] === id))); setDraft((current) => ({ ...current, ...partial })); const fields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', line2: 'buy-line2', postalCode: 'buy-postal', deliveryDate: 'buy-date', acceptTerms: 'buy-terms' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[fields[key]]); return next }); setServerError('') }
   function patchItem(uid: string, partial: Partial<BuyItem>) {
+    if (partial.withName !== undefined) setSides(current => ({ ...current, [uid]: partial.withName ? 'back' : 'front' }))
     for (const field of ['color', 'finish'] as const) if (partial[field]) void api.metrics.track({ event: 'buy_choice', field, value: partial[field] }).catch(() => {})
     if (partial.withName !== undefined) void api.metrics.track({ event: 'buy_choice', field: 'name', value: partial.withName ? 'on' : 'off' }).catch(() => {})
     setDraft((current) => ({ ...current, items: current.items.map((item) => item.uid === uid ? { ...item, ...partial } : item) }))
@@ -220,7 +223,7 @@ export function BuyPage() {
   function next() {
     if (step === 2) { void pay(); return }
     if (step === 1) { const found = { ...validate(2), ...validate(3) }; if (!showErrors(found)) { setReturnReview(false); go(2) }; return }
-    const mobile = window.matchMedia('(max-width: 899px)').matches
+    const mobile = window.matchMedia('(max-width: 1023px)').matches
     if (mobile && substep < 2) {
       const all = validate(0)
       const found = Object.fromEntries(Object.entries(all).filter(([key]) => key.endsWith(`-${activeItem.uid}`) && (substep === 0 ? key.startsWith('color-') || key.startsWith('finish-') : key.startsWith('back-'))))
@@ -238,6 +241,20 @@ export function BuyPage() {
     if (partial.items && partial.items.length > draft.items.length) { setActiveUid(partial.items[partial.items.length - 1].uid); setSubstep(0) }
     if (partial.items && !partial.items.some(item => item.uid === activeUid)) setActiveUid(partial.items[0]?.uid ?? '')
     patch(partial)
+  }
+  function selectItem(uid: string) { setActiveUid(uid); setSubstep(0); setPreviewChoice(null) }
+  function addItem() {
+    setPreviewChoice(null)
+    const item = newItem()
+    updateDraft({ items: [...draft.items, item] })
+    requestAnimationFrame(() => document.getElementById(`tab-${item.uid}`)?.focus())
+  }
+  function removeItem(uid: string) {
+    const index = draft.items.findIndex(item => item.uid === uid)
+    const rest = draft.items.filter(item => item.uid !== uid)
+    const nextItem = rest[Math.min(index, rest.length - 1)]
+    updateDraft({ items: rest })
+    if (nextItem) { setActiveUid(nextItem.uid); requestAnimationFrame(() => document.getElementById(`tab-${nextItem.uid}`)?.focus()) }
   }
   return <form className={`${panel.panel} ${styles.shop}`} noValidate onFocus={(event) => {
     const target = event.target
@@ -270,17 +287,25 @@ export function BuyPage() {
     <section className={styles.step} aria-labelledby="buy-heading">
       <h2 id="buy-heading" ref={headingRef} tabIndex={-1}>{stepLabels[step]}</h2>
       {step === 0 && <div className={styles.design} data-substep={substep}>
-        <div className={styles.previewPane}><OrnamentPreview key={activeItem.uid} item={{ ...activeItem, ...previewChoice }} /><strong>{t('shopTotal')}: <AnimatedPrice value={total} locale={locale} /></strong><div className={styles.subprogress} role="progressbar" aria-label={t('premiumSubstep')} aria-valuemin={1} aria-valuemax={3} aria-valuenow={substep + 1}><span style={{ transform: `scaleX(${(substep + 1) / 3})` }} /></div></div>
-        <div className={styles.optionsPane} key={activeItem.uid}>
-          <div className={styles.itemTabs}>{draft.items.map((item, index) => <button type="button" key={item.uid} aria-pressed={activeItem.uid === item.uid} onClick={() => { setActiveUid(item.uid); setSubstep(0) }}>{t('ornamentN', { n: index + 1 })}</button>)}</div>
-          <BuyItemsStep {...stepProps} patch={updateDraft} activeUid={activeItem.uid} preview={setPreviewChoice} />
-          <div className={styles.petGroup}><BuyPetStep {...stepProps} activeUid={activeItem.uid} /></div>
+        <div className={styles.previewPane}>
+          <OrnamentPreview key={activeItem.uid} item={{ ...activeItem, ...previewChoice }} side={sides[activeItem.uid]} onSideChange={side => setSides(current => ({ ...current, [activeItem.uid]: side }))} />
+          <div className={styles.previewSummary}><span>{t('shopTotal')}</span><strong data-buy-total><AnimatedPrice value={total} locale={locale} /></strong></div>
+        </div>
+        <div className={styles.optionsPane}>
+          <ItemTabs items={draft.items} activeUid={activeItem.uid} maxItems={config.maxItems} onSelect={selectItem} onAdd={addItem} />
+          {err('buy-add') && <p className={styles.error} role="alert">{err('buy-add')}</p>}
+          {draft.items.filter(item => item.uid !== activeItem.uid).map(item => <div role="tabpanel" key={item.uid} id={`panel-${item.uid}`} aria-labelledby={`tab-${item.uid}`} hidden />)}
+          <div role="tabpanel" id={`panel-${activeItem.uid}`} aria-labelledby={`tab-${activeItem.uid}`} className={styles.itemPanel} key={activeItem.uid}>
+            <BuyItemsStep {...stepProps} activeUid={activeItem.uid} preview={setPreviewChoice} />
+            <div className={styles.petGroup}><BuyPetStep {...stepProps} activeUid={activeItem.uid} /></div>
+            {draft.items.length > 1 && <div className={styles.itemFooter}><span>{t('ornamentN', { n: draft.items.findIndex(item => item.uid === activeItem.uid) + 1 })} · {formatEur(itemPrice(activeItem), locale)}</span><button type="button" className={styles.linkBtn} onClick={() => removeItem(activeItem.uid)}>{t('shopRemoveThis')}</button></div>}
+          </div>
         </div>
       </div>}
       {step === 1 && <><BuyDateStep {...stepProps} /><div className={styles.deliveryContact}><BuyContactStep {...stepProps} validateField={validateField} validFields={validFields} /></div></>}
-      {step === 2 && <BuyReviewStep {...stepProps} go={(index, uid, sub) => { if (uid) setActiveUid(uid); if (sub !== undefined) setSubstep(sub); setChangedSection(uid ?? (index === 2 ? 'delivery' : 'contact')); setReturnReview(true); go(index < 2 ? 0 : 1); if (index === 3) window.setTimeout(() => document.getElementById('buy-name')?.scrollIntoView({ block: 'center' }), 50) }} itemsTotal={itemsTotal} total={total} changed={changedSection} />}
+      {step === 2 && <BuyReviewStep {...stepProps} go={(index, uid, sub, field) => { pendingErrorFocus.current = field ?? null; if (uid) setActiveUid(uid); if (sub !== undefined) setSubstep(sub); setChangedSection(uid ?? (index === 3 ? 'contact' : 'delivery')); setReturnReview(true); go(index < 2 ? 0 : 1) }} itemsTotal={itemsTotal} total={total} changed={changedSection} />}
     </section>
-    <aside hidden={step === 2} className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><dl aria-live="polite"><div><dt>{t('shopItemsTotal')} ({draft.items.length})</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{config.deliveryFee ? formatEur(config.deliveryFee, locale) : t('shopFree')}</dd></div><div className={styles.cartTotal}><dt>{t('shopTotal')}</dt><dd>{formatEur(total, locale)}</dd></div></dl></aside>
-    <div className={styles.actions}><div className={styles.mobileTotal} hidden={step === 2}><span>{t('shopTotal')}</span><strong><AnimatedPrice value={total} locale={locale} /></strong></div>{(step > 0 || substep > 0) && <Button variant="secondary" disabled={busy} onClick={back}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 2 ? busy ? t('shopPaying') : `${t('shopPayStripe')} · ${formatEur(total, locale)}` : t('continue')}</Button>{step === 2 && <small className={styles.stripeLine}>{t('secureStripe')}</small>}</div>
+    <aside hidden={step !== 1} className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><dl aria-live="polite"><div><dt>{t('shopItemsTotal')} ({draft.items.length})</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{config.deliveryFee ? formatEur(config.deliveryFee, locale) : t('shopFree')}</dd></div><div className={styles.cartTotal}><dt>{t('shopTotal')}</dt><dd>{formatEur(total, locale)}</dd></div></dl></aside>
+    <div className={styles.actions}><div className={styles.mobileTotal} hidden={step === 2}><span>{t('shopTotal')}</span><strong data-buy-total><AnimatedPrice value={total} locale={locale} /></strong></div>{(step > 0 || substep > 0) && <Button variant="secondary" disabled={busy} onClick={back}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 2 ? busy ? t('shopPaying') : `${t('shopPayStripe')} · ${formatEur(total, locale)}` : t('continue')}</Button>{step === 2 && <small className={styles.stripeLine}>{t('secureStripe')}</small>}</div>
   </form>
 }

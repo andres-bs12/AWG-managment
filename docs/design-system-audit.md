@@ -264,3 +264,7 @@ These rows are a migration proposal, not authorization to change legal meaning o
 ## Short summary
 
 The largest consistency gaps are competing selection palettes, unowned spacing between components, mismatched review columns and separate QR-form patterns. Unify tokens and shared components first; then verify rendered spacing, truthfulness, keyboard operation and both languages. All audit findings remain open; Task 6 delivers documentation only.
+
+## Task 7B source follow-up (2026-11-05)
+
+Codex independently reviewed Claude's uncommitted core before implementing Task 7B. Source fixes, retained measurements, component inventory and external verification are recorded in [Task 7B handoff](task7b-handoff.md). Review rows, static review previews, date selection/summary, shared finish/city help, readable sold-out choices and the DEV guide now have implementations. Additional tab activation/panel references, per-item preview side state, radio focus and `fill` animation issues were corrected. The existing staff SegmentedControl branch remains unchanged. Browser-dependent audit rows remain open until Claude verifies the updated suite and screenshots; the older snapshot anchors above must not be treated as current source locations.

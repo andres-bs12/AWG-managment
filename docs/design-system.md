@@ -798,3 +798,9 @@ Translucent illustration colours have the following exact migration names. They 
 ## 14. Short summary
 
 Build public AWG UI with warm opaque surfaces, one dark-green selection treatment, one spacing scale and clear display/body typography. Keep the illustrated ornament central, use blue only for purchase summaries in UI, name every edit action, and share the same components with the QR form. Verify language, accessibility, states and rendered spacing before calling any implementation finished.
+
+## Task 7B implementation notes (2026-11-05)
+
+Public consumers must continue to follow this specification. The implemented shared components are `components/public/ItemTabs`, `ReviewCard`, `WaitlistSignup`, `components/ui/HelpTip` and the public native-radio branch of `SegmentedControl`. The existing staff branch is retained. `/dev/design` is lazy-loaded only in development, outside authentication, with synthetic fixtures and injected local actions. It is not linked from the public shell. Browser verification remains pending; see [Task 7B handoff](task7b-handoff.md).
+
+Additional centralized rendering dimensions preserve the existing preview geometry: `--preview-perspective:800px`, `--preview-glint-shift:90px` (illustration transform only). The development gallery adds `--guide-frame-height:440px` for isolated component frames and `--guide-zoom-size:2rem` for its text-zoom fixture. These values live only in `tokens.css`; they are not new public spacing steps.

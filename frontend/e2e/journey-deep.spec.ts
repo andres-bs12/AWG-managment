@@ -11,7 +11,7 @@ const note = 'Keep the white whiskers'
 const money = (amount: number, locale: Locale = 'de') => new Intl.NumberFormat(locale === 'de' ? 'de-AT' : 'en-IE', { style: 'currency', currency: 'EUR' }).format(amount)
 const preview = (page: Page) => page.locator('form div[role="img"]')
 // The first column is the persistent preview, above the options at mobile widths.
-const price = (page: Page) => page.locator('form [data-substep] > div > strong').first().locator('span[aria-hidden="true"]')
+const price = (page: Page) => page.locator('form [data-buy-total]:visible').first().locator('span[aria-hidden="true"]')
 const nameOption = (page: Page) => page.getByRole('checkbox', { name: /name (auf|on)/i })
 const backButton = (page: Page) => page.locator('form').getByRole('button', { name: /^(Zurück|Back)$/ })
 
@@ -47,7 +47,7 @@ async function namedDesign(page: Page, color = /^(Rot|Red)$/, finish = /^(Glänz
   if (mobile(page)) await next(page).click()
   await nameOption(page).check()
   await page.locator('input[id^="back-"]').fill(name)
-  await expect(page.locator('input[id^="back-"]')).toHaveValue(name.toUpperCase())
+  await expect(page.locator('input[id^="back-"]')).toHaveValue(name)
   if (mobile(page)) await next(page).click()
   await page.locator('input[id^="pet-"]').fill(name)
   await page.locator('input[type=file]').setInputFiles(photo)
@@ -77,7 +77,7 @@ async function expectContact(page: Page) {
 async function expectReview(page: Page, total: number, locale: Locale = 'de') {
   await expect(page.locator('#buy-heading')).toHaveText(locale === 'de' ? 'Prüfen & bezahlen' : 'Review & pay')
   await expect(page.locator('form button[type=submit]')).toHaveText(`${locale === 'de' ? 'Zahlungspflichtig bestellen' : 'Order and pay'} · ${money(total, locale)}`)
-  for (const value of [contact.customerName, contact.email, contact.phone, address.line1, address.line2, address.postalCode, 'Luna', 'LUNA']) {
+  for (const value of [contact.customerName, contact.email, contact.phone, address.line1, address.line2, address.postalCode, 'Luna']) {
     await expect(page.locator('form')).toContainText(value)
   }
 }
@@ -95,7 +95,7 @@ for (const locale of ['de', 'en'] as const) {
       await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
       await expect(page.getByRole('img', { name: 'Photo 1 of Luna', exact: true })).toBeVisible()
     }
-    await expect(preview(page)).toHaveAttribute('aria-label', locale === 'de' ? 'Rot, Glänzend, Name: LUNA' : 'Red, Shiny, name: LUNA')
+    await expect(preview(page)).toHaveAttribute('aria-label', locale === 'de' ? 'Rot, Glänzend, Name: Luna · Hinten' : 'Red, Shiny, name: Luna · Back')
     // Reference photos must stay in the thumbnail gallery, outside the SVG.
     await expect(preview(page).locator('image, img')).toHaveCount(0)
     await expect(preview(page).locator('svg')).toBeVisible()
@@ -126,7 +126,7 @@ for (const locale of ['de', 'en'] as const) {
       expect(parsed).toEqual({
         ...contact, address, deliveryDate: dates[0].date, acceptTerms: true,
         items: [{ kind: 'custom', color: 'red', finish: 'shiny', withName: true,
-          backName: 'LUNA', petName: 'Luna', note, photos: [{ id: expect.stringMatching(/^pho-/), name: 'pet.png' }] }],
+          backName: 'Luna', petName: 'Luna', note, photos: [{ id: expect.stringMatching(/^pho-/), name: 'pet.png' }] }],
       })
       expect(parsed.items[0].photos).toHaveLength(1)
       const photoId = parsed.items[0].photos[0].id
@@ -150,33 +150,33 @@ for (const locale of ['de', 'en'] as const) {
 test('two ornaments keep independent colour, finish, names, previews and totals after removal', async ({ page }) => {
   const config = await prepare(page)
   await namedDesign(page)
-  const firstLabel = 'Rot, Glänzend, Name: LUNA'
+  const firstLabel = 'Rot, Glänzend, Name: Luna · Hinten'
   await expect(preview(page)).toHaveAttribute('aria-label', firstLabel)
   await page.locator('#buy-add').click()
   await namedDesign(page, /^(Grün|Green)$/, /^(Matt|Matte)$/, 'Max')
-  const secondLabel = 'Grün, Matt, Name: MAX'
+  const secondLabel = 'Grün, Matt, Name: Max · Hinten'
   await expect(preview(page)).toHaveAttribute('aria-label', secondLabel)
   const twoTotal = 2 * (config.customPrice + config.nameExtra) + config.deliveryFee
   await expect(price(page)).toHaveText(money(twoTotal))
 
-  for (const [number, color, finish, name, label] of [
-    [1, 'Rot', 'Glänzend', 'Luna', firstLabel], [2, 'Grün', 'Matt', 'Max', secondLabel],
+  for (const [color, finish, name, label] of [
+    ['Rot', 'Glänzend', 'Luna', firstLabel], ['Grün', 'Matt', 'Max', secondLabel],
   ] as const) {
-    await page.getByRole('button', { name: `Kugel ${number}`, exact: true }).click()
-    await expect(page.getByRole('button', { name: `Kugel ${number}`, exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('tab', { name, exact: true }).click()
+    await expect(page.getByRole('tab', { name, exact: true })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('radio', { name: color, exact: true })).toBeChecked()
     await expect(page.getByRole('radio', { name: finish, exact: true })).toBeChecked()
     await expect(preview(page)).toHaveAttribute('aria-label', label)
     if (mobile(page)) await next(page).click()
-    await expect(page.locator('input[id^="back-"]')).toHaveValue(name.toUpperCase())
+    await expect(page.locator('input[id^="back-"]')).toHaveValue(name)
     if (mobile(page)) await next(page).click()
     await expect(page.locator('input[id^="pet-"]')).toHaveValue(name)
     await expect(page.getByRole('img', { name: `Foto 1 von ${name}`, exact: true })).toBeVisible()
   }
   // Removal lives in the options card, visible in substep 0 on mobile.
-  await page.getByRole('button', { name: 'Kugel 2', exact: true }).click()
-  await page.getByRole('button', { name: 'Kugel 2 entfernen', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Kugel 2', exact: true })).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Max', exact: true }).click()
+  await page.getByRole('button', { name: 'Diese Kugel entfernen', exact: true }).click()
+  await expect(page.getByRole('tab', { name: 'Max', exact: true })).toHaveCount(0)
   await expect(preview(page)).toHaveAttribute('aria-label', firstLabel)
   const remainingTotal = config.customPrice + config.nameExtra + config.deliveryFee
   await expect(price(page)).toHaveText(money(remainingTotal))
@@ -189,7 +189,7 @@ test('two ornaments keep independent colour, finish, names, previews and totals 
   await expect(page.locator('form button[type=submit]')).toHaveText(`Zahlungspflichtig bestellen · ${money(remainingTotal)}`)
 })
 
-test('name option adds exactly 12.99, flips to the capitalised back and retains its value off/on', async ({ page }) => {
+test('name option adds exactly 12.99, turns to the scripted back and retains its value off/on', async ({ page }) => {
   const config = await prepare(page)
   expect(config.nameExtra).toBe(12.99)
   await choose(page)
@@ -199,28 +199,28 @@ test('name option adds exactly 12.99, flips to the capitalised back and retains 
   await nameOption(page).check()
   await expect(price(page)).toHaveText(money(base + 12.99))
   await page.locator('input[id^="back-"]').fill('luna')
-  await expect(page.locator('input[id^="back-"]')).toHaveValue('LUNA')
-  await expect(preview(page)).toHaveAttribute('aria-label', 'Rot, Glänzend, Name: LUNA')
-  const back = page.getByRole('button', { name: 'Hinten', exact: true })
-  const front = page.getByRole('button', { name: 'Vorne', exact: true })
-  await expect(back).toHaveAttribute('aria-pressed', 'true')
-  await expect(preview(page).locator('svg text')).toHaveText('LUNA')
+  await expect(page.locator('input[id^="back-"]')).toHaveValue('luna')
+  await expect(preview(page)).toHaveAttribute('aria-label', 'Rot, Glänzend, Name: luna · Hinten')
+  const back = page.getByRole('radio', { name: 'Hinten', exact: true })
+  const front = page.getByRole('radio', { name: 'Vorne', exact: true })
+  await expect(back).toBeChecked()
+  await expect(preview(page).locator('svg text')).toHaveText('Luna')
   await expect(preview(page).locator('svg text')).toHaveCSS('opacity', '1')
   await front.click()
-  await expect(front).toHaveAttribute('aria-pressed', 'true')
-  await expect(back).toHaveAttribute('aria-pressed', 'false')
+  await expect(front).toBeChecked()
+  await expect(back).not.toBeChecked()
   await expect(preview(page).locator('svg text')).toHaveCSS('opacity', '0')
   await back.click()
-  await expect(back).toHaveAttribute('aria-pressed', 'true')
+  await expect(back).toBeChecked()
   await expect(preview(page).locator('svg text')).toHaveCSS('opacity', '1')
   await nameOption(page).uncheck()
   await expect(price(page)).toHaveText(money(base))
-  await expect(preview(page)).toHaveAttribute('aria-label', 'Rot, Glänzend, Name: kein Name')
+  await expect(preview(page)).toHaveAttribute('aria-label', 'Rot, Glänzend, Name: kein Name · Vorne')
   await expect(page.locator('input[id^="back-"]')).toHaveCount(0)
   await expect(back).toHaveCount(0)
   await nameOption(page).check()
-  await expect(page.locator('input[id^="back-"]')).toHaveValue('LUNA')
-  await expect(back).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('input[id^="back-"]')).toHaveValue('luna')
+  await expect(back).toBeChecked()
   await expect(price(page)).toHaveText(money(base + 12.99))
 })
 
@@ -232,7 +232,7 @@ async function measuredClick(page: Page, control: Locator, expectedLabel: string
   await control.evaluate((node, expected) => {
     const win = window as unknown as { journeyLatency?: Promise<number> }
     const image = document.querySelector('form div[role="img"]')!
-    const total = document.querySelector('form [data-substep] > div > strong')!
+    const total = [...document.querySelectorAll('form [data-buy-total]')].find(node => node.getClientRects().length)!
     const visiblePrice = total.querySelector('span[aria-hidden="true"]')!
     const exactPrice = total.querySelector('.visually-hidden')!
     const input = node instanceof HTMLInputElement ? node : node.querySelector('input')!
@@ -273,14 +273,14 @@ test('configuration reacts in under 100ms (median of five colour clicks and five
     // Colour has the same price in the product contract: assert it stays correct
     // rather than inventing a colour surcharge just to force a price mutation.
     colourSamples.push(await measuredClick(page, page.getByRole('radio', { name: color, exact: true }).locator('..'),
-      `${color}, Glänzend, Name: kein Name`, money(config.customPrice + config.deliveryFee), false))
+      `${color}, Glänzend, Name: kein Name · Vorne`, money(config.customPrice + config.deliveryFee), false))
     await expect(page.getByRole('radio', { name: color, exact: true })).toBeChecked()
   }
   if (mobile(page)) await next(page).click()
   const priceSamples: number[] = []
   for (const withName of [true, false, true, false, true]) {
     priceSamples.push(await measuredClick(page, nameOption(page),
-      `Grün, Glänzend, Name: ${withName ? 'LUNA' : 'kein Name'}`,
+      `Grün, Glänzend, Name: ${withName ? 'LUNA · Hinten' : 'kein Name · Vorne'}`,
       money(config.customPrice + config.deliveryFee + (withName ? config.nameExtra : 0)), true))
     await expect(nameOption(page)).toBeChecked({ checked: withName })
   }
@@ -305,7 +305,7 @@ test('browser back/forward and in-app Back preserve all answers across the three
   await expectContact(page)
   await page.goBack()
   await expect(page.locator('#buy-heading')).toHaveText('Deine Kugel')
-  await expect(preview(page)).toHaveAttribute('aria-label', 'Rot, Glänzend, Name: LUNA')
+  await expect(preview(page)).toHaveAttribute('aria-label', 'Rot, Glänzend, Name: Luna · Hinten')
   // Browser history restores the design screen with its current mobile substep.
   await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
   await expect(page.getByRole('img', { name: 'Foto 1 von Luna', exact: true })).toBeVisible()
@@ -326,7 +326,7 @@ test('browser back/forward and in-app Back preserve all answers across the three
   await expect(page.getByRole('radio', { name: 'Glänzend', exact: true })).toBeChecked()
   if (mobile(page)) await next(page).click()
   await expect(nameOption(page)).toBeChecked()
-  await expect(page.locator('input[id^="back-"]')).toHaveValue('LUNA')
+  await expect(page.locator('input[id^="back-"]')).toHaveValue('Luna')
   if (mobile(page)) await next(page).click()
   await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
   await expect(page.getByRole('img', { name: 'Foto 1 von Luna', exact: true })).toBeVisible()
@@ -352,7 +352,7 @@ test('reload from delivery restores every text field and explicitly asks to re-a
   await expect(page.getByRole('radio', { name: 'Glänzend', exact: true })).toBeChecked()
   if (mobile(page)) await next(page).click()
   await expect(nameOption(page)).toBeChecked()
-  await expect(page.locator('input[id^="back-"]')).toHaveValue('LUNA')
+  await expect(page.locator('input[id^="back-"]')).toHaveValue('Luna')
   if (mobile(page)) await next(page).click()
   await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
   await expect(page.getByRole('status').filter({ hasText: 'Fotos können nach dem Neuladen nicht gespeichert werden. Bitte füge sie erneut hinzu.' })).toBeVisible()

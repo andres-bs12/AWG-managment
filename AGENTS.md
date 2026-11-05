@@ -20,6 +20,8 @@ ArtWithGab es una herramienta para registrar ventas y coordinar la producción y
 
 ## Reglas de producto y límites
 
+- **UI pública:** leer y aplicar obligatoriamente `docs/design-system.md` antes de cualquier cambio; `docs/design-system-audit.md` registra la migración pendiente.
+
 - El formulario del cliente recoge datos y fotos; no cobra. El staff confirma manualmente un pago después de verificar que se recibió.
 - Estados de pago acordados en la documentación: `unpaid`, `deposit` y `paid`. `deposit` representa exactamente el 50 % del total porque el estado actual no guarda un importe parcial arbitrario.
 - En el puesto no se integra ningún procesador de pagos. **Excepción decidida por el dueño (2026-11-04):** la tienda web pública (`/buy`, solo entrega en Viena) cobra con Stripe Checkout.
@@ -106,7 +108,7 @@ Paquete `com.artwithgab.awg_tracking` (con guion bajo; no cambiarlo). Capas: `mo
 ## Tienda pública
 
 - `/buy` ofrece solo adornos personalizados en tres pantallas (diseño con subpasos móviles, entrega y revisión); obtiene colores y disponibilidad de la API, comprueba fechas de entrega y conserva los campos de texto en `sessionStorage`. Las fotos deben volver a añadirse después de recargar.
-- El contrato `ShopConfig.colors` requiere que el backend entregue la lista de colores con `inStock`; el mock marca rojo y gris disponibles, verde y blanco agotados. La entrega y el pago definitivo requieren validar la integración real con Stripe.
+- El contrato `ShopConfig.colors` requiere que el backend entregue la lista de colores con `inStock`; el mock inicia cada combinación de color y acabado con cantidad 3 (revisión 12). Las pruebas de agotados preparan su propio stock mediante la API. La entrega y el pago definitivo requieren validar la integración real con Stripe.
 
 ## Estado y siguientes tareas
 
@@ -115,6 +117,14 @@ Rama `feat/backend-domain` (PR #2 a `main`), subida a GitHub. Sprint 6 (respuest
 Forma de trabajo acordada: Codex CLI (`gpt-6.1-terra`, esfuerzo high para implementar, medium/high para auditar; siempre `< /dev/null`) para frontend y revisiones; Claude para backend delicado, integración y pruebas en navegador. Nunca audita el mismo LLM que escribió el código.
 
 ### Sprint 6 — estado del frontend
+
+- 2026-11-05 · Fix a-3: preparación de referencias terminada; comparación en navegador pendiente. Claude informó 146/149 aciertos; las tres trazas locales confirman únicamente nueve errores de referencia ausente. Se inspeccionaron las nueve imágenes y se verificó que cada PNG de `a11y-visual.spec.ts-snapshots` coincide byte a byte con su `*-actual.png`. Son las referencias recién regeneradas, no las antiguas: se conservan para evitar repetir el ciclo de borrado. Sin cambios de app, selectores, tolerancias ni checks axe. Build, lint (advertencias existentes) y 12 pruebas Node pasan. No se ejecutó Playwright ni se hicieron commits. Claude debe repetir normalmente los 149 casos, sin borrar ni actualizar automáticamente las referencias; detalles y límites de las capturas en `docs/ux-validation.md`.
+
+- 2026-11-05 · Fix a-2 **parcial, pendiente de validar en navegador**: Claude informó 143 aciertos y 6 fallos; tres corresponden a la coma de la fecha inglesa y tres a capturas visuales. Se corrigió la expectativa y se eliminaron las nueve referencias visuales obsoletas para regenerarlas y revisarlas. Se mantienen las comprobaciones axe. Claude debe repetir la suite y revisar las capturas; no se ejecutó Playwright por instrucción del dueño.
+
+- 2026-11-05 · Fix a-1 **parcial, pendiente de validar en navegador**: expectativas E2E actualizadas para nombres y pestañas, acciones de edición, fechas inglesas, columnas responsive y stock agotado preparado por API; se eliminaron las capturas antiguas para regenerarlas y revisarlas. Playwright no se ejecutó por instrucción del dueño; Claude debe ejecutar los 149 casos y revisar las nuevas capturas.
+
+- 2026-11-05 · Task 7B: implementación y revisión independiente del núcleo de Claude terminadas; validación de navegador pendiente. Revisión alineada con acciones precisas y miniaturas estáticas, fecha elegida persistente, `HelpTip` compartido, agotados legibles y enlace a la lista existente de próxima temporada. Guía aislada `/dev/design` solo en DEV; pruebas actualizadas y geometría exacta añadida. Se corrigieron activación manual de tabs, estado Front/Back por ítem, referencias de paneles, foco de radios y transición de `fill`; se conservan las medidas aprobadas. Handoff y verificación en `docs/task7b-handoff.md`. No se ejecutó Playwright ni se hicieron commits.
 
 - 2026-11-05 · Fix 12 **parcial, pendiente de validar**: Claude informó 121 aciertos y un fallo de axe en escritorio. La traza identifica la ayuda de fotos y el contador; el fundido de entrada de `optionsPane` reduce temporalmente su contraste a 2,86:1. La entrada conserva ahora solo el deslizamiento, con texto totalmente opaco y movimiento reducido sin animación. No se modificaron tests ni aserciones. Build y lint pasan (advertencias existentes). No se ejecutó Playwright por instrucción del dueño; Claude debe repetir la suite y revisar capturas antes de cerrar el fix.
 

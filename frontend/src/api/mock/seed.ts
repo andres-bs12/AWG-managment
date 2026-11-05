@@ -12,7 +12,7 @@ import { itemCost } from '../../lib/money'
 
 export const DEMO_NOW_HOUR = 15 + 10 / 60
 /** Bump when demo orders change. load() reseeds if revision mismatches. */
-export const SEED_REVISION = 11
+export const SEED_REVISION = 12
 export const STORAGE_KEY = `awg-mock-store-v${SEED_REVISION}`
 
 export const STAFF_ACCOUNTS: Array<StaffUser & { password: string }> = [

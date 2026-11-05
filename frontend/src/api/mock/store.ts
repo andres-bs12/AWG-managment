@@ -160,7 +160,7 @@ export function listInventory(): InventoryItem[] {
     if (!rows.some(row => row.kind === 'custom' && row.color === color && row.finish === finish)) {
       const legacy = finish === 'shiny' ? rows.find(row => row.kind === 'custom' && row.color === color && !row.finish) : undefined
       if (legacy) { legacy.finish = finish; legacy.id = `custom-${color}-${finish}` }
-      else rows.push({ id: `custom-${color}-${finish}`, kind: 'custom', color, finish, quantity: color === 'red' ? 3 : 0 })
+      else rows.push({ id: `custom-${color}-${finish}`, kind: 'custom', color, finish, quantity: 3 })
     }
   }
   for (const row of rows) if (row.kind === 'custom' && !row.finish) row.finish = 'shiny'

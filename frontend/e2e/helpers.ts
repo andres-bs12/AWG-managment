@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 export const photo = join(import.meta.dirname, 'fixtures/pet.png')
 export const next = (page: Page) => page.locator('form').getByRole('button', { name: /^(Weiter|Continue)$/ })
-export const mobile = (page: Page) => (page.viewportSize()?.width ?? 1280) < 900
+export const mobile = (page: Page) => (page.viewportSize()?.width ?? 1280) < 1024
 
 export async function open(page: Page, locale = 'de') {
   await page.clock.setFixedTime(new Date('2026-11-05T12:00:00Z'))

@@ -53,7 +53,15 @@ test('photo upload rejects invalid and oversized files and limits the count', as
 
 test('sold-out choices cannot be selected and explain why', async ({ page }) => {
   await open(page)
-  const soldOut = page.getByRole('radio', { disabled: true }).first()
+  await page.evaluate(async () => {
+    const path = '/src/api/client.ts'
+    const { api } = await import(path)
+    for (const item of await api.inventory.list()) {
+      if (item.kind === 'custom' && item.color === 'beige') await api.inventory.update(item.id, 0, item.quantity)
+    }
+  })
+  await page.reload()
+  const soldOut = page.getByRole('radio', { name: /^Beige/, disabled: true })
   await expect(soldOut).toBeDisabled()
   await expect(soldOut.locator('..')).toContainText(/Ausverkauft|Sold out/i)
 })

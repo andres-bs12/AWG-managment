@@ -13,12 +13,13 @@ type Props = {
   onSubmit: (code: string) => void
   initialCode?: string
   error?: string
+  lookup?: typeof api.tracking.getByCode
 }
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
 /** Mount only while the pop-up should be visible — mounting is what resets and focuses it. */
-export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Props) {
+export function TrackDialog({ onClose, onSubmit, initialCode = '', error, lookup = api.tracking.getByCode }: Props) {
   const { t, locale } = useLocale()
   const titleId = useId()
   const hintId = useId()
@@ -73,7 +74,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
     setLocalError('')
     setBusy(true)
     try {
-      await api.tracking.getByCode(next)
+      await lookup(next)
       onSubmit(next)
     } catch (err) {
       setLocalError(apiError(err, locale, t('trackNotFound')).text)

@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.TextStyle;
 import java.util.*;
 
@@ -42,6 +43,9 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class ShopService {
+    /** Pickup arrival times are offered every 30 minutes. */
+    static final int PICKUP_STEP_MINUTES = 30;
+
     private static final double CUSTOM_HOURS = 1.0;
     private static final double CUSTOM_WITH_NAME_HOURS = 1.25;
     public static final int MAX_ITEMS = 10;
@@ -186,6 +190,44 @@ public class ShopService {
         return out;
     }
 
+    /**
+     * Stall days where a web order can be picked up: from the lead time on (pickups do not wait for
+     * the first Vienna delivery day), not after the season end, with painting time for every
+     * ornament on days before the stall day.
+     */
+    public List<PickupDayDto> pickupDays(List<ShopItemShape> items) {
+        requireCustomOnly(items);
+        AgendaService.Snapshot s = agendaService.snapshot();
+        List<Double> durations = durations(items);
+        LocalDate today = s.index().today();
+        LocalDate first = today.plusDays(Math.max(1, props.shop().leadDays()));
+        LocalDate last = today.plusDays(props.shop().maxDaysAhead());
+        if (last.isAfter(seasonEnd())) last = seasonEnd();
+        List<PickupDayDto> out = new ArrayList<>();
+        for (LocalDate d = first; !d.isAfter(last); d = d.plusDays(1)) {
+            Optional<MarketDay> stall = s.index().marketDayOn(d);
+            if (stall.isEmpty() || !hasPickupWindow(stall.get())) continue;
+            if (plan(s, d, durations) == null) continue;
+            MarketDay day = stall.get();
+            out.add(new PickupDayDto(d.toString(), d.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH).toLowerCase(Locale.ROOT),
+                    day.getMarket().getName(), day.getMarket().getStall(), day.getOpenTime().toString(), day.getCloseTime().toString()));
+        }
+        return out;
+    }
+
+    private static boolean hasPickupWindow(MarketDay day) {
+        return day.getOpenTime() != null && day.getCloseTime() != null
+                && !day.getOpenTime().plusMinutes(PICKUP_STEP_MINUTES).isAfter(day.getCloseTime());
+    }
+
+    /** Arrival times are on the half hour, from opening until 30 minutes before closing. */
+    static boolean isPickupTimeAllowed(MarketDay day, LocalTime time) {
+        return time != null && hasPickupWindow(day) && time.getSecond() == 0 && time.getNano() == 0
+                && time.getMinute() % PICKUP_STEP_MINUTES == 0
+                && !time.isBefore(day.getOpenTime())
+                && !time.isAfter(day.getCloseTime().minusMinutes(PICKUP_STEP_MINUTES));
+    }
+
     /** Lead time after today, and never before the season's first delivery day. */
     private LocalDate firstDeliveryDay(LocalDate today) {
         LocalDate first = today.plusDays(Math.max(1, props.shop().leadDays()));
@@ -248,10 +290,14 @@ public class ShopService {
     @Transactional
     public CheckoutResponse checkout(CheckoutRequest req, Map<String, MultipartFile> files) {
         if (!isOpen()) throw new StripeClient.ShopUnavailableException();
-        if (!ViennaAddress.isViennaPostal(req.address().postalCode())) throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).")
-                .code("POSTAL_OUTSIDE_VIENNA").field("address.postalCode");
-        if (!CalendarRules.isViennaDay(req.deliveryDate()) && !req.deliveryDate().equals(seasonEnd())) {
-            throw new BadRequestException("Deliveries are on Wednesday or Friday.").code("DELIVERY_DAY_INVALID").field("deliveryDate");
+        boolean pickup = req.isPickup();
+        if (!pickup) {
+            if (req.address() == null) throw new BadRequestException("Add the delivery address.").code("VALIDATION").field("address");
+            if (!ViennaAddress.isViennaPostal(req.address().postalCode())) throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).")
+                    .code("POSTAL_OUTSIDE_VIENNA").field("address.postalCode");
+            if (!CalendarRules.isViennaDay(req.deliveryDate()) && !req.deliveryDate().equals(seasonEnd())) {
+                throw new BadRequestException("Deliveries are on Wednesday or Friday.").code("DELIVERY_DAY_INVALID").field("deliveryDate");
+            }
         }
 
         calendarService.lockSchedule();
@@ -262,7 +308,17 @@ public class ShopService {
         }
         AgendaService.Snapshot s = agendaService.snapshot();
         LocalDate today = s.index().today();
-        if (req.deliveryDate().isBefore(firstDeliveryDay(today))
+        if (pickup) {
+            Optional<MarketDay> stall = s.index().marketDayOn(req.deliveryDate());
+            if (stall.isEmpty() || req.deliveryDate().isBefore(today.plusDays(Math.max(1, props.shop().leadDays())))
+                    || req.deliveryDate().isAfter(today.plusDays(props.shop().maxDaysAhead()))
+                    || req.deliveryDate().isAfter(seasonEnd()) || !hasPickupWindow(stall.get())) {
+                throw new BadRequestException("Choose one of the offered market days.").code("PICKUP_DAY_INVALID").field("deliveryDate");
+            }
+            if (!isPickupTimeAllowed(stall.get(), req.pickupTime())) {
+                throw new BadRequestException("Choose a pickup time while the stall is open.").code("PICKUP_TIME_INVALID").field("pickupTime");
+            }
+        } else if (req.deliveryDate().isBefore(firstDeliveryDay(today))
                 || req.deliveryDate().isAfter(today.plusDays(props.shop().maxDaysAhead()))
                 || !isDeliveryDay(s, req.deliveryDate())) {
             throw new BadRequestException("Choose one of the offered delivery days.").code("DELIVERY_DAY_INVALID").field("deliveryDate");
@@ -312,10 +368,11 @@ public class ShopService {
         order.setCheckoutExpiresAt(now.plusSeconds(60L * Math.max(30, props.shop().checkoutMinutes()) + 120));
         order.setPaymentState(PaymentState.UNPAID);
         order.setFormSubmitted(true);
-        order.setDeliveryAddress(OrderService.toAddress(req.address()));
-        order.setDeliveryFee(fee());
+        BigDecimal deliveryFee = pickup ? BigDecimal.ZERO : fee();
+        order.setDeliveryAddress(pickup ? null : OrderService.toAddress(req.address()));
+        order.setDeliveryFee(deliveryFee);
 
-        BigDecimal total = fee();
+        BigDecimal total = deliveryFee;
         int position = 0;
         int slotIndex = 0;
         Map<OrderItem, ShopItemRequest> sources = new LinkedHashMap<>();
@@ -330,8 +387,9 @@ public class ShopService {
             item.setCost(pricingService.itemCost(row.kind(), withName));
             item.setProductionStatus(custom ? ProductionStatus.NOT_STARTED : ProductionStatus.FINISHED);
             item.setPosition(position++);
-            item.setDeliveryKind(DeliveryKind.DELIVERY);
+            item.setDeliveryKind(pickup ? DeliveryKind.MARKET : DeliveryKind.DELIVERY);
             item.setHandoffDate(req.deliveryDate());
+            if (pickup) item.setPickUpTime(req.pickupTime());
             item.setPetName(row.petName() == null ? "" : row.petName().trim());
             item.setNote(row.note() == null ? "" : row.note().trim());
             if (withName && row.backName() != null) {
@@ -373,7 +431,7 @@ public class ShopService {
                 String name = "Custom pet ornament" + (item.getPetName().isBlank() ? "" : " · " + item.getPetName()) + (item.isWithName() ? " + name" : "");
                 lines.add(new StripeClient.Line(name, item.getCost(), 1));
             }
-            if (fee().signum() > 0) lines.add(new StripeClient.Line("Delivery in Vienna", fee(), 1));
+            if (deliveryFee.signum() > 0) lines.add(new StripeClient.Line("Delivery in Vienna", deliveryFee, 1));
             session = stripe.createCheckoutSession(order.getId().toString(), order.getCode(),
                     customer.getEmail(), lines, order.getCheckoutExpiresAt());
             order.setStripeSessionId(session.id());

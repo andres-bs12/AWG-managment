@@ -1,15 +1,13 @@
 import styles from '../BuyPage.module.css'
 import type { BuyStepProps } from './shared'
 import { Field } from '../../../components/ui/Field'
-import { colorKeys, MAX_PHOTOS } from './shared'
+import { MAX_PHOTOS } from './shared'
 
 import { useState } from 'react'
 
 export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, addFiles, activeUid }: { activeUid: string } & Pick<BuyStepProps, 't' | 'draft' | 'patchItem' | 'err' | 'described' | 'photoErrors' | 'addFiles'>) {
   const [reading, setReading] = useState<string | null>(null)
-  return (draft.items.map((item, index) => item.uid !== activeUid ? null : <div className={styles.card} key={item.uid}>
-    <h3>
-      {t('ornamentN', { n: index + 1 })} · {item.color && t(colorKeys[item.color])}{item.finish && <> · {t(item.finish === 'shiny' ? 'finishShiny' : 'finishMatte')}</>}</h3>
+  return (draft.items.map(item => item.uid !== activeUid ? null : <div className={styles.itemSection} key={item.uid}>
     <Field label={t('petName')} htmlFor={`pet-${item.uid}`} error={err(`pet-${item.uid}`)}>
       <input
 
@@ -24,7 +22,7 @@ export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, a
         aria-describedby={described(`pet-${item.uid}`)}
 
         onChange={(event) => patchItem(item.uid, { petName: event.target.value })} /></Field>
-    <div className={styles.photoBlock}>
+    <div id={`photos-block-${item.uid}`} tabIndex={-1} className={styles.photoBlock}>
       <p className={styles.label}>
         {t('formPhotos')}</p>
       <p className={styles.muted} id={`photos-${item.uid}-hint`}>

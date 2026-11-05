@@ -2,13 +2,14 @@
  * The cat and dog portraits painted on our ornaments, drawn in a 100x100 box. Shared by the
  * tracking "painting" ornament and the opening curtain so both show the same pets.
  */
-type FaceProps = { className?: string }
+/** `disc` tints the outer background circle (e.g. a darker shade of the ornament colour). */
+type FaceProps = { className?: string; disc?: string }
 
-export function CatFace({ className }: FaceProps) {
+export function CatFace({ className, disc = '#7cae98' }: FaceProps) {
   return (
     <g className={className}>
-      <circle cx="50" cy="50" r="50" fill="#7cae98" />
-      <circle cx="50" cy="52" r="40" fill="#fff4df" stroke="#d9e7cd" strokeWidth="2" />
+      <circle cx="50" cy="50" r="50" style={{ fill: disc }} />
+      <circle cx="50" cy="52" r="40" fill="#fff4df" stroke="#fff4df" strokeWidth="2" />
       <path d="M26 45 L25 24 Q26 20 30 24 L41 33 Q50 29 59 33 L71 24 Q75 21 75 26 L74 46 Q82 72 61 79 Q49 84 36 78 Q19 70 26 45Z" fill="#e3a25c" />
       <path d="M29 38 L29 28 L38 35 M63 35 L71 28 L71 39" fill="#eab1a0" />
       <path d="M48 33 Q41 45 44 53 Q33 50 29 60 Q26 73 42 78 Q57 85 70 72 Q78 59 62 53 Q54 52 53 33Z" fill="#fff7e9" />
@@ -24,11 +25,11 @@ export function CatFace({ className }: FaceProps) {
   )
 }
 
-export function DogFace({ className }: FaceProps) {
+export function DogFace({ className, disc = '#86afc7' }: FaceProps) {
   return (
     <g className={className}>
-      <circle cx="50" cy="50" r="50" fill="#86afc7" />
-      <circle cx="50" cy="52" r="40" fill="#fff4df" stroke="#d7e6ec" strokeWidth="2" />
+      <circle cx="50" cy="50" r="50" style={{ fill: disc }} />
+      <circle cx="50" cy="52" r="40" fill="#fff4df" stroke="#fff4df" strokeWidth="2" />
       <path d="M33 34 Q23 28 19 42 L18 62 Q20 74 29 68 L38 46 M67 34 Q77 28 81 42 L82 62 Q80 74 71 68 L62 46" fill="#956548" />
       <path d="M29 48 Q29 30 50 30 Q71 30 71 48 L72 62 Q71 81 50 82 Q29 81 28 62Z" fill="#d9ac78" />
       <path d="M46 31 Q42 43 47 55 Q34 53 33 65 Q34 78 50 79 Q66 78 67 65 Q66 53 53 55 Q58 43 54 31Z" fill="#fff7e9" />

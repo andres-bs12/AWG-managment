@@ -5,9 +5,9 @@ test('back name retains value and changes the preview and price', async ({ page 
   await open(page); await choose(page); if (mobile(page)) await next(page).click()
   const checkbox = page.locator('input[type=checkbox]').first()
   await checkbox.check(); await page.locator('input[id^="back-"]').fill('LUNA')
-  await expect(page.getByRole('button', { name: /^(Hinten|Back)$/ })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByText(/62,98/).first()).toBeVisible()
-  await checkbox.uncheck(); await expect(page.getByText(/49,99/).first()).toBeVisible()
+  await expect(page.getByRole('radio', { name: /^(Hinten|Back)$/ })).toBeChecked()
+  await expect(page.locator('[data-buy-total]:visible').first().locator('[aria-hidden="true"]')).toContainText('62,98')
+  await checkbox.uncheck(); await expect(page.locator('[data-buy-total]:visible').first().locator('[aria-hidden="true"]')).toContainText('49,99')
   await checkbox.check(); await expect(page.locator('input[id^="back-"]')).toHaveValue('LUNA')
 })
 

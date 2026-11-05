@@ -25,12 +25,18 @@ const PaintPage = lazy(() => import('./pages/staff/PaintPage').then(module => ({
 const ChangePasswordPage = lazy(() => import('./pages/staff/ChangePasswordPage').then(module => ({ default: module.ChangePasswordPage })))
 const LegalPage = lazy(() => import('./pages/public/LegalPage').then(module => ({ default: module.LegalPage })))
 
+// The guide import and route are removed from production builds by Vite.
+const DesignGuide = import.meta.env.DEV ? lazy(() => import('./pages/dev/DesignGuide').then(module => ({ default: module.DesignGuide }))) : null
+
 function RouteFallback() {
   const { pathname } = useLocation()
   return pathname.startsWith('/staff') ? <p role="status" style={{ minHeight: '100vh', margin: 0, padding: 24, background: 'var(--staff-bg)', color: 'var(--staff-ink)' }}>Loading…</p> : <OrnamentLoader />
 }
 
 export default function App() {
+  if (import.meta.env.DEV && DesignGuide && window.location.pathname === '/dev/design') {
+    return <LocaleProvider><BrowserRouter><Suspense fallback={<OrnamentLoader />}><Routes><Route path="/dev/design" element={<DesignGuide />} /></Routes></Suspense></BrowserRouter></LocaleProvider>
+  }
   return (
     <LocaleProvider>
       <AuthProvider>

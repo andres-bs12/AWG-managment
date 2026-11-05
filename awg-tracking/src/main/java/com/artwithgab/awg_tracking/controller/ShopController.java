@@ -45,6 +45,12 @@ public class ShopController {
         return shopService.deliveryDates(body.items());
     }
 
+    @PostMapping("/pickup-days")
+    public List<PickupDayDto> pickupDays(@Valid @RequestBody DeliveryDatesRequest body, HttpServletRequest request) {
+        rateLimiter.check("shop-dates", request.getRemoteAddr(), 30);
+        return shopService.pickupDays(body.items());
+    }
+
     /** Multipart: part "payload" (CheckoutRequest JSON) plus file parts "photo-{id}". */
     @PostMapping(value = "/checkout", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public CheckoutResponse checkout(MultipartHttpServletRequest request) {

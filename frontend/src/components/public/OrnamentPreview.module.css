@@ -1,25 +1,53 @@
-.preview { text-align: center; color: var(--public-ink); }
-.preview p { margin: 0.5rem 0 0; font-size: var(--fs-small); color: var(--public-muted); }
-.stage { perspective: 800px; }
-.sway { animation: sway 6s ease-in-out infinite; transform-origin: 50% 0; }
-.flip { transform-style: preserve-3d; transition: transform 450ms ease; }
-.flip[data-back='true'] { transform: rotateY(180deg); }
-.art { display: block; width: min(100%, 280px); margin: auto; overflow: visible; }
-.ball { fill: #d8c3a0; opacity: 0; transition: opacity 200ms ease; }
-.ball[data-visible="true"] { opacity: 1; }
-.ball[data-color='red'] { fill: #b03a2e; }
-.ball[data-color='green'] { fill: #2f6b3f; }
-.front, .back { transition: opacity 200ms ease; }
-.back { opacity: 0; font: 700 20px var(--font-display); fill: white; transform: scaleX(-1); transform-origin: center; }
-.flip[data-back='true'] .front { opacity: 0; }
-.flip[data-back='true'] .back { opacity: 1; }
-.dog { animation: pets 10s ease-in-out infinite; }
-.glint { animation: glint 700ms ease-out both; }
-.segment { display: inline-flex; padding: 3px; border: 1px solid var(--snow-2); border-radius: var(--radius); }
-.segment button { min-height: 44px; padding: 0 1rem; border: 0; border-radius: var(--radius); background: transparent; cursor: pointer; color: var(--public-ink); }
-.segment button[aria-pressed='true'] { background: var(--night); color: white; }
-.segment button:focus-visible { outline: 3px solid var(--night); outline-offset: 2px; }
+/* Live ornament preview — docs/design-system.md §7.16 (tokens only). */
+.preview { position: relative; text-align: center; color: var(--color-text); }
+.stage { display: block; }
+.art { display: block; width: min(100%, var(--size-preview-desktop)); margin: auto; overflow: visible; }
+.hook { stroke: var(--ornament-hook); }
+.cap { fill: var(--ornament-cap); }
+.ball { opacity: 0; transition: opacity var(--dur-change) ease; }
+.ball[data-visible='true'] { opacity: 1; }
+.ball[data-color='red'] { fill: var(--ornament-red); }
+.ball[data-color='green'] { fill: var(--ornament-green); }
+.ball[data-color='beige'] { fill: var(--ornament-beige); }
+.shade { pointer-events: none; }
+
+/* Turning the ornament like a globe (owner, 2026-11-05): the ball never changes shape; the
+   painted side travels across the surface and foreshortens towards the rim (scaleX), while the
+   other side comes in from the opposite rim. Only transform/opacity animate. */
+.front, .back {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform var(--dur-flip) cubic-bezier(0.45, 0, 0.55, 1), opacity var(--dur-flip) cubic-bezier(0.45, 0, 0.55, 1);
+}
+.front { transform: none; opacity: 1; }
+.back { transform: translateX(110px) scaleX(0.15); opacity: 0; font: 600 40px var(--font-script); fill: var(--ornament-name-light); }
+.turn[data-back='true'] .front { transform: translateX(-110px) scaleX(0.15); opacity: 0; }
+.turn[data-back='true'] .back { transform: none; opacity: 1; }
+/* White fails on beige (2.33:1): the name is dark brown there. */
+.back[data-color='beige'] { fill: var(--ornament-name-dark); }
+.dog { animation: pets var(--dur-pet-cycle) ease-in-out infinite; }
+.glint { animation: glint var(--dur-enter) ease-out both; }
+
+/* Front/Back: native radios with the C1 selection (2px green boundary + tint + weight 600).
+   Preview → control 12px; control → disclaimer 8px. Padding = 16px inset - border width, so the
+   1px -> 2px selected border never changes the size. */
+.disclaimer { margin: var(--space-2) 0 0; font-size: var(--fs-small); color: var(--color-text-muted); }
+
 @keyframes pets { 0%, 40%, 100% { opacity: 0; } 50%, 90% { opacity: 1; } }
-@keyframes sway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
-@keyframes glint { from { transform: translateX(-90px); opacity: 0; } 40% { opacity: 1; } to { transform: translateX(90px); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .sway, .dog, .glint { animation: none; } .dog { opacity: 0; } .flip { transition: none; transform: none !important; } .front, .back, .ball { transition-duration: 150ms; } .back { transform: none; } }
+@keyframes glint { from { transform: translateX(calc(-1 * var(--preview-glint-shift))); opacity: 0; } 40% { opacity: 1; } to { transform: translateX(var(--preview-glint-shift)); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .dog, .glint { animation: none; }
+  .dog { opacity: 0; }
+  /* Reduced motion: a short crossfade, no travel. */
+  .front, .back, .turn[data-back='true'] .front { transform: none; }
+  .front, .back, .ball { transition: opacity var(--dur-reduced-fade) linear; }
+}
+
+.pause { position: absolute; inset-inline-end: 0; top: 0; display: grid; place-items: center; width: var(--touch); height: var(--touch); padding: 0; border: 0; border-radius: var(--radius-small); background: var(--color-surface); color: var(--color-text-muted); cursor: pointer; }
+.pause svg { width: var(--size-icon); height: var(--size-icon); }
+.pause:focus-visible { outline: none; box-shadow: var(--focus); }
+.preview[data-paused='true'] .dog { animation-play-state: paused; }
+.preview:focus-within .dog, .preview:hover .dog { animation-play-state: paused; }
+.preview[data-preview='static'] * { animation: none; transition: none; }
+.preview[data-preview='static'] .dog { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .pause { display: none; } }

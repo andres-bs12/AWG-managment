@@ -12,10 +12,10 @@ test('contact fields have labels, single-column spacing and aligned postcode and
   }
   const email = await page.locator('#buy-email').boundingBox(), phone = await page.locator('#buy-phone').boundingBox()
   expect(phone!.y).toBeGreaterThan(email!.y + email!.height)
-  const postal = await page.locator('#buy-postal').boundingBox(), city = await page.locator('[class*="cityField"] span').boundingBox()
+  const postal = await page.locator('#buy-postal').boundingBox(), city = await page.locator('[class*="cityValue"]').boundingBox()
   expect(Math.abs(postal!.y - city!.y)).toBeLessThanOrEqual(1)
   await page.locator('#buy-postal').fill('9999'); await page.locator('#buy-postal').blur()
-  const postalError = await page.locator('#buy-postal').boundingBox(), cityError = await page.locator('[class*="cityField"] span').boundingBox()
+  const postalError = await page.locator('#buy-postal').boundingBox(), cityError = await page.locator('[class*="cityValue"]').boundingBox()
   expect(Math.abs(postalError!.y - cityError!.y)).toBeLessThanOrEqual(1)
 })
 
@@ -38,6 +38,12 @@ test('ordinary contact fields follow the spacing scale', async ({ page }) => {
   }
   const name = await page.locator('#buy-name').boundingBox()
   const emailLabel = await page.locator('label[for="buy-email"]').boundingBox()
-  expect(emailLabel!.y - name!.y - name!.height).toBeGreaterThanOrEqual(20)
-  expect(emailLabel!.y - name!.y - name!.height).toBeLessThanOrEqual(28)
+  if ((page.viewportSize()?.width ?? 0) >= 768) {
+    const nameLabel = await page.locator('label[for="buy-name"]').boundingBox()
+    expect(Math.abs(emailLabel!.y - nameLabel!.y)).toBeLessThanOrEqual(1)
+    expect(emailLabel!.x).toBeGreaterThan(name!.x + name!.width)
+  } else {
+    expect(emailLabel!.y - name!.y - name!.height).toBeGreaterThanOrEqual(20)
+    expect(emailLabel!.y - name!.y - name!.height).toBeLessThanOrEqual(28)
+  }
 })

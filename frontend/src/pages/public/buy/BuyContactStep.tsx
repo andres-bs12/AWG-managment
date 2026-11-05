@@ -1,9 +1,10 @@
 import type { BuyStepProps } from './shared'
 import styles from '../BuyPage.module.css'
+import { HelpTip } from '../../../components/ui/HelpTip'
 import { Field } from '../../../components/ui/Field'
 
 /**
- * Mobile: one column, only PLZ + Ort share a row. From 640px a 6-column grid puts related fields
+ * Mobile: one column, only PLZ + Ort share a row. From 768px a 6-column grid puts related fields
  * side by side (Name | E-Mail, Straße | Stiege, PLZ | Ort); the fields use subgrid rows, so labels,
  * hints and inputs stay aligned. Two sections with display-font titles so they never look like labels.
  */
@@ -59,9 +60,6 @@ export function BuyContactStep({ t, draft, patch, err, described, validateField,
 
       <fieldset className={styles.section}>
         <legend className={styles.sectionTitle}>{t('addressHeading')}</legend>
-        <div className={styles.inset}>
-          <p>{t('viennaNotice')}</p>
-        </div>
         <div className={styles.formGrid} data-field-grid>
         <Field className={styles.colWide} label={t('shopStreet')} htmlFor="buy-line1" error={err('buy-line1')}>
           <input
@@ -98,8 +96,8 @@ export function BuyContactStep({ t, draft, patch, err, described, validateField,
             />
           </Field>
           <div className={`${styles.cityField} ${styles.colCity}`}>
-            <strong>{t('shopCity')}</strong>
-            <span>Wien</span>
+            <div className={styles.cityLabel}><strong id="buy-city-label">{t('shopCity')}</strong><HelpTip label={t('explainVienna')}>{t('viennaHelp')}</HelpTip></div>
+            <span className={styles.cityValue} aria-labelledby="buy-city-label">Wien</span>
           </div>
         </div>
       </fieldset>

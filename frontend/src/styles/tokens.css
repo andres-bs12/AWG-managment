@@ -7,6 +7,157 @@
   --space-6: 32px;
   --space-7: 48px;
   --space-8: 64px;
+  --space-9: 80px;
+  --space-10: 96px;
+
+  /* Public design system (docs/design-system.md). Public UI uses only these semantic
+     tokens; the raw palette further below stays for illustrations and staff. */
+  --color-surface: #fffdf9;
+  --color-surface-raised: #ffffff;
+  --color-text: #152033;
+  --color-text-muted: #5c6b80;
+  --color-border: #c6cec9;
+  --color-control-border: #738078;
+  --color-primary: #1f7a4d;
+  --color-primary-hover: #14553a;
+  --color-on-primary: #ffffff;
+  /* C1: one selection treatment = 2px selected boundary + tint + label weight 600. */
+  --color-selected: #14553a;
+  --color-selected-surface: #e9f4ee;
+  --color-selection-hover: #f4f9f6;
+  --color-focus: #14553a;
+  --color-error: #9a3b3b;
+  --color-error-surface: #fff0ee;
+  --color-cart-surface: #eef4f8;
+  --color-cart-ink: #243352;
+  --color-disabled-surface: #f3f5f7;
+  --color-disabled-text: #5c6b80;
+
+  --size-control: 48px;
+  --size-swatch: 24px;
+  --size-check: 24px;
+  --size-help-glyph: 24px;
+  --size-icon: 24px;
+  --border-thin: 1px;
+  --border-control: 2px;
+  --border-inset: 4px;
+  --radius-small: 8px;
+  --radius-control: 12px;
+  --radius-panel: 20px;
+  --shadow-1: 0 4px 12px rgba(21, 32, 51, 0.1);
+  --shadow-2: 0 16px 40px rgba(21, 32, 51, 0.16);
+  --layout-configurator-max: 1100px;
+  --layout-form-max: 760px;
+
+  --dur-press: 100ms;
+  --dur-change: 200ms;
+  --dur-enter: 300ms;
+  --dur-flip: 450ms;
+  --ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+  /* Complete public role tuples and shared dimensions, design system §§3–8. */
+  --type-display-size: clamp(2rem, 6vw, 3.25rem);
+  --type-display-line: 1.10;
+  --type-display-weight: 800;
+  --type-display-tracking: -0.015em;
+  --type-h1-size: 1.75rem;
+  --type-h1-line: 1.20;
+  --type-h1-weight: 700;
+  --type-h1-tracking: 0em;
+  --type-h2-size: 1.625rem;
+  --type-h2-line: 1.25;
+  --type-h2-weight: 700;
+  --type-h2-tracking: 0em;
+  --type-h3-size: 1.25rem;
+  --type-h3-line: 1.30;
+  --type-h3-weight: 700;
+  --type-h3-tracking: 0em;
+  --type-label-size: 1rem;
+  --type-label-line: 1.40;
+  --type-label-weight: 600;
+  --type-label-tracking: 0em;
+  --type-body-size: 1rem;
+  --type-body-line: 1.50;
+  --type-body-weight: 400;
+  --type-body-tracking: 0em;
+  --type-hint-size: 0.875rem;
+  --type-hint-line: 1.45;
+  --type-hint-weight: 400;
+  --type-hint-tracking: 0em;
+  --type-caption-size: 0.75rem;
+  --type-caption-line: 1.50;
+  --type-caption-weight: 600;
+  --type-caption-tracking: 0em;
+  --type-price-size: 1.5rem;
+  --type-price-line: 1.25;
+  --type-price-weight: 700;
+  --type-price-tracking: 0em;
+  --type-button-size: 1rem;
+  --type-button-line: 1.25;
+  --type-button-weight: 600;
+  --type-button-tracking: 0em;
+  --color-focus-gap: #ffffff;
+  --color-primary-pressed: var(--color-primary-hover);
+  --color-success: var(--color-selected);
+  --color-success-surface: var(--color-selected-surface);
+  --color-warning: #805515;
+  --color-warning-surface: #fff4d6;
+  --color-info: var(--color-text);
+  --color-info-surface: var(--color-surface);
+  --color-overlay: rgba(21, 32, 51, 0.56);
+  --radius-circle: 50%;
+  --shadow-none: none;
+  --size-review-art: 76px;
+  --size-date-card: 88px;
+  --size-photo: 76px;
+  --size-preview-mobile: 140px;
+  --size-preview-desktop: 280px;
+  --size-preview-success: 150px;
+  --size-textarea-min: 96px;
+  --size-choice-card: 72px;
+  --size-icon-sm: 16px;
+  --size-step-marker: 32px;
+  --size-progress-rail: 4px;
+  --layout-reading-max: 680px;
+  --layout-status-max: 440px;
+  --layout-field-max: 34rem;
+  --layout-postcode-max: 8rem;
+  --layout-calendar-max: 420px;
+  --layout-gutter: var(--space-4);
+  --layout-header-height: var(--space-8);
+  --layout-sticky-gap: var(--space-4);
+  --measure-prose: 65ch;
+  --measure-hint: 52ch;
+  --measure-heading: 28ch;
+  --dur-exit: 200ms;
+  --dur-reduced: 0ms;
+  --dur-reduced-fade: 150ms;
+  --dur-pet-cycle: 10s;
+  --ease-press: cubic-bezier(0.2, 0, 0, 1);
+  --motion-shift: var(--space-2);
+  --motion-press-scale: 0.97;
+  --ornament-highlight: rgba(255, 255, 255, 0.55);
+  --ornament-glint: rgba(255, 255, 255, 0.22);
+  --ornament-swatch-highlight: rgba(255, 255, 255, 0.60);
+  --ornament-swatch-border: var(--color-control-border);
+  --icon-stroke: 2;
+  --guide-frame-height: 440px;
+  --guide-zoom-size: 2rem;
+  --preview-perspective: 800px;
+  --preview-glint-shift: 90px;
+
+  /* Ornament artwork: body colour + the slightly darker tint behind the pet portrait (C3). */
+  --ornament-red: #b03a2e;
+  --ornament-green: #2f6b3f;
+  --ornament-beige: #d8c3a0;
+  --portrait-red: #963126;
+  --portrait-green: #275b35;
+  --portrait-beige: #bea780;
+  --ornament-cap: #d2b66f;
+  --ornament-hook: #a98948;
+  --ornament-name-light: #ffffff;
+  --ornament-name-dark: #5a4330;
 
   --touch: 44px;
   --touch-lg: 56px;
@@ -16,6 +167,8 @@
 
   --font-display: 'Baloo 2', 'Trebuchet MS', 'Avenir Next Rounded', system-ui, sans-serif;
   --font-sans: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+  /* Back-of-ornament lettering, like Gaby's hand-painted script. */
+  --font-script: 'Dancing Script Variable', 'Dancing Script', 'Brush Script MT', cursive;
   --font-staff: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
 
   --fs-body: 1rem;
@@ -24,7 +177,7 @@
   --fs-h2: 1.25rem;
   --fs-display: clamp(2rem, 6vw, 3.25rem);
 
-  --focus: 0 0 0 3px #fff, 0 0 0 6px #2c5aa0;
+  --focus: 0 0 0 3px var(--color-focus-gap), 0 0 0 6px var(--color-focus);
 
   /* Public (stall) */
   --night: #1b2740;
