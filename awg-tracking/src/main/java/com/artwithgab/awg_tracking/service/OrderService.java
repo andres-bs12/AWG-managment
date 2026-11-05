@@ -257,6 +257,8 @@ public class OrderService {
     public OrderDto updatePaymentState(UUID orderId, PaymentState state, PaymentMethod method, BigDecimal amountPaid) {
         Order order = findOrderOrThrow(orderId);
         if (order.isAwaitingPayment()) throw new ConflictException("This web order is waiting for its online payment.").code("PAYMENT_PENDING");
+        // Staff checked a mismatched Stripe payment by hand: setting the payment resolves the review.
+        if (order.isPaymentReview()) order.setCheckoutStatus(com.artwithgab.awg_tracking.enums.CheckoutStatus.CONFIRMED);
         BigDecimal total = order.getTotal();
         BigDecimal received = switch (state) {
             case UNPAID -> BigDecimal.ZERO;

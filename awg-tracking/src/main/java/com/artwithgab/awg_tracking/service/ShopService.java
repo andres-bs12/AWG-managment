@@ -202,11 +202,6 @@ public class ShopService {
     @Transactional
     public CheckoutResponse checkout(CheckoutRequest req, Map<String, MultipartFile> files) {
         if (!isOpen()) throw new StripeClient.ShopUnavailableException();
-        // Unpaid checkouts hold painting time and stock; cap how many can be open at once.
-        if (orderRepository.countByCheckoutStatus(CheckoutStatus.PENDING) >= Math.max(1, props.shop().maxOpenCheckouts())) {
-            throw new com.artwithgab.awg_tracking.exception.TooManyRequestsException()
-                    .code("TOO_MANY_OPEN_CHECKOUTS");
-        }
         if (!ViennaAddress.isViennaPostal(req.address().postalCode())) throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).")
                 .code("POSTAL_OUTSIDE_VIENNA").field("address.postalCode");
         if (!CalendarRules.isViennaDay(req.deliveryDate()) && !req.deliveryDate().equals(seasonEnd())) {
@@ -214,6 +209,11 @@ public class ShopService {
         }
 
         calendarService.lockSchedule();
+        // Unpaid checkouts hold painting time and stock; cap how many can be open at once (counted under the lock).
+        if (orderRepository.countByCheckoutStatus(CheckoutStatus.PENDING) >= Math.max(1, props.shop().maxOpenCheckouts())) {
+            throw new com.artwithgab.awg_tracking.exception.TooManyRequestsException()
+                    .code("TOO_MANY_OPEN_CHECKOUTS");
+        }
         AgendaService.Snapshot s = agendaService.snapshot();
         LocalDate today = s.index().today();
         if (req.deliveryDate().isBefore(today.plusDays(Math.max(1, props.shop().leadDays())))

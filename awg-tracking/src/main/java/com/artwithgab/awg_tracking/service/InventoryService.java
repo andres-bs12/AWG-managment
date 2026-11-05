@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class InventoryService {
     private final InventoryRepository inventoryRepository;
+    private final org.springframework.beans.factory.ObjectProvider<CalendarService> calendarService;
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public java.util.List<com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto> list() {
@@ -25,6 +26,8 @@ public class InventoryService {
     /** Gaby sets the count after painting more bases or finished ornaments. */
     @org.springframework.transaction.annotation.Transactional
     public com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto setQuantity(java.util.UUID id, int quantity, Integer expectedQuantity) {
+        // Same lock as sales: a sale cannot deduct between the check and the write.
+        calendarService.getObject().lockSchedule();
         Inventory row = inventoryRepository.findById(id)
                 .orElseThrow(() -> new com.artwithgab.awg_tracking.exception.ResourceNotFoundException("Stock row not found"));
         if (expectedQuantity != null && expectedQuantity != row.getQuantity()) {

@@ -21,3 +21,10 @@ tasks/preguntas-pendientes.md rewritten with the owner's answers.
 - Next: apply review fixes; Claude reviews part 2 diff, build/lint, commit; restart test backend (worktree scratchpad/wt
   at new tip, task env in summary); live retest per "Plan de re-test" (Claude subagent) + Codex static retest; fix;
   update AGENTS.md/todo.md; delete RESUME.md + .agent-heartbeat; push; Spanish report.
+
+## Codex review of 8737725 — status (scratchpad codex-review-be-result.md)
+Fixed in the next commit: #1 stock PATCH under ScheduleLock, #3 manual payment resolves REVIEW, #4 open-checkout cap counted under the lock.
+STILL TO DO: #2 Stripe expireSession failure after success/rollback → on error retrieveSession and release only if
+status=expired (confirm if paid) in OrderService.cancelOrder and ShopService.abandon; #5 truly decode JPEG/PNG
+(reader.read with setSourceSubsampling(8,8)) + truncated-image test; #6 STOCK_CHANGED either returns the row or
+update docs/sprint5-contract.md to "UI reloads". Codex frontend part 2 may still be running (codex-fix-fe2.log/result).
