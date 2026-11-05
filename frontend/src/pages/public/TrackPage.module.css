@@ -405,4 +405,8 @@
 }
 
 /* One-time confirmation after the QR form was sent (C1 success surface, no icon). */
-.savedBanner { margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border-radius: var(--radius-control); background: var(--color-success-surface); color: var(--color-text); font-weight: var(--type-label-weight); }
+.savedBanner { position: relative; z-index: 1; width: min(var(--layout-form-max), calc(100% - 2 * var(--layout-gutter))); margin: var(--space-5) auto 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-control); background: var(--color-success-surface); color: var(--color-text); font-weight: var(--type-label-weight); }
+
+.codeRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.copyStatus { flex-basis: 100%; color: var(--color-text-muted); font-size: var(--type-hint-size); }
+.copyStatus:empty { display: none; }

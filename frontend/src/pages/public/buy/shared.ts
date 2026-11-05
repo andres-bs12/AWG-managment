@@ -26,10 +26,4 @@ export type BuyStepProps = {
   serverError: string
 }
 
-/** Arrival times every 30 minutes from opening until 30 minutes before closing (mirrors ShopService). */
-export function pickupTimes(day: Pick<ShopPickupDay, 'openTime' | 'closeTime'>): string[] {
-  const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
-  const out: string[] = []
-  for (let at = minutes(day.openTime); at <= minutes(day.closeTime) - 30; at += 30) out.push(`${String(Math.floor(at / 60)).padStart(2, '0')}:${String(at % 60).padStart(2, '0')}`)
-  return out
-}
+export { pickupTimes } from '../../../lib/pickupTimes'

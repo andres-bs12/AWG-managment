@@ -38,6 +38,7 @@ export function TrackPage() {
   const [addr, setAddr] = useState<Address>({ line1: '', city: 'Vienna', postalCode: '' })
   const [editing, setEditing] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [copyMessage, setCopyMessage] = useState('')
   const [savingAddress, setSavingAddress] = useState(false)
   const [addressError, setAddressError] = useState('')
   const [addressField, setAddressField] = useState('')
@@ -146,6 +147,8 @@ export function TrackPage() {
   return (
     <div className={styles.page}>
       {showWipe ? <SleighWipe label={t('sleigh')} leaving={phase === 'leaving'} /> : null}
+      {/* The form was saved even if loading the order below fails: confirm it regardless. */}
+      {formSaved && <p className={styles.savedBanner} role="status">{t('formSavedBanner')}</p>}
 
       {view && phase === 'done' ? (
         <section className={styles.card} aria-live="polite">
@@ -158,7 +161,6 @@ export function TrackPage() {
           </div>
 
           <div className={styles.details}>
-            {formSaved && <p className={styles.savedBanner} role="status">{t('formSavedBanner')}</p>}
             <span
               className={`${styles.chip} ${
                 status === 'preparing' ? styles.chipWork : status === 'delivered' ? styles.chipDone : styles.chipReady
@@ -173,7 +175,9 @@ export function TrackPage() {
             <dl className={styles.facts}>
               <div>
                 <dt>{t('trackCode')}</dt>
-                <dd className={styles.code}>{view.code}</dd>
+                <dd className={styles.codeRow}><span className={styles.code}>{view.code}</span>
+                  <Button variant="secondary" onClick={() => { void navigator.clipboard.writeText(view.code).then(() => setCopyMessage('copiedCode')).catch(() => setCopyMessage('copyFailed')) }}>{t('copyCode')}</Button>
+                  <span role="status" className={styles.copyStatus}>{copyMessage && t(copyMessage)}</span></dd>
               </div>
               <div>
                 <dt>{t('pickupWhen')}</dt>
