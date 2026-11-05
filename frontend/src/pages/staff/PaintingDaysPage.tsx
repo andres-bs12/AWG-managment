@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api/client'
 import type { PaintingDay } from '../../domain/types'
 import { Button } from '../../components/ui/Button'
@@ -34,43 +34,65 @@ export function PaintingDaysPage() {
     api.paintingDays.list(from, to).then(rows => { if (active) { setDays(rows); setError('') } }).catch(err => { if (active) setError(err instanceof Error ? err.message : 'Could not load painting days.') }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [from, to, seasonEnd, retry])
-  const weeks = Array.from({ length: Math.ceil(days.length / 7) }, (_, index) => days.slice(index * 7, index * 7 + 7))
+  // Past days cannot change anything any more; changes save on their own, so there is no Save button.
+  const upcoming = days.filter(day => day.date >= today)
+  const weeks = Array.from({ length: Math.ceil(upcoming.length / 7) }, (_, index) => upcoming.slice(index * 7, index * 7 + 7))
   return <section className={styles.page}>
     <StaffBackLink to="/staff/agenda" label="Agenda" /><h1>Painting days</h1>
-    <InsetNote><p>These limits apply to automatic suggestions, including stall days. Manual moves and sales may exceed them. Weekday and stall defaults are awaiting the owner's decision.</p></InsetNote>
+    <InsetNote><p>These limits apply to automatic suggestions, including stall days. Manual moves and sales may exceed them. Changes save automatically. Weekday and stall defaults are awaiting the owner's decision.</p></InsetNote>
     <nav className={styles.range} aria-label="Painting day ranges"><Button tone="staff" variant="secondary" disabled={offset === 0 || loading} onClick={() => { setLoading(true); setOffset(n => n - 1) }}>Previous 4 weeks</Button><Button tone="staff" variant="secondary" disabled={!seasonEnd || to >= seasonEnd || loading} onClick={() => { setLoading(true); setOffset(n => n + 1) }}>Next 4 weeks</Button></nav>
     {loading && <p role="status">Loading painting days…</p>}
     {error && <div role="alert"><p>{error}</p><Button tone="staff" onClick={() => { setLoading(true); setRetry(n => n + 1) }}>Retry</Button></div>}
-    {!loading && !error && !days.length && <p>No painting days in this range.</p>}
+    {!loading && !error && !upcoming.length && <p>No painting days in this range.</p>}
     {weeks.map(week => <section key={week[0].date}><h2>Week of {formatDateLabel(week[0].date)}</h2><div className={styles.list}>{week.map(day => <DayRow key={day.date} day={day} />)}</div></section>)}
   </section>
 }
+/** One compact row per day. Every change saves on its own (toggles at once, typed numbers after a pause), in order. */
 function DayRow({ day }: { day: PaintingDay }) {
   const [open, setOpen] = useState(day.open)
   const [max, setMax] = useState(String(day.maxPaintings))
   const [booked, setBooked] = useState(day.booked)
-  const [busy, setBusy] = useState(false)
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [error, setError] = useState('')
-  const [saved, setSaved] = useState({ open: day.open, max: day.maxPaintings })
-  const [notice, setNotice] = useState('')
-  const number = Number(max)
-  const valid = max.trim() !== '' && Number.isInteger(number) && number >= 0 && number <= 10
-  async function save() {
-    if (busy) return
-    if (!valid) { setError('Enter a whole number from 0 to 10.'); return }
-    setBusy(true); setError(''); setNotice('')
+  const pending = useRef<{ open: boolean; max: number } | null>(null)
+  const running = useRef(false)
+  const timer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+  async function flush() {
+    if (running.current) return
+    running.current = true
     try {
-      const result = await api.paintingDays.update(day.date, open, number)
-      setOpen(result.open); setMax(String(result.maxPaintings)); setBooked(result.booked); setSaved({ open: result.open, max: result.maxPaintings }); setNotice('Saved')
-    } catch (err) { setError(err instanceof Error ? err.message : 'Could not save day.') }
-    finally { setBusy(false) }
+      while (pending.current) {
+        const next = pending.current
+        pending.current = null
+        setState('saving'); setError('')
+        try {
+          const result = await api.paintingDays.update(day.date, next.open, next.max)
+          setBooked(result.booked)
+          if (!pending.current) { setOpen(result.open); setMax(String(result.maxPaintings)) }
+          setState('saved')
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Could not save day.'); setState('error')
+        }
+      }
+    } finally { running.current = false }
+  }
+  function change(nextOpen: boolean, nextMax: string, wait: number) {
+    setOpen(nextOpen); setMax(nextMax)
+    window.clearTimeout(timer.current)
+    const number = Number(nextMax)
+    if (nextMax.trim() === '' || !Number.isInteger(number) || number < 0 || number > 10) { setError('Enter a whole number from 0 to 10.'); setState('error'); return }
+    setError(''); setState('idle')
+    timer.current = window.setTimeout(() => { pending.current = { open: nextOpen, max: number }; void flush() }, wait)
   }
   const label = formatDateLabel(day.date)
-  return <article className={styles.row}>
-    <div className={styles.name}><h3>{label}</h3><p>{booked}/{saved.max} booked{(open !== saved.open || number !== saved.max) ? ' · Unsaved changes' : ''}</p>{notice && <p role="status">{notice}</p>}</div>
-    <label><input type="checkbox" role="switch" aria-label={`Painting open ${label}`} checked={open} disabled={busy} onChange={event => setOpen(event.target.checked)} /> {open ? 'Open' : 'Closed'}</label>
-    <NumberStepper label={`Max paintings for ${label}`} value={max} onChange={setMax} max={10} disabled={busy} />
-    <Button tone="staff" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</Button>
+  const limit = Number(max)
+  const over = open && Number.isFinite(limit) && booked > limit
+  return <article className={styles.dayRow}>
+    <div className={styles.name}><h3>{label}</h3><p data-over={over || undefined}>{booked}/{open ? max : 0} booked{over ? ' · Over limit' : ''}</p></div>
+    <label className={styles.toggle}><input type="checkbox" role="switch" aria-label={`Painting open ${label}`} checked={open} onChange={event => change(event.target.checked, max, 0)} /> {open ? 'Open' : 'Closed'}</label>
+    <NumberStepper label={`Max paintings for ${label}`} value={max} onChange={value => change(open, value, 400)} max={10} disabled={!open} />
+    <p className={styles.saveState} role="status">{state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : ''}</p>
     {error && <p className={styles.error} role="alert">{error}</p>}
   </article>
 }

@@ -89,7 +89,12 @@ async function httpFixture(page: Page, options: FixtureOptions = {}) {
     if (path === '/api/inventory') return json(route, inventory)
     if (path === '/api/markets' && method === 'GET') return json(route, allMarkets)
     if (path === '/api/market-days') return json(route, allDays.filter(row => !url.searchParams.has('marketId') || row.marketId === url.searchParams.get('marketId')))
-    if (path === '/api/painting-days') return json(route, [{ date: today, open: true, maxPaintings: 2, booked: 1 }])
+    if (path === '/api/painting-days') return json(route, [{ date: '2026-11-05', open: true, maxPaintings: 2, booked: 0 }, { date: today, open: true, maxPaintings: 2, booked: 3 }])
+    if (path.startsWith('/api/painting-days/') && method === 'PATCH') {
+      const body = request.postDataJSON() as { open: boolean; maxPaintings: number }
+      mutations.push({ path, body })
+      return json(route, { date: decodeURIComponent(path.split('/').pop()!), ...body, booked: 3 })
+    }
     if (path === '/api/agenda/days' || path.startsWith('/api/agenda/days/')) {
       dayReads++
       if (agendaStatus !== 200) return json(route, { code: 'UNAUTHORIZED', message: 'Session expired.' }, agendaStatus)
@@ -721,4 +726,21 @@ test('mock: one finished ornament, Deliver now, Paid in cash completes the sale'
   await expect(page.getByRole('button', { name: 'Retry checks', exact: true })).toHaveCount(0)
   await page.getByRole('link', { name: 'Open order', exact: true }).click()
   await expect(page.getByText(/^Handed over$/).first()).toBeVisible()
+})
+
+test('painting days hide past days, flag over-limit days and save each change without a Save button', async ({ page }) => {
+  const fixture = await httpFixture(page)
+  await signedIn(page, '/staff/painting-days')
+  await expect(page.getByRole('heading', { level: 3 })).toHaveCount(1)
+  await expect(page.getByText('3/2 booked · Over limit')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0)
+  const toggle = page.getByRole('switch', { name: /^Painting open/ })
+  const box = await toggle.boundingBox()
+  expect(box!.width).toBeGreaterThanOrEqual(24)
+  await page.getByRole('button', { name: /^Increase Max paintings/ }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible()
+  await expect(page.getByText('3/3 booked', { exact: true })).toBeVisible()
+  await toggle.uncheck()
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 3 }, { open: false, maxPaintings: 3 }])
+  await axe(page)
 })
