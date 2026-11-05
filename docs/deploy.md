@@ -24,6 +24,8 @@ Consulta el estado con `docker compose --env-file .env ps` y los registros con `
 | `STAFF_GABY_PASSWORD` | Contraseña inicial para crear la cuenta de Gaby. |
 | `STAFF_ANDRES_PASSWORD` | Contraseña inicial para crear la cuenta de Andres. |
 | `SHOP_ENABLED` | `false` desactiva la tienda; usa `true` solo cuando Stripe y el dominio estén configurados. |
+| `SHOP_DELIVERIES_FROM` | Primer día con entregas web (por defecto `2026-11-30`, después del primer fin de semana de mercado). |
+| `SHOP_SEASON_END` | Último día de entrega de la temporada (por defecto `2026-12-24`); después la tienda muestra la lista de espera. |
 | `STRIPE_SECRET_KEY` | Clave secreta de Stripe correspondiente al entorno de pruebas o producción. |
 | `STRIPE_WEBHOOK_SECRET` | Secreto de firma del endpoint de webhook de Stripe. |
 | `PUBLIC_BASE_URL` | Origen público del frontend, por ejemplo `https://example.com`, usado para volver desde Stripe. |
@@ -80,3 +82,7 @@ Variables:
 | `OWNER_EMAIL` | A dónde llegan los avisos del dueño. |
 
 Los e-mails se envían en segundo plano después de guardar el cambio. Si el SMTP falla, el pedido no se ve afectado y el error queda en el log.
+
+## Retención de datos
+
+Cada noche (03:30, hora de Viena) el backend borra las fotos y los datos personales (nombre, e-mail, teléfono, dirección, nombre de la mascota, nota) de los pedidos entregados hace más de 60 días. Los pedidos que nunca se entregaron se borran al cumplir un año. Se conservan el código, las fechas, los adornos y los importes para la contabilidad. El enlace del formulario deja de funcionar 30 días después de la entrega. Las inscripciones a la lista de espera sin confirmar se borran a los 7 días. Los plazos se cambian con `RETENTION_FORM_LINK_DAYS`, `RETENTION_PERSONAL_DATA_DAYS`, `RETENTION_STALE_ORDER_DAYS` y `RETENTION_WAITLIST_UNCONFIRMED_DAYS`; confírmalos con tu asesor.

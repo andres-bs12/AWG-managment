@@ -4,17 +4,23 @@ Actualizado 2026-11-05 con tus respuestas y con lo que encontró la auditoría f
 
 ## Abiertas
 
-1. **Colores de los adornos.** Sin respuesta. Hoy se venden rojo y gris (los únicos con stock). Verde y blanco existen en el sistema, pero sin stock: si los quieres, créales stock y aparecen solos en la tienda. ¿Cuáles son los colores reales?
-2. **Stripe.** Lo activas mañana. Tienes la guía en `docs/stripe-setup.md`. La CLI de Stripe ya está instalada; solo falta `stripe login` y tus claves de prueba.
-3. **E-mail (SMTP).** Los avisos al dueño y al cliente ya están programados, pero no se envía nada hasta configurar `MAIL_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` y `OWNER_EMAIL` (ver `docs/deploy.md`). ¿Qué proveedor de correo usas (Gmail/Workspace, Zoho, Brevo…)?
-4. **Datos para los textos legales.** Los borradores de `/impressum`, `/agb` y `/datenschutz` tienen marcadores `[…]`: nombre o empresa, dirección, e-mail, teléfono, UID, GISA, proveedor de hosting y de e-mail. Necesitan esos datos y una revisión legal. (artwithgab.com no resolvía cuando lo consulté.)
-5. **Despliegue.** Lo decides mañana. Todo está listo con Docker (`docs/deploy.md`); falta dominio y proveedor.
-6. **Lista de espera.** Los e-mails se guardan (tabla `waitlist_entry`), pero no hay pantalla para verlos ni envío automático cuando abra la temporada 2027. ¿Lo hacemos más adelante?
-7. **Avisos con agentes.** Comentaste que después quieres un seguimiento "más inteligente" de los movimientos. Queda para una fase futura.
-8. **Caducidad de los enlaces del formulario** (auditoría de seguridad, prioridad alta). Hoy el enlace `/form/…` de cada pedido funciona para siempre: quien lo tenga ve el nombre, el teléfono y la dirección. Propuesta: que deje de funcionar 30 días después de la entrega. ¿Te parece bien, o prefieres otro plazo?
-9. **Datos con códigos antiguos.** Track muestra el nombre de pila y el estado con solo el código del pedido (los códigos viejos son cortos). ¿Mostramos menos datos para los pedidos con código corto (anteriores a `AWG` + 6) o los dejamos como están?
-10. **Cuánto tiempo guardar los datos.** No hay borrado automático de clientes, fotos ni pedidos. Propuesta: borrar las fotos 60 días después de la entrega y anonimizar los clientes después del plazo que pida tu asesor (en Austria las facturas se guardan 7 años). ¿Lo hacemos así?
-11. **Confirmar la lista de espera.** Para cumplir con el RGPD lo ideal es enviar un e-mail de confirmación (doble opt-in) y un enlace para darse de baja. Necesita el SMTP de la pregunta 3. ¿Lo hacemos cuando esté el correo?
+1. **Stripe.** Lo activas hoy. Guía: `docs/stripe-setup.md` (falta `stripe login` y tus claves de prueba).
+2. **Dominio y correo.** Los compras junto con el despliegue. Recomendación y pasos en `docs/siguiente-fase.md` (buzón en el registrador o Zoho Mail; envíos automáticos con Brevo, servidores en la UE).
+3. **Despliegue.** Lo decides hoy. Todo está listo con Docker (`docs/deploy.md`); en `docs/siguiente-fase.md` hay una recomendación de servidor en la UE.
+4. **Datos legales.** Todavía pendientes. Los borradores de `/impressum`, `/agb` y `/datenschutz` tienen marcadores `[…]`. El asesor debe revisar también: el botón "Zahlungspflichtig bestellen", que los adornos personalizados no se pueden devolver (§ 18 FAGG) y los plazos de borrado (60 días después de la entrega; las facturas, 7 años).
+5. **Stock por acabado.** Supuse que las bases brillantes y mate son piezas distintas, así que el stock se lleva por color y acabado (6 filas). Si el acabado se aplica después sobre la misma base, avísame y lo cambio a stock solo por color.
+6. **Textos de los acabados.** Puse "Glänzend: spiegelt das Licht, kräftige Farben. Matt: weich und samtig, ohne Spiegelungen." Revisa que describan bien tus adornos (idealmente con una foto de cada uno).
+
+## Resueltas (2026-11-05, segunda ronda)
+
+- **Colores:** rojo, verde y beige, cada uno brillante o mate, con un "?" que explica la diferencia. Gris y blanco dejan de venderse (se conservan en pedidos antiguos).
+- **Primer día de entrega web:** después del primer mercado (último fin de semana de noviembre): desde el 30-nov-2026, es decir, el miércoles 2 de diciembre. Ajustable con `SHOP_DELIVERIES_FROM`. El 24-dic (jueves) sigue siendo el último día de entrega, como excepción.
+- **Hora de entrega:** no hay hora fija; se avisa de que es por la tarde-noche.
+- **Enlace del formulario:** deja de funcionar 30 días después de la entrega.
+- **Track con códigos antiguos (decidido por mí):** con un código corto (anterior a `AWG` + 6) solo se ve el estado y la fecha; el nombre y los datos de la mascota solo se muestran con el enlace del formulario. Los códigos nuevos no cambian.
+- **Borrado de datos:** fotos y datos personales se borran 60 días después de la entrega; se conserva lo contable (código, fechas, adornos, importes). Pedidos nunca entregados: al año.
+- **Lista de espera:** confirmación por e-mail (doble opt-in) y enlace para darse de baja; las no confirmadas se borran a los 7 días. La pantalla para ver la lista y el envío automático quedan como tarea futura (`tasks/todo.md`).
+- **Avisos con agentes:** para cuando todo esté en producción.
 
 ## Resueltas (2026-11-05)
 

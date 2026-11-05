@@ -1,6 +1,6 @@
 # Contexto del proyecto — ArtWithGab (AWG)
 
-**Actualizado:** 2026-11-05  
+**Actualizado:** 2026-11-05 (sprint 6)  
 **Propósito de este archivo:** memoria persistente para el dueño del proyecto y los agentes que trabajen en este repositorio.
 
 ## Instrucción de mantenimiento
@@ -90,11 +90,14 @@ Paquete `com.artwithgab.awg_tracking` (con guion bajo; no cambiarlo). Capas: `mo
 - Toda operación que reserva tiempo de pintura toma el lock de fila `ScheduleLock` (evita doble reserva y sobreventa de stock).
 - Los precios los calcula el servidor (`awg.pricing.*`).
 - Pedidos web `PENDING` ocupan horas pero se ocultan en Agenda/Entregas hasta que Stripe confirma.
-- Arranque: `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev` (datos demo y usuarios demo). Tests: `./mvnw test` (63 tests).
-- Esquema con Flyway (`db/migration/V1..V3`), `ddl-auto=validate`; los tests usan H2 sin Flyway. Un cambio de entidad necesita una migración nueva.
+- Arranque: `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev` (datos demo y usuarios demo: `gaby@artwithgab.com`/`gaby`, `andres@artwithgab.com`/`andres`). Tests: `./mvnw test` (75 tests).
+- Esquema con Flyway (`db/migration/V1..V4`), `ddl-auto=validate`; los tests usan H2 sin Flyway. Un cambio de entidad necesita una migración nueva.
 - Errores `{status, message, code, field}` con códigos estables (`docs/sprint5-contract.md`); el front los traduce con `frontend/src/lib/apiError.ts`.
 - Ventas del staff idempotentes (`Idempotency-Key`). Pago Stripe con importe distinto → `checkoutStatus=REVIEW` (no se libera; el staff lo resuelve al anotar el pago). Cancelar/abandonar cierra la sesión de Stripe (`expireOrReconcile`).
 - Stock editable con `expectedQuantity` (409 `STOCK_CHANGED`), días de pintura (`PaintingDay`, máximo 2 por defecto), fin de temporada `awg.shop.season-end` (24-dic), lista de espera.
+- Colores `red`/`green`/`beige` (gris y blanco solo para datos antiguos, `CustomColor.isOffered`) con acabado `shiny`/`matte` (`CustomFinish`); stock por color + acabado.
+- Entregas web desde `awg.shop.deliveries-from` (30-nov-2026). El enlace del formulario caduca 30 días tras la entrega (`Order.handedOverAt`, `FormLinkPolicy`, 404 `FORM_EXPIRED`). Track oculta nombres para códigos antiguos cortos sin token.
+- `RetentionService` (cada noche): borra fotos y datos personales 60 días tras la entrega (365 si nunca se entregó) y la lista de espera sin confirmar a los 7 días. Lista de espera con doble opt-in (`/waitlist/confirm#token`, `/waitlist/unsubscribe#token`).
 - E-mails al dueño y al cliente por evento de pedido (`NotificationService`, tras commit, asíncrono); sin `MAIL_HOST` no se envía nada.
 - Contraseñas iniciales del staff: mínimo 10 caracteres fuera de dev. Fotos JPEG/PNG se decodifican antes de guardarse.
 - Despliegue: `docker-compose.yml` + `docs/deploy.md`; nginx con cabeceras de seguridad y sin registrar enlaces `/form/`.
@@ -107,6 +110,10 @@ Paquete `com.artwithgab.awg_tracking` (con guion bajo; no cambiarlo). Capas: `mo
 
 ## Estado y siguientes tareas
 
-Rama `feat/backend-domain` (PR #2 a `main`), subida a GitHub. Sprints 1–5 terminados, incluida la auditoría final doble (`tasks/audit-final.md`, resultados en `tasks/audit-results/`). Backlog en `tasks/todo.md`; decisiones abiertas del dueño en `tasks/preguntas-pendientes.md` (Stripe, SMTP, despliegue, datos legales, colores, caducidad de enlaces, retención, lista de espera).
+Rama `feat/backend-domain` (PR #2 a `main`), subida a GitHub. Sprint 6 (respuestas del dueño + rediseño UX de `/buy`, `docs/sprint6-buy-ux.md`; investigación en `tasks/ux-research/`). Guía para el dueño: `docs/siguiente-fase.md`. Sprints 1–5 terminados, incluida la auditoría final doble (`tasks/audit-final.md`, resultados en `tasks/audit-results/`). Backlog en `tasks/todo.md`; decisiones abiertas del dueño en `tasks/preguntas-pendientes.md` (Stripe, SMTP, despliegue, datos legales, colores, caducidad de enlaces, retención, lista de espera).
 
 Forma de trabajo acordada: Codex CLI (`gpt-6.1-terra`, esfuerzo high para implementar, medium/high para auditar; siempre `< /dev/null`) para frontend y revisiones; Claude para backend delicado, integración y pruebas en navegador. Nunca audita el mismo LLM que escribió el código.
+
+### Sprint 6 — estado del frontend
+
+- Contratos de color/acabado, rediseño de `/buy` (calendario de entrega, fotos en mosaico, revisión por tarjetas, botón "Zahlungspflichtig bestellen"), páginas `/waitlist/confirm` y `/waitlist/unsubscribe`, soporte staff y mock. Verificado en navegador a 375 px y escritorio contra el backend real (2026-11-05). El texto legal de personalizados sigue pendiente del asesor.
