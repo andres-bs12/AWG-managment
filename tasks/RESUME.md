@@ -2,6 +2,11 @@
 
 Read AGENTS.md, docs/design-system.md and memory rules first. The owner wants a **perfect UX** on `/buy` (online shop, all devices) and `/form/:token` (QR flow at the stall: phones + iPad Air 11" 820×1180), then staff, then security. They will review everything by eye.
 
+## Status 18:25 (Claude)
+
+- Commits since `0a891f5`: cfe376e, e34d7b5, 68231db, 3407dff, 314d4fa, 23aa01c, 17f244c, 0f35d14, 516f2f5 and a792fee. Staff P0, all P1s and most P2s are done. Full suite: 420 passed.
+- Waiting on the Codex cross-review: `run7/rev12.sh` starts at 19:23 and writes `run7/rev12.md`. Then fix the confirmed findings, run the full e2e, commit, and write the final Spanish summary. Delete RESUME and the heartbeat at the very end.
+
 ## Status 17:40 (Claude)
 
 - Commit `0a891f5`: Codex's SEC-F work (form token expiry, HTTP-only production build, CORS `Idempotency-Key`), reviewed and e2e-validated by Claude.

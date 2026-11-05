@@ -24,7 +24,12 @@
 
 - [x] 2026-11-05 · Validación de navegador cerrada: suite completa en verde para `/buy`, `/form`, recogida en mercado, SEC-F (399/404 con tres timeouts por carga que pasan aislados) y capturas regeneradas y revisadas. Sustituye los seguimientos de Fix 9–12, a–e, Task 5–8, 7B y 11.
 - [ ] Staff UX — pendiente tras los arreglos del 2026-11-05 (informes `tasks/audit-results/staff-ux-*`):
-  - Los P2 de ambos informes. HSTS se verifica en el proxy TLS real. Sigue abierto el conflicto de tipos Playwright/axe en `e2e/helpers.ts:45`.
+  - P2 que quedan (el resto se hizo el 2026-11-05):
+    - venta: estado vacío con tarjetas grandes de «Añadir» (#12), resumen con «Delivery» sin día (#13) y espacio vertical en móvil (#27);
+    - agenda: chips del DayStrip completos con scroll-snap (P2-4);
+    - prioridad visual de los pedidos web en entregas (P2-10, falta la marca «Web»; el nombre del cliente ya se muestra).
+  - HSTS se verifica en el proxy TLS real. Sigue abierto el conflicto de tipos Playwright/axe en `e2e/helpers.ts:45`.
+  - Revisión cruzada de Codex del trabajo de staff (commits desde `0a891f5`): pendiente, programada para las 19:23.
 - [ ] `/buy` premium: verificar en navegador a 360/768/1280 px y completar las mejoras y pruebas de `docs/plan-buy-premium.md`.
 - [ ] Stripe: `stripe login`, claves de prueba, prueba real del checkout y webhook (`docs/stripe-setup.md`); luego claves live y `SHOP_ENABLED=true`.
 - [ ] SMTP (`MAIL_*`, `OWNER_EMAIL`) y prueba real de los e-mails.

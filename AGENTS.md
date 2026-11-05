@@ -133,4 +133,12 @@ Informes en `tasks/audit-results/`. Backlog en `tasks/todo.md`; decisiones del d
 
 Forma de trabajo: Codex CLI (`gpt-6.1-terra`/`sol`, esfuerzo high para implementar, medium/high para auditar; siempre `< /dev/null`) y Claude para backend delicado, integración y navegador. Nunca audita el mismo LLM que escribió el código.
 
-Pendiente del staff (auditorías del 2026-11-05: `staff-ux-sale-orders-*`, `staff-ux-agenda-ops-*`): ver `tasks/todo.md`.
+Staff (auditorías del 2026-11-05 `staff-ux-sale-orders-*` y `staff-ux-agenda-ops-*`): P0 y todos los P1 corregidos, junto con la mayoría de los P2. Cambios principales:
+- botones grandes de 56 px: la regla global `[data-staff-page]` ya no usa `:is()` con el selector de `input`;
+- entregas agrupadas por pedido y con fecha;
+- días de pintura con guardado automático;
+- agenda escalable con el tamaño del texto;
+- conflictos de día marcados en el editor de mercados;
+- diálogos con «Not yet» como única forma de cerrar sin actuar.
+
+Lo pendiente está en `tasks/todo.md`. E2E: 420 casos.
