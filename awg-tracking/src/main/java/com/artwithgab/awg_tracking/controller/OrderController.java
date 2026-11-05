@@ -21,6 +21,18 @@ public class OrderController {
         return orderService.getOrderByCode(code);
     }
 
+    /** Staff search by code, name or phone; at least 2 characters. */
+    @GetMapping("/search")
+    public java.util.List<com.artwithgab.awg_tracking.dto.order.OrderSummaryDto> search(@RequestParam("q") String q) {
+        return orderService.search(q);
+    }
+
+    /** Web orders waiting for Stripe or flagged for review (amount mismatch). */
+    @GetMapping("/attention")
+    public java.util.List<com.artwithgab.awg_tracking.dto.order.OrderSummaryDto> attention() {
+        return orderService.needingAttention();
+    }
+
     @GetMapping("/{id}")
     public OrderDto get(@PathVariable UUID id) {
         return orderService.getOrder(id);

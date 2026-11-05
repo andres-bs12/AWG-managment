@@ -77,13 +77,29 @@ public class AuthService {
         sessionRepository.deleteOtherSessions(user.getId(), currentToken == null ? "" : hash(currentToken));
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Sliding session: while staff keep using the app, the session is renewed once less than half
+     * of the TTL is left, so a long stall day never logs them out mid-sale. A session never lives
+     * longer than {@link #MAX_SESSION_LIFETIME} after login.
+     */
+    @Transactional
     public Optional<StaffUser> authenticate(String token) {
         if (token == null || token.isBlank() || token.length() > 100) return Optional.empty();
+        Instant now = clock.instant();
         return sessionRepository.findByTokenHash(hash(token))
-                .filter(s -> s.getExpiresAt().isAfter(clock.instant()))
-                .map(StaffSession::getStaffUser);
+                .filter(s -> s.getExpiresAt().isAfter(now))
+                .map(s -> {
+                    java.time.Duration ttl = props.session().ttl();
+                    Instant renewed = now.plus(ttl);
+                    Instant cap = s.getCreatedAt().plus(MAX_SESSION_LIFETIME);
+                    if (s.getExpiresAt().isBefore(now.plus(ttl.dividedBy(2))) && s.getExpiresAt().isBefore(cap)) {
+                        s.setExpiresAt(renewed.isAfter(cap) ? cap : renewed);
+                    }
+                    return s.getStaffUser();
+                });
     }
+
+    static final java.time.Duration MAX_SESSION_LIFETIME = java.time.Duration.ofDays(7);
 
     @Transactional
     public void logout(String token) {

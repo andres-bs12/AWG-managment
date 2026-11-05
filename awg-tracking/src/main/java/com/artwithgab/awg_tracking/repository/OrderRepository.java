@@ -39,4 +39,15 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     List<Order> findByCheckoutStatusAndCheckoutExpiresAtBefore(CheckoutStatus status, Instant before);
 
     Optional<Order> findByStripeSessionId(String sessionId);
+
+    /** Staff search by code, customer name or phone digits (newest first). */
+    @Query("select o from Order o join fetch o.customer c where o.anonymizedAt is null and ("
+            + "upper(o.code) like upper(concat('%', :q, '%')) or upper(c.name) like upper(concat('%', :q, '%'))"
+            + " or replace(replace(replace(c.phone, ' ', ''), '-', ''), '/', '') like concat('%', :digits, '%')) order by o.createdAt desc")
+    List<Order> search(@org.springframework.data.repository.query.Param("q") String q,
+                       @org.springframework.data.repository.query.Param("digits") String digits,
+                       org.springframework.data.domain.Pageable page);
+
+    @Query("select o from Order o join fetch o.customer where o.checkoutStatus in :statuses order by o.createdAt desc")
+    List<Order> findByCheckoutStatusIn(@org.springframework.data.repository.query.Param("statuses") java.util.Collection<CheckoutStatus> statuses);
 }

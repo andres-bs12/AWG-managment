@@ -344,10 +344,13 @@ public class OrderService {
         deleteAndRestock(order);
     }
 
-    /** Deletes an order with its photos, puts its ornaments back in stock and drops an orphan customer. */
+    /** Deletes an order with its photos, puts unpainted ornaments back in stock and drops an orphan customer. */
     void deleteAndRestock(Order order) {
         for (OrderItem item : order.getOrderItems()) {
-            if (item.getInventory() != null) item.getInventory().setQuantity(item.getInventory().getQuantity() + 1);
+            // A blank whose painting started (or finished) cannot go back on the shelf; finished
+            // ready-made ornaments and untouched blanks can.
+            boolean resellable = item.getItemKind() == ItemKind.GENERIC || item.getProductionStatus() == ProductionStatus.NOT_STARTED;
+            if (item.getInventory() != null && resellable) item.getInventory().setQuantity(item.getInventory().getQuantity() + 1);
             Set<UUID> ids = new HashSet<>();
             item.getPhotos().forEach(p -> ids.add(p.getPhotoId()));
             if (!ids.isEmpty()) photoRepository.findByIdIn(ids).forEach(photoStorage::delete);
@@ -356,6 +359,36 @@ public class OrderService {
         orderRepository.delete(order);
         orderRepository.flush();
         if (customer != null && !orderRepository.existsByCustomerId(customer.getId())) customerRepository.delete(customer);
+    }
+
+    /**
+     * Staff search: a code fragment, a customer name or phone digits. Short queries return nothing
+     * so a single letter does not list every customer.
+     */
+    @Transactional(readOnly = true)
+    public List<OrderSummaryDto> search(String query) {
+        String q = query == null ? "" : query.trim();
+        if (q.length() < 2) return List.of();
+        String digits = q.replaceAll("\\D", "");
+        // Without at least 3 digits the phone clause must not match everything.
+        String phone = digits.length() >= 3 ? digits : "\u0000";
+        return orderRepository.search(q, phone, org.springframework.data.domain.PageRequest.of(0, 20)).stream().map(OrderService::summary).toList();
+    }
+
+    /** Web orders staff must look at: still waiting for Stripe, or paid with a mismatching amount. */
+    @Transactional(readOnly = true)
+    public List<OrderSummaryDto> needingAttention() {
+        return orderRepository.findByCheckoutStatusIn(List.of(CheckoutStatus.PENDING, CheckoutStatus.REVIEW)).stream()
+                .map(OrderService::summary).toList();
+    }
+
+    static OrderSummaryDto summary(Order o) {
+        String next = o.getOrderItems().stream().map(OrderItem::getHandoffDate).filter(Objects::nonNull)
+                .min(Comparator.naturalOrder()).map(Object::toString).orElse(null);
+        return new OrderSummaryDto(o.getId().toString(), o.getCode(), o.getCustomer() == null ? "" : o.getCustomer().getName(),
+                o.getCustomer() == null ? "" : o.getCustomer().getPhone(), o.getCreatedAt() == null ? null : o.getCreatedAt().toString(),
+                o.getPaymentState().name().toLowerCase(Locale.ROOT), o.getCheckoutStatus() == null ? null : o.getCheckoutStatus().name().toLowerCase(Locale.ROOT),
+                o.getTotal(), o.getOrderItems().size(), next, o.isHandedOver());
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────

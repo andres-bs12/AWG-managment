@@ -1,5 +1,7 @@
 package com.artwithgab.awg_tracking.service;
 
+import com.artwithgab.awg_tracking.enums.DeliveryKind;
+
 import com.artwithgab.awg_tracking.dto.market.*;
 import com.artwithgab.awg_tracking.enums.MarketKind;
 import com.artwithgab.awg_tracking.exception.BadRequestException;
@@ -96,6 +98,12 @@ public class MarketService {
         for (SaveMarketDayRequest row : wanted.values()) {
             String conflict = hoursConflict(row.date(), row.openHour(), row.closeHour(), items);
             if (conflict != null) throw new BadRequestException(conflict);
+            boolean isNewDay = existing == null || existing.getMarketDays().stream().noneMatch(d -> d.getDate().equals(row.date()));
+            if (isNewDay && hasViennaDeliveries(row.date(), items)) {
+                // The stall has priority on its days: booked Vienna deliveries would silently drop off the run.
+                throw new BadRequestException(CalendarRules.label(row.date()) + ": Vienna deliveries are booked that day; move them before adding a stall day")
+                        .code("DAY_HAS_DELIVERIES").field("days");
+            }
         }
 
         Market market = existing != null ? existing : new Market();
@@ -159,6 +167,10 @@ public class MarketService {
     static boolean dayIsUsed(LocalDate date, List<OrderItem> items) {
         return items.stream().anyMatch(i -> date.equals(i.getHandoffDate())
                 || (i.getPaintStart() != null && i.getPaintStart().toLocalDate().equals(date)));
+    }
+
+    private static boolean hasViennaDeliveries(LocalDate date, List<OrderItem> items) {
+        return items.stream().anyMatch(i -> date.equals(i.getHandoffDate()) && i.getDeliveryKind() == DeliveryKind.DELIVERY);
     }
 
     private static String hoursConflict(LocalDate date, double open, double close, List<OrderItem> items) {
