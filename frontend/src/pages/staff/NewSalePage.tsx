@@ -588,7 +588,7 @@ export function NewSalePage() {
             ))}
           </p>
         </div>
-        {phase !== 'done' ? (
+        {phase !== 'done' && (order || draft.items.length > 0) ? (
           <Button tone="staff" variant="ghost" onClick={() => { if (order) setLeaveOpen(true); else startOver() }}>
             {order ? 'New sale' : 'Start over'}
           </Button>
@@ -848,15 +848,15 @@ function ItemsStep({
   return (
     <>
       {items.length === 0 ? (
-        <StaffActions className={styles.actions} total={prices ? draftTotal(items, prices) : null}>
-          <Button tone="staff" variant="secondary" size="lg" fullWidth onClick={() => onAdd('custom')}>
-            + Add custom ornament
+        // Empty sale: the two starting choices sit right under the question, with no €0.00 total.
+        <div className={styles.startChoices}>
+          <Button tone="staff" variant="choice" size="lg" onClick={() => onAdd('custom')}>
+            <span><strong>+ Add custom ornament</strong><small>Painted from the customer's photos</small></span>
           </Button>
-          <Button tone="staff" variant="secondary" size="lg" fullWidth onClick={() => onAdd('finished')}>
-            + Add finished product
+          <Button tone="staff" variant="choice" size="lg" onClick={() => onAdd('finished')}>
+            <span><strong>+ Add finished product</strong><small>Finished stock: {stockLabel(inventory.find(row => row.kind === 'finished')?.quantity ?? 0)}</small></span>
           </Button>
-          <p className={styles.hint}>Finished stock: {stockLabel(inventory.find(row => row.kind === 'finished')?.quantity ?? 0)}</p>
-        </StaffActions>
+        </div>
       ) : (
         <>
           {items.map((item, index) => (

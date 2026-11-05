@@ -385,3 +385,21 @@
   margin: 0;
   color: var(--staff-muted);
 }
+
+.startChoices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--size-staff-name)), 1fr));
+  gap: var(--space-3);
+}
+
+.startChoices button > span {
+  display: grid;
+  gap: var(--space-1);
+  text-align: left;
+}
+
+.startChoices small {
+  color: var(--staff-muted);
+  font-size: var(--type-staff-meta-size);
+  font-weight: 400;
+}
