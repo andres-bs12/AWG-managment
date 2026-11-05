@@ -15,15 +15,21 @@
 .dayRow .name { grid-area: name; gap: var(--space-1); }
 .dayRow .toggle { grid-area: toggle; }
 .dayRow .stepper { grid-area: stepper; }
-.dayRow .stepper label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.dayRow .stepper { align-items: center; }
-.dayRow .stepper > div { width: var(--size-staff-quantity); margin: 0; }
-.dayRow .stepper input { min-height: var(--size-control-staff); height: var(--size-control-staff); }
+.stockRow .stepper label, .dayRow .stepper label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.dayRow .stepper, .stockRow .stepper { align-items: center; }
+.dayRow .stepper > div, .stockRow .stepper > div { width: var(--size-staff-quantity); margin: 0; }
+.stockRow .stepper input, .dayRow .stepper input { min-height: var(--size-control-staff); height: var(--size-control-staff); }
 /* The label is visually hidden here, so the control sits level with the − and + buttons. */
-.dayRow .stepper [data-field-control] { margin-top: 0; }
+.dayRow .stepper [data-field-control], .stockRow .stepper [data-field-control] { margin-top: 0; }
 .saveState { grid-area: state; margin: 0; font-size: var(--type-staff-meta-size); color: var(--staff-muted); }
 .saveState:empty { display: none; }
 .dayRow .error { grid-column: 1 / -1; }
 .name p[data-over] { color: var(--staff-warn); font-weight: 600; }
 .toggle input { width: var(--size-check); height: var(--size-check); accent-color: var(--staff-btn); }
 @media (max-width: 599px) { .dayRow { grid-template-columns: auto auto; justify-content: space-between; grid-template-areas: 'name name' 'toggle stepper' 'state state'; } }
+
+.stockRow { background: var(--staff-surface); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius-control); padding: var(--space-3); display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2) var(--space-3); }
+.stockRow .name h2 { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--type-staff-h2-size); }
+.stockRow .error, .stockRow .conflict { grid-column: 1 / -1; }
+.swatch { flex: none; width: var(--size-swatch); height: var(--size-swatch); border-radius: var(--radius-circle); border: var(--border-thin) solid var(--ornament-swatch-border); }
+@media (max-width: 599px) { .stockRow { grid-template-columns: auto auto; justify-content: space-between; } .stockRow .name { grid-column: 1 / -1; } }

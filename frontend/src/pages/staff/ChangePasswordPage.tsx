@@ -11,16 +11,24 @@ export function ChangePasswordPage() {
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<{ next?: string; confirm?: string }>({})
   const [success, setSuccess] = useState(false)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError('')
     setSuccess(false)
-    if (next.length < 10) { setError('Use at least 10 characters.'); return }
-    if (next === current) { setError('Choose a different password from the current one.'); return }
-    if (new TextEncoder().encode(next).length > 72) { setError('Use at most 72 UTF-8 bytes (accented letters may use more than one byte).'); return }
-    if (next !== confirm) { setError('New passwords do not match.'); return }
+    // Check every field in one pass and show each problem under its own field.
+    const problems: { next?: string; confirm?: string } = {}
+    if (next.length < 10) problems.next = 'Use at least 10 characters.'
+    else if (new TextEncoder().encode(next).length > 72) problems.next = 'Too long: use at most 72 characters (accented letters count double).'
+    else if (next === current) problems.next = 'Choose a different password from the current one.'
+    if (next !== confirm) problems.confirm = 'The passwords do not match.'
+    setFieldErrors(problems)
+    if (problems.next || problems.confirm) {
+      document.getElementById(problems.next ? 'new-password' : 'confirm-password')?.focus()
+      return
+    }
     setBusy(true)
     try {
       await api.auth.changePassword(current, next)
@@ -37,8 +45,8 @@ export function ChangePasswordPage() {
       {error && <p className={styles.err} role="alert">{error}</p>}
       {success && <p role="status">Password changed</p>}
       <Field label="Current password" htmlFor="current-password"><input id="current-password" type="password" autoComplete="current-password" required value={current} onChange={e => setCurrent(e.target.value)} /></Field>
-      <Field label="New password" htmlFor="new-password" hint="At least 10 characters, at most 72 UTF-8 bytes. Choose a different password."><input id="new-password" type="password" autoComplete="new-password" required value={next} onChange={e => setNext(e.target.value)} /></Field>
-      <Field label="Confirm new password" htmlFor="confirm-password"><input id="confirm-password" type="password" autoComplete="new-password" required value={confirm} onChange={e => setConfirm(e.target.value)} /></Field>
+      <Field label="New password" htmlFor="new-password" hint="10–72 characters, different from the current one." error={fieldErrors.next}><input id="new-password" type="password" autoComplete="new-password" required value={next} onChange={e => setNext(e.target.value)} /></Field>
+      <Field label="Confirm new password" htmlFor="confirm-password" error={fieldErrors.confirm}><input id="confirm-password" type="password" autoComplete="new-password" required value={confirm} onChange={e => setConfirm(e.target.value)} /></Field>
       <Button type="submit" tone="staff" disabled={busy}>{busy ? 'Changing…' : 'Change password'}</Button>
     </form>
   </section>

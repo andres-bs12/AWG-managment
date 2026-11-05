@@ -55,11 +55,19 @@ function StockRow({ item }: { item: InventoryItem }) {
       } else setError(err instanceof Error ? err.message : 'Could not save stock. Retry.')
     } finally { setBusy(false) }
   }
-  return <article className={styles.row}>
-    <div className={styles.name}><h2>{name}</h2>{value !== saved && <p>Unsaved changes</p>}{notice && <p role="status">{notice}</p>}{saved <= 1 && <InsetNote><p>{saved === 0 ? 'Sold out' : 'Low stock: last one'}</p></InsetNote>}</div>
-    <NumberStepper label={`${name} quantity`} value={quantity} onChange={setQuantity} max={10000} disabled={busy} />
-    <Button tone="staff" disabled={busy || conflict !== null} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</Button>
+  const dirty = valid && value !== saved
+  return <article className={styles.stockRow}>
+    <div className={styles.name}>
+      <h2>{item.kind === 'custom' ? <span className={styles.swatch} style={{ background: `var(--ornament-${item.color})` }} aria-hidden="true" /> : null}{name}</h2>
+      {dirty && <p>Unsaved changes</p>}{notice && !dirty && <p role="status">{notice}</p>}{saved <= 1 && <InsetNote><p>{saved === 0 ? 'Sold out' : 'Low stock: last one'}</p></InsetNote>}
+    </div>
+    <NumberStepper label={`${name} quantity`} value={quantity} onChange={next => { setQuantity(next); setNotice('') }} max={10000} disabled={busy} />
+    <Button tone="staff" disabled={busy || conflict !== null || !dirty} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</Button>
     {error && <p className={styles.error} role="alert">{error}</p>}
-    {conflict !== null && <div className={styles.conflict}><Button tone="staff" disabled={busy} onClick={() => void save()}>Use mine</Button><Button tone="staff" variant="secondary" disabled={busy} onClick={() => { setQuantity(String(conflict)); setConflict(null); setError('') }}>Keep {conflict}</Button></div>}
+    {conflict !== null && <div className={styles.conflict}>
+      {/* Keeping the server value is the safe default: a sale may just have taken one. */}
+      <Button tone="staff" disabled={busy} onClick={() => { setQuantity(String(conflict)); setConflict(null); setError('') }}>Keep {conflict}</Button>
+      <Button tone="staff" variant="secondary" disabled={busy} onClick={() => void save()}>Save {quantity}</Button>
+    </div>}
   </article>
 }

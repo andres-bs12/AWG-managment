@@ -63,6 +63,8 @@ function clock(value: string): string {
   return match ? `${match[1]}:${match[2]}` : value
 }
 
+
+const STALL_ERROR = 'Stall number must be a whole number of 1 or more'
 export function MarketEditorPage() {
   const { id } = useParams()
   return <MarketEditor key={id ?? 'new'} />
@@ -159,7 +161,7 @@ function MarketEditor() {
     }
     const stallNumber = Number(stall)
     if (stall.trim() === '' || !Number.isInteger(stallNumber) || stallNumber < 1) {
-      return 'Stall number must be a whole number of 1 or more'
+      return STALL_ERROR
     }
     for (const day of days) {
       const open = parseHour(clock(day.open))
@@ -322,7 +324,7 @@ function MarketEditor() {
               }}
             />
           </Field>
-          <Field label="Stall number" htmlFor="market-stall">
+          <Field label="Stall number" htmlFor="market-stall" error={error === STALL_ERROR ? 'Use a whole number of 1 or more.' : undefined} announceError={false}>
             <input
               id="market-stall"
               className={styles.input}
