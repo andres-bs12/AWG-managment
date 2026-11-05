@@ -249,6 +249,11 @@ for (const transport of ['http', 'mock'] as const) {
     await page.locator('form button[type=submit]').click()
     await expect(page).toHaveURL(/\/buy\/thanks\?code=AWG[A-Z0-9]+/)
     await expect(page.getByRole('heading', { name: 'Danke für deine Bestellung!' })).toBeVisible()
+    const saved = await page.evaluate(() => {
+      const code = new URLSearchParams(location.search).get('code')!
+      return JSON.parse(localStorage.getItem(`awg-form-token:${code}`) ?? 'null')
+    })
+    expect(saved).toEqual({ token: expect.any(String), savedAt: Date.parse('2026-11-05T12:00:00Z') })
     if (transport === 'http') await useHttpMetrics(page)
     await page.getByRole('group', { name: 'Wie einfach war die Bestellung?' }).getByRole('button', { name: '6', exact: true }).click()
     await expect(page.getByRole('status').filter({ hasText: 'Danke für dein Feedback.' })).toBeVisible()
@@ -274,3 +279,54 @@ for (const transport of ['http', 'mock'] as const) {
     expect(metrics.filter(metric => (metric as BuyMetric).event === 'buy_seq')).toEqual([{ event: 'buy_seq', value: '6' }])
   })
 }
+
+test('HTTP checkout stores a dated token only on success and restores customer Track access', async ({ page }) => {
+  await open(page)
+  let checkoutFails = true
+  await page.route('**/api/shop/checkout', route => checkoutFails
+    ? route.fulfill({ status: 400, json: { code: 'OUT_OF_STOCK', message: 'Out of stock.' } })
+    : route.fulfill({ json: { orderCode: code, formToken: 'checkout-customer-token', checkoutUrl: `/buy/thanks?code=${code}` } }))
+  const tokenHeaders: (string | undefined)[] = []
+  await page.route(trackEndpoint, route => {
+    const header = route.request().headers()['x-form-token']
+    tokenHeaders.push(header)
+    const view = trackView('paid')
+    if (header !== 'checkout-customer-token') view.delivery.address = undefined
+    return route.fulfill({ json: view })
+  })
+  const checkout = () => page.evaluate(async () => {
+    const path = '/src/api/http/services.ts'; const { httpApi } = await import(path)
+    try {
+      await httpApi.shop.checkout({ customerName: 'Alex Example', email: 'alex@example.com', phone: '1234567', acceptTerms: true, deliveryDate: '2026-12-02', address: { line1: 'Hauptstraße 1', postalCode: '1010', city: 'Wien' }, items: [{ kind: 'custom', color: 'red', finish: 'shiny', withName: false, petName: 'Luna', photos: [] }] })
+      return true
+    } catch { return false }
+  })
+  const stored = () => page.evaluate(orderCode => localStorage.getItem(`awg-form-token:${orderCode}`), code)
+  expect(await checkout()).toBe(false)
+  expect(await stored()).toBeNull()
+  checkoutFails = false
+  expect(await checkout()).toBe(true)
+  const raw = await stored()
+  expect(JSON.parse(raw!)).toEqual({ token: 'checkout-customer-token', savedAt: Date.parse('2026-11-05T12:00:00Z') })
+  await showThanks(page)
+  await expect(page.getByRole('heading', { name: 'Danke für deine Bestellung!' })).toBeVisible()
+  expect(tokenHeaders).toContain('checkout-customer-token')
+  await page.getByRole('link', { name: 'Bestellung verfolgen', exact: true }).click()
+  await page.getByRole('button', { name: 'Lieferadresse ändern', exact: true }).click()
+  await expect(page.locator('#line1')).toHaveValue('Hauptstraße 1')
+  // Re-import the adapter after document reload: it must read the same dated record.
+  await page.reload()
+  const owner = await page.evaluate(async orderCode => {
+    const path = '/src/api/http/services.ts'; const { httpApi } = await import(path)
+    return httpApi.tracking.getByCode(orderCode)
+  }, code)
+  expect(owner.delivery.address?.line1).toBe('Hauptstraße 1')
+  expect(await stored()).toBe(raw)
+  await page.clock.setFixedTime(new Date('2026-12-20T12:00:00Z'))
+  await page.evaluate(async orderCode => {
+    const path = '/src/api/http/services.ts'; const { httpApi } = await import(path)
+    return httpApi.tracking.getByCode(orderCode)
+  }, code)
+  expect(tokenHeaders.at(-1)).toBeUndefined()
+  expect(await stored()).toBeNull()
+})

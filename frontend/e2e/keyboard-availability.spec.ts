@@ -169,6 +169,8 @@ test.describe('desktop keyboard checkout', () => {
 })
 
 test('Tab and Shift+Tab exclude hidden substeps, collapsed notes and the native file input', async ({ page }) => {
+  // Long keyboard walk: every Tab checks focus geometry, so it needs more than 30s on a loaded machine.
+  test.slow()
   await open(page)
   await tabTo(page, page.getByRole('radio', { name: 'Rot', exact: true }))
   await page.keyboard.press('Space')

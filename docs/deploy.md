@@ -37,6 +37,8 @@ Compose construye `DB_URL` como `jdbc:postgresql://postgres:5432/<POSTGRES_DB>` 
 
 Configura un proxy inverso o servicio de hosting con certificado TLS para dirigir el tráfico HTTPS del dominio al puerto 8081 del servidor. El puerto 8081 solo escucha en `127.0.0.1` (`docker-compose.yml`), así que el proxy TLS debe correr en el mismo servidor; si el proxy es un contenedor, quita la publicación del puerto y conéctalo por una red privada de Docker. Configura los límites de carga del proxy externo para permitir solicitudes de hasta 60 MB. El servidor nginx incluido no termina TLS.
 
+El proxy externo debe redirigir HTTP a HTTPS y añadir `Strict-Transport-Security: max-age=31536000` a todas las respuestas HTTPS, incluidos errores. Verifica la cabecera en el dominio público: nginx no puede garantizar HSTS porque recibe HTTP interno. Añade `includeSubDomains` solo si todos los subdominios usan HTTPS. El HTML también declara `no-referrer` para proteger los enlaces del formulario en hosts sin las cabeceras de nginx.
+
 En Stripe, crea un endpoint de webhook para `https://<dominio>/api/shop/stripe/webhook` y selecciona estos eventos:
 
 - `checkout.session.completed`

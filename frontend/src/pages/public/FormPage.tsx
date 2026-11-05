@@ -1,6 +1,6 @@
 import { keepFormFocusVisible } from '../../lib/publicFormFocus'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { CustomerFormView, OrderItem } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
@@ -46,6 +46,8 @@ export function FormPage() {
 }
 
 function CustomerForm({ token }: { token: string }) {
+  const [searchParams] = useSearchParams()
+  const staffHandoff = searchParams.get('staff') === '1'
   const { t, locale } = useLocale()
   const [view, setView] = useState<CustomerFormView | null>(null)
   const [loading, setLoading] = useState(true)
@@ -177,7 +179,7 @@ function CustomerForm({ token }: { token: string }) {
     try {
       const result = await api.forms.submitForm(token, { address: view?.needsAddress ? draft.address : undefined, customerName: draft.customerName, phone: draft.phone, email: draft.email,
         items: draft.items.map(({ orderItemId, petName, backName, note, photos }) => ({ orderItemId, petName, backName, note, photos })),
-      })
+      }, { rememberToken: !staffHandoff })
       try { sessionStorage.removeItem(formDraftKey(token)) } catch { setStorageError(true) }
       // The Track page already shows the order state: go there and confirm the save once.
       void navigate(`/track/${encodeURIComponent(result.orderCode)}`, { state: { formSaved: true } })

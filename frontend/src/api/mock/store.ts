@@ -1,4 +1,5 @@
 import { paymentSummary } from '../../lib/paymentSummary'
+import { readFormToken, rememberFormToken } from '../formTokens'
 import type {
   InventoryItem, PaintingDay, ShopCheckoutInput,
   Address,
@@ -319,14 +320,13 @@ export function createMockCheckout(input: ShopCheckoutInput) {
   state.customers.push(customer); state.orders.push(order); state.items.push(...items)
   // The mock checkout redirects directly to success, so it simulates confirmed payment.
   emit()
-  try { localStorage.setItem(`awg-form-token:${code}`, token) } catch { /* storage unavailable */ }
+  rememberFormToken(code, token)
   return { orderCode: code, formToken: token, checkoutUrl: `/buy/thanks?code=${code}` }
 }
 
 export function abandonMockCheckout(code: string) {
   const token = state.pendingCheckouts?.[code]
-  let suppliedToken: string | null = null
-  try { suppliedToken = localStorage.getItem(`awg-form-token:${code.toUpperCase()}`) } catch { /* storage unavailable */ }
+  const suppliedToken = readFormToken(code)
   if (!token || suppliedToken !== token) return
   const order = state.orders.find(row => row.code === code && row.formToken === token)
   if (!token || !order || order.paymentState !== 'unpaid') return
@@ -916,6 +916,9 @@ export function getTrackByCode(code: string): TrackView {
   const customer = state.customers.find((c) => c.id === order.customerId)
   const items = state.items.filter((i) => i.orderId === order.id)
   const first = items[0]
+  const owner = readFormToken(order.code) === order.formToken
+    && !(order.handedOver && order.handedOverAt && Date.now() - Date.parse(order.handedOverAt) >= 30 * 86400000)
+  const personal = owner || order.code.length >= 9
   const market = first?.delivery.marketId
     ? state.markets.find((m) => m.id === first.delivery.marketId)
     : undefined
@@ -940,18 +943,18 @@ export function getTrackByCode(code: string): TrackView {
     paymentState: order.paymentState,
     code: order.code,
     status: trackStatusFor(order, items),
-    customerName: customer?.name.split(' ')[0] ?? 'there',
+    customerName: personal ? customer?.name.split(' ')[0] ?? '' : '',
     items: items.map((i) => ({
       color: i.color,
       finish: i.finish,
       cost: i.cost,
-      petName: i.petName,
+      petName: personal ? i.petName : '',
       kind: i.kind,
       productionStatus: i.productionStatus,
       withName: i.withName,
-      backName: i.backName,
+      backName: personal ? i.backName : '',
     })),
-    delivery: first?.delivery ?? { kind: 'market' },
+    delivery: first ? { ...first.delivery, address: owner ? first.delivery.address : undefined } : { kind: 'market' },
     when,
   }
 }
@@ -959,6 +962,11 @@ export function getTrackByCode(code: string): TrackView {
 export function updateViennaAddress(code: string, address: Address): TrackView {
   const order = getOrderByCode(code)
   if (!order) throw new Error('Order not found')
+  if (readFormToken(order.code) !== order.formToken
+    || (order.handedOver && order.handedOverAt && Date.now() - Date.parse(order.handedOverAt) >= 30 * 86400000)) {
+    throw Object.assign(new Error('Open the link from your order form to change the address.'), { status: 403, code: 'FORBIDDEN' })
+  }
+  if (order.handedOver) throw Object.assign(new Error('This order was already delivered'), { status: 409, code: 'CONFLICT' })
   state.items
     .filter((i) => i.orderId === order.id && i.delivery.kind === 'vienna')
     .forEach((i) => {

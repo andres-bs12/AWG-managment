@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:mock": "VITE_DATA_SOURCE=mock VITE_ALLOW_MOCK_BUILD=1 npm run build",
     "lint": "oxlint && node scripts/lint-staff-styles.mjs",
     "preview": "vite preview",
     "test:e2e": "playwright test"

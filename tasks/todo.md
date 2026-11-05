@@ -2,6 +2,8 @@
 
 ## Hecho
 
+- [x] 2026-11-05 · SEC-F — implementación de M1/L5 y hardening barato I2/I4/I5; política compartida de tokens HTTP/mock, protección de la entrega del iPad, build HTTP obligatorio y escape local, meta referrer, documentación HSTS y CORS. E2E ampliados; validación de navegador pendiente. Ver `docs/sec-f-handoff.md`.
+
 - [x] 2026-11-05 · Task 11 — implementación de staff (P0/P1 solicitados, mock/HTTP, capa de diseño y suite escrita). Build/lint, 23 pruebas Node y 92 backend pasan. Sin Playwright ni commits; detalles y matriz en `docs/task11-staff-handoff.md`.
 
 - [x] 2026-11-05 · Task 8 — implementación QR de dos pantallas y componentes compartidos con `/buy`, DE/EN, errores/foco, borrador/fotos y estados de enlace; suite `e2e/form.spec.ts` escrita. Validación de navegador pendiente; ver `docs/task8-form-handoff.md`.
@@ -19,6 +21,8 @@
 - [x] 2026-11-05 · Sprint 5 — auditoría final doble (Claude + Codex: UI, UX, seguridad; `tasks/audit-final.md`), arreglos backend y frontend con revisión cruzada, códigos de error estables, ventas idempotentes, revisión de pagos, cabeceras de seguridad, fuentes locales.
 
 ## Pendiente (ver `tasks/preguntas-pendientes.md` para decisiones del dueño)
+
+- [ ] SEC-F: Claude debe ejecutar la suite actual, incluidos `form.spec.ts`, `success.spec.ts` y `staff-review.spec.ts`, y comprobar tokens tras envío/checkout, edición de dirección, expiración, recarga y logout sin red. Mantener axe y las nueve referencias presentes. Ver `docs/sec-f-handoff.md`. HSTS queda por configurar/verificar en el proxy TLS real; el conflicto previo de tipos Playwright/axe sigue abierto.
 
 - [ ] Fix e-4 (seguimiento actual, sustituye e-1/e-2/e-3): referencias preparadas; Claude debe repetir normalmente los 383 casos conservando los nueve PNG ya regenerados, revisados e idénticos byte a byte a los `*-actual.png`, sin borrarlos ni `--update-snapshots`. Último resultado externo: 378 aprobados, 3 fallidos exclusivamente por referencias ausentes, 2 omitidos; el foco de fotos ya no falla. No se cambió app/tests/axe. Build/lint y 23 pruebas Node pasan; sin Playwright ni commits aquí. Revisar contenido desplazable además de comparar los PNG. Ver `docs/ux-validation.md`.
 

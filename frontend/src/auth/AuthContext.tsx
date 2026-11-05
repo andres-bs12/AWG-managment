@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '../api/client'
+import { clearFormTokens } from '../api/formTokens'
 import type { StaffUser } from '../domain/types'
 
 const TOKEN_KEY = 'awg-staff-token'
@@ -60,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     // Start while the token is readable; never wait for market Wi-Fi to secure the iPad.
     void api.auth.logout().catch(() => {})
+    clearFormTokens()
     localStorage.removeItem(TOKEN_KEY)
     try { sessionStorage.removeItem('awg-sale-draft'); sessionStorage.removeItem('awg-staff-hub') } catch { /* storage unavailable */ }
     setToken(null); setUser(null); setOffline(false); setExpired(false); setReady(true)

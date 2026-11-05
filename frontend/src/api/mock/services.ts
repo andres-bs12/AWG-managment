@@ -1,4 +1,5 @@
 import { mockPricing } from './pricing'
+import { forgetFormToken, rememberFormToken } from '../formTokens'
 import { validatePhoto } from '../../lib/photoValidation'
 import type { Api, BuyMetric } from '../contracts'
 import type { Photo } from '../../domain/types'
@@ -169,7 +170,11 @@ export const mockApi: Api = {
   },
   forms: {
     getForm: (token) => later(() => getForm(token)),
-    submitForm: (token, payload) => later(() => submitForm(token, payload), 400),
+    submitForm: (token, payload, options) => later(() => {
+      const result = submitForm(token, payload)
+      rememberFormToken(result.orderCode, token, options?.rememberToken)
+      return result
+    }, 400),
   },
   uploads: {
     toPhoto: (file) => fileToPhoto(file),
@@ -183,7 +188,7 @@ export const mockApi: Api = {
     },
   },
   shop: {
-    abandonCheckout: (code) => later(() => { abandonMockCheckout(code); try { localStorage.removeItem(`awg-form-token:${code.trim().toUpperCase()}`) } catch { /* storage unavailable */ } }),
+    abandonCheckout: (code) => later(() => { abandonMockCheckout(code); forgetFormToken(code) }),
     confirmWaitlist: (token) => later(() => confirmWaitlist(token)),
     unsubscribeWaitlist: (token) => later(() => unsubscribeWaitlist(token)),
     joinWaitlist: (email) => later(() => joinWaitlist(email)),

@@ -101,7 +101,8 @@ export type TrackingService = {
 
 export type FormService = {
   getForm: (token: string) => Promise<CustomerFormView>
-  submitForm: (token: string, payload: CustomerFormPayload) => Promise<{ orderCode: string }>
+  /** Shared staff devices submit with rememberToken=false, including after signing out. */
+  submitForm: (token: string, payload: CustomerFormPayload, options?: { rememberToken?: boolean }) => Promise<{ orderCode: string }>
 }
 
 export type UploadService = {

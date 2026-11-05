@@ -1,5 +1,6 @@
 import { validatePhoto } from '../../lib/photoValidation'
 import type { Api } from '../contracts'
+import { forgetFormToken, readFormToken, rememberFormToken } from '../formTokens'
 import type {
   AgendaDay,
   CustomerFormPayload,
@@ -51,23 +52,9 @@ function jsonInit(method: string, body?: unknown): RequestInit {
  * The order code alone is public, so Track only returns or changes the Vienna address with the
  * long form token. The customer's browser keeps it after submitting the form.
  */
-const FORM_TOKEN_PREFIX = 'awg-form-token:'
-
-function rememberFormToken(code: string, token: string) {
-  try {
-    localStorage.setItem(FORM_TOKEN_PREFIX + code.toUpperCase(), token)
-  } catch {
-    /* storage unavailable: address edits will ask for the form link */
-  }
-}
-
 function formTokenHeader(code: string): Record<string, string> {
-  try {
-    const token = localStorage.getItem(FORM_TOKEN_PREFIX + code.trim().toUpperCase())
-    return token ? { 'X-Form-Token': token } : {}
-  } catch {
-    return {}
-  }
+  const token = readFormToken(code)
+  return token ? { 'X-Form-Token': token } : {}
 }
 
 async function request<T>(path: string, init: RequestInit = {}, opts: RequestOptions = {}): Promise<T> {
@@ -286,17 +273,13 @@ export const httpApi: Api = {
     },
   },
   forms: {
-    getForm: async (token) => {
-      const view = fixForm(await request<CustomerFormView>(`/api/forms/${enc(token)}`))
-      rememberFormToken(view.orderCode, token)
-      return view
-    },
-    submitForm: async (token, payload) => {
+    getForm: async (token) => fixForm(await request<CustomerFormView>(`/api/forms/${enc(token)}`)),
+    submitForm: async (token, payload, options) => {
       const result = await request<{ orderCode: string }>(`/api/forms/${enc(token)}`, {
         method: 'POST',
         body: buildFormData(payload),
       })
-      rememberFormToken(result.orderCode, token)
+      rememberFormToken(result.orderCode, token, options?.rememberToken)
       return result
     },
   },
@@ -305,7 +288,7 @@ export const httpApi: Api = {
   },
   metrics: { track: (metric) => request('/api/metrics/buy', jsonInit('POST', metric)) },
   shop: {
-    abandonCheckout: async (code) => { await request(`/api/shop/checkout/${enc(code)}/abandon`, { method: 'POST', headers: formTokenHeader(code) }); try { localStorage.removeItem(FORM_TOKEN_PREFIX + code.trim().toUpperCase()) } catch { /* storage unavailable */ } },
+    abandonCheckout: async (code) => { await request(`/api/shop/checkout/${enc(code)}/abandon`, { method: 'POST', headers: formTokenHeader(code) }); forgetFormToken(code) },
     confirmWaitlist: (token) => request('/api/shop/waitlist/confirm', jsonInit('POST', { token })),
     unsubscribeWaitlist: (token) => request('/api/shop/waitlist/unsubscribe', jsonInit('POST', { token })),
     joinWaitlist: (email, locale) => request('/api/shop/waitlist', jsonInit('POST', { email, locale })),

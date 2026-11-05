@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import type { OrderItem } from '../src/domain/types'
+import type { CustomerFormView, OrderItem } from '../src/domain/types'
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { axe, photo } from './helpers'
 
@@ -50,6 +50,7 @@ async function tabTo(page: Page, target: Locator) {
 for (const locale of ['de', 'en'] as const) {
   test(`mock QR happy path, exact saved details and axe on every screen (${locale})`, async ({ page }) => {
     await openForm(page, locale)
+    expect(await page.evaluate(() => localStorage.getItem('awg-form-token:AWG0000'))).toBeNull()
     await axe(page); await noOverflow(page)
     const before = await page.evaluate(async formToken => {
       const path = '/src/api/client.ts'; const { api } = await import(path)
@@ -77,9 +78,10 @@ for (const locale of ['de', 'en'] as const) {
     await axe(page); await noOverflow(page)
     const after = await page.evaluate(async formToken => {
       const path = '/src/api/client.ts'; const { api } = await import(path)
-      return { view: await api.forms.getForm(formToken), draft: sessionStorage.getItem(`awg-form-draft:${formToken}`) }
+      return { view: await api.forms.getForm(formToken), draft: sessionStorage.getItem(`awg-form-draft:${formToken}`), saved: JSON.parse(localStorage.getItem('awg-form-token:AWG0000') ?? 'null') }
     }, token)
     expect(after.draft).toBeNull()
+    expect(after.saved).toEqual({ token, savedAt: Date.parse('2026-11-05T12:00:00Z') })
     expect(after.view.customer).toMatchObject({ name: 'Alex Example', email: 'alex@example.com', phone: '+43 660 1234567' })
     expect(after.view.item).toMatchObject({ id: before.item.id, petName: 'Luna', backName: 'LUNA', withName: before.item.withName, note: 'Please keep the white patch.', formComplete: true })
     expect(after.view.item.photos).toHaveLength(1)
@@ -118,6 +120,92 @@ test('reload restores text, omits local bytes, and requests photos again', async
   await axe(page); await noOverflow(page)
   await page.locator('input[type=file]').setInputFiles(photo)
   await expect(page.getByRole('status').filter({ hasText: /Fotos können nach dem Neuladen/ })).toHaveCount(0)
+})
+
+for (const transport of ['http', 'mock'] as const) {
+  test(`form token is saved only after successful customer submission and expires (${transport})`, async ({ page }) => {
+    await openForm(page, 'en', 'frm-abs103')
+    const view: CustomerFormView = await page.evaluate(async () => {
+      const path = '/src/api/client.ts'; const { api } = await import(path)
+      return api.forms.getForm('frm-abs103')
+    })
+    const headers: (string | undefined)[] = []
+    let failed = true
+    if (transport === 'http') {
+      await page.route('**/api/forms/*', route => route.request().method() === 'GET'
+        ? route.fulfill({ json: view })
+        : failed ? route.fulfill({ status: 400, json: { code: 'VALIDATION', message: 'Check the form.' } })
+          : route.fulfill({ json: { orderCode: view.orderCode } }))
+      await page.route(new RegExp(`/api/track/${view.orderCode}(?:/address)?$`), route => {
+        const supplied = route.request().headers()['x-form-token']
+        headers.push(supplied)
+        if (route.request().method() === 'PATCH' && supplied !== view.token) return route.fulfill({ status: 403, json: { code: 'FORBIDDEN' } })
+        return route.fulfill({ json: { code: view.orderCode, customerName: supplied === view.token ? 'Alex' : '', items: [], delivery: { kind: 'vienna', address: supplied === view.token ? route.request().method() === 'PATCH' ? route.request().postDataJSON() : view.address : null } } })
+      })
+      await page.evaluate(async () => {
+        const clientPath = '/src/api/client.ts', httpPath = '/src/api/http/services.ts'
+        const { api } = await import(clientPath); const { httpApi } = await import(httpPath)
+        api.forms.getForm = httpApi.forms.getForm; api.forms.submitForm = httpApi.forms.submitForm
+        api.tracking.getByCode = httpApi.tracking.getByCode; api.tracking.updateViennaAddress = httpApi.tracking.updateViennaAddress
+      })
+    }
+    const inspect = () => page.evaluate(async ({ formToken, code }) => {
+      const path = '/src/api/client.ts'; const { api } = await import(path)
+      const form = await api.forms.getForm(formToken)
+      return { stored: localStorage.getItem(`awg-form-token:${code}`), track: await api.tracking.getByCode(code), form }
+    }, { formToken: view.token, code: view.orderCode })
+    const initial = await inspect()
+    expect(initial.stored).toBeNull()
+    expect(initial.track.customerName).toBe('')
+    expect(initial.track.delivery.address ?? null).toBeNull()
+    const payload = { customerName: 'Alex Example', email: 'alex@example.com', phone: '+43 660 1234567', address: view.address!, items: (view.items ?? [view.item]).map(item => ({ orderItemId: item.id, petName: 'Luna', backName: 'Luna', note: '', photos: item.photos })) }
+    const submit = (rememberToken: boolean, invalid = false) => page.evaluate(async ({ token, payload, rememberToken }) => {
+      const path = '/src/api/client.ts'; const { api } = await import(path)
+      try { await api.forms.submitForm(token, payload, { rememberToken }); return true } catch { return false }
+    }, { token: invalid && transport === 'mock' ? 'invalid-token' : view.token, payload, rememberToken })
+    expect(await submit(true, true)).toBe(false)
+    expect((await inspect()).stored).toBeNull()
+    failed = false
+    expect(await submit(false)).toBe(true)
+    expect((await inspect()).stored).toBeNull()
+    expect(await submit(true)).toBe(true)
+    const saved = await inspect()
+    expect(JSON.parse(saved.stored!)).toEqual({ token: view.token, savedAt: Date.parse('2026-11-05T12:00:00Z') })
+    expect(saved.track.customerName).toBe('Alex')
+    expect(saved.track.delivery.address).toEqual(view.address)
+    const changed = { ...view.address!, line1: 'Updated Street 2' }
+    const updated = await page.evaluate(async ({ code, address }) => {
+      const path = '/src/api/client.ts'; const { api } = await import(path)
+      return api.tracking.updateViennaAddress(code, address)
+    }, { code: view.orderCode, address: changed })
+    expect(updated.delivery.address).toEqual(changed)
+    await page.clock.setFixedTime(new Date('2026-12-20T12:00:00Z'))
+    const expired = await inspect()
+    expect(expired.track.delivery.address ?? null).toBeNull()
+    expect(expired.track.customerName).toBe('')
+    expect(await page.evaluate(code => localStorage.getItem(`awg-form-token:${code}`), view.orderCode)).toBeNull()
+    const rejected = await page.evaluate(async ({ code, address }) => {
+      const path = '/src/api/client.ts'; const { api } = await import(path)
+      try { await api.tracking.updateViennaAddress(code, address); return false } catch { return true }
+    }, { code: view.orderCode, address: changed })
+    expect(rejected).toBe(true)
+    if (transport === 'http') { expect(headers).toContain(view.token); expect(headers.at(-1)).toBeUndefined() }
+  })
+}
+
+test('staff-marked form stays non-persistent through reload and submission on the shared iPad', async ({ page }) => {
+  await openForm(page, 'en', 'frm-abs103?staff=1')
+  await page.reload()
+  await expect(page.locator('#form-heading')).toBeVisible()
+  expect(await page.evaluate(() => localStorage.getItem('awg-form-token:AWG0103'))).toBeNull()
+  await next(page).click(); await axe(page)
+  await next(page).click()
+  await expect(page).toHaveURL(/\/track\/AWG0103$/)
+  await expect(page.getByRole('status').filter({ hasText: 'Thank you! Your details are saved.' })).toBeVisible()
+  expect(await page.evaluate(() => ({ stored: localStorage.getItem('awg-form-token:AWG0103'), draft: sessionStorage.getItem('awg-form-draft:frm-abs103') }))).toEqual({ stored: null, draft: null })
+  await page.locator('section[aria-live]').evaluate(card => Promise.all(card.getAnimations().map(animation => animation.finished)))
+  await expect(page.getByRole('button', { name: 'Change delivery address', exact: true })).toHaveCount(0)
+  await axe(page)
 })
 
 test('expired mock link follows the real 30-day policy, invalid and locked states remain distinct', async ({ page }) => {

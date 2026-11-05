@@ -64,3 +64,23 @@ Background Codex chain, started by the Claude session. Status log and prompts li
    - Codex read-only audit (high) plus a Claude `/security-review` of the branch.
    - Fix the findings, then retest: `./mvnw test`, `npm run build/lint`, `npx playwright test`.
 5. Update AGENTS.md, tasks/todo.md and tasks/preguntas-pendientes.md, commit, push, and write a short Spanish summary for the owner. Delete this file and tasks/.agent-heartbeat when everything is done.
+
+## Status ~17:00 (Claude)
+
+**Committed:**
+- 257571f: t9.
+- 2b0876e: t10.
+- b6412d2: t11 staff, backend security (@Version, V7).
+- 166c9bf: review fixes.
+
+**Running chain:**
+- runner11: `secf.txt`, Codex frontend security (M1 tokens, L5 build) + e2e loop f → `ALL DONE 11`.
+- runner12: `t12.txt`, staff UX fixes from the two Claude reviews in `tasks/audit-results/staff-ux-*.md` + loop g → `ALL DONE 12`.
+
+**After ALL DONE 12:**
+1. Run `npx playwright test`.
+2. Review the regenerated snapshots by eye.
+3. Commit and push.
+4. Have Claude re-check the staff UX quickly in the browser.
+5. Update AGENTS.md and todo.md.
+6. Write the final summary.

@@ -4,6 +4,7 @@ import { OrderReceipt } from '../../components/public/OrderReceipt'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
+import { readFormToken } from '../../api/formTokens'
 import { GiftBoxReady } from '../../components/public/GiftBoxReady'
 import { PaintingOrnament } from '../../components/public/PaintingOrnament'
 import { SleighWipe } from '../../components/public/SleighWipe'
@@ -113,8 +114,7 @@ export function TrackPage() {
     }
   }
 
-  let hasFormToken = false
-  try { hasFormToken = !!view && !!localStorage.getItem(`awg-form-token:${view.code.toUpperCase()}`) } catch { /* storage unavailable */ }
+  const hasFormToken = !!view && !!readFormToken(view.code)
   const status = view?.status ?? 'preparing'
   const statusLabel =
     status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
