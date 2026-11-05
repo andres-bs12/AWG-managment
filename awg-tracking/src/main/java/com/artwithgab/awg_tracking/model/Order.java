@@ -37,6 +37,10 @@ public class Order {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
+    /** Money received so far: 0 unpaid, the deposit amount (50 % by default), or the total. */
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal amountPaid = BigDecimal.ZERO;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentState paymentState = PaymentState.UNPAID;

@@ -14,6 +14,27 @@ import org.springframework.stereotype.Service;
 public class InventoryService {
     private final InventoryRepository inventoryRepository;
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public java.util.List<com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto> list() {
+        return inventoryRepository.findAll().stream()
+                .sorted(java.util.Comparator.comparing((Inventory i) -> i.getItemKind().ordinal())
+                        .thenComparing(i -> i.getCustomColor() == null ? 0 : i.getCustomColor().ordinal()))
+                .map(InventoryService::view).toList();
+    }
+
+    /** Gaby sets the count after painting more bases or finished ornaments. */
+    @org.springframework.transaction.annotation.Transactional
+    public com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto setQuantity(java.util.UUID id, int quantity) {
+        Inventory row = inventoryRepository.findById(id)
+                .orElseThrow(() -> new com.artwithgab.awg_tracking.exception.ResourceNotFoundException("Stock row not found"));
+        row.setQuantity(quantity);
+        return view(row);
+    }
+
+    private static com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto view(Inventory i) {
+        return new com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto(i.getId().toString(), i.getItemKind(), i.getCustomColor(), i.getQuantity());
+    }
+
     void deductItem(OrderItem item) {
         Inventory inventory = item.getItemKind() == ItemKind.CUSTOM
                 ? inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, item.getCustomColor())

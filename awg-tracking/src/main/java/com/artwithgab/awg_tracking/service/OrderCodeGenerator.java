@@ -13,11 +13,18 @@ public class OrderCodeGenerator {
     private static final SecureRandom RANDOM = new SecureRandom();
     private final OrderRepository orderRepository;
 
-    /** AWG + 4 digits (1000–9999). The unique constraint on orders.code is the final guard. */
+    /** No 0/O/1/I so codes read well aloud and on paper. */
+    private static final String ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    /**
+     * AWG + 6 characters (32^6 ≈ 1 billion, so codes cannot be guessed). Old AWG + 4 digit codes stay
+     * valid. The unique constraint on orders.code is the final guard.
+     */
     public String generateCode() {
         for (int attempt = 0; attempt < 200; attempt++) {
-            String code = "AWG" + (1000 + RANDOM.nextInt(9000));
-            if (!orderRepository.existsByCode(code)) return code;
+            StringBuilder code = new StringBuilder("AWG");
+            for (int i = 0; i < 6; i++) code.append(ALPHABET.charAt(RANDOM.nextInt(ALPHABET.length())));
+            if (!orderRepository.existsByCode(code.toString())) return code.toString();
         }
         throw new IllegalStateException("Order code space exhausted");
     }

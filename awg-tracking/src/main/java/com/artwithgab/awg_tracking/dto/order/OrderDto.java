@@ -20,6 +20,7 @@ public record OrderDto(
         PaymentState paymentState,
         PaymentMethod paymentMethod,
         BigDecimal total,
+        BigDecimal amountPaid,
         String createdAt,
         List<String> itemIds,
         boolean handedOver,

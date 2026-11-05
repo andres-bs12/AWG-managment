@@ -52,7 +52,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/photos/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/shop/config").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/shop/delivery-dates", "/api/shop/checkout", "/api/shop/stripe/webhook").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/shop/delivery-dates", "/api/shop/checkout", "/api/shop/waitlist", "/api/shop/stripe/webhook").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/**").hasRole("STAFF")
                         .anyRequest().denyAll())

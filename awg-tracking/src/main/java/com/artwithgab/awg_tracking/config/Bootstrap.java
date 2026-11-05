@@ -51,7 +51,7 @@ public class Bootstrap implements ApplicationRunner {
     }
 
     private void seedInventory() {
-        int qty = props.bootstrap().initialStock();
+        int qty = props.bootstrap().initialCustomStock();
         for (CustomColor color : new CustomColor[]{CustomColor.RED, CustomColor.GREY}) {
             if (inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, color).isEmpty()) {
                 Inventory row = new Inventory();
@@ -64,7 +64,7 @@ public class Bootstrap implements ApplicationRunner {
         if (inventoryRepository.findFirstByItemKind(ItemKind.GENERIC).isEmpty()) {
             Inventory row = new Inventory();
             row.setItemKind(ItemKind.GENERIC);
-            row.setQuantity(qty);
+            row.setQuantity(props.bootstrap().initialFinishedStock());
             inventoryRepository.save(row);
         }
     }

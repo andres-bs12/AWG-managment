@@ -56,6 +56,6 @@ public class OrderController {
 
     @PatchMapping("/{id}/payment-state")
     public OrderDto setPaymentState(@PathVariable UUID id, @Valid @RequestBody PaymentStateRequest body) {
-        return orderService.updatePaymentState(id, body.state(), body.method());
+        return orderService.updatePaymentState(id, body.state(), body.method(), body.amountPaid());
     }
 }

@@ -77,6 +77,7 @@ public class ViewMapper {
                 o.getPaymentState(),
                 o.getPaymentMethod(),
                 o.getTotal(),
+                o.getAmountPaid(),
                 o.getCreatedAt().toString(),
                 o.getOrderItems().stream().map(i -> i.getId().toString()).toList(),
                 o.isHandedOver(),

@@ -1,19 +1,27 @@
-# Resume note (for the next agent session)
+# Resume note — read this first if the session was cut (limits/crash)
 
-Updated 2026-11-04. If a session ends mid-work, continue from here, then delete this file when done.
+Updated 2026-11-05 ~02:00. Owner is asleep and asked to keep going autonomously until EVERYTHING is done.
+Reply to the owner in Latin American Spanish; code/comments in English. Branch feat/backend-domain, PR #2
+(https://github.com/andres-bs12/AWG-managment/pull/2). Never audit with the same LLM that wrote the code
+(Claude ↔ Codex). Codex: `codex exec -m gpt-6.1-terra -c model_reasoning_effort="high" -s <mode> -o <out> "<prompt>" < /dev/null`
+and check the log shows `session id` within a minute.
 
-## Sprint 3b — web shop rework (owner request 2026-11-04)
-- Only **custom** ornaments can be bought online (no `finished`).
-- `/buy` must feel like a **shop**, not one long form: step-by-step (product with available colors and price → pet photos/name → delivery day → address/contact → review & pay).
-- Show available colors (from inventory stock) in `/api/shop/config`.
-- Audit UX with Codex (`codex exec -s read-only`) and fix findings.
-- Fix Codex shop audit (scratchpad codex-audit-s3.md): release must check the Stripe session is really expired before deleting; delete orphan photo files when checkout fails.
+## Done (committed + pushed unless noted)
+Goals 1–5 of plan /Users/andresbejarano/.claude/plans/reflective-giggling-kernighan.md: /buy shop, review fixes,
+Flyway, Docker (verified), password change + cancel order (backend+frontend), lazy routes, legal placeholders.
 
-## Then
-- `./mvnw test`, `npm run build`, `npm run lint`, browser check on port 5174 (backend with SHOP_ENABLED=true, dummy Stripe key).
-- Commit + push `feat/backend-domain`, open PR to `main`, report to owner in LatAm Spanish (questions in `tasks/preguntas-pendientes.md`).
+## Sprint 4 (owner answers in chat 2026-11-05; spec in docs/sprint4-contract.md)
+- Backend (Claude) — DONE locally, NOT committed yet, 49 tests green: inventory API, painting days (open switch,
+  default max 2/day, every weekday), season end 2026-12-24 + waitlist, deposit amountPaid, AWG+6 codes, V2 migration.
+- Frontend (Codex run, scratchpad codex-s4-brief.md / codex-s4-result.md): stock page, painting days, deposit amount,
+  Santa-left + waitlist, code format, cancel modal. Check result, build/lint, browser test, commit.
+- TODO e-mail notifications (owner + customer on every movement; Spring Mail, disabled without MAIL_HOST; never claim
+  sent). TODO legal base texts (DE/EN drafts from the app's features — artwithgab.com does not resolve; placeholders
+  for name/address/UID). TODO Stripe kit for the owner (docs/stripe-setup.md step by step + Stripe CLI test script).
+- TODO update tasks/preguntas-pendientes.md with the owner's answers; docs; AGENTS.md.
 
-## Status 2026-11-04 (evening)
-- Backend part of 3b DONE (custom-only, colors in config, late-webhook check against Stripe, orphan photo cleanup, Stripe timeouts, webhook under schedule lock) — 44 tests green. Docs/todo/questions updated.
-- Frontend wizard: Codex `gpt-6.1-terra` run in progress (brief in scratchpad codex-buy-brief.md). If it did not finish, rerun it with `-m gpt-6.1-terra -c model_reasoning_effort="high" -s workspace-write`.
-- Owner is away and asked to finish everything autonomously: wizard → build/lint → browser check → Codex UX audit (terra, high) → fixes → commit/push → PR → code review of the PR → fix review findings.
+## Final phase (owner request)
+Dual audit UI, UX, Security: write one specialized prompt per topic; BOTH Codex and Claude run each (test
+everything possible, browser at http://localhost:5174, backend `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`
+with SHOP_ENABLED=true dummy Stripe keys). Merge into a general report (tasks/audit-final.md), plan fixes, fix,
+retest, commit, push, Spanish summary to the owner.

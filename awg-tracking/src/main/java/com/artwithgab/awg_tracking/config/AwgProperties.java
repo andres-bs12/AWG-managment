@@ -16,7 +16,8 @@ public record AwgProperties(
         Session session,
         Calendar calendar,
         Bootstrap bootstrap,
-        Shop shop
+        Shop shop,
+        Mail mail
 ) {
     public record Pricing(BigDecimal custom, BigDecimal finished, BigDecimal nameExtra) {
     }
@@ -31,10 +32,11 @@ public record AwgProperties(
     }
 
     /** Home painting days are generated from today up to this many days ahead. */
-    public record Calendar(int homeDaysAhead) {
+    public record Calendar(int homeDaysAhead, int defaultMaxPaintings) {
     }
 
-    public record Bootstrap(List<StaffAccount> staff, int initialStock, boolean demoMarkets) {
+    /** Stock created on a fresh database: per custom color (bases ready to paint) and finished ornaments. */
+    public record Bootstrap(List<StaffAccount> staff, int initialCustomStock, int initialFinishedStock, boolean demoMarkets) {
     }
 
     /**
@@ -42,7 +44,12 @@ public record AwgProperties(
      * publicBaseUrl is the frontend origin used for Stripe success/cancel redirects.
      */
     public record Shop(boolean enabled, String publicBaseUrl, String stripeSecretKey, String stripeWebhookSecret,
-                       BigDecimal deliveryFee, int checkoutMinutes, int leadDays, int maxDaysAhead) {
+                       BigDecimal deliveryFee, int checkoutMinutes, int leadDays, int maxDaysAhead,
+                       java.time.LocalDate seasonEnd) {
+    }
+
+    /** E-mail notifications; nothing is sent while spring.mail.host is empty. */
+    public record Mail(String from, String ownerEmail) {
     }
 
     public record StaffAccount(String name, String email, String password) {

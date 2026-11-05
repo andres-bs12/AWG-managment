@@ -89,8 +89,10 @@ class ShopApiTests extends ApiTestSupport {
         List<String> d = dates(List.of(Map.of("kind", "custom", "withName", true)));
         assertThat(d).isNotEmpty().doesNotContain("2026-11-25");
         assertThat(d.getFirst()).isEqualTo("2026-12-02");
-        assertThat(d).allSatisfy(x -> assertThat(java.time.LocalDate.parse(x).getDayOfWeek())
-                .isIn(java.time.DayOfWeek.WEDNESDAY, java.time.DayOfWeek.FRIDAY));
+        // Wed/Fri, plus 24 Dec (a Thursday) as the season's last delivery; nothing after it.
+        assertThat(d).allSatisfy(x -> assertThat(x.equals("2026-12-24") || java.time.LocalDate.parse(x).getDayOfWeek() == java.time.DayOfWeek.WEDNESDAY
+                || java.time.LocalDate.parse(x).getDayOfWeek() == java.time.DayOfWeek.FRIDAY).isTrue());
+        assertThat(d.getLast()).isEqualTo("2026-12-24");
     }
 
     @Test

@@ -77,6 +77,13 @@ public class ShopController {
         return shopService.checkout(payload, files);
     }
 
+    @PostMapping("/waitlist")
+    public ResponseEntity<Void> waitlist(@Valid @RequestBody com.artwithgab.awg_tracking.dto.shop.WaitlistRequest body, HttpServletRequest request) {
+        rateLimiter.check("shop-waitlist", request.getRemoteAddr(), 5);
+        shopService.joinWaitlist(body.email(), body.locale());
+        return ResponseEntity.noContent().build();
+    }
+
     /** Stripe calls this. The signature is verified with STRIPE_WEBHOOK_SECRET before anything is read. */
     @PostMapping("/stripe/webhook")
     public ResponseEntity<Void> webhook(@RequestBody String payload, @RequestHeader(value = "Stripe-Signature", required = false) String signature) {

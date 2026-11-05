@@ -70,7 +70,7 @@ public class TrackingService {
     }
 
     private Order find(String code) {
-        if (code == null || !code.trim().matches("(?i)[A-Z]{3}\\d{3,6}")) {
+        if (code == null || !code.trim().matches("(?i)AWG[A-Z0-9]{4,6}")) {
             throw new ResourceNotFoundException("Order not found. Check the code.");
         }
         return orderRepository.findByCodeIgnoreCase(code.trim())

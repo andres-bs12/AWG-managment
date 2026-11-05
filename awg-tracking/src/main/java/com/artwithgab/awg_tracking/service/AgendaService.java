@@ -29,6 +29,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AgendaService {
     private final OrderItemRepository orderItemRepository;
+    private final com.artwithgab.awg_tracking.repository.PaintingDayRepository paintingDayRepository;
+    private final com.artwithgab.awg_tracking.config.AwgProperties props;
     private final CalendarService calendarService;
     private final ViewMapper mapper;
 
@@ -37,7 +39,26 @@ public class AgendaService {
     }
 
     /** Data for one request: calendar plus every item. */
-    record Snapshot(CalendarIndex index, List<OrderItem> items) {
+    record Snapshot(CalendarIndex index, List<OrderItem> items, Map<LocalDate, com.artwithgab.awg_tracking.model.PaintingDay> paintingDays,
+                    int defaultMaxPaintings) {
+        /** Custom ornaments painted on a date (pending web orders included: they hold their time). */
+        int paintingsOn(LocalDate date, String ignoreId) {
+            return (int) items.stream()
+                    .filter(i -> i.getPaintStart() != null && i.getPaintStart().toLocalDate().equals(date))
+                    .filter(i -> ignoreId == null || !i.getId().toString().equals(ignoreId))
+                    .count();
+        }
+
+        boolean paintingOpen(LocalDate date) {
+            var rule = paintingDays.get(date);
+            return rule == null || rule.isOpen();
+        }
+
+        int maxPaintings(LocalDate date) {
+            var rule = paintingDays.get(date);
+            return rule == null ? defaultMaxPaintings : rule.getMaxPaintings();
+        }
+
         List<Busy> busyOn(LocalDate date, String ignoreId) {
             return items.stream()
                     .filter(i -> i.getPaintStart() != null && i.getPaintStart().toLocalDate().equals(date))
@@ -49,7 +70,10 @@ public class AgendaService {
     }
 
     Snapshot snapshot() {
-        return new Snapshot(calendarService.snapshot(), orderItemRepository.findAllWithOrder());
+        Map<LocalDate, com.artwithgab.awg_tracking.model.PaintingDay> rules = new HashMap<>();
+        paintingDayRepository.findAll().forEach(d -> rules.put(d.getDate(), d));
+        return new Snapshot(calendarService.snapshot(), orderItemRepository.findAllWithOrder(), rules,
+                props.calendar().defaultMaxPaintings());
     }
 
     // ─── Reads ──────────────────────────────────────────────────────────────
@@ -131,6 +155,11 @@ public class AgendaService {
     CapacityResultDto findFreeSlot(Snapshot s, LocalDate date, double duration, Double afterHour, UUID marketId,
                                    List<Busy> extraBusy, String ignoreBlockId, Double beforeHour) {
         CalendarIndex index = s.index();
+        // Automatic planning respects Gaby's day switch and daily limit; manual moves do not come here.
+        if (!s.paintingOpen(date)) return new CapacityResultDto(false, null, 0, "Painting is closed on this day.");
+        if (s.paintingsOn(date, ignoreBlockId) + extraBusy.size() >= s.maxPaintings(date)) {
+            return new CapacityResultDto(false, null, 0, "Daily painting limit reached.");
+        }
         Optional<MarketDay> found = index.dayByDate(date, marketId).or(() -> index.dayByDate(date));
         if (found.isEmpty()) return new CapacityResultDto(false, null, 0, "No market day on that date.");
         MarketDay day = found.get();

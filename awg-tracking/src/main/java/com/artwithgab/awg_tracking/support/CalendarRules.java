@@ -36,12 +36,14 @@ public final class CalendarRules {
         return out;
     }
 
-    /** Home painting hours: Mon/Tue/Thu 10–13, Wed/Fri 10–12, none at weekends. Null when closed. */
+    /**
+     * Home painting hours. Gaby paints every day (owner, 2026-11-05): Wed/Fri 10–12 (delivery days),
+     * every other day 10–13. Whether a day takes paintings is her per-day switch (PaintingDay).
+     */
     public static LocalTime[] homePaintHours(LocalDate date) {
         return switch (date.getDayOfWeek()) {
-            case MONDAY, TUESDAY, THURSDAY -> new LocalTime[]{LocalTime.of(10, 0), LocalTime.of(13, 0)};
             case WEDNESDAY, FRIDAY -> new LocalTime[]{LocalTime.of(10, 0), LocalTime.of(12, 0)};
-            default -> null;
+            default -> new LocalTime[]{LocalTime.of(10, 0), LocalTime.of(13, 0)};
         };
     }
 

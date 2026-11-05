@@ -58,6 +58,7 @@ public class ShopService {
     private final PhotoStorageService photoStorage;
     private final StripeClient stripe;
     private final OrderService orderService;
+    private final com.artwithgab.awg_tracking.repository.WaitlistRepository waitlistRepository;
     private final Clock clock;
 
     public boolean isOpen() {
@@ -72,7 +73,30 @@ public class ShopService {
             inventoryRepository.findByItemKindAndCustomColor(ItemKind.CUSTOM, color)
                     .ifPresent(inv -> colors.add(new ShopColorOptionDto(color, inv.getQuantity() > 0)));
         }
-        return new ShopConfigDto(isOpen(), p.custom(), p.nameExtra(), fee(), MAX_ITEMS, colors);
+        LocalDate end = seasonEnd();
+        return new ShopConfigDto(isOpen(), p.custom(), p.nameExtra(), fee(), MAX_ITEMS, colors,
+                end.toString(), LocalDate.now(clock.withZone(java.time.ZoneId.of(props.zone()))).isAfter(end));
+    }
+
+    private LocalDate seasonEnd() {
+        LocalDate end = props.shop().seasonEnd();
+        return end == null ? LocalDate.of(2026, 12, 24) : end;
+    }
+
+    /** Stores a waitlist e-mail once (repeat sign-ups are silently accepted). */
+    @Transactional
+    public void joinWaitlist(String email, String locale) {
+        String normalized = email.trim().toLowerCase(Locale.ROOT);
+        if (waitlistRepository.existsByEmail(normalized)) return;
+        var entry = new com.artwithgab.awg_tracking.model.WaitlistEntry();
+        entry.setEmail(normalized);
+        entry.setLocale("en".equals(locale) ? "en" : "de");
+        entry.setCreatedAt(clock.instant());
+        try {
+            waitlistRepository.saveAndFlush(entry);
+        } catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
+            // Same e-mail sent twice at once: already on the list.
+        }
     }
 
     /** Online orders are custom pet ornaments only. */
@@ -93,6 +117,7 @@ public class ShopService {
         List<DeliveryDateDto> out = new ArrayList<>();
         LocalDate first = s.index().today().plusDays(Math.max(1, props.shop().leadDays()));
         LocalDate last = s.index().today().plusDays(props.shop().maxDaysAhead());
+        if (last.isAfter(seasonEnd())) last = seasonEnd();
         for (LocalDate d = first; !d.isAfter(last); d = d.plusDays(1)) {
             if (!isDeliveryDay(s, d)) continue;
             if (plan(s, d, durations) != null) {
@@ -102,9 +127,14 @@ public class ShopService {
         return out;
     }
 
-    /** Wed/Fri with a calendar day, and not a stall day: on market Fridays the stall has priority. */
-    private static boolean isDeliveryDay(AgendaService.Snapshot s, LocalDate d) {
-        return CalendarRules.isViennaDay(d) && s.index().dayByDate(d).isPresent() && s.index().marketDayOn(d).isEmpty();
+    /**
+     * Wed/Fri (plus the season's last delivery day, 24 Dec) with a calendar day, not after the season
+     * end, and not a stall day: on market Fridays the stall has priority.
+     */
+    private boolean isDeliveryDay(AgendaService.Snapshot s, LocalDate d) {
+        if (d.isAfter(seasonEnd())) return false;
+        return (CalendarRules.isViennaDay(d) || d.equals(seasonEnd()))
+                && s.index().dayByDate(d).isPresent() && s.index().marketDayOn(d).isEmpty();
     }
 
     /**
@@ -153,7 +183,9 @@ public class ShopService {
     public CheckoutResponse checkout(CheckoutRequest req, Map<String, MultipartFile> files) {
         if (!isOpen()) throw new StripeClient.ShopUnavailableException();
         if (!ViennaAddress.isViennaPostal(req.address().postalCode())) throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).");
-        if (!CalendarRules.isViennaDay(req.deliveryDate())) throw new BadRequestException("Deliveries are on Wednesday or Friday.");
+        if (!CalendarRules.isViennaDay(req.deliveryDate()) && !req.deliveryDate().equals(seasonEnd())) {
+            throw new BadRequestException("Deliveries are on Wednesday or Friday.");
+        }
 
         calendarService.lockSchedule();
         AgendaService.Snapshot s = agendaService.snapshot();
@@ -356,6 +388,7 @@ public class ShopService {
         order.setCheckoutStatus(CheckoutStatus.CONFIRMED);
         order.setPaymentState(PaymentState.PAID);
         order.setPaymentMethod(PaymentMethod.CARD);
+        order.setAmountPaid(order.getTotal());
         log.info("Web order {} paid", order.getCode());
     }
 

@@ -216,10 +216,22 @@ public class OrderService {
     // ─── Updates ────────────────────────────────────────────────────────────
 
     @Transactional
-    public OrderDto updatePaymentState(UUID orderId, PaymentState state, PaymentMethod method) {
+    public OrderDto updatePaymentState(UUID orderId, PaymentState state, PaymentMethod method, BigDecimal amountPaid) {
         Order order = findOrderOrThrow(orderId);
         if (order.isAwaitingPayment()) throw new ConflictException("This web order is waiting for its online payment.");
+        BigDecimal total = order.getTotal();
+        BigDecimal received = switch (state) {
+            case UNPAID -> BigDecimal.ZERO;
+            case PAID -> total;
+            // 50 % by default; a customer may leave more (or less) when there is no change.
+            case DEPOSIT -> amountPaid == null ? total.divide(BigDecimal.TWO, 2, java.math.RoundingMode.HALF_UP)
+                    : amountPaid.setScale(2, java.math.RoundingMode.HALF_UP);
+        };
+        if (state == PaymentState.DEPOSIT && (received.signum() <= 0 || received.compareTo(total) >= 0)) {
+            throw new BadRequestException("A deposit must be more than 0 and less than the total.");
+        }
         order.setPaymentState(state);
+        order.setAmountPaid(received);
         if (state == PaymentState.UNPAID) order.setPaymentMethod(null);
         else if (method != null) order.setPaymentMethod(method);
         return mapper.order(order);
