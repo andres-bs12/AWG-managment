@@ -141,4 +141,4 @@ Staff (auditorías del 2026-11-05 `staff-ux-sale-orders-*` y `staff-ux-agenda-op
 - conflictos de día marcados en el editor de mercados;
 - diálogos con «Not yet» como única forma de cerrar sin actuar.
 
-Lo pendiente está en `tasks/todo.md`. E2E: 420 casos.
+Codex hizo la revisión cruzada (`tasks/audit-results/codex-review-staff-*.md`) y sus hallazgos están corregidos. Lo pendiente está en `tasks/todo.md`. E2E: 429 casos en verde; backend: 95 tests.
