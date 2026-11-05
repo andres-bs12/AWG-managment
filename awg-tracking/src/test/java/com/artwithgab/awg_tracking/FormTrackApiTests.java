@@ -128,7 +128,7 @@ class FormTrackApiTests extends ApiTestSupport {
     @Test
     void truncatedJpegIsRejected() throws Exception {
         Created c = customOrder(login(), "market", SAT, 14.0);
-        byte[] cut = java.util.Arrays.copyOf(JPEG, JPEG.length / 2);
+        byte[] cut = TestImages.truncatedJpeg();
         MvcResult res = submit(c, new MockMultipartFile("photo-p1", "bella.jpg", "image/jpeg", cut));
         assertEquals(400, res.getResponse().getStatus());
     }

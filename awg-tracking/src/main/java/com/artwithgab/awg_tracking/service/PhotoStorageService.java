@@ -123,6 +123,10 @@ public class PhotoStorageService {
             javax.imageio.ImageReader reader = readers.next();
             try {
                 reader.setInput(iis, true, true);
+                // The JDK decoders "recover" from truncated data with a warning: treat any warning as unreadable.
+                reader.addIIOReadWarningListener((source, warning) -> {
+                    throw new BadRequestException("A photo could not be read. Add it again.");
+                });
                 int w = reader.getWidth(0);
                 int h = reader.getHeight(0);
                 if (w < 1 || h < 1 || w > 12000 || h > 12000 || (long) w * h > 80_000_000L) {

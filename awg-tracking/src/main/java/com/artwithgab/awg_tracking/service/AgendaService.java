@@ -96,7 +96,7 @@ public class AgendaService {
                 .orElseThrow(() -> new ResourceNotFoundException("No market day on that date."));
         List<AgendaSlotDto> slots = s.items().stream()
                 .filter(i -> i.getPaintStart() != null && i.getPaintStart().toLocalDate().equals(day.getDate()))
-                .filter(i -> !i.getOrder().isAwaitingPayment())
+                .filter(i -> !i.getOrder().isUnconfirmedWeb())
                 .sorted(Comparator.comparing(OrderItem::getPaintStart))
                 .map(i -> new AgendaSlotDto(mapper.block(i, index), mapper.order(i.getOrder()), mapper.item(i, index), mapper.customer(i.getOrder().getCustomer())))
                 .toList();
@@ -108,7 +108,7 @@ public class AgendaService {
         for (OrderItem item : s.items()) {
             if (!date.equals(item.getHandoffDate())) continue;
             Order order = item.getOrder();
-            if (order.isAwaitingPayment()) continue;
+            if (order.isUnconfirmedWeb()) continue;
             var customer = order.getCustomer();
             String title = firstNonBlank(item.getPetName(), customer.getName(), "Ornament");
             String photoUrl = item.getPhotos().isEmpty() ? null : ViewMapper.photoUrl(item.getPhotos().getFirst());
@@ -224,7 +224,7 @@ public class AgendaService {
             double blockDuration = end - start;
             if (blockDuration + Hours.EPS < duration) continue;
             if (beforeHour != null && start + duration > beforeHour + Hours.EPS) continue;
-            if (item.getProductionStatus() != ProductionStatus.NOT_STARTED || item.getOrder().isAwaitingPayment()) continue;
+            if (item.getProductionStatus() != ProductionStatus.NOT_STARTED || item.getOrder().isUnconfirmedWeb()) continue;
             if (index.isToday(targetDay) && start < index.nowHour()) continue;
             LocalDate handoff = item.getHandoffDate();
 

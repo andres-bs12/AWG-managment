@@ -153,8 +153,22 @@ class ShopApiTests extends ApiTestSupport {
         assertThat(order.getPaymentState().name()).isEqualTo("UNPAID");
         webhook("checkout.session.expired", "unpaid", 0);
         assertThat(orderRepository.findByCodeIgnoreCase(code)).isPresent();
-        mvc.perform(get("/api/orders/" + order.getId()).header("Authorization", bearer(login())))
+        String token = login();
+        mvc.perform(get("/api/orders/" + order.getId()).header("Authorization", bearer(token)))
                 .andExpect(jsonPath("$.paymentReview").value(true));
+        // Kept out of the production lists until resolved.
+        mvc.perform(get("/api/agenda/days/2026-12-02").header("Authorization", bearer(token)))
+                .andExpect(jsonPath("$.deliveries[?(@.orderCode=='" + code + "')]").isEmpty());
+        // Resolving needs a deliberate paid/deposit record; "unpaid" does not clear it.
+        mvc.perform(patch("/api/orders/" + order.getId() + "/payment-state").header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("state", "unpaid"))))
+                .andExpect(status().isConflict());
+        mvc.perform(patch("/api/orders/" + order.getId() + "/payment-state").header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("state", "paid", "method", "card"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentReview").value(false));
+        mvc.perform(get("/api/agenda/days/2026-12-02").header("Authorization", bearer(token)))
+                .andExpect(jsonPath("$.deliveries[?(@.orderCode=='" + code + "')]").isNotEmpty());
     }
 
     @Test

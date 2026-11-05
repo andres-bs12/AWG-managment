@@ -98,6 +98,11 @@ public class Order {
         return checkoutStatus == CheckoutStatus.REVIEW;
     }
 
+    /** Web order not (yet) safely paid: still in checkout or its payment needs a manual check. Kept out of production lists. */
+    public boolean isUnconfirmedWeb() {
+        return isAwaitingPayment() || isPaymentReview();
+    }
+
     public boolean isAwaitingPayment() {
         return source == OrderSource.WEB && checkoutStatus == CheckoutStatus.PENDING;
     }
