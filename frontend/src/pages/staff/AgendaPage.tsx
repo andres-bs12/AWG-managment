@@ -47,7 +47,12 @@ function slotRange(slot: AgendaSlot) {
 export function AgendaPage() {
   const version = useStaffRefresh()
   const { hour: nowHour } = useStaffClock()
-  const [HOUR_H] = useState(() => Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--size-agenda-hour')))
+  // The board is laid out in px, so the hour height follows the text size (5rem at 16px is the 80px token); at 200% text an hour doubles.
+  const [{ HOUR_H, REM }] = useState(() => {
+    const css = getComputedStyle(document.documentElement)
+    const rem = Number.parseFloat(css.fontSize) || 16
+    return { HOUR_H: Math.max(Number.parseFloat(css.getPropertyValue('--size-agenda-hour')), 5 * rem), REM: rem }
+  })
   const [paintingRule, setPaintingRule] = useState<PaintingDay | null>(null)
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
@@ -398,7 +403,7 @@ export function AgendaPage() {
   })
 
   return (
-    <section style={{ '--hour-h': 'var(--size-agenda-hour)' } as CSSProperties}>
+    <section style={{ '--hour-h': `${HOUR_H}px` } as CSSProperties}>
       <div className={styles.head}>
         <h1>Agenda</h1><ButtonLink to="/staff/painting-days" tone="staff" variant="secondary">Painting days</ButtonLink>
         <p className={styles.context}>
@@ -475,7 +480,7 @@ export function AgendaPage() {
       {[...slotLayout.values()].some(layout => layout.lanes > 1) && <p className={styles.moveError} role="status">Overlapping sessions are shown side by side. Review the schedule.</p>}
       <div className={styles.workspace}>
         {view === 'list' ? <AgendaSessionList slots={day.slots} days={marketDays} selectedId={selectedBlockId} onOpen={openOrder} /> : <div>
-          <div className={styles.board} style={{ ['--hour-h' as string]: 'var(--size-agenda-hour)' }}>
+          <div className={styles.board}>
             <div className={styles.hours}>
               {hours.map((h) => (
                 <div key={h} className={styles.hour}>
@@ -524,8 +529,8 @@ export function AgendaPage() {
                 const handoff = slot.item ? handoffLabel(slot.item, marketDays) : null
                 const tone = slot.held ? 'held' : slot.order?.handedOver ? 'delivered' : slot.block.status
                 const slotHeight = (slot.block.endHour - slot.block.startHour) * HOUR_H - 4
-                // Three lines need about 76px; shorter blocks get one line instead of overlapping text.
-                const compact = slotHeight < 76
+                // Three lines need about 4.75rem (76px at 16px); shorter blocks get one line instead of overlapping text.
+                const compact = slotHeight < 4.75 * REM
                 const statusLabel = slot.held ? (slot.holdUntil ? `Held until ${new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Vienna', hour: '2-digit', minute: '2-digit' }).format(new Date(slot.holdUntil))}` : 'Held by web checkout') : tone === 'delivered' ? 'Delivered' : tone === 'finished' ? 'Ready' : tone === 'in_progress' ? 'Painting' : 'To paint'
                 return (
                   <button

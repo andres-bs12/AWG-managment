@@ -744,3 +744,18 @@ test('painting days hide past days, flag over-limit days and save each change wi
   await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 3 }, { open: false, maxPaintings: 3 }])
   await axe(page)
 })
+
+test('agenda hours and blocks scale together at 200% text without clipped lines', async ({ page }) => {
+  await httpFixture(page)
+  await page.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.fontSize = '200%' }) })
+  await signedIn(page, `/staff/agenda?date=${today}&view=calendar`)
+  const slot = page.locator('[data-slot]').first()
+  await expect(slot).toBeVisible()
+  const geometry = await slot.evaluate(node => {
+    const box = node.getBoundingClientRect()
+    return { height: box.height, clipped: [...node.children].some(child => { const r = child.getBoundingClientRect(); return r.top < box.top - 1 || r.bottom > box.bottom + 1 }) }
+  })
+  // A 60-minute block at 32px text: one hour is 5rem (160px) minus the 4px gap.
+  expect(geometry.height).toBe(156)
+  expect(geometry.clipped).toBe(false)
+})

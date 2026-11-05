@@ -87,7 +87,7 @@
 
 .board {
   display: grid;
-  grid-template-columns: var(--touch-lg) 1fr;
+  grid-template-columns: minmax(var(--touch-lg), max-content) 1fr;
   background: var(--staff-surface);
   border: var(--border-thin) solid var(--staff-line);
   border-radius: var(--space-3);
@@ -369,7 +369,7 @@
 .slot strong { font-size: var(--type-staff-body-size); }
 .slotRange, .slotHandoff { font-size: var(--type-staff-meta-size); }
 .slot { padding: var(--space-2); }
-@media (max-width: 639px) { .board { grid-template-columns: var(--space-7) minmax(0,1fr); } .side { padding: var(--space-3); } .toolbar { gap: var(--space-2); } }
+@media (max-width: 639px) { .board { grid-template-columns: minmax(var(--space-7), max-content) minmax(0,1fr); } .side { padding: var(--space-3); } .toolbar { gap: var(--space-2); } }
 
 .slot[data-selected='true'] { border: var(--border-control) solid var(--color-selected); background: var(--color-selected-surface); color: var(--color-text); font-weight: 600; }
 .slot[data-held='true'] { background-color: var(--staff-bg); background-image: var(--staff-held-pattern); color: var(--staff-ink); cursor: default; border-color: var(--color-control-border); }
