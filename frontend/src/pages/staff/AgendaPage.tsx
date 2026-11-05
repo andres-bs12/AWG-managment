@@ -410,7 +410,7 @@ export function AgendaPage() {
             setParams(query, { replace: true })
           }}>{option === 'list' ? 'List' : 'Calendar'}</Button>)}
         </div>
-        {marketDeliveries.length || viennaDeliveries.length ? <a href="#agenda-pickups" className={styles.jump}>{marketDeliveries.length ? `${marketDeliveries.length} pickups` : `${viennaDeliveries.length} deliveries`} ↓</a> : null}
+        {marketDeliveries.length || viennaDeliveries.length ? <a href="#agenda-pickups" className={styles.jump}>{marketDeliveries.length ? `${marketDeliveries.length} ${marketDeliveries.length === 1 ? 'pickup' : 'pickups'}` : `${viennaDeliveries.length} ${viennaDeliveries.length === 1 ? 'delivery' : 'deliveries'}`} ↓</a> : null}
         {view === 'calendar' && !placeItem ? <Button tone="staff" variant="ghost" selected={arranging} onClick={() => { setArranging(!arranging); setMoveProposal(null); setNewProposal(null); setPreview(null); drag.current = null }}>{arranging ? 'Done moving' : 'Move sessions'}</Button> : null}
       </div>
       {view === 'calendar' ? (
@@ -553,7 +553,7 @@ export function AgendaPage() {
             </ButtonLink>
           </div>
           <p className={styles.sideMeta}>
-            {marketDeliveries.length} pickups · {viennaDeliveries.length} home deliveries
+            {marketDeliveries.length} {marketDeliveries.length === 1 ? 'pickup' : 'pickups'} · {viennaDeliveries.length} home {viennaDeliveries.length === 1 ? 'delivery' : 'deliveries'}
           </p>
           {marketDeliveries.length === 0 && viennaDeliveries.length === 0 ? (
             <p className={styles.sideMeta}>No deliveries for this day.</p>

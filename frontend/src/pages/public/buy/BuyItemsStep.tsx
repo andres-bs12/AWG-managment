@@ -87,6 +87,7 @@ export function BuyItemsStep({ t, draft, config, itemPrice, patch, patchItem, er
 
             className="visually-hidden"
 
+            aria-label={`${t(colorKeys[option.color])}${!option.inStock ? ` ${t('shopSoldOut')}` : ''}`}
             type="radio"
 
             name={`color-${item.uid}`}
@@ -105,6 +106,7 @@ export function BuyItemsStep({ t, draft, config, itemPrice, patch, patchItem, er
       <label className={styles.check}>
         <input
 
+          aria-label={t('shopNameOnBack', { price: formatEur(config.nameExtra, locale) })}
           type="checkbox"
 
           checked={item.withName}

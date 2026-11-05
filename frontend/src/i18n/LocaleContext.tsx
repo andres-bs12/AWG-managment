@@ -38,6 +38,7 @@ const messages: Record<Locale, Dictionary> = {
     whenAtUntil: 'we are at {market} until {time}',
     whenVienna: 'Home delivery in Vienna · Wed / Fri',
     whenTbd: 'We will confirm the handoff soon.',
+    deliveryAddress: 'Delivery address',
     editAddress: 'Change delivery address',
     saveAddress: 'Save address',
     saving: 'Saving…',
@@ -116,6 +117,8 @@ const messages: Record<Locale, Dictionary> = {
     shopProgress: 'Order progress', shopStepPet: 'Your pet', shopProduct: 'Custom pet ornament',
     shopIncludes: 'Includes a hand-painted pet portrait on an ornament.', shopSoldOut: 'Sold out',
     shopChooseColor: 'Choose an available colour.', shopAddAnother: 'Add another ornament',
+    shopStorageError: 'Your draft could not be saved. Text and photos will be lost if you reload.',
+    photoInvalid: 'A photo could not be read. Please add it again (JPEG, PNG, WebP or HEIC).', photoTooLarge: 'The photo is larger than 10 MB.',
     shopPhotosReload: 'Photos cannot be saved after a refresh. Please add them again.',
     shopCart: 'Your cart', shopRetry: 'Try again', shopPayStripe: 'Pay securely with Stripe',
     shopSoonTitle: 'Online orders open soon', shopSoonBody: 'Our online shop is getting ready. Please check back soon.',
@@ -206,6 +209,7 @@ const messages: Record<Locale, Dictionary> = {
     whenAtUntil: 'wir sind bis {time} am {market}',
     whenVienna: 'Lieferung in Wien · Mi / Fr',
     whenTbd: 'Wir bestätigen die Übergabe bald.',
+    deliveryAddress: 'Lieferadresse',
     editAddress: 'Lieferadresse ändern',
     saveAddress: 'Adresse speichern',
     saving: 'Wird gespeichert…',
@@ -284,6 +288,8 @@ const messages: Record<Locale, Dictionary> = {
     shopProgress: 'Bestellfortschritt', shopStepPet: 'Dein Tier', shopProduct: 'Personalisierte Tierkugel',
     shopIncludes: 'Enthält ein handgemaltes Tierporträt auf einer Kugel.', shopSoldOut: 'Ausverkauft',
     shopChooseColor: 'Wähle eine verfügbare Farbe.', shopAddAnother: 'Weitere Kugel hinzufügen',
+    shopStorageError: 'Dein Entwurf konnte nicht gespeichert werden. Text und Fotos gehen beim Neuladen verloren.',
+    photoInvalid: 'Ein Foto konnte nicht gelesen werden. Bitte füge es erneut hinzu (JPEG, PNG, WebP oder HEIC).', photoTooLarge: 'Das Foto ist größer als 10 MB.',
     shopPhotosReload: 'Fotos können nach dem Neuladen nicht gespeichert werden. Bitte füge sie erneut hinzu.',
     shopCart: 'Dein Warenkorb', shopRetry: 'Erneut versuchen', shopPayStripe: 'Sicher mit Stripe bezahlen',
     shopSoonTitle: 'Online-Bestellungen bald verfügbar', shopSoonBody: 'Unser Online-Shop wird vorbereitet. Schau bald wieder vorbei.',
@@ -343,10 +349,16 @@ const messages: Record<Locale, Dictionary> = {
   },
 }
 
+function localizeMessage(message: string, locale: Locale): string {
+  const key = Object.keys(messages.en).find(entry => messages.en[entry] === message || messages.de[entry] === message)
+  return key ? messages[locale][key] : message
+}
+
 type LocaleState = {
   locale: Locale
   setLocale: (locale: Locale) => void
   t: (key: string, vars?: Record<string, string | number>) => string
+  localizeMessage: (message: string) => string
 }
 
 const LocaleContext = createContext<LocaleState | null>(null)
@@ -368,6 +380,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     () => ({
       locale,
       setLocale,
+      localizeMessage: (message) => localizeMessage(message, locale),
       t: (key, vars) => {
         let text = messages[locale][key] ?? messages.en[key] ?? key
         if (vars) {

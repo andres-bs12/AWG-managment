@@ -51,14 +51,15 @@ export function loadBuyDraft(): BuyDraft {
   }
 }
 
-export function saveBuyDraft(draft: BuyDraft): void {
+export function saveBuyDraft(draft: BuyDraft): boolean {
   try {
     sessionStorage.setItem(BUY_DRAFT_KEY, JSON.stringify({
       ...draft, acceptTerms: false,
       items: draft.items.map((item) => ({ ...item, photos: [], photosNeedReload: item.photosNeedReload || item.photos.length > 0 })),
     }))
+    return true
   } catch {
-    // The shop remains usable if browser storage is unavailable.
+    return false
   }
 }
 

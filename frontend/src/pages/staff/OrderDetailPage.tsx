@@ -122,6 +122,7 @@ function OrderDetail({ id }: { id: string }) {
     setActionError('')
     try {
       await api.orders.cancelOrder(id)
+      try { localStorage.removeItem(`awg-form-token:${order.code.toUpperCase()}`) } catch { /* storage unavailable */ }
       navigate('/staff/agenda', { replace: true })
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Could not cancel order.')
@@ -147,7 +148,7 @@ function OrderDetail({ id }: { id: string }) {
       <div><p className={styles.eyebrow}>Order</p><h1>{order.code}</h1><p className={styles.customer}>{customer.name || 'Customer details pending'}</p></div>
       <span className={styles.status} data-ready={allFinished || order.handedOver}>{production}</span>
     </header>
-    {order.paymentReview ? <p role="alert">Payment needs review in Stripe</p> : null}
+    {order.paymentReview ? <p role="alert">Stripe reported a payment that does not match this order. Check it in Stripe, then record it as paid or deposit (or cancel the order). It stays off the agenda until then.</p> : null}
     <div className={styles.overview} data-delivery={Boolean(deliveryItem)}>
       <div><span>{deliveryItem ? 'Delivery' : 'Pickup'}</span><strong>{handoffs.join(' / ') || 'Not scheduled'}</strong>
         {deliveryItem ? <div className={styles.handoffActions}>
@@ -190,7 +191,7 @@ function OrderDetail({ id }: { id: string }) {
         <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
       </aside>
     </div>
-    {cancelOpen && <CancelOrderDialog busy={busy} card={order.paymentMethod === 'card' && order.paymentState !== 'unpaid'} onClose={() => setCancelOpen(false)} onConfirm={() => { void cancelOrder() }} />}
+    {cancelOpen && <CancelOrderDialog busy={busy} card={order.paymentMethod === 'card' && order.paymentState !== 'unpaid'} cash={order.paymentMethod === 'cash' && order.paymentState !== 'unpaid'} onClose={() => setCancelOpen(false)} onConfirm={() => { void cancelOrder() }} />}
     {pendingCompleteItemId ? (
       <CompleteOrderDialog
         orderCode={order.code}
@@ -205,13 +206,14 @@ function OrderDetail({ id }: { id: string }) {
   </article>
 }
 
-function CancelOrderDialog({ busy, card, onClose, onConfirm }: { busy: boolean; card: boolean; onClose: () => void; onConfirm: () => void }) {
+function CancelOrderDialog({ busy, card, cash, onClose, onConfirm }: { busy: boolean; card: boolean; cash: boolean; onClose: () => void; onConfirm: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => { ref.current?.showModal() }, [])
   return <dialog className={dialogStyles.nativeDialog} ref={ref} aria-labelledby="cancel-title" onCancel={event => { event.preventDefault(); if (!busy) onClose() }}>
     <h2 id="cancel-title">Cancel order?</h2>
     <p>The order will be deleted. Painting time and stock will be released. This cannot be undone.</p>
     {card && <p>If this order was paid online, the refund must be done manually in Stripe.</p>}
+    {cash && <p>Return any cash received to the customer manually.</p>}
     <Button tone="staff" variant="secondary" disabled={busy} onClick={onClose}>Keep order</Button>{' '}
     <Button tone="staff" variant="danger" disabled={busy} onClick={onConfirm}>{busy ? 'Cancelling…' : 'Cancel order'}</Button>
   </dialog>

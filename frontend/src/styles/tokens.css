@@ -83,13 +83,13 @@
   --staff-slot: #e7eeeb;
   --staff-slot-ink: #2d2a25;
   --staff-slot-idle: #e4e8e6;
-  --staff-slot-idle-ink: #6a7672;
+  --staff-slot-idle-ink: #495b55;
   --staff-slot-painting: #f3e2a8;
   --staff-slot-painting-ink: #5c4a12;
   --staff-slot-ready: #c8e6d4;
   --staff-slot-ready-ink: #1f4d35;
   --staff-slot-done: #eceeed;
-  --staff-slot-done-ink: #9aa3a0;
+  --staff-slot-done-ink: #52615c;
 }
 
 @media (prefers-reduced-motion: reduce) {

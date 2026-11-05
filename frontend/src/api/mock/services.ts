@@ -1,3 +1,4 @@
+import { validatePhoto } from '../../lib/photoValidation'
 import type { Api } from '../contracts'
 import type { Photo } from '../../domain/types'
 import {
@@ -44,11 +45,12 @@ function later<T>(fn: () => T, ms = 180): Promise<T> {
 }
 
 async function fileToPhoto(file: File): Promise<Photo> {
+  const type = await validatePhoto(file)
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result))
     reader.onerror = () => reject(new Error('Could not read photo'))
-    reader.readAsDataURL(file)
+    reader.readAsDataURL(file.slice(0, file.size, type))
   })
   return {
     id: `pho-${Math.random().toString(36).slice(2, 9)}`,
@@ -142,7 +144,7 @@ export const mockApi: Api = {
     toPhoto: (file) => fileToPhoto(file),
   },
   shop: {
-    abandonCheckout: (code) => later(() => abandonMockCheckout(code)),
+    abandonCheckout: (code) => later(() => { abandonMockCheckout(code); try { localStorage.removeItem(`awg-form-token:${code.trim().toUpperCase()}`) } catch { /* storage unavailable */ } }),
     joinWaitlist: (email) => later(() => joinWaitlist(email)),
     getConfig: () =>
       later(() => ({

@@ -2,6 +2,7 @@ type Problem = { code?: string; field?: string; message?: string }
 type Locale = 'de' | 'en'
 
 const messages: Record<string, [string, string]> = {
+  PHOTO_INVALID: ['A photo could not be read. Please add it again (JPEG, PNG, WebP or HEIC).', 'Ein Foto konnte nicht gelesen werden. Bitte füge es erneut hinzu (JPEG, PNG, WebP oder HEIC).'],
   VALIDATION: ['Please check this value.', 'Bitte überprüfe diese Angabe.'],
   NOT_FOUND: ['This item could not be found.', 'Dieser Eintrag wurde nicht gefunden.'],
   ORDER_NOT_FOUND: ['Order not found. Check your code.', 'Bestellung nicht gefunden. Bitte überprüfe deinen Code.'],

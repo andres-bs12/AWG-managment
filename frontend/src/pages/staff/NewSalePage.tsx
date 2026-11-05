@@ -516,10 +516,10 @@ export function NewSalePage() {
   }
 
   const stepLabels = !draft.items.length
-    ? ['1 Items']
+    ? ['1 Item']
     : onlyFinished
-      ? ['1 Items', '2 Pay']
-      : ['1 Items', '2 Pickup', '3 QR & payment']
+      ? ['1 Item', '2 Pay']
+      : ['1 Item', '2 Pickup', '3 QR & payment']
 
   function stepOn(index: number) {
     if (!draft.items.length || phase === 'items') return index === 0
@@ -607,6 +607,7 @@ export function NewSalePage() {
                     suggestions={suggestions}
                     moveSuggestion={moveSuggestions[item.id]}
                     slotTaken={Boolean(error && /hour is taken|overlap/i.test(error))}
+                    onModeChange={() => setError('')}
                     onDelivery={(delivery) => patchDelivery(item.id, delivery)}
                     onPlace={placeOnBoard}
                     onChangeSlot={changeSlot}
@@ -617,7 +618,7 @@ export function NewSalePage() {
 
               {onlyFinished ? (
                 <div className={styles.card}>
-                  <p className={styles.lead}>Hand over at the stall now. No calendar and no customer form.</p>
+                  <p className={styles.lead}>No customer form is needed for ready-made ornaments.</p>
                   <SegmentedControl
                     legend="Payment method"
                     name="finished-pay"
@@ -834,7 +835,7 @@ function ItemsStep({
               {item.kind === 'custom' ? (
                 <>
                   <label className={styles.check}>
-                    <input type="checkbox" checked={item.withName} onChange={() => onToggleName(item)} />
+                    <input type="checkbox" aria-label={`Add name on ornament · ${formatEur(NAME_EXTRA)}`} checked={item.withName} onChange={() => onToggleName(item)} />
                     {`Add name on ornament · ${formatEur(NAME_EXTRA)} (text comes from the customer form)`}
                   </label>
                   <SegmentedControl
@@ -890,6 +891,7 @@ function DeliveryCard({
   moveSuggestion,
   slotTaken,
   onDelivery,
+  onModeChange,
   onPlace,
   onChangeSlot,
   onApplyMove,
@@ -907,6 +909,7 @@ function DeliveryCard({
   suggestions: Record<string, CapacityResult>
   moveSuggestion?: MoveSuggestion | null
   slotTaken?: boolean
+  onModeChange: () => void
   onDelivery: (delivery: DraftItem['delivery']) => void
   onPlace: (item: DraftItem) => void
   onChangeSlot: (item: DraftItem) => void
@@ -961,6 +964,7 @@ function DeliveryCard({
   }
 
   function setMode(mode: DeliveryMode | 'today' | 'another_day') {
+    onModeChange()
     if (mode === 'now') {
       setDatePickerOpen(false)
       setViennaPickerOpen(false)

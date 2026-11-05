@@ -112,14 +112,15 @@ function ReviewRow({ label, onEdit, children }: { label: string; onEdit?: () => 
 
 export function FormPage() {
   const { token = '' } = useParams()
-  const { t, locale } = useLocale()
+  const { t, locale, localizeMessage } = useLocale()
   const [view, setView] = useState<CustomerFormView | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadedToken, setLoadedToken] = useState('')
   const [step, setStep] = useState<Step>('photos')
   const [draft, setDraft] = useState<Draft>(empty)
-  const [fieldError, setFieldError] = useState<Record<string, string>>({})
+  const [storedFieldError, setFieldError] = useState<Record<string, string>>({})
+  const fieldError = Object.fromEntries(Object.entries(storedFieldError).map(([key, value]) => [key, localizeMessage(value)]))
   const [sending, setSending] = useState(false)
   const sendLock = useRef(false)
   const [storageError, setStorageError] = useState(false)
@@ -210,9 +211,8 @@ export function FormPage() {
     const next: Photo[] = []
     let message = files.length > available ? t('shopPhotoLimit') : ''
     for (const file of files.slice(0, available)) {
-      if (!file.type.startsWith('image/')) { message = locale === 'de' ? 'Bitte wähle eine Bilddatei.' : 'Please choose an image file.'; continue }
       if (file.size > 10 * 1024 * 1024) { message = locale === 'de' ? 'Das Foto ist größer als 10 MB.' : 'The photo is larger than 10 MB.'; continue }
-      try { next.push(await api.uploads.toPhoto(file)) } catch { message = locale === 'de' ? 'Das Foto konnte nicht gelesen werden.' : 'Could not read the photo.' }
+      try { next.push(await api.uploads.toPhoto(file)) } catch { message = t('photoInvalid') }
     }
     patchItem(orderItemId, { photos: [...current.photos, ...next] })
     if (message) setFieldError(previous => ({ ...previous, [`photos:${orderItemId}`]: message }))
@@ -300,10 +300,10 @@ export function FormPage() {
       const problem = apiError(err, locale, locale === 'de' ? 'Das Formular konnte nicht gespeichert werden.' : 'Could not save the form.')
       const field = problem.field ?? ''
       const match = field.match(/^items\[(\d+)\]\.(\w+)/)
-      const item = match ? draft.items[Number(match[1])] : undefined
+      const item = match ? draft.items[Number(match[1])] : field === 'photos' ? draft.items[0] : undefined
       const itemFields: Record<string, Step> = { petName: 'names', backName: 'extras', note: 'extras', photos: 'photos' }
       const contactFields: Record<string, string> = { customerName: 'customerName', email: 'email', phone: 'phone', 'address.line1': 'line1', 'address.line2': 'line2', 'address.postalCode': 'postalCode', 'address.city': 'city', address: 'line1' }
-      if (match && item && itemFields[match[2]]) { setStep(itemFields[match[2]]); setFieldError({ [`${match[2]}:${item.orderItemId}`]: problem.text }) }
+      if (item && (match || field === 'photos')) { const name = match?.[2] ?? 'photos'; if (itemFields[name]) { setStep(itemFields[name]); setFieldError({ [`${name}:${item.orderItemId}`]: problem.text }) } else setError(problem.text) }
       else if (contactFields[field]) { setStep('contact'); setFieldError({ [contactFields[field]]: problem.text }) }
       else setError(problem.text)
     } finally {
@@ -573,7 +573,7 @@ export function FormPage() {
               <ReviewRow label={t('yourName')} onEdit={() => setStep('names')}>{draft.customerName}</ReviewRow>
               <ReviewRow label={t('phone')} onEdit={() => setStep('contact')}>{draft.phone}</ReviewRow>
               <ReviewRow label={t('email')} onEdit={() => setStep('contact')}>{draft.email}</ReviewRow>
-              {view?.needsAddress ? <ReviewRow label={t('editAddress')} onEdit={() => setStep('contact')}>{[draft.address.line1, draft.address.line2, draft.address.postalCode, draft.address.city].filter(Boolean).join(', ')}</ReviewRow> : null}
+              {view?.needsAddress ? <ReviewRow label={t('deliveryAddress')} onEdit={() => setStep('contact')}>{[draft.address.line1, draft.address.line2, draft.address.postalCode, draft.address.city].filter(Boolean).join(', ')}</ReviewRow> : null}
             </dl>
           </section>
 

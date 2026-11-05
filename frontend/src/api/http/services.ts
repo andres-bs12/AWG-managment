@@ -1,3 +1,4 @@
+import { validatePhoto } from '../../lib/photoValidation'
 import { apiError } from '../../lib/apiError'
 import type { Api } from '../contracts'
 import type {
@@ -15,7 +16,6 @@ import type {
 
 const TOKEN_KEY = 'awg-staff-token'
 const LOGIN_ROUTE = '/staff/login'
-const MAX_PHOTO_BYTES = 10 * 1024 * 1024
 const NETWORK_ERROR = 'Could not reach the server. Check your connection.'
 
 const baseUrl: string = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
@@ -153,13 +153,12 @@ function dataUrlToBlob(dataUrl: string): Blob {
 }
 
 async function fileToPhoto(file: File): Promise<Photo> {
-  if (!file.type.startsWith('image/')) throw new Error('Please choose an image file.')
-  if (file.size > MAX_PHOTO_BYTES) throw new Error('This photo is larger than 10 MB. Please choose a smaller one.')
+  const type = await validatePhoto(file)
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result))
     reader.onerror = () => reject(new Error('Could not read photo'))
-    reader.readAsDataURL(file)
+    reader.readAsDataURL(file.slice(0, file.size, type))
   })
   return { id: `pho-${Math.random().toString(36).slice(2, 9)}`, name: file.name, dataUrl }
 }
@@ -301,7 +300,7 @@ export const httpApi: Api = {
     toPhoto: (file) => fileToPhoto(file),
   },
   shop: {
-    abandonCheckout: (code) => request(`/api/shop/checkout/${enc(code)}/abandon`, { method: 'POST', headers: formTokenHeader(code) }),
+    abandonCheckout: async (code) => { await request(`/api/shop/checkout/${enc(code)}/abandon`, { method: 'POST', headers: formTokenHeader(code) }); try { localStorage.removeItem(FORM_TOKEN_PREFIX + code.trim().toUpperCase()) } catch { /* storage unavailable */ } },
     joinWaitlist: (email, locale) => request('/api/shop/waitlist', jsonInit('POST', { email, locale })),
     getConfig: () => request<ShopConfig>('/api/shop/config'),
     listDeliveryDates: (items) => request<ShopDeliveryDate[]>('/api/shop/delivery-dates', jsonInit('POST', { items })),

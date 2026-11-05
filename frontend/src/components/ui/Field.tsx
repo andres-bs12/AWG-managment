@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import styles from './Field.module.css'
 
 type Props = {
@@ -16,7 +16,7 @@ export function Field({ label, htmlFor, hint, error, children }: Props) {
         {label}
       </label>
       {hint ? <p className={styles.hint} id={`${htmlFor}-hint`}>{hint}</p> : null}
-      <div className={styles.control}>{children}</div>
+      <div className={styles.control}>{isValidElement(children) && typeof children.type === 'string' ? cloneElement(children as ReactElement<{ 'aria-invalid'?: boolean; 'aria-describedby'?: string }>, { 'aria-invalid': error ? true : undefined, 'aria-describedby': [hint ? `${htmlFor}-hint` : '', error ? `${htmlFor}-error` : ''].filter(Boolean).join(' ') || undefined }) : children}</div>
       {error ? (
         <p className={styles.error} id={`${htmlFor}-error`} role="alert">
           {error}
