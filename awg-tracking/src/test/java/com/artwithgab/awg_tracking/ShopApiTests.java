@@ -143,7 +143,7 @@ class ShopApiTests extends ApiTestSupport {
                 .andExpect(jsonPath("$[?(@.event == 'buy_paid')].count").value(1));
 
         mvc.perform(get("/api/agenda/days/2026-12-02").header("Authorization", bearer(token)))
-                .andExpect(jsonPath("$.deliveries[?(@.orderCode=='" + code + "')].methodLabel").value(org.hamcrest.Matchers.hasItem("Vienna · Wed/Fri")));
+                .andExpect(jsonPath("$.deliveries[?(@.orderCode=='" + code + "')].methodLabel").value(org.hamcrest.Matchers.hasItem("Vienna · Wed 2 Dec")));
     }
 
     @Test

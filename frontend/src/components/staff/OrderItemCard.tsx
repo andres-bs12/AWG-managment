@@ -14,10 +14,12 @@ type Props = {
   showHandoff: boolean
   navigationState: { from?: string; itemId?: string } | undefined
   busy: boolean
+  /** Online payment not confirmed: painting is possible but not the next step. */
+  held?: boolean
   onStatus: (status: ProductionStatus) => void
 }
 
-export function OrderItemCard({ item, block, days, selected, showHandoff, navigationState, busy, onStatus }: Props) {
+export function OrderItemCard({ item, block, days, selected, showHandoff, navigationState, busy, held = false, onStatus }: Props) {
   const title = item.petName || (item.kind === 'custom' ? 'Custom ornament' : 'Finished ornament')
   const photo = item.photos[0]
   const paintTo = `/staff/orders/${item.orderId}/paint/${item.id}`
@@ -39,7 +41,7 @@ export function OrderItemCard({ item, block, days, selected, showHandoff, naviga
       </dl>
       {item.note ? <div className={styles.note}><strong>Painter’s note</strong><p>{item.note}</p></div> : null}
       <div className={styles.actions}>
-        {photo ? <ButtonLink to={paintTo} state={navigationState} tone="staff" variant={item.productionStatus === 'finished' ? 'secondary' : 'primary'}>{item.productionStatus === 'finished' ? 'View reference' : 'Open painting'}</ButtonLink> : <span className={styles.waiting}>{item.kind === 'custom' ? 'Waiting for reference photos' : 'No reference photo'}</span>}
+        {photo ? <ButtonLink to={paintTo} state={navigationState} tone="staff" variant={item.productionStatus === 'finished' || held ? 'secondary' : 'primary'}>{item.productionStatus === 'finished' ? 'View reference' : 'Open painting'}</ButtonLink> : <span className={styles.waiting}>{item.kind === 'custom' ? 'Waiting for reference photos' : 'No reference photo'}</span>}
         {block ? <Link className={styles.schedule} to={agendaSlotPath(block, days)}>{paintSlotLabel(block, days)}</Link> : null}
       </div>
       <details className={styles.adjust}>

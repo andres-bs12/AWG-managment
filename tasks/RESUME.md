@@ -2,6 +2,15 @@
 
 Read AGENTS.md, docs/design-system.md and memory rules first. The owner wants a **perfect UX** on `/buy` (online shop, all devices) and `/form/:token` (QR flow at the stall: phones + iPad Air 11" 820×1180), then staff, then security. They will review everything by eye.
 
+## Status 17:40 (Claude)
+
+- Commit `0a891f5`: Codex's SEC-F work (form token expiry, HTTP-only production build, CORS `Idempotency-Key`), reviewed and e2e-validated by Claude.
+- Staff UX t12, implemented by Claude (not committed until the full e2e passes):
+  - sale P0-1 and P1-1…7: mock finished items; 56px large buttons via the root-cause fix of the `global.css` `:is()` specificity; Today-full hint; QR again; explicit leave dialog; handover dialog defaults; quiet Cancel; pending web orders.
+  - agenda/ops P1-1/2/3/4/5/8/10, plus a partial P1-6 (compact short blocks) and a partial P1-7 (focused error by Save).
+  - backend: Vienna `methodLabel` carries the date.
+- Codex is rate-limited until 19:21. After it resets, a **Codex review of t12** is required (cross-LLM rule). Then P1-9 (painting days) and the remaining P2s.
+
 ## Status 13:50 (Claude)
 
 - **Codex is rate-limited until 16:03.** The Codex runners (runner8/9/10) were stopped. Claude implemented task 9 itself:

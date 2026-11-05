@@ -130,6 +130,7 @@ export function NewSalePage() {
   const [depositAmount, setDepositAmount] = useState('')
   const [paidNote, setPaidNote] = useState('')
   const [finishedHandoff, setFinishedHandoff] = useState(false)
+  const [leaveOpen, setLeaveOpen] = useState(false)
   const [planRetry, setPlanRetry] = useState(0)
 
   // One-shot commands are consumed before reload or a remembered back link can replay them.
@@ -358,7 +359,7 @@ export function NewSalePage() {
   function addItem(kind: 'custom' | 'finished') {
     if (!draft.items.length && !draft.order) saleKey.current = crypto.randomUUID()
     setDraft((current) => {
-      const next = kind === 'custom' ? makeCustom({ delivery: { mode: 'market', pickupDate: today?.date } }) : makeFinished()
+      const next = kind === 'custom' ? makeCustom({ delivery: { mode: 'market', pickupDate: todayPaintingFull(paintingDays, today) ? undefined : today?.date } }) : makeFinished()
       const items = [...current.items.map((item) => item.plannedMove ? { ...item, plannedMove: undefined, slotLocked: false, paintDate: undefined, paintStart: undefined, paintEnd: undefined } : item), fillDayRefs(next, days, markets, seasonEnd)]
       const mixedNow = items.some((i) => i.kind === 'custom') && items.some((i) => i.kind === 'finished')
       return { ...current, items, differentPickups: current.differentPickups || mixedNow }
@@ -587,18 +588,24 @@ export function NewSalePage() {
           </p>
         </div>
         {phase !== 'done' ? (
-          <Button tone="staff" variant="ghost" onClick={startOver}>
-            Start over
+          <Button tone="staff" variant="ghost" onClick={() => { if (order) setLeaveOpen(true); else startOver() }}>
+            {order ? 'New sale' : 'Start over'}
           </Button>
         ) : null}
       </div>
 
+      {leaveOpen && order && <StaffDialog title="Leave this sale?" onClose={() => setLeaveOpen(false)}>
+        <p>{order.code} stays saved and unpaid, with its paint time reserved. Open it later from Search to show the QR or take payment.</p>
+        <Button tone="staff" variant="secondary" onClick={() => setLeaveOpen(false)}>Keep working</Button>
+        <Button tone="staff" variant="secondary" onClick={() => { clearStoredDraft(); navigate(`/staff/orders/${order.id}`, { state: { from: '/staff/sales/new' } }) }}>Open order</Button>
+        <Button tone="staff" onClick={() => { setLeaveOpen(false); startOver() }}>Start new sale</Button>
+      </StaffDialog>}
       {finishedHandoff && <StaffDialog title="Balance due" busy={busy} onClose={() => setFinishedHandoff(false)}>
         <p>Collect the remaining balance before handing over the whole order. {prices ? formatEur((order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0)) - (payState === 'deposit' ? depositValue(depositAmount, order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0)) : 0), 'en') : ''} is still due.</p>
         <SegmentedControl legend="Collection method" name="finished-handover-method" value={payMethod} onChange={setPayMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} />
         <Button tone="staff" disabled={busy || !payMethod} onClick={() => void finishFinishedSale('paid')}>Mark paid &amp; hand over</Button>
         <Button tone="staff" variant="secondary" disabled={busy} onClick={() => void finishFinishedSale(payState, false)}>Save without handover</Button>
-        <Button tone="staff" variant="secondary" disabled={busy} onClick={() => void finishFinishedSale(payState)}>Hand over with balance due</Button>
+        <Button tone="staff" variant="ghost" disabled={busy} onClick={() => void finishFinishedSale(payState)}>Hand over with balance due</Button>
         <Button tone="staff" variant="ghost" disabled={busy} onClick={() => setFinishedHandoff(false)}>Keep working</Button>
         {error && <p role="alert">{error}</p>}
       </StaffDialog>}
@@ -609,7 +616,7 @@ export function NewSalePage() {
           {error ? (
             <p className={styles.err} role="alert">
               {error}
-              {phase === 'delivery' && <Button tone="staff" variant="secondary" onClick={() => { setError(''); setPlanRetry(n => n + 1); setConfigRetry(n => n + 1) }}>Retry checks</Button>}
+              {phase === 'delivery' && !onlyFinished && <Button tone="staff" variant="secondary" onClick={() => { setError(''); setPlanRetry(n => n + 1); setConfigRetry(n => n + 1) }}>Retry checks</Button>}
             </p>
           ) : null}
 
@@ -737,6 +744,7 @@ export function NewSalePage() {
                 <Button tone="staff" size="lg" disabled={busy || (payState !== 'unpaid' && !payMethod) || (payState === 'deposit' && !validDeposit(depositAmount, order.total))} onClick={() => void recordPayment(payState)}>
                   {busy ? 'Saving…' : payState === 'unpaid' ? 'Leave unpaid' : payState === 'deposit' ? `Mark deposit · ${formatEur(depositValue(depositAmount, order.total), 'en')}` : `Mark paid · ${formatEur(order.total, 'en')}`}
                 </Button>
+                {order.formToken ? <Button tone="staff" variant="secondary" disabled={busy} onClick={() => setPhase('qr')}>Show QR again</Button> : null}
               </StaffActions>
             </div>
           ) : null}
@@ -765,6 +773,12 @@ export function NewSalePage() {
       </div>
     </section>
   )
+}
+
+/** Today's automatic painting limit is used up (or painting is closed): a same-day pickup cannot be planned. */
+function todayPaintingFull(paintingDays: PaintingDay[], today?: MarketDay): PaintingDay | null {
+  const rule = today ? paintingDays.find(row => row.date === today.date) : undefined
+  return rule && (!rule.open || rule.booked >= rule.maxPaintings) ? rule : null
 }
 
 function CustomMinutesField({
@@ -953,6 +967,10 @@ function DeliveryCard({
   const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [viennaPickerOpen, setViennaPickerOpen] = useState(false)
   const todayIsMarket = Boolean(today && marketDays.some(day => day.id === today.id))
+  const todayFull = item.kind === 'custom' && todayIsMarket ? todayPaintingFull(paintingDays, today) : null
+  const needsOtherDay = Boolean(todayFull && item.delivery.mode === 'market' && !item.delivery.pickupDate)
+  // When today cannot take another painting, go straight to the market-day choice instead of a dead end.
+  useEffect(() => { if (needsOtherDay) setDatePickerOpen(true) }, [needsOtherDay])
   const pickupWhen: 'today' | 'another_day' | 'vienna' | 'now' =
     item.kind === 'finished' && item.delivery.mode === 'now'
       ? 'now'
@@ -960,7 +978,7 @@ function DeliveryCard({
         ? 'vienna'
         : item.delivery.pickupDate && today && item.delivery.pickupDate !== today.date
           ? 'another_day'
-          : todayIsMarket
+          : todayIsMarket && (!todayFull || item.delivery.pickupDate === today?.date)
             ? 'today'
             : 'another_day'
 
@@ -1030,7 +1048,7 @@ function DeliveryCard({
 
   const slot = slotLabel(item)
   const pickupOptions = [
-    ...(todayIsMarket ? [{ value: 'today' as const, label: 'Today' }] : []),
+    ...(todayIsMarket ? [{ value: 'today' as const, label: todayFull ? 'Today · full' : 'Today' }] : []),
     { value: 'another_day' as const, label: 'Market day' },
     { value: 'vienna' as const, label: 'Delivery' },
   ]
@@ -1070,6 +1088,12 @@ function DeliveryCard({
           options={pickupOptions}
         />
       )}
+
+      {todayFull ? (
+        <p className={styles.hint} role="status">
+          {todayFull.open ? `Today is full (${todayFull.booked}/${todayFull.maxPaintings} paintings booked).` : 'Painting is closed today.'} Choose another market day for this ornament.
+        </p>
+      ) : null}
 
       {showSelectedMarketDay && pickupDay ? (
         <button

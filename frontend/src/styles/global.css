@@ -94,7 +94,8 @@ p {
 [data-staff-page] h1 { font-size: var(--type-staff-h1-size); line-height: var(--type-staff-h1-line); font-weight: var(--type-staff-h1-weight); }
 [data-staff-page] :is(h2, h3, h4) { font-size: var(--type-staff-h2-size); line-height: var(--type-staff-h2-line); font-weight: var(--type-staff-h2-weight); }
 [data-staff-page] :is(small, summary) { font-size: var(--type-staff-meta-size); }
-[data-staff-page] :is(button, summary, input:not([type=radio]):not([type=checkbox]), select, textarea) { min-height: var(--size-control-staff); }
+/* Floor only: kept at (0,1,1) so component sizes such as .staff.lg (56px) win. :is() would take the (0,3,1) of the input selector. */
+[data-staff-page] :is(button, summary, select, textarea), [data-staff-page] input:not(:where([type=radio], [type=checkbox])) { min-height: var(--size-control-staff); }
 [data-staff-page] summary { cursor: pointer; padding-block: var(--space-3); }
 [data-staff-page] label:has(> input:is([type=radio], [type=checkbox])) { min-height: var(--size-control-staff); display: flex; align-items: center; gap: var(--space-3); }
 [data-staff-page] input:is([type=radio], [type=checkbox]) { accent-color: var(--color-selected); }

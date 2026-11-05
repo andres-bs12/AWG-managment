@@ -36,7 +36,7 @@ export function useHandover(onChanged: () => Promise<unknown> | void, onError: (
       const bundle = await api.orders.getOrderBundle(id)
       if (bundle.items.some(item => item.productionStatus !== 'finished')) throw new Error('Finish every ornament before handing over the order.')
       if (bundle.order.checkoutStatus === 'pending' || bundle.order.checkoutStatus === 'review' || bundle.order.paymentReview) throw new Error('Check the online payment in Stripe before handover.')
-      if (paymentSummary(bundle.order).remaining > 0) { setPending(bundle); setMethod(null); setError('') }
+      if (paymentSummary(bundle.order).remaining > 0) { setPending(bundle); setMethod(bundle.order.paymentMethod ?? null); setError('') }
       else proceed = true
     } catch (err) { onError(err instanceof Error ? err.message : 'Could not check order balance.') }
     finally { lock.current = false; setBusy(false) }
@@ -47,8 +47,8 @@ export function useHandover(onChanged: () => Promise<unknown> | void, onError: (
     <SegmentedControl legend="Collection method" name="handover-method" value={method} onChange={setMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} />
     {error && <p role="alert">{error}</p>}
     <Button tone="staff" disabled={busy || !method} onClick={() => void perform(pending.order.id, true, true)}>Mark paid &amp; hand over</Button>
-    <Button tone="staff" variant="secondary" disabled={busy} onClick={() => void perform(pending.order.id, true)}>Hand over with balance due</Button>
-    <Button tone="staff" variant="ghost" disabled={busy} onClick={() => setPending(null)}>Keep order</Button>
+    <Button tone="staff" variant="ghost" disabled={busy} onClick={() => void perform(pending.order.id, true)}>Hand over with balance due</Button>
+    <Button tone="staff" variant="secondary" disabled={busy} onClick={() => setPending(null)}>Not yet</Button>
   </StaffDialog> : null
   return { request, busy, dialog }
 }

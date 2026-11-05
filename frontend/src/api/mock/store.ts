@@ -605,7 +605,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         handedOver: Boolean(order.handedOver),
         deliveryKind: 'vienna',
         pickupHour: null,
-        methodLabel: 'Vienna · Wed/Fri',
+        methodLabel: `Vienna · ${new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '')}`,
         timeLabel: null,
         phone: customer.phone,
         addressLabel: addressLabel(item.delivery.address),
@@ -749,7 +749,7 @@ export function createSale(input: CreateSaleInput): Order {
       backName: '',
       note: '',
       cost,
-      productionStatus: 'not_started',
+      productionStatus: row.kind === 'finished' ? 'finished' : 'not_started',
       photos: [],
       formComplete: false,
       delivery: {

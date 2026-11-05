@@ -97,7 +97,9 @@ function OrderDetail({ id }: { id: string }) {
   const deliveryTo = deliveryDate ? `/staff/deliveries?day=${deliveryDate}&mode=route` : '/staff/deliveries'
   const handoffs = [...new Set(items.map(item => handoffLabel(item, days)))]
   const formUrl = `${window.location.origin}/form/${order.formToken}`
-  const production = order.handedOver ? (deliveryItem ? 'Delivered' : 'Handed over') : allFinished ? (deliveryItem ? 'Ready for delivery' : 'Ready for pickup') : formWaiting ? 'Waiting for form' : 'In the workshop'
+  // Unconfirmed online payments hold their slot but are not ready for painting or delivery yet.
+  const paymentHeld = !order.handedOver && (order.checkoutStatus === 'pending' || order.checkoutStatus === 'review' || Boolean(order.paymentReview))
+  const production = paymentHeld ? (order.checkoutStatus === 'pending' ? 'Waiting for online payment' : 'Payment review') : order.handedOver ? (deliveryItem ? 'Delivered' : 'Handed over') : allFinished ? (deliveryItem ? 'Ready for delivery' : 'Ready for pickup') : formWaiting ? 'Waiting for form' : 'In the workshop'
 
   async function cancelOrder() {
     if (actionLock.current) return
@@ -154,13 +156,13 @@ function OrderDetail({ id }: { id: string }) {
         </span>
       </h2>
       <section aria-labelledby="order-items" className={styles.items}>
-        {items.map(item => <OrderItemCard key={item.id} item={item} block={blocks.find(block => block.orderItemId === item.id)} days={days} showHandoff={handoffs.length > 1} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />)}
+        {items.map(item => <OrderItemCard key={item.id} item={item} block={blocks.find(block => block.orderItemId === item.id)} days={days} showHandoff={handoffs.length > 1} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />)}
       </section>
       <aside className={styles.support} aria-label="Order management">
         <section className={styles.panel} aria-labelledby="handoff-heading">
           <h2 id="handoff-heading">{deliveryItem ? 'Delivery' : 'Pickup'}</h2>
           {order.handedOver ? <p className={styles.muted}>{deliveryItem ? 'Delivered to the customer.' : 'Picked up at the stall.'}</p> : <p className={styles.muted}>{allFinished ? (deliveryItem ? 'Ready to deliver.' : 'Ready for pickup.') : `${items.filter(item => item.productionStatus !== 'finished').length} still to finish.`}</p>}
-          {deliveryItem ? <ButtonLink tone="staff" fullWidth to={deliveryTo} variant={allFinished && !order.handedOver ? 'primary' : 'secondary'}>Open delivery run</ButtonLink> : <Button tone="staff" fullWidth variant={allFinished && !order.handedOver ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || (!order.handedOver && !allFinished)} onClick={() => { void handover.request(id, !order.handedOver) }}>{order.handedOver ? 'Undo pickup' : 'Mark picked up'}</Button>}
+          {paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : deliveryItem ? <ButtonLink tone="staff" fullWidth to={deliveryTo} variant={allFinished && !order.handedOver ? 'primary' : 'secondary'}>Open delivery run</ButtonLink> : <Button tone="staff" fullWidth variant={allFinished && !order.handedOver ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || (!order.handedOver && !allFinished)} onClick={() => { void handover.request(id, !order.handedOver) }}>{order.handedOver ? 'Undo pickup' : 'Mark picked up'}</Button>}
         </section>
         <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method, amount) => runAction(() => api.payments.setPaymentState(id, state, method, amount), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} />
         <details className={styles.panel}>
@@ -172,9 +174,11 @@ function OrderDetail({ id }: { id: string }) {
           </dl>
         </details>
         {hasForm && !formWaiting ? <details className={styles.panel}><summary>Customer form <span className={styles.muted}>Completed</span></summary>{formContent}</details> : null}
-        <Button tone="staff" variant="danger" disabled={busy || order.handedOver} onClick={() => setCancelOpen(true)}>Cancel order</Button>
-        {order.handedOver && <p className={styles.muted}>A handed-over order cannot be cancelled. Undo handover first.</p>}
         <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
+        <div className={styles.dangerZone}>
+          <Button tone="staff" variant="ghost" className={styles.cancelBtn} disabled={busy || order.handedOver} onClick={() => setCancelOpen(true)}>Cancel order</Button>
+          {order.handedOver && <p className={styles.muted}>A handed-over order cannot be cancelled. Undo handover first.</p>}
+        </div>
       </aside>
     </div>
     {cancelOpen && <CancelOrderDialog busy={busy} order={order} items={items} onClose={() => setCancelOpen(false)} onConfirm={() => { void cancelOrder() }} />}

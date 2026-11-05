@@ -60,3 +60,21 @@
 .dayFilters fieldset > div { flex-wrap: nowrap; overflow-x: auto; padding: var(--space-2); }
 .dayFilters label { flex: 0 0 auto; }
 .past { margin-block: var(--space-3); }
+
+/* A card and its handover action read as one unit, clearly apart from the next order. */
+.item {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.item > :first-child {
+  margin-bottom: 0;
+}
+
+.itemAction {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}

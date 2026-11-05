@@ -404,7 +404,7 @@ export function AgendaPage() {
         <p className={styles.context}>
           {day.market.name} · {formatDateLabel(day.marketDay.date)}
         </p>
-        {paintingRule && <p className={styles.context}>{paintingRule.booked}/{paintingRule.maxPaintings} paintings {day.marketDay.isToday ? 'today' : 'scheduled'}{!paintingRule.open ? ' · Automatic painting closed' : ''}{paintingRule.booked >= paintingRule.maxPaintings ? ' · Manual reservations may exceed the automatic limit' : ''}</p>}
+        {paintingRule && <p className={styles.context}>{paintingRule.booked} {paintingRule.booked === 1 ? 'session' : 'sessions'} {day.marketDay.isToday ? 'today' : 'scheduled'}{!paintingRule.open ? ' · Web booking closed' : paintingRule.booked >= paintingRule.maxPaintings ? ` · Web booking full (${Math.min(paintingRule.booked, paintingRule.maxPaintings)}/${paintingRule.maxPaintings})` : ''}</p>}
       </div>
 
       <DayStrip
@@ -447,10 +447,10 @@ export function AgendaPage() {
         </p>
       ) : null}
 
-      {moveError ? <p className={styles.moveError} role="alert">{moveError}</p> : null}
+      {moveError && !moveProposal ? <p className={styles.moveError} role="alert">{moveError}</p> : null}
 
       {moveProposal ? (
-        <StaffDialog title="Confirm schedule change" busy={moving} onClose={() => setMoveProposal(null)}>
+        <StaffDialog title="Confirm schedule change" busy={moving} onClose={() => { setMoveProposal(null); setMoveError('') }}>
           <div>
             <strong>Move {moveProposal.slot.order?.code ?? moveProposal.slot.item?.petName ?? 'session'}?</strong>
             <p>
@@ -460,8 +460,9 @@ export function AgendaPage() {
             </p>
             <small>Pickup stays {moveProposal.slot.item ? handoffLabel(moveProposal.slot.item, marketDays) : 'unchanged'}.</small>
           </div>
+          {moveError ? <p role="alert">{moveError}</p> : null}
           <div className={styles.moveActions}>
-            <Button tone="staff" variant="ghost" onClick={() => setMoveProposal(null)} disabled={moving}>
+            <Button tone="staff" variant="ghost" onClick={() => { setMoveProposal(null); setMoveError('') }} disabled={moving}>
               Cancel
             </Button>
             <Button tone="staff" onClick={confirmMove} disabled={moving}>
@@ -522,6 +523,9 @@ export function AgendaPage() {
                 const code = slot.order?.code
                 const handoff = slot.item ? handoffLabel(slot.item, marketDays) : null
                 const tone = slot.held ? 'held' : slot.order?.handedOver ? 'delivered' : slot.block.status
+                const slotHeight = (slot.block.endHour - slot.block.startHour) * HOUR_H - 4
+                // Three lines need about 76px; shorter blocks get one line instead of overlapping text.
+                const compact = slotHeight < 76
                 const statusLabel = slot.held ? (slot.holdUntil ? `Held until ${new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Vienna', hour: '2-digit', minute: '2-digit' }).format(new Date(slot.holdUntil))}` : 'Held by web checkout') : tone === 'delivered' ? 'Delivered' : tone === 'finished' ? 'Ready' : tone === 'in_progress' ? 'Painting' : 'To paint'
                 return (
                   <button
@@ -541,16 +545,19 @@ export function AgendaPage() {
                       left: `${100 * (slotLayout.get(slot.block.id)?.lane ?? 0) / (slotLayout.get(slot.block.id)?.lanes ?? 1)}%`,
                       width: `calc(${100 / (slotLayout.get(slot.block.id)?.lanes ?? 1)}% - var(--space-2))`,
                       top: hourToY(slot.block.startHour, HOUR_H, boardStart),
-                      height: (slot.block.endHour - slot.block.startHour) * HOUR_H - 4,
+                      height: slotHeight,
                     }}
+                    data-compact={compact || undefined}
                     onClick={() => openOrder(slot)}
                   >
-                    <strong>{name}</strong>
-                    <span className={styles.slotRange}>
-                      {range}
-                      {code ? ` · ${code}` : ''}
-                    </span>
-                    <span className={styles.slotHandoff}>{statusLabel}</span>
+                    {compact ? <span className={styles.slotLine}><strong>{name}</strong> · {range} · {statusLabel}</span> : <>
+                      <strong>{name}</strong>
+                      <span className={styles.slotRange}>
+                        {range}
+                        {code ? ` · ${code}` : ''}
+                      </span>
+                      <span className={styles.slotHandoff}>{statusLabel}</span>
+                    </>}
                   </button>
                 )
               })}

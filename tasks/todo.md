@@ -22,19 +22,13 @@
 
 ## Pendiente (ver `tasks/preguntas-pendientes.md` para decisiones del dueño)
 
-- [ ] SEC-F: Claude debe ejecutar la suite actual, incluidos `form.spec.ts`, `success.spec.ts` y `staff-review.spec.ts`, y comprobar tokens tras envío/checkout, edición de dirección, expiración, recarga y logout sin red. Mantener axe y las nueve referencias presentes. Ver `docs/sec-f-handoff.md`. HSTS queda por configurar/verificar en el proxy TLS real; el conflicto previo de tipos Playwright/axe sigue abierto.
-
-- [ ] Fix e-4 (seguimiento actual, sustituye e-1/e-2/e-3): referencias preparadas; Claude debe repetir normalmente los 383 casos conservando los nueve PNG ya regenerados, revisados e idénticos byte a byte a los `*-actual.png`, sin borrarlos ni `--update-snapshots`. Último resultado externo: 378 aprobados, 3 fallidos exclusivamente por referencias ausentes, 2 omitidos; el foco de fotos ya no falla. No se cambió app/tests/axe. Build/lint y 23 pruebas Node pasan; sin Playwright ni commits aquí. Revisar contenido desplazable además de comparar los PNG. Ver `docs/ux-validation.md`.
-
-- [ ] Task 11: Claude debe ejecutar `staff-review.spec.ts` en ipadPortrait/ipadLandscape/desktop (34 casos, 102 ejecuciones previstas), verificar axe cero en todas las páginas, teclado/toque, 390px, 820×1180/1180×820, HTTP real y cambios visuales. Revisar DTOs añadidos antes de desplegar el frontend. Stylelint binario pendiente de instalar cuando haya red; el lint de tokens está activo. P1-14/17/18/22 pendientes del dueño; P2-21 historial/referencia Stripe y P2-24 back-off por cuenta no implementados. Ver `docs/task11-staff-handoff.md`.
-
-- [ ] Seguimiento histórico Fix b-2 / Task 8: la ejecución externa más reciente (378 aprobados de 383, Fix e-4) no registra de nuevo el fallo axe móvil; las trazas visuales actuales solo muestran referencias ausentes. Revisar el calendario y la barra durante el scroll; conservar las capturas ya regeneradas. El seguimiento vigente de navegador es Fix e-4 en `docs/ux-validation.md`, sin debilitar los checks.
-
-- [ ] Seguimiento histórico Fix b-1 / Task 8: Claude debe repetir la suite de 193 ejecuciones, validar el foco y envío del código postal con ratón, teclado y táctil, y regenerar y revisar las nueve referencias visuales eliminadas por instrucción del dueño. Revisar DE/EN, axe, recarga, enlaces, varias Kugeln/finished, 360×640/reflow/zoom y regresiones de `/buy`. Handoff en `docs/task8-form-handoff.md`.
-
-- [ ] Task 7B: Claude debe ejecutar la suite actualizada (incluido `e2e/design-system.spec.ts`), revisar capturas DE/EN a 360/768/1280 px, la guía `/dev/design` y reflow/zoom del calendario. Implementación terminada; handoff en `docs/task7b-handoff.md`. Mantener checks de accesibilidad y no aceptar capturas automáticamente.
-
-- [ ] 2026-11-05 · Fix 12 **parcial, pendiente de validar**: Claude informó 121 aciertos y un fallo de axe en escritorio. La traza identifica la ayuda de fotos y el contador; el fundido de entrada de `optionsPane` reduce temporalmente su contraste a 2,86:1. La entrada conserva ahora solo el deslizamiento, con texto totalmente opaco y movimiento reducido sin animación. No se modificaron tests ni aserciones. Build y lint pasan (advertencias existentes). No se ejecutó Playwright por instrucción del dueño; Claude debe repetir la suite y revisar capturas antes de cerrar el fix. Sustituye el seguimiento pendiente de Fix 11.
+- [x] 2026-11-05 · Validación de navegador cerrada: suite completa en verde para `/buy`, `/form`, recogida en mercado, SEC-F (399/404 con tres timeouts por carga que pasan aislados) y capturas regeneradas y revisadas. Sustituye los seguimientos de Fix 9–12, a–e, Task 5–8, 7B y 11.
+- [ ] Staff UX — pendiente tras los arreglos del 2026-11-05 (informes `tasks/audit-results/staff-ux-*`):
+  - Agenda P1-6: texto al 200 % (altura de hora y columna horaria que escalen con el texto; ya se arreglaron los bloques cortos).
+  - Días de pintura P1-9: tabla compacta por semana, un solo guardado, días pasados bloqueados, «Over limit» y casilla de 24 px.
+  - Editor de mercados P1-7: marcar el día en conflicto (`field: 'days'`) en su fila. El mock no puede provocar el conflicto porque los pedidos web de Viena no tienen `marketDayId`.
+  - Mock: los ítems de Viena sin `marketDayId` aparecen en todos los miércoles/viernes (`viennaBelongsToDate`).
+  - Los P2 de ambos informes. HSTS se verifica en el proxy TLS real. Sigue abierto el conflicto de tipos Playwright/axe en `e2e/helpers.ts:45`.
 - [ ] `/buy` premium: verificar en navegador a 360/768/1280 px y completar las mejoras y pruebas de `docs/plan-buy-premium.md`.
 - [ ] Stripe: `stripe login`, claves de prueba, prueba real del checkout y webhook (`docs/stripe-setup.md`); luego claves live y `SHOP_ENABLED=true`.
 - [ ] SMTP (`MAIL_*`, `OWNER_EMAIL`) y prueba real de los e-mails.

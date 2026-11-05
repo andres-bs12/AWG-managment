@@ -84,6 +84,9 @@ function MarketEditor() {
   const [missing, setMissing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const actionErrorRef = useRef<HTMLParagraphElement>(null)
+  // Save sits at the bottom of a long form: show the error there and move focus to it (Save is disabled while busy).
+  useEffect(() => { if (error) actionErrorRef.current?.focus() }, [error])
   const [deleting, setDeleting] = useState<DayDraft | 'market' | null>(null)
   const [originalBusy, setOriginalBusy] = useState(false)
   const [notice, setNotice] = useState(
@@ -261,11 +264,7 @@ function MarketEditor() {
       </div>
 
       <form className={styles.form} onSubmit={(event) => void onSave(event)}>
-        {error ? (
-          <p className={styles.error} role="alert">
-            {error}
-          </p>
-        ) : null}
+        {error ? <p className={styles.error}>{error}</p> : null}
         {notice ? (
           <section className={styles.notice} role="status">
             <h2>{notice}</h2>
@@ -387,11 +386,13 @@ function MarketEditor() {
                       {locked ? <span className={styles.locked}>Has orders</span> : null}
                       <Button
                         tone="staff"
-                        variant="danger"
+                        variant="ghost"
+                        className={styles.removeDay}
                         disabled={locked || busy}
+                        aria-label={`Remove ${formatDateLabel(day.date)}`}
                         onClick={() => setDeleting(day)}
                       >
-                        Delete day
+                        Remove
                       </Button>
                     </div>
                   </li>
@@ -405,6 +406,7 @@ function MarketEditor() {
           <Button type="submit" tone="staff" variant="primary" size="lg" disabled={busy}>
             Save
           </Button>
+          {error ? <p ref={actionErrorRef} tabIndex={-1} className={styles.error} role="alert">{error}</p> : null}
           {marketId ? (
             <div className={styles.deleteMarket}>
               {marketLocked ? <p className={styles.locked}>This market has orders and cannot be deleted.</p> : null}
@@ -415,7 +417,7 @@ function MarketEditor() {
           ) : null}
         </div>
       </form>
-      {deleting && <StaffDialog title={deleting === 'market' ? 'Delete market?' : 'Delete day?'} busy={busy} onClose={() => setDeleting(null)}>
+      {deleting && <StaffDialog title={deleting === 'market' ? 'Delete market?' : 'Remove day?'} busy={busy} onClose={() => setDeleting(null)}>
         <p>{deleting === 'market' ? 'This permanently deletes the market and all its unused days. Unsaved edits will be discarded.' : `Remove ${formatDateLabel(deleting.date)} from this draft? The day is deleted only when you Save.`}</p>
         <Button tone="staff" variant="secondary" disabled={busy} onClick={() => setDeleting(null)}>{deleting === 'market' ? 'Keep market' : 'Keep day'}</Button>
         <Button tone="staff" variant="danger" disabled={busy} onClick={() => { if (deleting === 'market') void onDeleteMarket(); else stageDeleteDay(deleting) }}>{deleting === 'market' ? (busy ? 'Deleting…' : 'Delete market') : 'Remove day from draft'}</Button>

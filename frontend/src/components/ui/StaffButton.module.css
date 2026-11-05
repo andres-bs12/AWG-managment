@@ -13,6 +13,7 @@
 .danger:hover:not(:disabled) { text-decoration: underline; }
 .choice { min-height: var(--size-choice-card); justify-content: flex-start; text-align: left; }
 .staff { min-height: var(--size-control-staff); font-family: var(--font-staff); }
+.staff.lg { min-height: var(--touch-lg); }
 .btn[data-selected='false'] { padding: calc(var(--space-2) + var(--border-thin)) calc(var(--space-4) + var(--border-thin)); }
 .btn[data-selected='true'] { background: var(--color-selected-surface); color: var(--color-text); border: var(--border-control) solid var(--color-selected); font-weight: 600; }
 .btn[data-selected='true']:hover:not(:disabled) { background: var(--color-selected-surface); }

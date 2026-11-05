@@ -374,3 +374,19 @@
 .slot[data-selected='true'] { border: var(--border-control) solid var(--color-selected); background: var(--color-selected-surface); color: var(--color-text); font-weight: 600; }
 .slot[data-held='true'] { background-color: var(--staff-bg); background-image: var(--staff-held-pattern); color: var(--staff-ink); cursor: default; border-color: var(--color-control-border); }
 .slot[data-held='true'] strong, .slot[data-held='true'] .slotRange, .slot[data-held='true'] .slotHandoff { background: var(--staff-surface); align-self: start; }
+
+/* Children keep their height and clip on their own line instead of shrinking into each other. */
+.slot > * {
+  flex-shrink: 0;
+}
+
+.slot[data-compact] {
+  justify-content: center;
+}
+
+.slotLine {
+  font-size: var(--type-staff-meta-size);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

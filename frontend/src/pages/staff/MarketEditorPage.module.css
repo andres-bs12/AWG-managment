@@ -25,7 +25,6 @@
 
 .input {
   color: var(--staff-ink);
-  border: var(--border-control) solid var(--staff-ink);
   font-family: var(--font-staff);
 }
 
@@ -128,4 +127,9 @@
   .dayActions {
     align-items: stretch;
   }
+}
+
+/* Removing a day only stages the change; it must not outweigh Save. */
+.removeDay:not(:disabled) {
+  color: var(--staff-danger);
 }

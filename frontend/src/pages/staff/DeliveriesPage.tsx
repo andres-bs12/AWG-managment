@@ -18,7 +18,7 @@ type DayFilter = 'all' | string
 type StatusFilter = 'all' | ProductionStatus
 type KindFilter = 'all' | DeliveryKind
 
-type DatedDelivery = AgendaDelivery & { date: string }
+type DatedDelivery = AgendaDelivery & { date: string; count?: number; ready?: number }
 
 type Section = {
   key: string
@@ -47,6 +47,23 @@ function flattenDays(days: AgendaDay[]): DatedDelivery[] {
       date: day.marketDay.date,
     })),
   )
+}
+
+/** One row per order and handoff kind; names, readiness and the handover check cover every ornament. */
+function groupOrders(rows: DatedDelivery[]): DatedDelivery[] {
+  const groups = new Map<string, DatedDelivery[]>()
+  for (const row of rows) {
+    const key = `${row.orderId}|${row.deliveryKind}`
+    groups.set(key, [...(groups.get(key) ?? []), row])
+  }
+  return [...groups.values()].map(([first, ...rest]) => {
+    if (!rest.length) return first
+    const all = [first, ...rest]
+    const ready = all.filter(row => row.productionStatus === 'finished').length
+    const names = [...new Set(all.map(row => row.title).filter(Boolean))]
+    const productionStatus: ProductionStatus = ready === all.length ? 'finished' : all.some(row => row.productionStatus !== 'not_started') ? 'in_progress' : 'not_started'
+    return { ...first, title: `${names.join(', ')} · ${all.length} ornaments`, productionStatus, count: all.length, ready, color: undefined, finish: undefined, backName: undefined }
+  })
 }
 
 function uniqueVienna(rows: DatedDelivery[]): DatedDelivery[] {
@@ -80,8 +97,8 @@ function buildSections(days: AgendaDay[], rows: DatedDelivery[], dayFilter: DayF
     if (vienna.length) {
       out.push({
         key: 'vienna',
-        title: 'Home deliveries',
-        meta: '',
+        title: `Vienna · ${title}`,
+        meta: 'Home deliveries · no exact time',
         rows: vienna,
       })
     }
@@ -100,12 +117,12 @@ function buildSections(days: AgendaDay[], rows: DatedDelivery[], dayFilter: DayF
     })
   }
   const vienna = uniqueVienna(rows)
-  if (vienna.length) {
+  for (const date of [...new Set(vienna.map(row => row.date))].sort()) {
     out.push({
-      key: 'vienna',
-      title: 'Home deliveries',
-        meta: '',
-      rows: vienna,
+      key: `vienna-${date}`,
+      title: `Vienna · ${formatDateLabel(date)}`,
+      meta: 'Home deliveries · no exact time',
+      rows: vienna.filter(row => row.date === date),
     })
   }
   return out
@@ -123,6 +140,10 @@ export function DeliveriesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [handoffError, setHandoffError] = useState('')
+  // Orders toggled on this screen keep their place until the filters change, so the next button never slides under the finger.
+  const [pinned, setPinned] = useState<Set<string>>(() => new Set())
+  const [lastToggle, setLastToggle] = useState<{ orderId: string; code: string; target: boolean } | null>(null)
+  useEffect(() => { setPinned(new Set()); setLastToggle(null) }, [dayFilter, statusFilter, kindFilter, routeMode, includePast])
 
   function setDayFilter(value: string) {
     const next = new URLSearchParams(params)
@@ -156,8 +177,15 @@ export function DeliveriesPage() {
 
   const todayDate = days.find(day => day.marketDay.isToday)?.marketDay.date ?? clock.date
   const handover = useHandover(() => setReload(n => n + 1), setHandoffError)
+  function toggle(row: DatedDelivery, target: boolean) {
+    setPinned(current => new Set(current).add(row.orderId))
+    setLastToggle({ orderId: row.orderId, code: row.orderCode, target })
+    void handover.request(row.orderId, target)
+  }
 
   const dated = useMemo(() => flattenDays(days), [days])
+  const confirmed = lastToggle && dated.find(row => row.orderId === lastToggle.orderId)?.handedOver === lastToggle.target ? lastToggle : null
+  const handoverStatus = confirmed ? `${confirmed.code} ${confirmed.target ? 'handed over' : 'handover undone'}.` : ''
 
   const filtered = useMemo(() => {
     return dated.filter((row) => {
@@ -228,6 +256,7 @@ export function DeliveriesPage() {
         <label className={styles.past}><input type="checkbox" checked={includePast} onChange={event => setIncludePast(event.target.checked)} /> Include past days</label>
         {handover.dialog}
         {handoffError ? <p role="alert">{handoffError}</p> : null}
+        <p className={styles.hint} role="status">{handoverStatus}</p>
 
         {sections.length === 0 ? (
           <p className={styles.empty}>{emptyMessage}</p>
@@ -236,22 +265,23 @@ export function DeliveriesPage() {
             <div key={section.key} className={styles.group}>
               <h2>{section.title}</h2>
               <p className={styles.meta}>{section.meta}</p>
-              {[...section.rows].filter((row, index, all) => all.findIndex(other => other.orderId === row.orderId && other.deliveryKind === row.deliveryKind) === index).sort((a, b) => Number(a.handedOver) - Number(b.handedOver)).map((row) =>
+              {groupOrders(section.rows).sort((a, b) => Number(a.handedOver && !pinned.has(a.orderId)) - Number(b.handedOver && !pinned.has(b.orderId))).map((row) =>
                 routeMode && row.deliveryKind === 'vienna' ? (
                   <ViennaDeliveryCard
                     key={`${row.orderId}-${row.itemId}-${row.date}`}
                     row={row}
                     from={`/staff/deliveries?${params}`}
                     busy={handover.busy}
-                    onToggle={(orderId, handedOver) => void handover.request(orderId, handedOver)}
+                    onToggle={(_, handedOver) => toggle(row, handedOver)}
                   />
                 ) : (
-                  <div key={`${row.orderId}-${row.itemId}-${row.date}`}><DeliveryRow
-                    key={`${row.orderId}-${row.itemId}-${row.date}`}
-                    row={row}
-                    from={`/staff/deliveries?${params}`}
-                  />
-                  <Button tone="staff" variant="secondary" disabled={handover.busy || (!row.handedOver && row.productionStatus !== 'finished')} onClick={() => void handover.request(row.orderId, !row.handedOver)}>{row.handedOver ? 'Undo handover' : row.deliveryKind === 'market' ? 'Mark picked up' : 'Mark delivered'}</Button></div>
+                  <div key={`${row.orderId}-${row.itemId}-${row.date}`} className={styles.item}>
+                    <DeliveryRow row={row} from={`/staff/deliveries?${params}`} />
+                    <div className={styles.itemAction}>
+                      <Button tone="staff" variant="secondary" disabled={handover.busy || (!row.handedOver && row.productionStatus !== 'finished')} onClick={() => toggle(row, !row.handedOver)}>{row.handedOver ? 'Undo handover' : row.deliveryKind === 'market' ? 'Mark picked up' : 'Mark delivered'}</Button>
+                      {!row.handedOver && row.productionStatus !== 'finished' ? <span className={styles.hint}>{row.count ? `${row.ready} of ${row.count} ready` : 'Finish before handoff'}</span> : null}
+                    </div>
+                  </div>
                 ),
               )}
             </div>

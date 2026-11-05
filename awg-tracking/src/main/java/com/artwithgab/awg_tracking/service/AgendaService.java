@@ -109,6 +109,9 @@ public class AgendaService {
         return new AgendaDayDto(mapper.marketDay(day, index.today()), mapper.market(day.getMarket()), slots, deliveries(s, day.getDate()));
     }
 
+    /** Staff read the delivery day on each row, for example "Wed 2 Dec". */
+    private static final java.time.format.DateTimeFormatter VIENNA_DAY = java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", java.util.Locale.ENGLISH);
+
     private List<AgendaDeliveryDto> deliveries(Snapshot s, LocalDate date) {
         List<AgendaDeliveryDto> rows = new ArrayList<>();
         for (OrderItem item : s.items()) {
@@ -124,7 +127,7 @@ public class AgendaService {
                     customer.getName(), item.getCustomColor(), item.getCustomFinish(), ViewMapper.nz(item.getNameInOrnament()),
                     order.getId().toString(), order.getCode(), item.getId().toString(), title,
                     item.getProductionStatus(), order.isHandedOver(), item.getDeliveryKind(), hour,
-                    market ? "Market pickup" : "Vienna · Wed/Fri",
+                    market ? "Market pickup" : "Vienna · " + VIENNA_DAY.format(date),
                     hour == null ? null : Hours.format(hour),
                     customer.getPhone(),
                     market ? null : addressLabel(order),

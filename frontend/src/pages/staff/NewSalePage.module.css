@@ -373,3 +373,8 @@
     grid-template-columns: 1fr;
   }
 }
+
+.hint {
+  margin: 0;
+  color: var(--staff-muted);
+}
