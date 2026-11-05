@@ -13,10 +13,11 @@ Flyway, Docker (verified), password change + cancel order (backend+frontend), la
 ## Sprint 4 — DONE and pushed (backend 4ff367b, frontend 76795b9, e-mails a940770, legal 97ecfc1, Stripe kit 6bce633).
 tasks/preguntas-pendientes.md rewritten with the owner's answers.
 
-## Final phase — IN PROGRESS (started ~02:40 2026-11-05)
-Prompts: tasks/audit-prompts/{_context,ui,ux,security}.md. Six auditors running:
-- Codex (read-only, static): outputs in scratchpad codex-audit-{ui,ux,security}.md → copy to tasks/audit-results/codex-*.md
-- Claude subagents (live browser/curl): tasks/audit-results/claude-{ui,ux,security}.md
-Test backend runs from a git worktree at scratchpad/wt (branch tip) so in-progress edits don't break it.
-Next: merge all six into tasks/audit-final.md (dedupe, prioritize), plan fixes (split Claude/Codex; reviewer ≠ author),
-fix, retest (tests + browser), commit, push, update AGENTS.md/todo, delete RESUME.md + .agent-heartbeat, Spanish report.
+## Final phase — audits DONE, fixes IN PROGRESS (2026-11-05)
+- Audits merged in tasks/audit-final.md (50 findings). Contract: docs/sprint5-contract.md.
+- Backend fixes committed 8737725 (61 tests green, V3 verified on fresh Postgres).
+- Frontend fixes part 1 committed 3418420 (Codex). Part 2 running in Codex: brief scratchpad codex-fix-fe2-brief.md,
+  result codex-fix-fe2-result.md. Codex read-only review of 8737725 → codex-review-be-result.md.
+- Next: apply review fixes; Claude reviews part 2 diff, build/lint, commit; restart test backend (worktree scratchpad/wt
+  at new tip, task env in summary); live retest per "Plan de re-test" (Claude subagent) + Codex static retest; fix;
+  update AGENTS.md/todo.md; delete RESUME.md + .agent-heartbeat; push; Spanish report.

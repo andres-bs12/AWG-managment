@@ -1,6 +1,6 @@
 # Preguntas pendientes para el dueño
 
-Actualizado 2026-11-05 con tus respuestas. Abajo: lo que queda abierto y lo resuelto (para referencia).
+Actualizado 2026-11-05 con tus respuestas y con lo que encontró la auditoría final. Abajo: lo que queda abierto y lo resuelto (para referencia).
 
 ## Abiertas
 
@@ -11,6 +11,10 @@ Actualizado 2026-11-05 con tus respuestas. Abajo: lo que queda abierto y lo resu
 5. **Despliegue.** Lo decides mañana. Todo está listo con Docker (`docs/deploy.md`); falta dominio y proveedor.
 6. **Lista de espera.** Los e-mails se guardan (tabla `waitlist_entry`), pero no hay pantalla para verlos ni envío automático cuando abra la temporada 2027. ¿Lo hacemos más adelante?
 7. **Avisos con agentes.** Comentaste que después quieres un seguimiento "más inteligente" de los movimientos. Queda para una fase futura.
+8. **Caducidad de los enlaces del formulario** (auditoría de seguridad, prioridad alta). Hoy el enlace `/form/…` de cada pedido funciona para siempre: quien lo tenga ve el nombre, el teléfono y la dirección. Propuesta: que deje de funcionar 30 días después de la entrega. ¿Te parece bien, o prefieres otro plazo?
+9. **Datos con códigos antiguos.** Track muestra el nombre de pila y el estado con solo el código del pedido (los códigos viejos son cortos). ¿Mostramos menos datos para los pedidos con código corto (anteriores a `AWG` + 6) o los dejamos como están?
+10. **Cuánto tiempo guardar los datos.** No hay borrado automático de clientes, fotos ni pedidos. Propuesta: borrar las fotos 60 días después de la entrega y anonimizar los clientes después del plazo que pida tu asesor (en Austria las facturas se guardan 7 años). ¿Lo hacemos así?
+11. **Confirmar la lista de espera.** Para cumplir con el RGPD lo ideal es enviar un e-mail de confirmación (doble opt-in) y un enlace para darse de baja. Necesita el SMTP de la pregunta 3. ¿Lo hacemos cuando esté el correo?
 
 ## Resueltas (2026-11-05)
 
@@ -25,6 +29,6 @@ Actualizado 2026-11-05 con tus respuestas. Abajo: lo que queda abierto y lo resu
 - **Notificaciones:** e-mail al dueño y al cliente en cada movimiento (pendiente de SMTP, ver la pregunta 3).
 - **Cancelaciones:** online, el cliente escribe un e-mail; en el puesto, lo cancelas tú en el detalle del pedido (*Cancel order*). Los reembolsos con tarjeta se hacen a mano en Stripe.
 - **Código de pedido:** ahora `AWG` + 6 caracteres; los códigos antiguos siguen funcionando.
-- **Base de datos:** migraciones Flyway (V1 y V2).
+- **Base de datos:** migraciones Flyway (V1, V2 y V3).
 - **Contraseñas del staff:** pantalla *Change password*.
 - **`package-lock.json` de la raíz:** borrado (estaba vacío).
