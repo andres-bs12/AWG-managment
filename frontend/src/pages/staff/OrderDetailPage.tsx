@@ -36,6 +36,8 @@ function OrderDetail({ id }: { id: string }) {
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
   const [notice, setNotice] = useState('')
+  // A confirmation is read once; it should not stay over the page.
+  useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(''), 5000); return () => window.clearTimeout(timer) }, [notice])
   const [busy, setBusy] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const actionLock = useRef(false)

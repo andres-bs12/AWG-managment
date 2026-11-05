@@ -722,7 +722,7 @@ export function NewSalePage() {
                   <Button tone="staff" size="lg" onClick={() => setPhase('payment')}>
                     Continue to payment
                   </Button>
-                  <CustomerHandoff token={order.formToken} label="Fill on this iPad instead" />
+                  <CustomerHandoff token={order.formToken} label="Fill on this device instead" />
                   <button
                     type="button"
                     className={styles.textBtn}

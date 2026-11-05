@@ -1,5 +1,5 @@
 .bar { padding: var(--space-3); border: 1px solid var(--staff-line); border-radius: var(--radius-control); background: var(--staff-surface); }
 .total { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); font-variant-numeric: tabular-nums; }
 .total strong { white-space: nowrap; }
-.bar[data-docked='true'] { margin-top: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; box-shadow: var(--shadow-up); }
+.bar[data-docked='true'] { margin-top: 0; margin-bottom: var(--space-2); box-shadow: var(--shadow-up); }
 @media (min-width: 1024px) { .total { display: none; } .bar { padding: 0; border: 0; background: transparent; } }
