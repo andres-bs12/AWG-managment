@@ -172,3 +172,51 @@ The mock (`frontend/src/api/mock/`) implements the same contract:
 - `deliveriesFrom`.
 - `FORM_EXPIRED`.
 - The waitlist confirm and unsubscribe flow.
+
+## Form design rules (public forms: `/buy`, `/form`)
+
+These rules were added after owner feedback on 2026-11-05 ("no hierarchy, no symmetry"). Every public form step must follow them.
+
+Sources:
+- [Baymard: avoid multi-column forms](https://baymard.com/blog/avoid-multi-column-forms)
+- [NN/g: white space in forms](https://www.nngroup.com/articles/form-design-white-space/)
+- [Scottish Government: form spacing](https://designsystem.gov.scot/guidance/forms/form-spacing)
+- [GOV.UK: inset text](https://design-system.service.gov.uk/components/inset-text) and [warning text](https://design-system.service.gov.uk/components/warning-text)
+
+**Layout**
+- Single column.
+- Fields share a row only when they form one entity: PLZ + Ort.
+  - E-Mail and Telefon are never side by side.
+  - Straße and Stiege/Tür are never side by side.
+- Input width hints the expected length: PLZ is about 8rem, the other text fields go up to 34rem.
+- The hint goes between the label and the input, so a field with a hint is taller. That is why fields with different hints never share a row: the inputs would not line up.
+
+**Spacing (4-pt scale; proximity shows what belongs together)**
+
+| Between | Space |
+|---|---|
+| Label and hint | 4px |
+| Label (or hint) and input | 8px |
+| Input and its error or count | 8px |
+| Two fields | 24px |
+| Two sections | 32px + 1px divider + 24px, at least 2× the field gap |
+| Step title and first content | 24px (8px when an intro paragraph follows; the intro then has 24px below) |
+
+**Type scale, three clearly different levels**
+
+| Level | Size | Font | Weight |
+|---|---|---|---|
+| Step title (h2) | 1.625rem | Display (Baloo 2) | 700 |
+| Section or card title (h3 / legend) | 1.25rem | Display | 700 |
+| Field label | 1rem | Sans (Source Sans 3) | 600 |
+| Hint and meta | 0.875rem | Sans | muted (#5c6b80) |
+
+Headings use the display font and labels use the sans font, so they never look alike.
+
+**Color roles**
+- The light-blue `--snow` background is only for the product card and the cart (summaries of what is bought).
+- Supporting information (Vienna only, finish explanation, photo reload, no-return notice) uses **inset text**:
+  - a 4px neutral left border, no background, normal ink;
+  - used sparingly, at most one per step.
+- Errors are red.
+- Selection is a dark border plus a ✓, so it never relies on color alone.

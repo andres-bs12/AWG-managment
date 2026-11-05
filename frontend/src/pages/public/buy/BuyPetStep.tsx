@@ -28,8 +28,8 @@ export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, a
       <p className={styles.label}>
         {t('formPhotos')}</p>
       <p className={styles.muted} id={`photos-${item.uid}-hint`}>
-        {t('shopPhotosHint')} {(item.photos.length > 0) && t('shopPhotosWarning')}</p>
-      {item.photosNeedReload && <p className={styles.notice} role="status">
+        {t('shopPhotosHint')}</p>
+      {item.photosNeedReload && <p className={styles.inset} role="status">
         {t('shopPhotosReload')}</p>}
       <div className={styles.photoRow}>
         {item.photos.map((photo, photoIndex) => <span key={photo.id} className={styles.thumb}>
@@ -42,7 +42,7 @@ export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, a
 
             onClick={() => patchItem(item.uid, { photos: item.photos.filter((other) => other.id !== photo.id) })}>×</button></span>)}{item.photos.length < MAX_PHOTOS && <button type="button" id={`photos-${item.uid}`} className={styles.photoAdd} aria-label={t('addPhoto')} aria-describedby={described(`photos-${item.uid}`, true)} disabled={reading === item.uid} onClick={() => document.getElementById(`gallery-${item.uid}`)?.click()}>+</button>}</div>{reading === item.uid && <p role="status">{t('photoReading')}</p>}
       <p className={styles.muted} aria-live="polite">
-        {t('shopPhotosCount', { n: item.photos.length, max: MAX_PHOTOS })}</p>
+        {t('shopPhotosCount', { n: item.photos.length, max: MAX_PHOTOS })}{item.photos.length > 0 && <> · {t('shopPhotosWarningShort')}</>}</p>
       <input
 
         id={`gallery-${item.uid}`}
@@ -64,7 +64,7 @@ export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, a
         {err(`photos-${item.uid}`)}</p>}{photoErrors[item.uid] && <p className={styles.error} role="alert">
           {photoErrors[item.uid]}</p>}
     </div>
-    <details><summary>{t('optionalNote')}</summary><Field label={t('note')} htmlFor={`note-${item.uid}`} error={err(`note-${item.uid}`)}>
+    <details className={styles.noteToggle}><summary>{t('optionalNote')}</summary><Field label={t('note')} htmlFor={`note-${item.uid}`} error={err(`note-${item.uid}`)}>
       <textarea
 
         id={`note-${item.uid}`} maxLength={1000}

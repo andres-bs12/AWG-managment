@@ -1,0 +1,42 @@
+.art {
+  overflow: visible;
+}
+
+.sway {
+  transform-box: view-box;
+  transform-origin: 40px 0;
+  animation: sway 4s ease-in-out infinite;
+}
+
+/* Cat and dog take turns (8s cycle, ~0.6s crossfade). */
+.cat,
+.dog {
+  animation: swap 8s ease-in-out infinite;
+}
+
+.dog {
+  animation-delay: -4s;
+}
+
+@keyframes swap {
+  0%, 42% { opacity: 1; }
+  50%, 92% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sway,
+  .cat,
+  .dog {
+    animation: none;
+  }
+
+  .dog {
+    opacity: 0;
+  }
+}

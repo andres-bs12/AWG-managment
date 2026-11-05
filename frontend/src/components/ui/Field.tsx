@@ -7,11 +7,13 @@ type Props = {
   hint?: string
   error?: string
   children: ReactNode
+  /** Extra class, e.g. a column span when the field sits in a form grid. */
+  className?: string
 }
 
-export function Field({ label, htmlFor, hint, error, children }: Props) {
+export function Field({ label, htmlFor, hint, error, children, className }: Props) {
   return (
-    <div className={`${styles.field} ${error ? styles.invalid : ''}`}>
+    <div className={`${styles.field} ${error ? styles.invalid : ''} ${className ?? ''}`}>
       <label className={styles.label} htmlFor={htmlFor}>
         {label}
       </label>

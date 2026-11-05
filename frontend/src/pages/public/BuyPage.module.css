@@ -1,135 +1,959 @@
-.shop { width: min(760px, 92vw); }
-.notice { margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border-radius: var(--radius); background: var(--snow); border: 1px solid var(--snow-2); }
-.progress { display: flex; gap: var(--space-2); list-style: none; padding: 0 0 var(--space-4); margin: 0; border-bottom: 1px solid var(--snow-2); }
-.progress li { flex: 1; min-width: 0; color: var(--public-muted); font-size: var(--fs-small); line-height: 1.15; }
-.progress li span { display: grid; place-items: center; width: 28px; height: 28px; margin-bottom: var(--space-1); border-radius: 50%; background: var(--snow); color: var(--night); font-weight: 700; }
-.progress li[aria-current='step'] { color: var(--night); font-weight: 700; }
-.progress li[aria-current='step'] span { background: var(--night); color: white; }
-.progress li[data-done='true'] span { background: var(--green-deep); color: white; }
-.step { margin-top: var(--space-5); }
-.step h2 { margin: 0 0 var(--space-4); font-size: var(--fs-h2); scroll-margin-top: var(--space-4); }
-.step h2:focus { outline: 2px solid var(--night); outline-offset: 4px; }
-.step h3 { font-size: 1.05rem; margin: 0 0 var(--space-2); }
-.product { display: flex; gap: var(--space-4); align-items: center; margin-bottom: var(--space-5); padding: var(--space-4); border-radius: var(--radius); background: var(--snow); }
-.product p { margin: var(--space-2) 0 0; }
-.productArt { flex: 0 0 80px; width: 80px; height: 90px; color: var(--berry-deep); }
-.productArt[data-color='grey'] { color: #8b929a; }
-.productArt[data-color='green'] { color: var(--green-deep); }
-.productArt[data-color='white'] { color: #f8f5ec; }
-.card { margin-bottom: var(--space-4); padding: var(--space-4); border: 1px solid var(--snow-2); border-radius: var(--radius); background: white; }
-.cardHead { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
-.cardHead h3 { flex: 1; margin: 0; }
-.price { font-weight: 700; white-space: nowrap; }
-.linkBtn { min-height: var(--touch); min-width: var(--touch); padding: 0 var(--space-2); border: 0; background: none; color: var(--night); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
-.linkBtn:focus-visible, .thumb button:focus-visible { outline: 3px solid var(--night); outline-offset: 2px; }
-.muted { margin: var(--space-2) 0 var(--space-3); color: var(--public-muted); font-size: var(--fs-small); }
-.label { margin: 0 0 var(--space-1); font-weight: 650; }
-.error { margin: var(--space-2) 0; color: var(--staff-danger); font-size: var(--fs-small); font-weight: 700; }
-.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-4); padding: 0; border: 0; min-width: 0; }
-.chips legend { padding: 0; margin-bottom: var(--space-2); font-weight: 650; }
-.chip { display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--touch); padding: var(--space-2) var(--space-3); border: 2px solid var(--public-muted); border-radius: var(--radius); background: white; font-weight: 600; cursor: pointer; }
-.chip[data-selected='true'] { border-color: var(--night); background: var(--snow); }
-.chip[data-disabled='true'] { color: var(--public-muted); background: var(--snow); cursor: not-allowed; }
-.chip small { display: block; font-size: .75rem; font-weight: 400; }
-.chip:has(input:focus-visible) { box-shadow: var(--focus); }
-.swatch { width: 24px; height: 24px; flex: 0 0 24px; border-radius: 50%; border: 1px solid #0004; }
-.swatch[data-color='red'] { background: var(--berry-deep); }
-.swatch[data-color='grey'] { background: #8b929a; }
-.swatch[data-color='green'] { background: var(--green-deep); }
-.swatch[data-color='white'] { background: white; }
-.photoBlock { margin-bottom: var(--space-4); }
-.thumb { position: relative; display: inline-block; }
-.thumb button { position: absolute; top: -8px; right: -8px; width: var(--touch); height: var(--touch); display: grid; place-items: center; border: 0; background: none; padding: 0; cursor: pointer; font-size: 0; }
-.thumb button::before { content: '×'; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--night); color: white; font-size: 1.1rem; }
-.check { display: flex; align-items: flex-start; gap: var(--space-3); min-height: var(--touch); margin: var(--space-3) 0; cursor: pointer; }
-.check input { width: 24px; height: 24px; flex: 0 0 24px; margin-top: 10px; accent-color: var(--night); }
-.check span { padding-top: 10px; }
-.review { border: 1px solid var(--snow-2); border-radius: var(--radius); padding: 0 var(--space-4); }
-.reviewItem { padding: var(--space-4) 0; border-bottom: 1px solid var(--snow-2); }
-.reviewItem:last-child { border: 0; }
-.reviewItem p { margin: var(--space-1) 0; }
-.reviewItem h3:not(:first-child) { margin-top: var(--space-4); }
-.cart { margin-top: var(--space-5); padding: var(--space-4); background: var(--snow); border-radius: var(--radius); }
-.cart h2 { font-size: 1rem; margin: 0 0 var(--space-2); }
-.cart dl { margin: 0; }
-.cart dl div { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-1) 0; }
-.cart dd { margin: 0; white-space: nowrap; }
-.cartTotal { border-top: 1px solid var(--snow-2); margin-top: var(--space-2); font-weight: 700; font-size: 1.1rem; }
-.actions { display: flex; gap: var(--space-3); margin-top: var(--space-5); }
-.actions button { flex: 1; }
-@media (max-width: 500px) { .progress { gap: var(--space-1); } .progress li { font-size: .7rem; } .productArt { flex-basis: 60px; height: 60px; } .actions { flex-wrap: wrap; } }
+/*
+ * /buy — public order form. Follows "Form design rules" in docs/sprint6-buy-ux.md:
+ * single column, 4-pt spacing (label 8 → input, field 24 → field, section 56 → section),
+ * three type levels (step 1.625rem display / section 1.25rem display / label 1rem sans),
+ * light blue only for the product card and the cart, inset text for supporting notes.
+ */
 
-.mobileTotal { display: none; }
-@media (max-width: 500px) {
-  .shop { padding-bottom: 8rem; }
-  .actions { position: sticky; bottom: 0; z-index: 5; align-items: center; flex-wrap: nowrap; margin: var(--space-4) calc(-1 * var(--space-4)) calc(-1 * var(--space-4)); padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom)); background: white; box-shadow: 0 -4px 12px #15203322; }
-  .actions button { flex: 1 1 auto; }
-  .mobileTotal { display: flex; flex: 0 0 auto; flex-direction: column; font-size: var(--fs-small); }
-  .mobileTotal strong { font-size: 1rem; }
+.shop {
+  width: min(760px, 92vw);
+  /* Selection uses the brand green of the main button and finished steps. */
+  --select: var(--green-deep);
+  --select-tint: #e9f4ee;
+  --choice-line: #b9c7d3;
 }
 
-.chip[data-selected="true"]::before { content: "✓"; font-weight: 800; }
-@media (max-width: 500px) { .shop { scroll-padding-bottom: 10rem; } .step :is(input, textarea, button, fieldset, [role="alert"]) { scroll-margin-bottom: 10rem; } .actions button { min-width: 0; } }
-.progress { gap: 0; }
-.progress li { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; }
-.progress li:not(:first-child)::before { content: ''; position: absolute; top: 13px; right: 50%; width: 100%; height: 2px; background: var(--snow-2); }
-.progress li span { position: relative; z-index: 1; }
-.step h2:focus { outline: none; }
-.swatch[data-color='red'] { background: #b03a2e; }
-.swatch[data-color='green'] { background: #2f6b3f; }
-.swatch[data-color='beige'] { background: #d8c3a0; }
+/* ── Page-level messages ─────────────────────────────────────────────── */
+
+.notice {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-1) 0 var(--space-1) var(--space-4);
+  border-left: 4px solid var(--public-muted);
+}
+
+/* ── Stepper ─────────────────────────────────────────────────────────── */
+
+.progress {
+  display: flex;
+  margin: var(--space-5) 0 0;
+  padding: 0 0 var(--space-5);
+  border-bottom: 1px solid var(--snow-2);
+  list-style: none;
+}
+
+.progress li {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--public-muted);
+  font-size: var(--fs-small);
+  line-height: 1.2;
+  text-align: center;
+}
+
+.progress li:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--snow-2);
+}
+
+.progress li[data-done='true']:not(:first-child)::before,
+.progress li[aria-current='step']:not(:first-child)::before {
+  background: var(--green-deep);
+}
+
+.progress li span {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--snow);
+  color: var(--night);
+  font-weight: 700;
+}
+
+.progress li[aria-current='step'] {
+  color: var(--night);
+  font-weight: 700;
+}
+
+.progress li[aria-current='step'] span {
+  background: var(--night);
+  color: #fff;
+}
+
+.progress li[data-done='true'] span {
+  background: var(--green-deep);
+  color: #fff;
+}
+
+/* ── Step: title, intro, sections ────────────────────────────────────── */
+
+.step {
+  margin-top: var(--space-6);
+}
+
+.step h2 {
+  margin: 0 0 var(--space-5);
+  font-family: var(--font-display);
+  font-size: 1.625rem;
+  font-weight: 700;
+  line-height: 1.2;
+  scroll-margin-top: var(--space-4);
+}
+
+/* Focus moves to the heading for screen readers; it is not interactive, so no outline. */
+.step h2:focus,
+.step h2:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.step h2:has(+ .intro) {
+  margin-bottom: var(--space-2);
+}
+
+.intro {
+  margin: 0 0 var(--space-5);
+}
+
+.intro p {
+  margin: 0;
+}
+
+.intro p + p {
+  margin-top: var(--space-2);
+}
+
+/* Section and card titles: one level below the step title, display font so they never look like a label. */
+.step h3,
+.sectionTitle {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.section {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* A floated legend sits inside the fieldset instead of on its border. */
+.section > legend {
+  float: left;
+  width: 100%;
+}
+
+.section > legend + * {
+  clear: both;
+}
+
+.section > :last-child {
+  margin-bottom: 0;
+}
+
+/* Cancel the field gap after the last grid row (fields keep their own bottom margin). */
+.section > .formGrid:last-child {
+  margin-bottom: calc(-1 * var(--space-5));
+}
+
+.section + .section {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--snow-2);
+}
+
+/* ── Supporting text ─────────────────────────────────────────────────── */
+
+/* Inset text (GOV.UK): related information that is not the main task. Neutral, sparing. */
+.inset {
+  margin: 0 0 var(--space-5);
+  padding: var(--space-1) 0 var(--space-1) var(--space-4);
+  border-left: 4px solid var(--snow-2);
+}
+
+.inset p {
+  margin: 0;
+}
+
+.inset p + p {
+  margin-top: var(--space-2);
+}
+
+.muted {
+  margin: var(--space-2) 0 0;
+  color: var(--public-muted);
+  font-size: var(--fs-small);
+}
+
+.label {
+  margin: 0;
+  font-weight: 600;
+}
+
+.error {
+  margin: var(--space-2) 0 0;
+  color: var(--staff-danger);
+  font-size: var(--fs-small);
+  font-weight: 700;
+}
+
+/* ── Step 1: product, ornament cards, choices ────────────────────────── */
+
+.product {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--snow);
+}
+
+.product h3 {
+  margin-bottom: var(--space-1);
+  font-size: 1.125rem;
+}
+
+.product p {
+  margin: var(--space-1) 0 0;
+}
+
+.productArt {
+  flex: 0 0 72px;
+  width: 72px;
+  height: 86px;
+}
+
+.card {
+  margin-bottom: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--snow-2);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.cardHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.cardHead h3 {
+  flex: 1;
+  margin: 0;
+}
+
+.price {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.linkBtn {
+  min-width: var(--touch);
+  min-height: var(--touch);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--night);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* A group of radio chips: legend is a field label (not a heading). */
+.chips {
+  min-width: 0;
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  border: 0;
+}
+
+.chips legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  font-weight: 600;
+}
+
+.chips:has(+ .error) {
+  margin-bottom: 0;
+}
+
+.chips + .error {
+  margin-bottom: var(--space-5);
+}
+
+/* Validation moves focus to the group: show where it went. */
+.chips:focus-visible,
+.calendarField:focus-visible {
+  outline: 3px solid var(--night);
+  outline-offset: 4px;
+  border-radius: var(--radius);
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch);
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  border: 1.5px solid var(--choice-line);
+  border-radius: var(--radius-pill);
+  background: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.chip:hover {
+  border-color: var(--public-muted);
+}
+
+/* Selected: green border + light green tint; the swatch gets a ring (no checkmark). */
+.chip[data-selected='true'] {
+  border-color: var(--select);
+  background: var(--select-tint);
+  box-shadow: inset 0 0 0 1px var(--select);
+  color: var(--select);
+}
+
+.chip[data-selected='true'] .swatch {
+  box-shadow: 0 0 0 2px var(--select-tint), 0 0 0 4px var(--select);
+}
+
+.chip[data-disabled='true'] {
+  border-style: dashed;
+  color: var(--public-muted);
+  background: #fff;
+  cursor: not-allowed;
+}
+
+.chip small {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.chip:has(input:focus-visible) {
+  box-shadow: var(--focus);
+}
+
+.swatch {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #0004;
+  border-radius: 50%;
+}
+
+.swatch[data-color='red'] { background-color: #b03a2e; }
+.swatch[data-color='green'] { background-color: #2f6b3f; }
+.swatch[data-color='beige'] { background-color: #d8c3a0; }
 .swatch[data-finish='shiny'] { background-image: radial-gradient(circle at 30% 30%, #fff9 0 18%, transparent 45%); }
-.help { min-width: 44px; min-height: 44px; border: 0; background: none; font: inherit; cursor: pointer; }
-.help:focus-visible, .photoAdd:focus-visible, .day:has(input:focus-visible) { outline: 3px solid var(--night); outline-offset: 2px; }
-.explanation { flex-basis: 100%; margin: 0; }
-.explanation[hidden] { display: none; }
-.photoRow { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-.photoRow img, .reviewRow img { width: 76px; height: 76px; object-fit: cover; border-radius: var(--radius); }
-.photoAdd { width: 76px; height: 76px; border: 2px dashed var(--public-muted); border-radius: var(--radius); background: transparent; font-size: 2rem; cursor: pointer; }
-.calendarField { border: 0; padding: 0; margin: 0; }
-.calendar { display: grid; grid-template-columns: repeat(7, minmax(40px, 1fr)); max-width: 420px; justify-items: center; gap: 2px; }
-.weekday, .unavailable, .day { display: grid; place-items: center; min-width: 40px; height: 44px; }
-.weekday { font-size: .75rem; }
-.unavailable { color: var(--public-muted); opacity: .55; }
-.day { border-radius: 50%; border: 1px solid var(--night); cursor: pointer; }
-.day[data-selected='true'] { background: var(--night); color: white; }
-.postalRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(80px, 1fr); gap: var(--space-4); }
-.reviewCard { border: 1px solid var(--snow-2); border-radius: var(--radius); padding: var(--space-4); margin-bottom: var(--space-3); }
-.reviewCard p { overflow-wrap: anywhere; }
-.reviewRow { display: flex; align-items: center; gap: var(--space-3); }
-.reviewRow p { flex: 1; }
-.reviewRow img { width: 56px; height: 56px; }
-.totals div { display: flex; justify-content: space-between; gap: var(--space-3); }.totals dd { margin: 0; }
-.actions { flex-wrap: wrap; }.stripeLine { flex-basis: 100%; text-align: center; }
-@media (max-width: 500px) { .cart { display: none; } .shop { padding-bottom: var(--space-4); } .actions { flex-wrap: wrap; } .stripeLine { font-size: .75rem; } }
 
-.mobileTotal[hidden] { display: none; }
-
-/* Checkout details and accessible controls */
-.productArt { flex-basis: 64px; width: 64px; height: 72px; }
-.productArt[data-color='beige'] { color: #d8c3a0; }
-.help { display: inline-grid; place-items: center; padding: 0; vertical-align: middle; }
-.help span { display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid currentColor; border-radius: 50%; font-size: .85rem; font-weight: 700; }
-.explanation, .infoNote, .dateConfirmation { padding: var(--space-3); border: 1px solid var(--snow-2); border-radius: var(--radius); background: var(--snow); }
-.nameArt { flex: 0 0 64px; width: 64px; height: 64px; }
-.check label { padding-top: 10px; }
-.reviewExtra { display: flex; justify-content: space-between; gap: var(--space-3); margin: var(--space-2) 0 0 68px; font-size: var(--fs-small); }
-.reviewExtra span:last-child { white-space: nowrap; }
-.calendarLegend { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: var(--space-3) 0; color: var(--public-muted); font-size: var(--fs-small); }
-.calendarLegend span { display: inline-flex; align-items: center; gap: var(--space-2); }
-.legendAvailable, .legendSelected { width: 18px; height: 18px; border: 1px solid var(--night); border-radius: 50%; }
-.legendSelected { background: var(--night); }
-.dateConfirmation { font-weight: 700; }
-.contactGroup { min-width: 0; margin: 0 0 var(--space-5); padding: 0; border: 0; }
-.contactGroup legend { padding: 0; margin-bottom: var(--space-3); font-size: 1.1rem; font-weight: 700; }
-.infoNote { font-size: var(--fs-small); }
-.cityField { display: flex; flex-direction: column; gap: var(--space-1); }
-.cityField span { display: flex; align-items: center; min-height: var(--touch); }
-@media (min-width: 640px) {
-  .contactRow, .addressRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
-  .addressRow { grid-template-columns: 2fr 1fr; }
+/* "?" next to the finish label: 24px visible circle, 44px hit area. */
+.help {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--touch);
+  min-height: var(--touch);
+  margin: calc((var(--touch) - 24px) / -2) 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--night);
+  font: inherit;
+  cursor: pointer;
 }
 
-.day { width: 40px; height: 40px; align-self: center; }
-.dateConfirmation { display: flex; align-items: center; gap: var(--space-2); }
-.dateConfirmation svg { flex: none; }
+.help span {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.help[aria-expanded='true'] span {
+  background: var(--night);
+  color: #fff;
+}
+
+.explanation {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-1) 0 var(--space-1) var(--space-4);
+  border-left: 4px solid var(--snow-2);
+}
+
+.explanation[hidden] {
+  display: none;
+}
+
+/* Name on the back: a card with the option + price, a front/back preview and, when on, the field. */
+.nameCard {
+  padding: var(--space-4);
+  border: 1.5px solid var(--choice-line);
+  border-radius: var(--radius);
+  background: #fff;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.nameCard[data-on='true'] {
+  border-color: var(--select);
+  box-shadow: inset 0 0 0 1px var(--select);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch);
+  margin: 0;
+  cursor: pointer;
+}
+
+.check input {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--select);
+}
+
+.check > span,
+.check > label {
+  flex: 1;
+  font-weight: 600;
+}
+
+.namePreview {
+  display: flex;
+  gap: var(--space-5);
+  margin: var(--space-3) 0 0 calc(24px + var(--space-3));
+}
+
+.namePreview figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.namePreview svg {
+  width: 64px;
+  height: 77px;
+}
+
+.namePreview figcaption {
+  color: var(--public-muted);
+  font-size: var(--fs-small);
+}
+
+.backArt { color: #b03a2e; }
+.backArt[data-color='green'] { color: #2f6b3f; }
+.backArt[data-color='beige'] { color: #d8c3a0; }
+
+.backText {
+  fill: #fff8ec;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.backArt[data-color='beige'] .backText {
+  fill: #5a4330;
+}
+
+.nameDetails {
+  margin: var(--space-4) 0 0 calc(24px + var(--space-3));
+}
+
+/* The no-refund note belongs to the name field: 8px below it, not a new field gap. */
+.nameDetails > :first-child {
+  margin-bottom: 0;
+}
+
+/* ── Step 2: photos ──────────────────────────────────────────────────── */
+
+.photoBlock {
+  margin-bottom: var(--space-5);
+}
+
+.photoBlock > .label + .muted {
+  margin-top: var(--space-1);
+}
+
+.photoRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.photoRow img {
+  display: block;
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+.thumb {
+  position: relative;
+  display: inline-block;
+}
+
+.thumb button {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  display: grid;
+  place-items: center;
+  width: var(--touch);
+  height: var(--touch);
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0;
+  cursor: pointer;
+}
+
+.thumb button::before {
+  content: '×';
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--night);
+  color: #fff;
+  font-size: 1.1rem;
+}
+
+.photoAdd {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border: 2px dashed var(--public-muted);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--night);
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.photoAdd:hover {
+  border-color: var(--night);
+}
+
+/* Optional note: a text button with a "+" that turns into "−" when open. */
+.noteToggle summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch);
+  color: var(--night);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.noteToggle summary::-webkit-details-marker {
+  display: none;
+}
+
+.noteToggle summary::before {
+  content: '+';
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.noteToggle[open] summary::before {
+  content: '−';
+}
+
+.noteToggle summary:focus-visible {
+  outline: 3px solid var(--night);
+  outline-offset: 2px;
+}
+
+.noteToggle[open] summary {
+  margin-bottom: var(--space-2);
+}
+
+/* ── Step 3: delivery calendar ───────────────────────────────────────── */
+
+.calendarField {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  justify-items: center;
+  gap: var(--space-1) 2px;
+  max-width: 420px;
+}
+
+.weekday,
+.unavailable,
+.day {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  height: 44px;
+}
+
+.weekday {
+  color: var(--public-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.unavailable {
+  color: var(--public-muted);
+  opacity: 0.55;
+}
+
+.day {
+  width: 40px;
+  height: 40px;
+  min-width: 0;
+  align-self: center;
+  border: 1.5px solid var(--select);
+  border-radius: 50%;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.day:hover {
+  background: var(--select-tint);
+}
+
+.day[data-selected='true'] {
+  background: var(--select);
+  color: #fff;
+}
+
+.calendarLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: var(--space-3) 0 0;
+  color: var(--public-muted);
+  font-size: var(--fs-small);
+}
+
+.calendarLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.legendAvailable,
+.legendSelected {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--select);
+  border-radius: 50%;
+}
+
+.legendSelected {
+  background: var(--select);
+}
+
+/* Selected day, said in words (no box: it is the answer, not a note). */
+.dateConfirmation {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  font-weight: 700;
+}
+
+.dateConfirmation svg {
+  flex: none;
+}
+
+/* ── Step 4: contact and address ─────────────────────────────────────── */
+
+/* 6-column form grid. Fields are subgrids (see Field.module.css), so side-by-side inputs align. */
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  column-gap: var(--space-4);
+}
+
+.formGrid > * {
+  grid-column: span 6;
+}
+
+/* PLZ + Ort are one entity: one row at every width. */
+.formGrid > .colPostal { grid-column: span 2; }
+.formGrid > .colCity { grid-column: span 4; }
+
+@media (min-width: 640px) {
+  .formGrid > .colHalf { grid-column: span 3; }
+  .formGrid > .colWide { grid-column: span 4; }
+  .formGrid > .colNarrow { grid-column: span 2; }
+}
+
+/* Ort is fixed: same rows as a field (label, hint, control), with the value where the input would be. */
+.cityField {
+  display: grid;
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  margin-bottom: var(--space-5);
+}
+
+.cityField strong {
+  grid-row: 1;
+  align-self: end;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.cityField span {
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  /* Same box model as the inputs (padding + 2px border), so the value lines up with the PLZ. */
+  min-height: var(--touch);
+  margin-top: var(--space-2);
+  padding: calc(0.55rem + 2px) var(--space-1);
+  font-size: var(--fs-body);
+}
+
+/* ── Step 5: review ──────────────────────────────────────────────────── */
+
+.reviewCard {
+  margin-bottom: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--snow-2);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.reviewCard p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.reviewCard p + p {
+  margin-top: var(--space-3);
+}
+
+.reviewCard .cardHead {
+  margin-bottom: var(--space-3);
+}
+
+.reviewItem + .reviewItem {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--snow-2);
+}
+
+.reviewRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.reviewRow img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+.reviewRow p {
+  flex: 1;
+}
+
+.reviewExtra {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: var(--space-2) 0 0 calc(56px + var(--space-3));
+  color: var(--public-muted);
+  font-size: var(--fs-small);
+}
+
+.reviewExtra span:last-child {
+  color: var(--public-ink);
+  white-space: nowrap;
+}
+
+.totals {
+  margin: 0;
+}
+
+.totals div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+}
+
+.totals div:last-child {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--snow-2);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.totals dd {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.terms {
+  margin-top: var(--space-5);
+}
+
+.terms .check {
+  align-items: flex-start;
+  margin-top: var(--space-4);
+}
+
+.terms .check label {
+  padding: 0;
+  font-weight: 400;
+  line-height: 24px;
+}
+
+/* ── Cart and actions ────────────────────────────────────────────────── */
+
+.cart {
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--snow);
+}
+
+.cart h2 {
+  margin: 0 0 var(--space-2);
+  font-size: 1rem;
+}
+
+.cart dl {
+  margin: 0;
+}
+
+.cart dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+}
+
+.cart dd {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.cartTotal {
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--snow-2);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.actions button {
+  flex: 1;
+}
+
+.stripeLine {
+  flex-basis: 100%;
+  color: var(--public-muted);
+  text-align: center;
+}
+
+.mobileTotal {
+  display: none;
+}
+
+.mobileTotal[hidden] {
+  display: none;
+}
+
+.linkBtn:focus-visible,
+.thumb button:focus-visible,
+.help:focus-visible,
+.photoAdd:focus-visible,
+.day:has(input:focus-visible) {
+  outline: 3px solid var(--night);
+  outline-offset: 2px;
+}
+
+@media (max-width: 500px) {
+  .progress li { font-size: 0.7rem; }
+  .card,
+  .reviewCard { padding: var(--space-4); }
+  .productArt { flex-basis: 56px; width: 56px; height: 64px; }
+  .cart { display: none; }
+  .actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    align-items: center;
+    margin: var(--space-5) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
+    padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom));
+    background: #fff;
+    box-shadow: 0 -4px 12px #15203322;
+  }
+  .actions button { flex: 1 1 auto; min-width: 0; }
+  .mobileTotal:not([hidden]) {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    font-size: var(--fs-small);
+  }
+  .mobileTotal strong { font-size: 1rem; }
+  .stripeLine { font-size: 0.75rem; }
+  .shop { scroll-padding-bottom: 10rem; }
+  .step :is(input, textarea, button, fieldset, [role='alert']) { scroll-margin-bottom: 10rem; }
+}
