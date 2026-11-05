@@ -2,7 +2,7 @@ import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useHandover } from '../../components/staff/useHandover'
 import { useStaffClock } from '../../lib/staffClock'
 import { Button } from '../../components/ui/Button'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useStaffRefresh } from '../../lib/useStaffRefresh'
@@ -71,7 +71,8 @@ function uniqueVienna(rows: DatedDelivery[]): DatedDelivery[] {
   const out: DatedDelivery[] = []
   for (const row of rows) {
     if (row.deliveryKind !== 'vienna') continue
-    const id = row.orderId
+    // One row per ornament (the mock can list an undated item on several days); orders are grouped later.
+    const id = row.itemId
     if (seen.has(id)) continue
     seen.add(id)
     out.push(row)
@@ -140,10 +141,21 @@ export function DeliveriesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [handoffError, setHandoffError] = useState('')
-  // Orders toggled on this screen keep their place until the filters change, so the next button never slides under the finger.
-  const [pinned, setPinned] = useState<Set<string>>(() => new Set())
+  // Rows keep the position they were first shown in until the filters change: a handover or an undo
+  // never moves another order's button under the finger. New rows go after the known ones.
+  const positions = useRef({ view: '', order: new Map<string, number>() })
   const [lastToggle, setLastToggle] = useState<{ orderId: string; code: string; target: boolean } | null>(null)
-  useEffect(() => { setPinned(new Set()); setLastToggle(null) }, [dayFilter, statusFilter, kindFilter, routeMode, includePast])
+  const view = [dayFilter, statusFilter, kindFilter, routeMode, includePast].join('|')
+  useEffect(() => { setLastToggle(null) }, [view])
+  function stableOrder(rows: DatedDelivery[]): DatedDelivery[] {
+    if (positions.current.view !== view) positions.current = { view, order: new Map() }
+    const order = positions.current.order
+    const key = (row: DatedDelivery) => `${row.orderId}|${row.deliveryKind}|${row.date}`
+    for (const row of [...rows].sort((a, b) => Number(a.handedOver) - Number(b.handedOver))) {
+      if (!order.has(key(row))) order.set(key(row), order.size)
+    }
+    return [...rows].sort((a, b) => order.get(key(a))! - order.get(key(b))!)
+  }
 
   function setDayFilter(value: string) {
     const next = new URLSearchParams(params)
@@ -178,7 +190,6 @@ export function DeliveriesPage() {
   const todayDate = days.find(day => day.marketDay.isToday)?.marketDay.date ?? clock.date
   const handover = useHandover(() => setReload(n => n + 1), setHandoffError)
   function toggle(row: DatedDelivery, target: boolean) {
-    setPinned(current => new Set(current).add(row.orderId))
     setLastToggle({ orderId: row.orderId, code: row.orderCode, target })
     void handover.request(row.orderId, target)
   }
@@ -192,14 +203,17 @@ export function DeliveriesPage() {
       if (!includePast && dayFilter === 'all' && row.date < todayDate) return false
       if (routeMode && row.deliveryKind !== 'vienna') return false
       if (dayFilter !== 'all' && row.date !== dayFilter) return false
-      if (statusFilter !== 'all' && row.productionStatus !== statusFilter) return false
       if (kindFilter !== 'all' && row.deliveryKind !== kindFilter) return false
       return true
     })
-  }, [dated, dayFilter, kindFilter, statusFilter, routeMode, includePast, todayDate])
+  }, [dated, dayFilter, kindFilter, routeMode, includePast, todayDate])
 
-  const sections = useMemo(() => buildSections(days, filtered, dayFilter), [days, filtered, dayFilter])
-  const remainingCount = filtered.filter(row => !row.handedOver).length
+  // Group whole orders first, then filter by production, so a group keeps every ornament for names, counts and readiness.
+  const grouped = useMemo(() => buildSections(days, filtered, dayFilter)
+    .map(section => ({ ...section, rows: groupOrders(section.rows).filter(row => statusFilter === 'all' || row.productionStatus === statusFilter) }))
+    .filter(section => section.rows.length > 0), [days, filtered, dayFilter, statusFilter])
+  const sections = grouped.map(section => ({ ...section, rows: stableOrder(section.rows) }))
+  const remainingCount = sections.reduce((sum, section) => sum + section.rows.filter(row => !row.handedOver).reduce((n, row) => n + (row.count ?? 1), 0), 0)
 
   const dayOptions = useMemo(
     () => [
@@ -265,7 +279,7 @@ export function DeliveriesPage() {
             <div key={section.key} className={styles.group}>
               <h2>{section.title}</h2>
               <p className={styles.meta}>{section.meta}</p>
-              {groupOrders(section.rows).sort((a, b) => Number(a.handedOver && !pinned.has(a.orderId)) - Number(b.handedOver && !pinned.has(b.orderId))).map((row) =>
+              {section.rows.map((row) =>
                 routeMode && row.deliveryKind === 'vienna' ? (
                   <ViennaDeliveryCard
                     key={`${row.orderId}-${row.itemId}-${row.date}`}

@@ -30,7 +30,7 @@ import { itemCost } from '../../lib/money'
 import { mockPricing } from './pricing'
 import { marketPickupDates, paintDatesToTry } from '../../lib/calendar'
 import { hasPaintOverlap } from '../../lib/slots'
-import { formatDateLabel, formatHour, formatMinutes, hoursOverlap, utcWeekday } from '../../lib/time'
+import { addUtcDays, formatDateLabel, formatHour, formatMinutes, hoursOverlap, utcWeekday } from '../../lib/time'
 import { createSeed, DEMO_NOW_HOUR, SEED_REVISION, STAFF_ACCOUNTS, STORAGE_KEY, type MockState } from './seed'
 
 let state: MockState = load()
@@ -543,16 +543,21 @@ function deliveryDateForItem(item: OrderItem): string | null {
   // Web Vienna orders carry the chosen date directly (like the backend's handoff date).
   if (item.delivery.deliveryDate) return item.delivery.deliveryDate
   const block = state.blocks.find((b) => b.orderItemId === item.id)
-  if (block) return marketDayDate(block.marketDayId)
+  if (!block) return null
+  const paintDate = marketDayDate(block.marketDayId)
+  if (!paintDate) return null
+  // Legacy undated Vienna item: the first Wednesday or Friday after painting, so it shows on exactly one day.
+  for (let offset = 1; offset <= 7; offset++) {
+    const date = addUtcDays(paintDate, offset)
+    if (utcWeekday(date) === 3 || utcWeekday(date) === 5) return date
+  }
   return null
 }
 
 function viennaBelongsToDate(item: OrderItem, date: string): boolean {
   if (item.delivery.kind !== 'vienna') return false
   if (item.delivery.marketDayId) return marketDayDate(item.delivery.marketDayId) === date
-  if (item.delivery.deliveryDate) return item.delivery.deliveryDate === date
-  const weekday = utcWeekday(date)
-  return weekday === 3 || weekday === 5
+  return deliveryDateForItem(item) === date
 }
 
 function addressLabel(address?: { line1: string; line2?: string; city: string; postalCode: string } | null): string | null {

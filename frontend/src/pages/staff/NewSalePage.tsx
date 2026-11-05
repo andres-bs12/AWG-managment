@@ -973,6 +973,11 @@ function DeliveryCard({
   const needsOtherDay = Boolean(todayFull && item.delivery.mode === 'market' && !item.delivery.pickupDate)
   // When today cannot take another painting, go straight to the market-day choice instead of a dead end.
   useEffect(() => { if (needsOtherDay) setDatePickerOpen(true) }, [needsOtherDay])
+  // Capacity can arrive after the draft picked today: release that unplannable choice once (a board placement stays).
+  const staleToday = Boolean(todayFull && item.delivery.mode === 'market' && item.delivery.pickupDate === today?.date && !item.slotLocked)
+  useEffect(() => {
+    if (staleToday) onDelivery({ ...item.delivery, pickupDate: undefined, marketDayId: undefined, pickupHour: null })
+  }, [staleToday]) // eslint-disable-line react-hooks/exhaustive-deps
   const pickupWhen: 'today' | 'another_day' | 'vienna' | 'now' =
     item.kind === 'finished' && item.delivery.mode === 'now'
       ? 'now'
@@ -1032,7 +1037,7 @@ function DeliveryCard({
       setViennaPickerOpen(true)
       return
     }
-    if (mode === 'today' && todayIsMarket) {
+    if (mode === 'today' && todayIsMarket && !todayFull) {
       setDatePickerOpen(false)
       setViennaPickerOpen(false)
       onDelivery({
@@ -1050,7 +1055,7 @@ function DeliveryCard({
 
   const slot = slotLabel(item)
   const pickupOptions = [
-    ...(todayIsMarket ? [{ value: 'today' as const, label: todayFull ? 'Today · full' : 'Today' }] : []),
+    ...(todayIsMarket ? [{ value: 'today' as const, label: todayFull ? 'Today · full' : 'Today', disabled: Boolean(todayFull) }] : []),
     { value: 'another_day' as const, label: 'Market day' },
     { value: 'vienna' as const, label: 'Delivery' },
   ]
@@ -1093,7 +1098,7 @@ function DeliveryCard({
 
       {todayFull ? (
         <p className={styles.hint} role="status">
-          {todayFull.open ? `Today is full (${todayFull.booked}/${todayFull.maxPaintings} paintings booked).` : 'Painting is closed today.'} Choose another market day for this ornament.
+          {todayFull.open ? `Today is full (${todayFull.booked}/${todayFull.maxPaintings} paintings booked).` : 'Painting is closed today.'} Automatic planning cannot add one: choose another market day, or place it on the board by hand.
         </p>
       ) : null}
 

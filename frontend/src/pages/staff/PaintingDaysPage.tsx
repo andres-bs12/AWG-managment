@@ -54,45 +54,63 @@ function DayRow({ day }: { day: PaintingDay }) {
   const [booked, setBooked] = useState(day.booked)
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [error, setError] = useState('')
-  const pending = useRef<{ open: boolean; max: number } | null>(null)
+  // `latest` is what the screen shows; `queue` waits to be sent; `running` guards one request at a time.
+  const latest = useRef({ open: day.open, max: day.maxPaintings })
+  // Every edit, valid or not, bumps the revision; a response only applies to the revision it was sent for.
+  const revision = useRef(0)
+  const queue = useRef<{ open: boolean; max: number; revision: number } | null>(null)
   const running = useRef(false)
   const timer = useRef<number | undefined>(undefined)
-  useEffect(() => () => window.clearTimeout(timer.current), [])
+  const flushRef = useRef<() => void>(() => {})
   async function flush() {
     if (running.current) return
     running.current = true
     try {
-      while (pending.current) {
-        const next = pending.current
-        pending.current = null
+      while (queue.current) {
+        const next = queue.current
+        queue.current = null
         setState('saving'); setError('')
         try {
           const result = await api.paintingDays.update(day.date, next.open, next.max)
           setBooked(result.booked)
-          if (!pending.current) { setOpen(result.open); setMax(String(result.maxPaintings)) }
-          setState('saved')
+          // Only reflect the server when nothing newer was typed meanwhile.
+          if (next.revision !== revision.current) continue
+          setOpen(result.open); setMax(String(result.maxPaintings)); latest.current = { open: result.open, max: result.maxPaintings }
+          setState(queue.current || timer.current !== undefined ? 'saving' : 'saved')
         } catch (err) {
+          if (next.revision !== revision.current) continue
           setError(err instanceof Error ? err.message : 'Could not save day.'); setState('error')
         }
       }
     } finally { running.current = false }
   }
+  flushRef.current = () => { void flush() }
+  // Leaving the page or the range during the pause still sends the last edit.
+  useEffect(() => () => {
+    if (timer.current !== undefined) { window.clearTimeout(timer.current); timer.current = undefined; queue.current = { ...latest.current, revision: revision.current }; flushRef.current() }
+  }, [])
+  function send(wait: number) {
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => { timer.current = undefined; queue.current = { ...latest.current, revision: revision.current }; void flush() }, wait)
+  }
   function change(nextOpen: boolean, nextMax: string, wait: number) {
     setOpen(nextOpen); setMax(nextMax)
-    window.clearTimeout(timer.current)
+    revision.current += 1
+    window.clearTimeout(timer.current); timer.current = undefined
     const number = Number(nextMax)
     if (nextMax.trim() === '' || !Number.isInteger(number) || number < 0 || number > 10) { setError('Enter a whole number from 0 to 10.'); setState('error'); return }
-    setError(''); setState('idle')
-    timer.current = window.setTimeout(() => { pending.current = { open: nextOpen, max: number }; void flush() }, wait)
+    latest.current = { open: nextOpen, max: number }
+    setError(''); setState('saving')
+    send(wait)
   }
   const label = formatDateLabel(day.date)
   const limit = Number(max)
   const over = open && Number.isFinite(limit) && booked > limit
   return <article className={styles.dayRow}>
-    <div className={styles.name}><h3>{label}</h3><p data-over={over || undefined}>{booked}/{open ? max : 0} booked{over ? ' · Over limit' : ''}</p></div>
-    <label className={styles.toggle}><input type="checkbox" role="switch" aria-label={`Painting open ${label}`} checked={open} onChange={event => change(event.target.checked, max, 0)} /> {open ? 'Open' : 'Closed'}</label>
+    <div className={styles.name}><h3>{label}</h3><p data-over={over || undefined}>{booked}/{open ? max : 0} booked{over ? ' · Over limit' : ''}{!open ? ' · Closed' : ''}</p></div>
+    <label className={styles.toggle}><input type="checkbox" role="switch" checked={open} onChange={event => change(event.target.checked, max, 0)} /> Open<span className="visually-hidden">, {label}</span></label>
     <NumberStepper label={`Max paintings for ${label}`} value={max} onChange={value => change(open, value, 400)} max={10} disabled={!open} />
     <p className={styles.saveState} role="status">{state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : ''}</p>
-    {error && <p className={styles.error} role="alert">{error}</p>}
+    {error && <p className={styles.error} role="alert">{error}{state === 'error' && error !== 'Enter a whole number from 0 to 10.' ? <> <Button tone="staff" variant="secondary" onClick={() => send(0)}>Retry</Button></> : null}</p>}
   </article>
 }

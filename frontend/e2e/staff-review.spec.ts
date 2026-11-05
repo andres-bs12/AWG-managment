@@ -89,11 +89,11 @@ async function httpFixture(page: Page, options: FixtureOptions = {}) {
     if (path === '/api/inventory') return json(route, inventory)
     if (path === '/api/markets' && method === 'GET') return json(route, allMarkets)
     if (path === '/api/market-days') return json(route, allDays.filter(row => !url.searchParams.has('marketId') || row.marketId === url.searchParams.get('marketId')))
-    if (path === '/api/painting-days') return json(route, [{ date: '2026-11-05', open: true, maxPaintings: 2, booked: 0 }, { date: today, open: true, maxPaintings: 2, booked: 3 }])
+    if (path === '/api/painting-days') return json(route, [{ date: '2026-11-05', open: true, maxPaintings: 2, booked: 0 }, { date: today, open: true, maxPaintings: 2, booked: 1 }, { date: '2026-11-07', open: true, maxPaintings: 2, booked: 3 }])
     if (path.startsWith('/api/painting-days/') && method === 'PATCH') {
       const body = request.postDataJSON() as { open: boolean; maxPaintings: number }
       mutations.push({ path, body })
-      return json(route, { date: decodeURIComponent(path.split('/').pop()!), ...body, booked: 3 })
+      return json(route, { date: decodeURIComponent(path.split('/').pop()!), ...body, booked: 1 })
     }
     if (path === '/api/agenda/days' || path.startsWith('/api/agenda/days/')) {
       dayReads++
@@ -738,15 +738,15 @@ test('mock: one finished ornament, Deliver now, Paid in cash completes the sale'
 test('painting days hide past days, flag over-limit days and save each change without a Save button', async ({ page }) => {
   const fixture = await httpFixture(page)
   await signedIn(page, '/staff/painting-days')
-  await expect(page.getByRole('heading', { level: 3 })).toHaveCount(1)
+  await expect(page.getByRole('heading', { level: 3 })).toHaveCount(2)
   await expect(page.getByText('3/2 booked · Over limit')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0)
-  const toggle = page.getByRole('switch', { name: /^Painting open/ })
+  const toggle = page.getByRole('switch', { name: /^Open\b/ }).first()
   const box = await toggle.boundingBox()
   expect(box!.width).toBeGreaterThanOrEqual(24)
-  await page.getByRole('button', { name: /^Increase Max paintings/ }).click()
+  await page.getByRole('button', { name: /^Increase Max paintings/ }).first().click()
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible()
-  await expect(page.getByText('3/3 booked', { exact: true })).toBeVisible()
+  await expect(page.getByText('1/3 booked', { exact: true })).toBeVisible()
   await toggle.uncheck()
   await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 3 }, { open: false, maxPaintings: 3 }])
   await axe(page)
@@ -805,4 +805,61 @@ test('stock rows save only when changed and a conflict keeps the server value by
   await expect(row.getByRole('spinbutton')).toHaveValue('2')
   expect(fixture.mutations.filter(entry => entry.path.startsWith('/api/inventory/'))).toHaveLength(0)
   await axe(page)
+})
+
+async function mockSignIn(page: Page, to: string) {
+  await page.goto('/staff/login')
+  await page.getByLabel('Password', { exact: true }).fill('gaby')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expect(page.locator('div[data-staff-page]')).toBeVisible()
+  await navigation(page, to)
+}
+
+test('mock: a multi-ornament order is grouped before production filters and rows keep their place', async ({ page }) => {
+  await mockSignIn(page, '/staff/deliveries')
+  const group = page.locator('[class*="item"]').filter({ hasText: 'Pip, Dot · 2 ornaments' })
+  await expect(group).toBeVisible()
+  await expect(group).toContainText('1 of 2 ready')
+  // Under "Finished" the half-finished order is not shown as a finished single ornament.
+  await page.getByRole('radio', { name: 'Finished', exact: true }).locator('..').click()
+  await expect(page.getByText(/Pip|Dot/)).toHaveCount(0)
+  await page.getByRole('radio', { name: 'All', exact: true }).first().locator('..').click()
+  const codes = () => page.locator('[class*="item"] strong').evaluateAll(nodes => nodes.map(node => node.textContent?.split(' · ')[0]))
+  const before = await codes()
+  const ready = page.locator('[class*="item"]').filter({ has: page.getByRole('button', { name: 'Mark picked up', exact: true, disabled: false }) }).first()
+  const code = (await ready.locator('strong').first().textContent())!.split(' · ')[0]
+  await ready.getByRole('button', { name: 'Mark picked up', exact: true }).click()
+  const balance = page.getByRole('dialog', { name: 'Balance due', exact: true })
+  if (await balance.isVisible().catch(() => false)) await balance.getByRole('button', { name: /Mark paid.*hand over/i }).click()
+  await expect(page.getByRole('status').filter({ hasText: `${code} handed over.` })).toBeVisible()
+  expect(await codes()).toEqual(before)
+  await page.locator('[class*="item"]').filter({ hasText: code }).getByRole('button', { name: 'Undo handover', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: `${code} handover undone.` })).toBeVisible()
+  expect(await codes()).toEqual(before)
+})
+
+test('mock: a full Today cannot be chosen and the market-day choice opens instead', async ({ page }) => {
+  await mockSignIn(page, '/staff/sales/new')
+  await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await expect(page.getByRole('heading', { name: /Custom 1 · €/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  const todayOption = page.getByRole('radio', { name: 'Today · full', exact: true })
+  await expect(todayOption).toBeDisabled()
+  await expect(page.getByRole('status').filter({ hasText: /Today is full/ })).toBeVisible()
+  await expect(page.getByText('Choose market day', { exact: true })).toBeVisible()
+  await axe(page)
+})
+
+test('painting-day edits typed quickly are all sent, even when leaving during the pause', async ({ page }) => {
+  const fixture = await httpFixture(page)
+  await page.route(url => url.pathname.startsWith('/api/painting-days/'), async route => { await new Promise(resolve => setTimeout(resolve, 300)); await route.fallback() })
+  await signedIn(page, '/staff/painting-days')
+  const increase = page.getByRole('button', { name: /^Increase Max paintings/ }).first()
+  await increase.click()
+  await increase.click()
+  await increase.click()
+  await expect(page.getByRole('spinbutton').first()).toHaveValue('5')
+  // Leave before the 400ms pause ends: the last value is still saved.
+  await navigation(page, '/staff/agenda')
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 5 }])
 })

@@ -28,7 +28,9 @@
     - venta: resumen con «Delivery» sin día (#13) y espacio vertical en móvil (#27);
     - prioridad visual de los pedidos web en entregas (P2-10, falta la marca «Web»; el nombre del cliente ya se muestra).
   - HSTS se verifica en el proxy TLS real. Sigue abierto el conflicto de tipos Playwright/axe en `e2e/helpers.ts:45`.
-  - Revisión cruzada de Codex del trabajo de staff (commits desde `0a891f5`): pendiente, programada para las 19:23.
+  - Revisión cruzada de Codex hecha (`tasks/audit-results/codex-review-staff-*.md`): 5 P1 y 3 P2, corregidos y verificados de nuevo por Codex. Quedan dos puntos:
+    - Si un guardado automático de día de pintura falla después de salir de la página, no se ve el error.
+    - En el mock, los ítems de Viena sin fecha toman el primer miércoles o viernes después de pintar.
 - [ ] `/buy` premium: verificar en navegador a 360/768/1280 px y completar las mejoras y pruebas de `docs/plan-buy-premium.md`.
 - [ ] Stripe: `stripe login`, claves de prueba, prueba real del checkout y webhook (`docs/stripe-setup.md`); luego claves live y `SHOP_ENABLED=true`.
 - [ ] SMTP (`MAIL_*`, `OWNER_EMAIL`) y prueba real de los e-mails.
