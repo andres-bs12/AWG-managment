@@ -307,14 +307,14 @@ export function createMockCheckout(input: ShopCheckoutInput) {
     id: uid('orn'), orderId, kind: 'custom', petName: item.petName ?? '', withName: item.withName,
     color: item.color ?? 'red', finish: item.finish, backName: item.backName ?? '', note: item.note ?? '',
     cost: itemCost('custom', item.withName), productionStatus: 'not_started', photos: item.photos,
-    formComplete: true, delivery: { kind: 'vienna', address: input.address },
+    formComplete: true, delivery: { kind: 'vienna', address: input.address, deliveryDate: input.deliveryDate },
   }))
   const order: Order = { id: orderId, customerId: customer.id, code, trackToken: uid('trk'), formToken: token,
-    paymentState: 'unpaid', paymentMethod: null, amountPaid: 0, total: items.reduce((sum, item) => sum + item.cost, 0),
+    paymentState: 'paid', paymentMethod: 'card', amountPaid: items.reduce((sum, item) => sum + item.cost, 0), total: items.reduce((sum, item) => sum + item.cost, 0),
     createdAt: new Date().toISOString(), itemIds: items.map(item => item.id), handedOver: false, paymentEntries: [] }
   for (const [id, count] of counts) inventory.find(row => row.id === id)!.quantity -= count
   state.customers.push(customer); state.orders.push(order); state.items.push(...items)
-  ;(state.pendingCheckouts ??= {})[code] = token
+  // The mock checkout redirects directly to success, so it simulates confirmed payment.
   emit()
   try { localStorage.setItem(`awg-form-token:${code}`, token) } catch { /* storage unavailable */ }
   return { orderCode: code, formToken: token, checkoutUrl: `/buy/thanks?code=${code}` }
@@ -913,7 +913,7 @@ export function getTrackByCode(code: string): TrackView {
     : undefined
   const when: TrackWhen =
     first?.delivery.kind === 'vienna'
-      ? { kind: 'vienna', date: null, fromHour: null, marketName: null, untilHour: null }
+      ? { kind: 'vienna', date: first.delivery.deliveryDate ?? null, fromHour: null, marketName: null, untilHour: null }
       : day
         ? {
             kind: 'market',

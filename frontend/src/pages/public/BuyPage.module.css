@@ -309,6 +309,7 @@
 }
 
 .chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -319,7 +320,28 @@
   background: #fff;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s;
+}
+
+/* Keep native radio semantics and full-size keyboard focus without clipping
+   the focused input into a 1px visually-hidden box. The label draws the choice. */
+.choiceInput {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: inherit;
+}
+
+.choiceInput:focus-visible {
+  outline: 3px solid var(--night);
+  outline-offset: 2px;
 }
 
 .chip:hover {
@@ -633,6 +655,7 @@
 .weekday,
 .unavailable,
 .day {
+  position: relative;
   display: grid;
   place-items: center;
   min-width: 40px;
@@ -647,12 +670,11 @@
 
 .unavailable {
   color: var(--public-muted);
-  opacity: 0.55;
 }
 
 .day {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   min-width: 0;
   align-self: center;
   border: 1.5px solid var(--select);
@@ -957,3 +979,67 @@
   .shop { scroll-padding-bottom: 10rem; }
   .step :is(input, textarea, button, fieldset, [role='alert']) { scroll-margin-bottom: 10rem; }
 }
+
+.previewPane { position: sticky; top: 0; z-index: 3; padding: var(--space-2); background: white; text-align: center; }
+.previewPane svg { max-height: 140px; }
+.previewPane > strong { display: block; }
+.subprogress { height: 3px; margin-top: var(--space-2); background: var(--snow-2); }
+.subprogress span { display: block; width: 100%; height: 100%; background: var(--green-deep); transform-origin: left; transition: transform 200ms ease; }
+.itemTabs { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-4) 0; }
+.itemTabs button { min-height: 44px; padding: 0 var(--space-4); border: 1px solid var(--choice-line); border-radius: var(--radius); background: white; color: var(--public-ink); cursor: pointer; }
+.itemTabs button[aria-pressed='true'] { border: 2px solid var(--night); font-weight: 700; }
+.itemTabs button:focus-visible { outline: 3px solid var(--night); outline-offset: 2px; }
+.deliveryContact { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--snow-2); }
+@media (max-width: 899px) {
+  .step :is(input, textarea, button, summary, fieldset) { scroll-margin-block: var(--space-4) 10rem; }
+  .design :is(input, textarea, button, summary) { scroll-margin-top: 15rem; }
+  .design[data-substep='0'] .nameGroup, .design[data-substep='0'] .petGroup,
+  .design[data-substep='1'] .choiceGroup, .design[data-substep='1'] .petGroup,
+  .design[data-substep='2'] .choiceGroup, .design[data-substep='2'] .nameGroup { display: none; }
+}
+@media (min-width: 900px) {
+  .shop:has(.design) { width: min(1100px, 92vw); }
+  .design { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-6); align-items: start; }
+  .previewPane { top: var(--space-4); }
+  .previewPane svg { max-height: none; }
+  .subprogress { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .subprogress span { transition: none; } }
+
+@media (max-width: 899px) {
+  .cart { display: none; }
+  .actions { position: sticky; bottom: 0; z-index: 5; align-items: center; padding: var(--space-3); background: #fff; box-shadow: 0 -4px 12px #15203322; }
+  .mobileTotal:not([hidden]) { display: flex; flex-direction: column; font-size: var(--fs-small); }
+}
+/* Keep labels and photo guidance at full contrast throughout the entrance. */
+.optionsPane { animation: itemEnter 300ms ease-out; }
+@keyframes itemEnter { from { transform: translateX(16px); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .optionsPane { animation: none; } }
+
+.dateCards { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .75rem; margin: 1.5rem 0; }
+.dateCard, .dateSkeleton { min-height: 5.5rem; border: 1px solid var(--public-muted); border-radius: var(--radius); background: white; }
+.dateCard { display: flex; flex-wrap: wrap; align-content: center; gap: .25rem; padding: .8rem; text-align: left; color: var(--public-ink); cursor: pointer; }
+.dateCard small { flex-basis: 100%; font-weight: 700; }
+.dateCard[data-earliest='true'] { border-width: 2px; }
+.dateCard[data-selected='true'] { background: var(--snow); outline: 2px solid var(--public-ink); }
+.dateSkeleton { background: var(--snow); opacity: .65; }
+.formGrid input[data-valid='true'] { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4 10l4 4 8-9' fill='none' stroke='%232f6b3f' stroke-width='2'/%3E%3C/svg%3E"); background-size: 20px; background-position: right .75rem center; background-repeat: no-repeat; padding-right: 2.5rem; }
+.reviewPreview { width: 76px; flex: 0 0 76px; }
+.reviewPreview p, .reviewPreview button { display: none; }
+.reviewLinks { display: flex; gap: 1rem; flex-wrap: wrap; }
+.shop button { transition: transform 100ms ease; }
+.shop button:active { transform: scale(.97); }
+@media (min-width: 640px) { .formGrid > .colHalf, .formGrid > .colWide, .formGrid > .colNarrow { grid-column: 1 / -1; } }
+@media (prefers-reduced-motion: reduce) { .shop button { transition: none; } .shop button:active { transform: none; } }
+.thanksPreview { width: 150px; margin: 1rem auto; }
+.thanksTimeline { display: grid; gap: .75rem; margin: 1.5rem 0; padding-left: 1.5rem; }
+.seq { border: 0; padding: 1.5rem 0; }
+.seq legend { font-weight: 700; }
+.seq div { display: flex; flex-wrap: wrap; gap: .5rem; }
+.seq button { min-width: 44px; min-height: 44px; border: 1px solid var(--public-muted); border-radius: var(--radius); background: white; cursor: pointer; }
+.reviewItem[data-changed='true'], .reviewCard[data-changed='true'] { animation: reviewed 450ms ease-out; }
+@keyframes reviewed { from { opacity: .55; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .reviewItem[data-changed='true'], .reviewCard[data-changed='true'] { animation: none; } }
+.progress li[aria-current='step'] span { animation: progress-enter 200ms ease-out; }
+@keyframes progress-enter { from { opacity: .6; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .progress li[aria-current='step'] span { animation: none; } }

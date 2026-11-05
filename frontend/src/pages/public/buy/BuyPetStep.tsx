@@ -5,9 +5,9 @@ import { colorKeys, MAX_PHOTOS } from './shared'
 
 import { useState } from 'react'
 
-export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, addFiles }: Pick<BuyStepProps, 't' | 'draft' | 'patchItem' | 'err' | 'described' | 'photoErrors' | 'addFiles'>) {
+export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, addFiles, activeUid }: { activeUid: string } & Pick<BuyStepProps, 't' | 'draft' | 'patchItem' | 'err' | 'described' | 'photoErrors' | 'addFiles'>) {
   const [reading, setReading] = useState<string | null>(null)
-  return (draft.items.map((item, index) => <div className={styles.card} key={item.uid}>
+  return (draft.items.map((item, index) => item.uid !== activeUid ? null : <div className={styles.card} key={item.uid}>
     <h3>
       {t('ornamentN', { n: index + 1 })} · {item.color && t(colorKeys[item.color])}{item.finish && <> · {t(item.finish === 'shiny' ? 'finishShiny' : 'finishMatte')}</>}</h3>
     <Field label={t('petName')} htmlFor={`pet-${item.uid}`} error={err(`pet-${item.uid}`)}>
@@ -40,7 +40,7 @@ export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, a
 
             aria-label={t('shopRemovePhoto', { name: photo.name })}
 
-            onClick={() => patchItem(item.uid, { photos: item.photos.filter((other) => other.id !== photo.id) })}>×</button></span>)}{item.photos.length < MAX_PHOTOS && <button type="button" id={`photos-${item.uid}`} className={styles.photoAdd} aria-label={t('addPhoto')} aria-describedby={described(`photos-${item.uid}`, true)} disabled={reading === item.uid} onClick={() => document.getElementById(`gallery-${item.uid}`)?.click()}>+</button>}</div>{reading === item.uid && <p role="status">{t('photoReading')}</p>}
+            onClick={() => patchItem(item.uid, { photos: item.photos.filter((other) => other.id !== photo.id) })}>×</button></span>)}{item.photos.length < MAX_PHOTOS && <button type="button" id={`photos-${item.uid}`} className={styles.photoAdd} aria-label={t('addPhoto')} aria-describedby={described(`photos-${item.uid}`, true)} aria-disabled={reading === item.uid} aria-busy={reading === item.uid} onClick={() => { if (reading !== item.uid) document.getElementById(`gallery-${item.uid}`)?.click() }}>+</button>}</div>{reading === item.uid && <p role="status">{t('photoReading')}</p>}
       <p className={styles.muted} aria-live="polite">
         {t('shopPhotosCount', { n: item.photos.length, max: MAX_PHOTOS })}{item.photos.length > 0 && <> · {t('shopPhotosWarningShort')}</>}</p>
       <input

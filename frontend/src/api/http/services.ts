@@ -299,6 +299,7 @@ export const httpApi: Api = {
   uploads: {
     toPhoto: (file) => fileToPhoto(file),
   },
+  metrics: { track: (metric) => request('/api/metrics/buy', jsonInit('POST', metric)) },
   shop: {
     abandonCheckout: async (code) => { await request(`/api/shop/checkout/${enc(code)}/abandon`, { method: 'POST', headers: formTokenHeader(code) }); try { localStorage.removeItem(FORM_TOKEN_PREFIX + code.trim().toUpperCase()) } catch { /* storage unavailable */ } },
     confirmWaitlist: (token) => request('/api/shop/waitlist/confirm', jsonInit('POST', { token })),

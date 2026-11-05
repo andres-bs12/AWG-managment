@@ -44,7 +44,7 @@ public class SecurityConfig {
                 .headers(h -> h.contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; img-src 'self'; frame-ancestors 'none'")))
                 .authorizeHttpRequests(a -> a
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/staff/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/staff/login", "/api/metrics/buy").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/track/*").permitAll()
                         .requestMatchers(HttpMethod.PATCH, "/api/track/*/address").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/forms/*").permitAll()

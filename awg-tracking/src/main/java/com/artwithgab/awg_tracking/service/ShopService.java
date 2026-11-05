@@ -61,6 +61,7 @@ public class ShopService {
     private final OrderService orderService;
     private final com.artwithgab.awg_tracking.repository.WaitlistRepository waitlistRepository;
     private final Clock clock;
+    private final BuyMetricsService buyMetrics;
 
     public boolean isOpen() {
         return props.shop().enabled() && stripe.isConfigured();
@@ -468,6 +469,7 @@ public class ShopService {
             }
             return;
         }
+        buyMetrics.paid();
         order.setCheckoutStatus(CheckoutStatus.CONFIRMED);
         order.setPaymentState(PaymentState.PAID);
         order.setPaymentMethod(PaymentMethod.CARD);

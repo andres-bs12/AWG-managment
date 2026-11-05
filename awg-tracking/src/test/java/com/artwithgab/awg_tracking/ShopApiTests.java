@@ -138,6 +138,9 @@ class ShopApiTests extends ApiTestSupport {
         var paid = orderRepository.findByCodeIgnoreCase(code).orElseThrow();
         assertThat(paid.isAwaitingPayment()).isFalse();
         assertThat(paid.getPaymentState().name()).isEqualTo("PAID");
+        webhook("checkout.session.completed", "paid", cents);
+        mvc.perform(get("/api/metrics/buy").param("from", TUE).param("to", TUE).header("Authorization", bearer(token)))
+                .andExpect(jsonPath("$[?(@.event == 'buy_paid')].count").value(1));
 
         mvc.perform(get("/api/agenda/days/2026-12-02").header("Authorization", bearer(token)))
                 .andExpect(jsonPath("$.deliveries[?(@.orderCode=='" + code + "')].methodLabel").value(org.hamcrest.Matchers.hasItem("Vienna · Wed/Fri")));

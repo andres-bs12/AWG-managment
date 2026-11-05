@@ -30,7 +30,7 @@
 .brand {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  min-height: 44px;
   padding: 0 4px;
   border-radius: var(--radius-pill);
   font-family: var(--font-display);
@@ -183,4 +183,4 @@
 .social { min-height: var(--touch); }
 
 .legal { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
-.legal a { color: var(--public-ink); font-weight: 700; }
+.legal a { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; justify-content: center; color: var(--public-ink); font-weight: 700; }

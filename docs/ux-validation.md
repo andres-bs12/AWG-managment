@@ -1,0 +1,61 @@
+# Validación de UX de /buy
+
+## Estado y ejecución
+
+Suite **parcial, pendiente de validar Fix 11**: la última ejecución externa comunicada por Claude obtuvo **120 aciertos y 2 fallos de 122**. Se inspeccionaron las dos capturas y sus trazas locales. En móvil, `Impressum` queda parcialmente recortado (ratio de intersección 0,997869); el ajuste de foco de cabecera/pie ahora desplaza el contenedor público y deja 8 px de margen. La prueba exige foco visible y completo en todos los enlaces del pie, hacia delante y atrás. En escritorio, la traza completa el recorrido pero supera los 30 s al acumular las comprobaciones de cada Tab; solo ese caso usa `test.slow()` (90 s), sin cambiar aserciones ni sus límites individuales. Build y lint pasan (advertencias existentes). No se ejecutó Playwright aquí por instrucción del dueño: Claude debe repetir la suite y revisar los resultados. Desde `frontend/`, con las dependencias instaladas y Chromium de Playwright disponible:
+
+```sh
+npx playwright test
+# Solo un proyecto o prueba:
+npx playwright test --project=mobile
+npx playwright test --grep 'validation'
+```
+
+La configuración inicia Vite en el puerto 5199 con `VITE_DATA_SOURCE=mock` y no reutiliza servidores. La fecha se fija en noviembre de 2026 para que la temporada y las fechas del mock no dependan del día de ejecución. Hay proyectos de 360 × 740, 768 × 1024 y 1280 × 900, más uno de movimiento reducido. Los fallos guardan captura y traza; `npx playwright show-report` abre el informe cuando el reporter lo genera.
+
+Las comparaciones visuales necesitan imágenes de referencia: la primera ejecución sin ellas falla y escribe capturas candidatas. Revisarlas a mano en las tres resoluciones antes de aceptarlas con `npx playwright test --update-snapshots`; no aceptar cambios automáticamente. Volver a ejecutar la suite después. Las fuentes, el SO y la versión de Chromium afectan las imágenes: generar y comparar en el mismo entorno.
+
+La ejecución anterior de 49 casos obtuvo 45 aciertos y cuatro fallos: tres por referencias ausentes y uno por movimiento reducido. Es un resultado histórico; el seguimiento actual es el de 122 casos indicado arriba. Que las capturas automatizadas pasen no sustituye la revisión visual de sus referencias.
+
+## Cobertura y límites
+
+Los archivos comparten `helpers.ts` y se ejecutan en las tres resoluciones salvo `reduced-motion.spec.ts`. `journey-deep.spec.ts` se incluye además en el proyecto de movimiento reducido:
+
+- `journey.spec.ts`: recorrido DE/EN y payload mock de un adorno; elecciones independientes de dos adornos.
+- `journey-deep.spec.ts` (Task 5C): siete casos implementados, sin fallos en la última ejecución externa comunicada. Checkout DE y cambio visible a EN con un adorno y nombre; payload multipart entero, bytes de la foto, contacto, dirección, fecha y total del botón calculado desde la configuración. Dos adornos con color/acabado/nombres distintos, sus previews y retirada con recálculo. Opción de nombre (+12,99 €), mayúsculas, giro y Vorne/Hinten, valor conservado al apagar/encender. Atrás/Adelante del navegador y Zurück por las tres pantallas, conservando fotos, nota, fecha, contacto, dirección y condiciones. Recarga desde entrega que vuelve al diseño, restaura texto, exige volver a añadir fotos y conserva la fecha. Stock preparado por `api.inventory` del mock; disponibilidad y checkout usan el adaptador HTTP real con `page.route`. Sin hooks nuevos ni modificaciones de los otros specs.
+- `validation.spec.ts`: foco y errores, postcódigos, selección agotada y límites de fotos.
+- `persistence.spec.ts`: nombre y precio, recarga y edición desde la revisión.
+- `keyboard.spec.ts`: comprobación inicial de radios, foco y navegación por teclado; no cubre todavía el recorrido completo.
+- `keyboard-availability.spec.ts` (Task 5B): siete casos implementados; los dos fallos de la última ejecución externa se describen en Fix 11 arriba. Recorrido de escritorio sin ratón hasta el botón de pago; Tab/Shift+Tab con estilos calculados de foco, geometría, recorte y solapamiento; subpasos/notas ocultos fuera del orden de Tab; fecha agotada antes del pago y opciones de color/acabado agotadas en DE/EN; fallo de red al reconsultar sin crear checkout. El recorrido de escritorio fija 1280 × 900; los demás conservan los tamaños de cada proyecto. La disponibilidad usa el adaptador HTTP real con `page.route`; el stock se prepara mediante `api.inventory` del mock. No modifica otros specs ni necesita hooks de producción. Fotos, notas, diseño, dirección y condiciones deben conservarse al volver al calendario.
+- `a11y-visual.spec.ts`: axe en pantallas y algunos errores, capturas de las tres pantallas y desbordamiento móvil.
+- `layout.spec.ts`: etiquetas, espacio de campos, alineación PLZ/ciudad y controles visibles en entrega.
+- `success.spec.ts`: nueve casos escritos para confirmación `unpaid` → `paid`, código/copia/enlace Track, límite de 60 segundos con Track sin pagar o bloqueado, contenido del .ics, SEQ único de 6 por HTTP y mock, cancelación con diseño guardado y privacidad durante un recorrido completo por ambos transportes. Usan `helpers.ts`, rutas interceptadas, aserciones con reintento y reloj virtual; sin esperas fijas. Sin fallos en la última ejecución externa comunicada a 360/768/1280 px.
+- `reduced-motion.spec.ts`: busca animaciones transform activas bajo movimiento reducido.
+
+El resultado externo comunicado es **120/122, con Fix 11 aún pendiente de validar**. No se ejecuta Playwright aquí por instrucción del dueño. Claude debe repetir la suite completa fuera del sandbox y revisar los resultados de los tres tamaños y movimiento reducido, además de las referencias visuales. No se editaron los otros specs en Task 5A/5B/5C ni en Fix 11. Siguen pendientes ampliar axe a todos los errores y medir el rendimiento completo en todas las pantallas. Estas pruebas tampoco validan Stripe real, webhook ni transporte multipart HTTP contra un backend real.
+
+La latencia de 5C se mide dentro del navegador con `performance.now` desde el evento de clic hasta el estado seleccionado, el `aria-label` esperado y el precio correcto. El color no tiene sobreprecio: se comprueba su precio estable y se mide aparte el primer cambio visible del precio al alternar el nombre. Cada medición usa cinco muestras, exige mediana < 100 ms y adjunta `configuration-latency.json`; no es una medición de INP. El hover previo y el tiempo de comunicación con Playwright quedan fuera. Los siete casos se incluyen en los cuatro proyectos, sin omisiones. El reloj comienza en el clic del documento, por lo que no incluye la demora del driver ni de emulación táctil; no se presupone que móvil vaya a ser inestable sin ejecutarlo. No hay esperas fijas.
+
+En Task 5A pasan `npm run build` y `npm run lint` (con advertencias existentes). La comprobación TypeScript adicional de `success.spec.ts` encuentra un conflicto previo en `helpers.ts:45`: `@playwright/test` usa Playwright 1.49.1 y axe resuelve `playwright-core` 1.64.1, con tipos `Page` incompatibles. No se cambiaron dependencias ni el helper. El build normal no incluye `e2e/`; su resultado no sustituye esta comprobación ni la ejecución del navegador.
+
+En Task 5B pasan `npm run build` y `npm run lint` (advertencias existentes). La comprobación TypeScript vuelve a encontrar únicamente ese conflicto en `helpers.ts:45`; no informa de errores en el spec nuevo. No se han cambiado dependencias para ocultarlo. Las correcciones de app añaden una consulta real de fechas antes del checkout, mensaje DE/EN con regreso al calendario, radios con área completa e indicador de foco, Enter que confirma el día sin enviar el formulario y foco al cambiar de subpaso móvil. El botón de fotos conserva el foco mientras lee; `aria-disabled` y una guarda impiden abrir otra carga durante ese estado. Claude debe verificar estos comportamientos en navegador.
+
+En Task 5C pasan `npm run build` y `npm run lint` (advertencias existentes). La comprobación TypeScript adicional del spec solo encuentra el conflicto previo en `helpers.ts:45`; no informa de errores en `journey-deep.spec.ts`. Se corrigió la navegación que solo vivía en estado React: las tres pantallas ahora usan historial del router sin guardar datos personales allí ni desmontar el formulario. Recargar conserva el comportamiento de volver al diseño para reañadir fotos. Queda pendiente verificar en navegador tanto la suite como esta corrección; no se ha contactado Stripe.
+
+Para probar Track con respuestas controladas, los casos de éxito sustituyen únicamente `api.tracking.getByCode` por el adaptador HTTP real y navegan por el router; `page.route` intercepta `/api/track/{code}`. El resto del flujo conserva el mock predeterminado. Las pruebas de privacidad observan todas las peticiones de métricas y el array `window.__awgMetrics` del mock, incluso al recargar tras checkout; comprueban nombres de evento permitidos, campos y ausencia de textos personales. La variante HTTP usa el adaptador real de métricas con POST interceptados. No contactan Stripe ni un backend real.
+
+## Prueba moderada con cinco personas
+
+Reclutar cinco participantes que usen teléfonos, incluyendo hablantes de alemán y de inglés; registrar idioma, dispositivo y tamaño de pantalla sin datos personales innecesarios. No usar empleados que conozcan el flujo como sustitutos de clientes. Preparar una foto de prueba y un entorno sin pagos reales.
+
+Leer: «Queremos evaluar la web, no a ti. Piensa en voz alta: dime qué esperas que pase, qué buscas y qué te resulta confuso. No te ayudaré salvo que quedes bloqueado; puedes parar cuando quieras». Evitar explicar los controles o el resultado esperado.
+
+Tareas: (1) configurar un adorno para una mascota y añadir una foto; (2) elegir nombre detrás, comprobar precio y cambiar de decisión; (3) añadir un segundo adorno diferente; (4) seleccionar fecha y dirección de Viena, revisar y llegar al pago simulado; (5) volver a editar un dato y recuperar el progreso tras recargar. Tras cada tarea preguntar SEQ: «En una escala de 1 a 7, ¿qué tan fácil fue esta tarea? 1 = muy difícil, 7 = muy fácil». Anotar también por qué eligió ese número, sin sugerir respuestas.
+
+Criterio: al menos **4 de 5** completan cada tarea sin ayuda; registrar tiempo, éxito, errores, retrocesos, bloqueos, solicitudes de ayuda, SEQ y citas textuales con un identificador anónimo. Pedir consentimiento antes de grabar pantalla o voz, guardar el material con acceso limitado y una fecha de eliminación. Priorizar problemas por gravedad y frecuencia, corregir y repetir la prueba; no extrapolar porcentajes poblacionales de cinco personas.
+
+## Embudo y objetivos
+
+Con staff autenticado, consultar `GET /api/metrics/buy?from=2026-11-01&to=2026-11-30` con fechas inclusivas. Sumar `count` por `event`, `step`, `field` y `value`; los eventos son contadores agregados, no sesiones únicas ni recorridos enlazables. Comparar `buy_view` → `buy_step` (design/delivery/review) → `buy_pay_click` → `buy_paid`, y los errores `buy_validation_error` por campo y los valores 1–7 de `buy_seq`. El mock conserva copias completas de los eventos en `window.__awgMetrics` solo en desarrollo o modo test/mock, sin enviarlos ni persistirlos; esto permite detectar filtraciones sin sanear previamente el payload de prueba. En un build de producción normal no expone este registro. `buy_paid` lo registra el servidor al confirmar Stripe.
+
+Objetivos iniciales para contrastar tras dos semanas: vista → clic de pago ≥ 35 %, clic → pago ≥ 80 %, errores < 0,3 por pedido pagado, ningún campo > 10 % de visitas, SEQ medio ≥ 6. Son aproximaciones de eventos: reintentos y visitas repetidas pueden inflar los cocientes; no atribuirlos a usuarios únicos. Tiempo mediano < 4 min sin fotos e INP móvil p75 ≤ 200 ms necesitan medición adicional: este endpoint no los registra. No enviar nombres, direcciones, correos ni fotos como métricas.

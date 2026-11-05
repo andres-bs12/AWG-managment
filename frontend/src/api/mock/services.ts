@@ -1,5 +1,5 @@
 import { validatePhoto } from '../../lib/photoValidation'
-import type { Api } from '../contracts'
+import type { Api, BuyMetric } from '../contracts'
 import type { Photo } from '../../domain/types'
 import {
   createMockCheckout, abandonMockCheckout,
@@ -31,6 +31,13 @@ import {
   submitForm,
   updateViennaAddress,
 } from './store'
+
+declare global {
+  interface Window {
+    /** Observable mock events for development and tests; never persisted. */
+    __awgMetrics?: BuyMetric[]
+  }
+}
 
 function later<T>(fn: () => T, ms = 180): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -143,6 +150,14 @@ export const mockApi: Api = {
   },
   uploads: {
     toPhoto: (file) => fileToPhoto(file),
+  },
+  metrics: {
+    track: async (metric) => {
+      if (import.meta.env.DEV || import.meta.env.MODE === 'test' || import.meta.env.MODE === 'mock') {
+        // Preserve the whole payload so privacy tests also catch unexpected fields.
+        (window.__awgMetrics ??= []).push(structuredClone(metric))
+      }
+    },
   },
   shop: {
     abandonCheckout: (code) => later(() => { abandonMockCheckout(code); try { localStorage.removeItem(`awg-form-token:${code.trim().toUpperCase()}`) } catch { /* storage unavailable */ } }),

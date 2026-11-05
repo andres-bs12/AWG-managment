@@ -55,6 +55,7 @@ export type OrderItem = {
     marketId?: string
     marketDayId?: string
     pickupHour?: number | null
+    deliveryDate?: string
     address?: Address | null
   }
 }
