@@ -85,6 +85,8 @@ function MarketEditor() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const actionErrorRef = useRef<HTMLParagraphElement>(null)
+  // A day-level conflict from the server names the day first ("Fri 11 Dec: …"); mark that row too.
+  const [conflictDate, setConflictDate] = useState<string | null>(null)
   // Save sits at the bottom of a long form: show the error there and move focus to it (Save is disabled while busy).
   useEffect(() => { if (error) actionErrorRef.current?.focus() }, [error])
   const [deleting, setDeleting] = useState<DayDraft | 'market' | null>(null)
@@ -179,6 +181,7 @@ function MarketEditor() {
     }
     setBusy(true)
     setError('')
+    setConflictDate(null)
     try {
       const saved = await api.markets.saveMarket({
         id: marketId,
@@ -207,7 +210,11 @@ function MarketEditor() {
       window.scrollTo({ top: 0, behavior: 'instant' })
     } catch (err) {
       setNotice('')
-      setError(err instanceof Error ? err.message : 'Could not save market')
+      const message = err instanceof Error ? err.message : 'Could not save market'
+      const field = err && typeof err === 'object' && 'field' in err ? (err as { field?: string }).field : undefined
+      const plain = (text: string) => text.replace(/,/g, '').toLowerCase()
+      setConflictDate(field === 'days' ? days.find(day => plain(message).startsWith(plain(formatDateLabel(day.date))))?.date ?? null : null)
+      setError(message)
     } finally {
       setBusy(false)
     }
@@ -264,7 +271,6 @@ function MarketEditor() {
       </div>
 
       <form className={styles.form} onSubmit={(event) => void onSave(event)}>
-        {error ? <p className={styles.error}>{error}</p> : null}
         {notice ? (
           <section className={styles.notice} role="status">
             <h2>{notice}</h2>
@@ -346,8 +352,8 @@ function MarketEditor() {
               {days.map((day) => {
                 const locked = Boolean(day.id && busyIds.has(day.id))
                 return (
-                  <li key={day.date} className={styles.day}>
-                    <p className={styles.dayDate}>{formatDateLabel(day.date)}</p>
+                  <li key={day.date} className={styles.day} data-invalid={conflictDate === day.date || undefined}>
+                    <p className={styles.dayDate}>{formatDateLabel(day.date)}{conflictDate === day.date ? <span className={styles.dayConflict}>Has Vienna deliveries</span> : null}</p>
                     <label className={styles.time}>
                       <span>Open</span>
                       <input
@@ -410,7 +416,7 @@ function MarketEditor() {
           {marketId ? (
             <div className={styles.deleteMarket}>
               {marketLocked ? <p className={styles.locked}>This market has orders and cannot be deleted.</p> : null}
-              <Button tone="staff" variant="danger" disabled={marketLocked || busy} onClick={() => setDeleting('market')}>
+              <Button tone="staff" variant="ghost" className={styles.deleteMarketBtn} disabled={marketLocked || busy} onClick={() => setDeleting('market')}>
                 Delete market
               </Button>
             </div>

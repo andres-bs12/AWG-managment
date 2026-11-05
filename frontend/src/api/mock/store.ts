@@ -540,6 +540,8 @@ function deliveryDateForItem(item: OrderItem): string | null {
     return marketDayDate(item.delivery.marketDayId)
   }
   if (item.delivery.marketDayId) return marketDayDate(item.delivery.marketDayId)
+  // Web Vienna orders carry the chosen date directly (like the backend's handoff date).
+  if (item.delivery.deliveryDate) return item.delivery.deliveryDate
   const block = state.blocks.find((b) => b.orderItemId === item.id)
   if (block) return marketDayDate(block.marketDayId)
   return null
@@ -548,6 +550,7 @@ function deliveryDateForItem(item: OrderItem): string | null {
 function viennaBelongsToDate(item: OrderItem, date: string): boolean {
   if (item.delivery.kind !== 'vienna') return false
   if (item.delivery.marketDayId) return marketDayDate(item.delivery.marketDayId) === date
+  if (item.delivery.deliveryDate) return item.delivery.deliveryDate === date
   const weekday = utcWeekday(date)
   return weekday === 3 || weekday === 5
 }

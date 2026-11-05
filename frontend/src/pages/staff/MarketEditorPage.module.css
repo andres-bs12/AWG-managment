@@ -24,7 +24,12 @@
 }
 
 .input {
+  min-height: var(--size-control-staff);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-thin) solid var(--color-control-border);
+  border-radius: var(--radius-control);
   color: var(--staff-ink);
+  background: var(--staff-surface);
   font-family: var(--font-staff);
 }
 
@@ -131,5 +136,24 @@
 
 /* Removing a day only stages the change; it must not outweigh Save. */
 .removeDay:not(:disabled) {
+  color: var(--staff-danger);
+}
+
+.day[data-invalid] {
+  /* Tint without moving the columns: the padding is taken back by the margin. */
+  margin-inline: calc(-1 * var(--space-3));
+  padding-inline: var(--space-3);
+  background: var(--color-error-surface);
+  border-radius: var(--radius-small);
+}
+
+.dayConflict {
+  display: block;
+  color: var(--staff-danger);
+  font-size: var(--type-staff-meta-size);
+  font-weight: 600;
+}
+
+.deleteMarketBtn:not(:disabled) {
   color: var(--staff-danger);
 }

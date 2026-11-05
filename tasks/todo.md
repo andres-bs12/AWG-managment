@@ -24,8 +24,6 @@
 
 - [x] 2026-11-05 · Validación de navegador cerrada: suite completa en verde para `/buy`, `/form`, recogida en mercado, SEC-F (399/404 con tres timeouts por carga que pasan aislados) y capturas regeneradas y revisadas. Sustituye los seguimientos de Fix 9–12, a–e, Task 5–8, 7B y 11.
 - [ ] Staff UX — pendiente tras los arreglos del 2026-11-05 (informes `tasks/audit-results/staff-ux-*`):
-  - Editor de mercados P1-7: marcar el día en conflicto (`field: 'days'`) en su fila. El mock no puede provocar el conflicto porque los pedidos web de Viena no tienen `marketDayId`.
-  - Mock: los ítems de Viena sin `marketDayId` aparecen en todos los miércoles/viernes (`viennaBelongsToDate`).
   - Los P2 de ambos informes. HSTS se verifica en el proxy TLS real. Sigue abierto el conflicto de tipos Playwright/axe en `e2e/helpers.ts:45`.
 - [ ] `/buy` premium: verificar en navegador a 360/768/1280 px y completar las mejoras y pruebas de `docs/plan-buy-premium.md`.
 - [ ] Stripe: `stripe login`, claves de prueba, prueba real del checkout y webhook (`docs/stripe-setup.md`); luego claves live y `SHOP_ENABLED=true`.

@@ -759,3 +759,20 @@ test('agenda hours and blocks scale together at 200% text without clipped lines'
   expect(geometry.height).toBe(156)
   expect(geometry.clipped).toBe(false)
 })
+
+test('a market day conflict is shown next to Save with focus and marks its day row', async ({ page }) => {
+  await httpFixture(page)
+  await page.route(url => url.pathname === '/api/markets', route => route.request().method() === 'POST'
+    ? route.fulfill({ status: 400, json: { status: 400, code: 'DAY_HAS_DELIVERIES', field: 'days', message: 'Sat 5 Dec: Vienna deliveries are booked that day; move them before adding a stall day' } })
+    : route.fallback())
+  await signedIn(page, `/staff/markets/${spareMarket.id}`)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  const alert = page.getByRole('alert').filter({ hasText: 'Vienna deliveries are booked' })
+  await expect(alert).toBeFocused()
+  await expect(alert).toBeInViewport()
+  const row = page.locator('li[data-invalid]')
+  await expect(row).toHaveCount(1)
+  await expect(row).toContainText('5 Dec')
+  await expect(row).toContainText('Has Vienna deliveries')
+  await axe(page)
+})
