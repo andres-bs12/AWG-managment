@@ -102,4 +102,23 @@ class Sprint5ApiTests extends ApiTestSupport {
         mvc.perform(withIp(get("/api/track/AWGZZZZZZ"))).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ORDER_NOT_FOUND"));
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void finishedOrnamentHandedOverNowOnAHomeDay() throws Exception {
+        String token = login();
+        Map<String, Object> item = finishedItem();
+        item.put("marketDayId", dayId(token, TUE)); // today is a home (Casa) day, no stall
+        MvcResult res = sale(token, item);
+        assertThat(res.getResponse().getStatus()).as(res.getResponse().getContentAsString()).isEqualTo(201);
+    }
+
+    @Test
+    void wrongContentTypeIs415NotA500() throws Exception {
+        mvc.perform(post("/api/orders").header("Authorization", bearer(login()))
+                        .contentType(MediaType.TEXT_PLAIN).content("x"))
+                .andExpect(status().isUnsupportedMediaType());
+        mvc.perform(withIp(post("/api/shop/checkout")).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isBetween(400, 499));
+    }
 }

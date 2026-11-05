@@ -164,7 +164,8 @@ public class OrderService {
             MarketDay handoffDay = index.byId(row.marketDayId()).orElse(null);
             LocalDate handoff;
             if (handoffDay != null) {
-                if (row.deliveryKind() == DeliveryKind.MARKET && handoffDay.getMarket().getKind() != MarketKind.MARKET) {
+                // Custom pickups happen at the stall; a finished ornament may be handed over on the spot on any day.
+                if (custom && row.deliveryKind() == DeliveryKind.MARKET && handoffDay.getMarket().getKind() != MarketKind.MARKET) {
                     throw new BadRequestException("Choose a market day for the pickup");
                 }
                 handoff = handoffDay.getDate();

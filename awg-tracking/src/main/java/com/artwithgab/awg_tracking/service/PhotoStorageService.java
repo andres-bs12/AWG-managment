@@ -41,10 +41,10 @@ public class PhotoStorageService {
         try (InputStream in = file.getInputStream()) {
             read = in.readNBytes(head, 0, head.length);
         } catch (IOException e) {
-            throw new BadRequestException("A photo could not be read. Add it again.");
+            throw new BadRequestException("A photo could not be read. Add it again.").code("PHOTO_INVALID").field("photos");
         }
         String[] type = detect(Arrays.copyOf(head, read));
-        if (type == null) throw new BadRequestException("Photos must be JPEG, PNG, WebP or HEIC images.");
+        if (type == null) throw new BadRequestException("Photos must be JPEG, PNG, WebP or HEIC images.").code("PHOTO_INVALID").field("photos");
 
         checkDecodable(file, type[0]);
 
@@ -119,18 +119,18 @@ public class PhotoStorageService {
         try (InputStream in = file.getInputStream();
              javax.imageio.stream.ImageInputStream iis = javax.imageio.ImageIO.createImageInputStream(in)) {
             var readers = javax.imageio.ImageIO.getImageReaders(iis);
-            if (!readers.hasNext()) throw new BadRequestException("A photo could not be read. Add it again.");
+            if (!readers.hasNext()) throw new BadRequestException("A photo could not be read. Add it again.").code("PHOTO_INVALID").field("photos");
             javax.imageio.ImageReader reader = readers.next();
             try {
                 reader.setInput(iis, true, true);
                 // The JDK decoders "recover" from truncated data with a warning: treat any warning as unreadable.
                 reader.addIIOReadWarningListener((source, warning) -> {
-                    throw new BadRequestException("A photo could not be read. Add it again.");
+                    throw new BadRequestException("A photo could not be read. Add it again.").code("PHOTO_INVALID").field("photos");
                 });
                 int w = reader.getWidth(0);
                 int h = reader.getHeight(0);
                 if (w < 1 || h < 1 || w > 12000 || h > 12000 || (long) w * h > 80_000_000L) {
-                    throw new BadRequestException("A photo is too large. Use a smaller image.");
+                    throw new BadRequestException("A photo is too large. Use a smaller image.").code("PHOTO_INVALID").field("photos");
                 }
                 // Decode every pixel row (subsampled, so memory stays small): truncated or corrupt data fails here.
                 javax.imageio.ImageReadParam param = reader.getDefaultReadParam();
@@ -142,7 +142,7 @@ public class PhotoStorageService {
             }
         } catch (IOException | RuntimeException e) {
             if (e instanceof BadRequestException b) throw b;
-            throw new BadRequestException("A photo could not be read. Add it again.");
+            throw new BadRequestException("A photo could not be read. Add it again.").code("PHOTO_INVALID").field("photos");
         }
     }
 

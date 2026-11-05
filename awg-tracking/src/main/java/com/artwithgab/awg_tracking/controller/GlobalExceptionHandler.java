@@ -43,6 +43,23 @@ public class GlobalExceptionHandler {
         return body(HttpStatus.BAD_REQUEST, "The request could not be read.");
     }
 
+    @ExceptionHandler({org.springframework.web.bind.ServletRequestBindingException.class,
+            org.springframework.web.multipart.MultipartException.class})
+    ResponseEntity<ErrorResponse> badRequest(Exception e) {
+        if (e instanceof MaxUploadSizeExceededException m) return tooLarge(m);
+        return body(HttpStatus.BAD_REQUEST, "The request could not be read.");
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    ResponseEntity<ErrorResponse> mediaType(Exception e) {
+        return body(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "This content type is not supported here.", "BAD_REQUEST", null);
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotAcceptableException.class)
+    ResponseEntity<ErrorResponse> notAcceptable(Exception e) {
+        return body(HttpStatus.NOT_ACCEPTABLE, "Not acceptable.", "BAD_REQUEST", null);
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     ResponseEntity<ErrorResponse> tooLarge(MaxUploadSizeExceededException e) {
         return body(HttpStatus.PAYLOAD_TOO_LARGE, "Photos are too large. Use smaller images.");

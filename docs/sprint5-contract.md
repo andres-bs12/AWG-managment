@@ -4,7 +4,7 @@ Source: tasks/audit-final.md. Backend by Claude, frontend by Codex; each reviews
 
 ## Errors
 Every non-2xx body: `{ status, message, code?, field? }`.
-- `code` (stable, for client-side localisation): `VALIDATION`, `NOT_FOUND`, `ORDER_NOT_FOUND`, `FORM_LOCKED`, `POSTAL_OUTSIDE_VIENNA`, `DELIVERY_DAY_INVALID`, `DAY_FULL`, `RATE_LIMITED`, `STOCK_CHANGED`, `OUT_OF_STOCK`, `PAYMENT_PENDING`, `SHOP_CLOSED`, `TOO_MANY_OPEN_CHECKOUTS`, `PAYMENT_PROVIDER`, `UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT`, `BAD_REQUEST`.
+- `code` (stable, for client-side localisation): `VALIDATION`, `NOT_FOUND`, `ORDER_NOT_FOUND`, `FORM_LOCKED`, `POSTAL_OUTSIDE_VIENNA`, `DELIVERY_DAY_INVALID`, `DAY_FULL`, `RATE_LIMITED`, `STOCK_CHANGED`, `OUT_OF_STOCK`, `PHOTO_INVALID` (field `photos`), `PAYMENT_PENDING`, `SHOP_CLOSED`, `TOO_MANY_OPEN_CHECKOUTS`, `PAYMENT_PROVIDER`, `UNAUTHORIZED`, `FORBIDDEN`, `CONFLICT`, `BAD_REQUEST`.
 - `field` (for `VALIDATION`): the request property path, e.g. `items[0].petName`, `address.postalCode`, `customerName`.
 - The frontend shows a localized text for known codes (DE/EN) next to the field when `field` is set, and falls back to `message`.
 
