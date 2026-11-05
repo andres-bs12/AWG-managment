@@ -46,6 +46,7 @@ export type SaleDraft = {
   differentPickups: boolean
   phase: SalePhase
   order?: CreatedSaleRef
+  idempotencyKey?: string
   placingItemId?: string
 }
 
@@ -217,6 +218,7 @@ export const SLOT_TAKEN_COPY = 'That hour is taken · change / place on board'
 
 export function saleErrorMessage(err: unknown, fallback = 'Could not create sale'): string {
   const msg = err instanceof Error ? err.message : ''
+  if ((err as { code?: string })?.code === 'DELIVERY_DAY_INVALID') return 'Choose a Wednesday, Friday or 24 December without a market, before the season ends.'
   if (/overlap/i.test(msg) || /hour is taken/i.test(msg)) return SLOT_TAKEN_COPY
   return msg || fallback
 }

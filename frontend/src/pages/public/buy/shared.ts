@@ -16,7 +16,7 @@ export type BuyStepProps = {
   err: (key: string) => string | undefined
   described: (key: string, hint?: boolean) => string | undefined
   photoErrors: Record<string, string>
-  addFiles: (uid: string, files: FileList | null) => Promise<void>
+  addFiles: (uid: string, files: File[] | null) => Promise<void>
   dates: ShopDeliveryDate[]
   datesState: 'idle' | 'loading' | 'ready' | 'error'
   setDatesRetry: Dispatch<SetStateAction<number>>

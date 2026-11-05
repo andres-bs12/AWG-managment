@@ -203,7 +203,7 @@
 .slot[data-status='delivered'] {
   background: var(--staff-slot-done);
   color: var(--staff-slot-done-ink);
-  opacity: 0.55;
+  
   border-style: dashed;
   border-color: var(--staff-line);
 }

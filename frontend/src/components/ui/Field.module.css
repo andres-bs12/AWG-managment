@@ -19,7 +19,7 @@
   width: 100%;
   min-height: var(--touch);
   padding: 0.55rem 0.8rem;
-  border: 1px solid var(--snow-2);
+  border: 2px solid var(--public-muted);
   border-radius: var(--radius);
   background: #fff;
   color: var(--public-ink);

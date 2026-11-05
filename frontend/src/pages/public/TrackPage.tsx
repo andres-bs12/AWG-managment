@@ -68,10 +68,10 @@ export function TrackPage() {
           }, MIN_WIPE_MS),
         )
       })
-      .catch((err: Error) => {
+      .catch(() => {
         if (cancelled) return
         setLoaded(null)
-        setError(err.message || t('trackNotFound'))
+        setError(t('trackNotFound'))
         setPhase('done')
         setDialogOpen(true)
       })
@@ -97,19 +97,20 @@ export function TrackPage() {
       setLoaded(next)
       setEditing(false)
       setSaved(true)
-    } catch (err) {
-      setAddressError(err instanceof Error && err.message ? err.message : t('addressSaveError'))
+    } catch {
+      setAddressError(t('addressSaveError'))
     } finally {
       setSavingAddress(false)
     }
   }
 
+  let hasFormToken = false
+  try { hasFormToken = !!view && !!localStorage.getItem(`awg-form-token:${view.code.toUpperCase()}`) } catch { /* storage unavailable */ }
   const status = view?.status ?? 'preparing'
-  const homeDelivery = view?.delivery.kind === 'vienna'
   const statusLabel =
-    status === 'delivered' ? t('delivered') : status === 'ready' ? (homeDelivery ? t('outForDelivery') : t('ready')) : t('preparing')
+    status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
   const stepIndex = status === 'delivered' ? 2 : status === 'ready' ? 1 : 0
-  const steps = [t('stepPainting'), homeDelivery ? t('outForDelivery') : t('stepReady'), t('stepHandover')]
+  const steps = [t('stepPainting'), t('ready'), t('stepHandover')]
   /** Sleigh only after a hit — misses stay in the dialog without this animation. */
   const showWipe = phase === 'loading' || phase === 'leaving'
 
@@ -118,7 +119,7 @@ export function TrackPage() {
   if (view) {
     const when = view.when
     if (when.kind === 'vienna') {
-      whenLines.push(t('whenVienna'))
+      whenLines.push([t('whenVienna'), when.date ? formatDateLabel(when.date, locale === 'de' ? 'de-AT' : 'en-GB') : ''].filter(Boolean).join(' · '))
     } else if (when.kind === 'market') {
       const head = [
         when.date ? formatDateLabel(when.date, locale === 'de' ? 'de-AT' : 'en-GB') : null,
@@ -156,7 +157,7 @@ export function TrackPage() {
             >
               {statusLabel}
             </span>
-            <h1 className={styles.title}>{t('trackGreeting', { name: view.customerName })}</h1>
+            <h1 className={styles.title}>{view.customerName && view.customerName !== 'Walk-in' ? t('trackGreeting', { name: view.customerName }) : (locale === 'de' ? 'Deine Bestellung' : 'Your order')}</h1>
 
             <ProgressSteps labels={steps} current={stepIndex} label={statusLabel} />
 
@@ -181,9 +182,9 @@ export function TrackPage() {
                 {!editing ? (
                   <>
                     {saved ? <p className={styles.saved}>{t('addressSaved')}</p> : null}
-                    <Button variant="secondary" fullWidth onClick={() => setEditing(true)}>
+                    {hasFormToken ? <Button variant="secondary" fullWidth onClick={() => setEditing(true)}>
                       {t('editAddress')}
-                    </Button>
+                    </Button> : <p>{locale === 'de' ? 'Öffne deinen persönlichen Formularlink, um die Lieferadresse zu ändern.' : 'Open your personal form link to change the delivery address.'}</p>}
                   </>
                 ) : (
                   <div>

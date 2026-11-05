@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import type { AgendaDay, AgendaDelivery, ProductionStatus } from '../../domain/types'
 import styles from './DeliveryRow.module.css'
 
@@ -34,6 +35,7 @@ type Props = {
 
 export function DeliveryRow({ row, from }: Props) {
   const navigate = useNavigate()
+  const [photoFailed, setPhotoFailed] = useState(false)
 
   return (
     <button
@@ -41,8 +43,8 @@ export function DeliveryRow({ row, from }: Props) {
       className={styles.dlv}
       onClick={() => navigate(`/staff/orders/${row.orderId}`, { state: { from } })}
     >
-      {row.photoUrl ? (
-        <img src={row.photoUrl} alt="" width={48} height={48} />
+      {row.photoUrl && !photoFailed ? (
+        <img src={row.photoUrl} alt="" width={48} height={48} onError={() => setPhotoFailed(true)} />
       ) : (
         <span className={styles.thumb} />
       )}

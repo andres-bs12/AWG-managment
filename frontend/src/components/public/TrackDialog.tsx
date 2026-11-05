@@ -74,9 +74,8 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
     try {
       await api.tracking.getByCode(next)
       onSubmit(next)
-    } catch (err) {
-      const message = err instanceof Error && err.message ? err.message : t('trackNotFound')
-      setLocalError(message)
+    } catch {
+      setLocalError(t('trackNotFound'))
       inputRef.current?.focus()
     } finally {
       setBusy(false)

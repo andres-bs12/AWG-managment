@@ -1,4 +1,4 @@
-.shop { width: min(760px, 92vw); overflow-wrap: anywhere; }
+.shop { width: min(760px, 92vw); }
 .notice { margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border-radius: var(--radius); background: var(--snow); border: 1px solid var(--snow-2); }
 .progress { display: flex; gap: var(--space-2); list-style: none; padding: 0 0 var(--space-4); margin: 0; border-bottom: 1px solid var(--snow-2); }
 .progress li { flex: 1; min-width: 0; color: var(--public-muted); font-size: var(--fs-small); line-height: 1.15; }
@@ -27,7 +27,7 @@
 .error { margin: var(--space-2) 0; color: var(--staff-danger); font-size: var(--fs-small); font-weight: 700; }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-4); padding: 0; border: 0; min-width: 0; }
 .chips legend { padding: 0; margin-bottom: var(--space-2); font-weight: 650; }
-.chip { display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--touch); padding: var(--space-2) var(--space-3); border: 2px solid var(--snow-2); border-radius: var(--radius); background: white; font-weight: 600; cursor: pointer; }
+.chip { display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--touch); padding: var(--space-2) var(--space-3); border: 2px solid var(--public-muted); border-radius: var(--radius); background: white; font-weight: 600; cursor: pointer; }
 .chip[data-selected='true'] { border-color: var(--night); background: var(--snow); }
 .chip[data-disabled='true'] { color: var(--public-muted); background: var(--snow); cursor: not-allowed; }
 .chip small { display: block; font-size: .75rem; font-weight: 400; }
@@ -67,3 +67,6 @@
   .mobileTotal { display: flex; flex: 0 0 auto; flex-direction: column; font-size: var(--fs-small); }
   .mobileTotal strong { font-size: 1rem; }
 }
+
+.chip[data-selected="true"]::before { content: "✓"; font-weight: 800; }
+@media (max-width: 500px) { .shop { scroll-padding-bottom: 10rem; } .step :is(input, textarea, button, fieldset, [role="alert"]) { scroll-margin-bottom: 10rem; } .actions button { min-width: 0; } }

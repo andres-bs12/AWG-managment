@@ -1,15 +1,16 @@
 import { formatDateLabel, formatHour } from '../../lib/time'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { OrnamentLoader } from '../../components/public/OrnamentLoader'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
 import { Field } from '../../components/ui/Field'
-import type { CustomerFormView, OrderItem, Photo } from '../../domain/types'
+import type { Address, CustomerFormView, OrderItem, Photo } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
 import styles from './Panel.module.css'
+import { MAX_PHOTOS, colorKeys } from './buy/shared'
 
 type Step = 'photos' | 'names' | 'contact' | 'extras' | 'review' | 'done'
 
@@ -26,6 +27,7 @@ type Draft = {
   phone: string
   email: string
   items: ItemDraft[]
+  address: Address
 }
 
 const empty: Draft = {
@@ -33,6 +35,7 @@ const empty: Draft = {
   phone: '',
   email: '',
   items: [],
+  address: { line1: '', line2: '', postalCode: '', city: 'Wien' },
 }
 
 function draftKey(token: string) {
@@ -51,7 +54,8 @@ function formTargets(view: CustomerFormView): OrderItem[] {
 
 function draftFromView(view: CustomerFormView): Draft {
   return {
-    customerName: view.customer.name,
+    customerName: view.customer.name === 'Walk-in' ? '' : view.customer.name,
+    address: view.address ?? { line1: '', line2: '', postalCode: '', city: 'Wien' },
     phone: view.customer.phone,
     email: view.customer.email,
     items: formTargets(view).map((item) => ({
@@ -72,6 +76,7 @@ function parseDraft(raw: string, itemIds: string[]): Draft | null {
     if (parsed.items.some((item, index) => item?.orderItemId !== itemIds[index])) return null
     return {
       customerName: parsed.customerName,
+      address: parsed.address ?? { line1: '', line2: '', postalCode: '', city: 'Wien' },
       phone: typeof parsed.phone === 'string' ? parsed.phone : '',
       email: typeof parsed.email === 'string' ? parsed.email : '',
       items: parsed.items.map((item) => ({
@@ -79,7 +84,7 @@ function parseDraft(raw: string, itemIds: string[]): Draft | null {
         petName: item.petName ?? '',
         backName: item.backName ?? '',
         note: item.note ?? '',
-        photos: Array.isArray(item.photos) ? item.photos : [],
+        photos: Array.isArray(item.photos) ? item.photos.filter(photo => !photo.dataUrl.startsWith('data:')) : [],
       })),
     }
   } catch {
@@ -115,6 +120,8 @@ export function FormPage() {
   const [draft, setDraft] = useState<Draft>(empty)
   const [fieldError, setFieldError] = useState<Record<string, string>>({})
   const [sending, setSending] = useState(false)
+  const sendLock = useRef(false)
+  const [storageError, setStorageError] = useState(false)
   const [orderCode, setOrderCode] = useState('')
   const [copyMessage, setCopyMessage] = useState('')
 
@@ -131,13 +138,13 @@ export function FormPage() {
         setView(data)
         setLoadedToken(token)
         const itemIds = formTargets(data).map((item) => item.id)
-        const saved = sessionStorage.getItem(draftKey(token))
+        let saved: string | null = null
+        try { saved = sessionStorage.getItem(draftKey(token)) } catch { setStorageError(true) }
         const restored = saved ? parseDraft(saved, itemIds) : null
         setDraft(restored ?? draftFromView(data))
-        if (data.alreadySubmitted) setStep('done')
       })
-      .catch((err: Error) => {
-        if (!cancelled) setError(err.message)
+      .catch(() => {
+        if (!cancelled) setError(locale === 'de' ? 'Das Formular konnte nicht geladen werden. Bitte versuche es erneut.' : 'Could not load the form. Please try again.')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -145,11 +152,11 @@ export function FormPage() {
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [token, locale])
 
   useEffect(() => {
     if (!token || loadedToken !== token || loading || step === 'done') return
-    sessionStorage.setItem(draftKey(token), JSON.stringify(draft))
+    try { sessionStorage.setItem(draftKey(token), JSON.stringify({ ...draft, items: draft.items.map(item => ({ ...item, photos: item.photos.filter(photo => !photo.dataUrl.startsWith('data:')) })) })) } catch { window.setTimeout(() => setStorageError(true), 0) }
   }, [draft, token, loadedToken, loading, step])
 
   const steps = useMemo<Step[]>(() => ['photos', 'names', 'contact', 'extras', 'review'], [])
@@ -167,14 +174,14 @@ export function FormPage() {
     : []
   const handoffLines = [...new Set((view?.handoffs ?? []).map((handoff) =>
     handoff.kind === 'vienna'
-      ? t('whenVienna')
+      ? [t('whenVienna'), handoff.date ? formatDateLabel(handoff.date, intlLocale) : ''].filter(Boolean).join(' · ')
       : handoff.kind === 'unknown'
         ? t('whenTbd')
         : [handoff.marketName, handoff.date ? formatDateLabel(handoff.date, intlLocale) : '', handoff.fromHour != null ? t('whenFrom', { time: formatHour(handoff.fromHour) }) : ''].filter(Boolean).join(' · '),
   ))]
 
   function ornamentTitle(index: number, item: OrderItem | undefined) {
-    const color = item?.color === 'red' ? t('colorRed') : item?.color === 'grey' ? t('colorGrey') : ''
+    const color = item?.color ? t(colorKeys[item.color]) : ''
     return color ? t('ornamentWithColor', { n: index + 1, color }) : t('ornamentN', { n: index + 1 })
   }
 
@@ -184,7 +191,7 @@ export function FormPage() {
 
   function patch(partial: Partial<Pick<Draft, 'customerName' | 'phone' | 'email'>>) {
     setDraft((d) => ({ ...d, ...partial }))
-    setFieldError({})
+    setFieldError(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[key]); return next })
   }
 
   function patchItem(orderItemId: string, partial: Partial<Omit<ItemDraft, 'orderItemId'>>) {
@@ -192,18 +199,22 @@ export function FormPage() {
       ...d,
       items: d.items.map((item) => (item.orderItemId === orderItemId ? { ...item, ...partial } : item)),
     }))
-    setFieldError({})
+    setFieldError(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[`${key}:${orderItemId}`]); return next })
   }
 
-  async function addFiles(orderItemId: string, files: FileList | null) {
-    if (!files) return
+  async function addFiles(orderItemId: string, files: File[]) {
     const current = draft.items.find((item) => item.orderItemId === orderItemId)
     if (!current) return
+    const available = MAX_PHOTOS - current.photos.length
     const next: Photo[] = []
-    for (const file of Array.from(files).slice(0, 4 - current.photos.length)) {
-      next.push(await api.uploads.toPhoto(file))
+    let message = files.length > available ? t('shopPhotoLimit') : ''
+    for (const file of files.slice(0, available)) {
+      if (!file.type.startsWith('image/')) { message = locale === 'de' ? 'Bitte wähle eine Bilddatei.' : 'Please choose an image file.'; continue }
+      if (file.size > 10 * 1024 * 1024) { message = locale === 'de' ? 'Das Foto ist größer als 10 MB.' : 'The photo is larger than 10 MB.'; continue }
+      try { next.push(await api.uploads.toPhoto(file)) } catch { message = locale === 'de' ? 'Das Foto konnte nicht gelesen werden.' : 'Could not read the photo.' }
     }
     patchItem(orderItemId, { photos: [...current.photos, ...next] })
+    if (message) setFieldError(previous => ({ ...previous, [`photos:${orderItemId}`]: message }))
   }
 
   function errorsFor(current: Step): Record<string, string> {
@@ -220,6 +231,11 @@ export function FormPage() {
       }
     }
     if (current === 'contact') {
+      if (view?.needsAddress) {
+        if (!draft.address.line1.trim()) errs.line1 = t('required')
+        if (!/^1(0[1-9]|1[0-9]|2[0-3])0$/.test(draft.address.postalCode.trim())) errs.postalCode = t('shopPostalInvalid')
+        if (!draft.address.city.trim()) errs.city = t('required')
+      }
       if (!draft.phone.trim()) errs.phone = t('required')
       if (!draft.email.trim()) errs.email = t('required')
       else if (!isEmail(draft.email.trim())) errs.email = t('invalidEmail')
@@ -251,6 +267,7 @@ export function FormPage() {
   }
 
   async function send() {
+    if (sendLock.current) return
     for (const current of ['photos', 'names', 'contact', 'extras'] as const) {
       const errs = errorsFor(current)
       if (Object.keys(errs).length) {
@@ -259,9 +276,11 @@ export function FormPage() {
         return
       }
     }
+    sendLock.current = true
     setSending(true)
     try {
       const result = await api.forms.submitForm(token, {
+        address: view?.needsAddress ? draft.address : undefined,
         customerName: draft.customerName,
         phone: draft.phone,
         email: draft.email,
@@ -273,12 +292,16 @@ export function FormPage() {
           photos: item.photos,
         })),
       })
-      sessionStorage.removeItem(draftKey(token))
+      try { sessionStorage.removeItem(draftKey(token)) } catch { setStorageError(true) }
       setOrderCode(result.orderCode)
       setStep('done')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send')
+      const { code, field } = err as { code?: string; field?: string }
+      const addressFields: Record<string, string> = { 'address.line1': 'line1', 'address.postalCode': 'postalCode', 'address.city': 'city', address: 'line1' }
+      if (field && addressFields[field]) { setStep('contact'); setFieldError({ [addressFields[field]]: code === 'POSTAL_OUTSIDE_VIENNA' ? t('shopPostalInvalid') : t('required') }); return }
+      setError(code === 'FORM_LOCKED' ? (locale === 'de' ? 'Die Bemalung hat begonnen. Änderungen sind nicht mehr möglich.' : 'Painting has started. Changes are no longer possible.') : (locale === 'de' ? 'Das Formular konnte nicht gespeichert werden. Bitte prüfe deine Angaben und versuche es erneut.' : 'Could not save the form. Please check your details and try again.'))
     } finally {
+      sendLock.current = false
       setSending(false)
     }
   }
@@ -292,14 +315,15 @@ export function FormPage() {
         {fieldError[`photos:${item.orderItemId}`] ? <p role="alert">{fieldError[`photos:${item.orderItemId}`]}</p> : null}
         <div className={styles.photoRow}>
           {item.photos.map((photo) => (
-            <img key={photo.id} src={photo.dataUrl} alt={photo.name} />
+            <span key={photo.id}><img src={photo.dataUrl} alt={photo.name} /><Button variant="secondary" aria-label={t('shopRemovePhoto', { name: photo.name })} onClick={() => patchItem(item.orderItemId, { photos: item.photos.filter(p => p.id !== photo.id) })}>{t('shopRemovePhoto', { name: photo.name })}</Button></span>
           ))}
         </div>
+        <p>{t('shopPhotosCount', { n: item.photos.length, max: MAX_PHOTOS })}</p><p>{t('shopPhotosWarning')}</p>
         <div className={styles.actions}>
-          <Button variant="secondary" onClick={() => document.getElementById(cameraId)?.click()}>
+          <Button variant="secondary" disabled={item.photos.length >= MAX_PHOTOS} onClick={() => document.getElementById(cameraId)?.click()}>
             {t('takePhoto')}
           </Button>
-          <Button variant="secondary" onClick={() => document.getElementById(galleryId)?.click()}>
+          <Button variant="secondary" disabled={item.photos.length >= MAX_PHOTOS} onClick={() => document.getElementById(galleryId)?.click()}>
             {t('addPhoto')}
           </Button>
           <input
@@ -309,7 +333,7 @@ export function FormPage() {
             accept="image/*"
             capture="environment"
             onChange={(e) => {
-              void addFiles(item.orderItemId, e.target.files)
+              void addFiles(item.orderItemId, Array.from(e.target.files ?? []))
               e.target.value = ''
             }}
           />
@@ -320,7 +344,7 @@ export function FormPage() {
             accept="image/*"
             multiple
             onChange={(e) => {
-              void addFiles(item.orderItemId, e.target.files)
+              void addFiles(item.orderItemId, Array.from(e.target.files ?? []))
               e.target.value = ''
             }}
           />
@@ -347,6 +371,8 @@ export function FormPage() {
     )
   }
 
+  if (view && !view.editable && step !== 'done') return <div className={styles.panel}><p>{locale === 'de' ? 'Die Bemalung hat begonnen. Änderungen sind nicht mehr möglich.' : 'Painting has started. Changes are no longer possible.'}</p><ButtonLink to="/">{t('backHome')}</ButtonLink></div>
+
   if (step === 'done') {
     const code = orderCode || view?.orderCode || ''
     return (
@@ -371,6 +397,8 @@ export function FormPage() {
     <div className={styles.panel}>
       <ProgressSteps labels={[t('formPhotos'), t('formNames'), t('formContact'), t('formExtras'), t('review')]} current={stepIndex} label={t('progress', { n: stepIndex + 1, total })} compact />
       {error ? <p role="alert">{error}</p> : null}
+      {storageError ? <p role="status">{locale === 'de' ? 'Der Entwurf konnte nicht gespeichert werden.' : 'The draft could not be saved.'}</p> : null}
+      {view?.editable ? <p>{locale === 'de' ? 'Du kannst deine Angaben bis zum Beginn der Bemalung ändern.' : 'You can still change your details until painting starts.'}</p> : null}
       {step === 'photos' ? (
         <>
           <h1>{t('formPhotos')}</h1>
@@ -384,7 +412,7 @@ export function FormPage() {
           <h1>{t('formNames')}</h1>
           <Field label={t('yourName')} htmlFor="customerName" error={fieldError.customerName}>
             <input
-              id="customerName"
+              id="customerName" maxLength={120}
               autoComplete="name"
               value={draft.customerName}
               onChange={(e) => patch({ customerName: e.target.value })}
@@ -395,13 +423,13 @@ export function FormPage() {
                 <section key={item.orderItemId} className={styles.itemBlock}>
                   <h2>{ornamentTitle(index, sourceFor(item.orderItemId))}</h2>
                   <Field label={t('petName')} htmlFor={`petName-${item.orderItemId}`} error={fieldError[`petName:${item.orderItemId}`]}>
-                    <input id={`petName-${item.orderItemId}`} value={item.petName} onChange={(e) => patchItem(item.orderItemId, { petName: e.target.value })} />
+                    <input id={`petName-${item.orderItemId}`} maxLength={60} value={item.petName} onChange={(e) => patchItem(item.orderItemId, { petName: e.target.value })} />
                   </Field>
                 </section>
               ))
             : single ? (
                 <Field label={t('petName')} htmlFor="petName" error={fieldError[`petName:${single.orderItemId}`]}>
-                  <input id="petName" value={single.petName} onChange={(e) => patchItem(single.orderItemId, { petName: e.target.value })} />
+                  <input id="petName" maxLength={60} value={single.petName} onChange={(e) => patchItem(single.orderItemId, { petName: e.target.value })} />
                 </Field>
               ) : null}
         </>
@@ -410,9 +438,15 @@ export function FormPage() {
       {step === 'contact' ? (
         <>
           <h1>{t('formContact')}</h1>
+          {view?.needsAddress ? <>
+            <Field label={t('shopStreet')} htmlFor="form-line1" error={fieldError.line1}><input id="form-line1" maxLength={200} value={draft.address.line1} onChange={e => { setDraft(d => ({ ...d, address: { ...d.address, line1: e.target.value } })); setFieldError(x => ({ ...x, line1: '' })) }} /></Field>
+            <Field label={t('shopLine2')} htmlFor="form-line2"><input id="form-line2" maxLength={200} value={draft.address.line2 ?? ''} onChange={e => setDraft(d => ({ ...d, address: { ...d.address, line2: e.target.value } }))} /></Field>
+            <Field label={t('shopPostal')} htmlFor="form-postal" error={fieldError.postalCode}><input id="form-postal" maxLength={4} inputMode="numeric" value={draft.address.postalCode} onChange={e => { setDraft(d => ({ ...d, address: { ...d.address, postalCode: e.target.value } })); setFieldError(x => ({ ...x, postalCode: '' })) }} /></Field>
+            <Field label={t('shopCity')} htmlFor="form-city" error={fieldError.city}><input id="form-city" maxLength={120} value={draft.address.city} onChange={e => { setDraft(d => ({ ...d, address: { ...d.address, city: e.target.value } })); setFieldError(x => ({ ...x, city: '' })) }} /></Field>
+          </> : null}
           <Field label={t('phone')} htmlFor="phone" error={fieldError.phone}>
             <input
-              id="phone"
+              id="phone" maxLength={40}
               type="tel"
               autoComplete="tel"
               value={draft.phone}
@@ -421,7 +455,7 @@ export function FormPage() {
           </Field>
           <Field label={t('email')} htmlFor="email" error={fieldError.email}>
             <input
-              id="email"
+              id="email" maxLength={200}
               type="email"
               autoComplete="email"
               value={draft.email}
@@ -451,7 +485,7 @@ export function FormPage() {
                       </Field>
                     ) : null}
                     <Field label={t('note')} htmlFor={`note-${item.orderItemId}`}>
-                      <textarea id={`note-${item.orderItemId}`} value={item.note} onChange={(e) => patchItem(item.orderItemId, { note: e.target.value })} />
+                      <textarea id={`note-${item.orderItemId}`} maxLength={1000} value={item.note} onChange={(e) => patchItem(item.orderItemId, { note: e.target.value })} />
                     </Field>
                   </section>
                 )
@@ -469,7 +503,7 @@ export function FormPage() {
                     </Field>
                   ) : null}
                   <Field label={t('note')} htmlFor="note">
-                    <textarea id="note" value={single.note} onChange={(e) => patchItem(single.orderItemId, { note: e.target.value })} />
+                    <textarea id="note" maxLength={1000} value={single.note} onChange={(e) => patchItem(single.orderItemId, { note: e.target.value })} />
                   </Field>
                 </>
               ) : null}
@@ -496,7 +530,7 @@ export function FormPage() {
                       <ReviewRow label={t('colour')}>
                         <span className={styles.itemLine}>
                           <span className={styles.colorDot} data-color={source?.color ?? 'none'} aria-hidden="true" />
-                          {source?.color ? t(source.color === 'red' ? 'colorRed' : 'colorGrey') : t('colorUnknown')}
+                          {source?.color ? t(colorKeys[source.color]) : t('colorUnknown')}
                         </span>
                       </ReviewRow>
                       {source?.withName ? <ReviewRow label={t('backName')} onEdit={() => setStep('extras')}>{item.backName}</ReviewRow> : null}
@@ -517,7 +551,7 @@ export function FormPage() {
                       <ReviewRow label={t('colour')}>
                         <span className={styles.itemLine}>
                           <span className={styles.colorDot} data-color={orderItems[0].color ?? 'none'} aria-hidden="true" />
-                          {orderItems[0].color ? t(orderItems[0].color === 'red' ? 'colorRed' : 'colorGrey') : t('colorUnknown')}
+                          {orderItems[0].color ? t(colorKeys[orderItems[0].color]) : t('colorUnknown')}
                         </span>
                       </ReviewRow>
                     ) : null}
@@ -533,6 +567,7 @@ export function FormPage() {
               <ReviewRow label={t('yourName')} onEdit={() => setStep('names')}>{draft.customerName}</ReviewRow>
               <ReviewRow label={t('phone')} onEdit={() => setStep('contact')}>{draft.phone}</ReviewRow>
               <ReviewRow label={t('email')} onEdit={() => setStep('contact')}>{draft.email}</ReviewRow>
+              {view?.needsAddress ? <ReviewRow label={t('editAddress')} onEdit={() => setStep('contact')}>{[draft.address.line1, draft.address.line2, draft.address.postalCode, draft.address.city].filter(Boolean).join(', ')}</ReviewRow> : null}
             </dl>
           </section>
 
@@ -552,7 +587,7 @@ export function FormPage() {
                         <span className={styles.colorDot} data-color={item.color ?? 'none'} aria-hidden="true" />
                         <span>
                           {item.petName || t(item.kind === 'custom' ? 'customOrnament' : 'finishedOrnament')}
-                          {item.color ? ` · ${t(item.color === 'red' ? 'colorRed' : 'colorGrey')}` : ''}
+                          {item.color ? ` · ${t(colorKeys[item.color])}` : ''}
                         </span>
                         {item.cost != null ? <span className={styles.itemPrice}>{money(item.cost)}</span> : null}
                       </span>

@@ -91,9 +91,10 @@ export function CompleteOrderDialog({
         </h2>
         <p className={styles.message} id={descId}>
           This is the last ornament in order {orderCode} ({displayName}). Marking it as finished
-          sets the whole order to ready, and the customer sees it on the tracking page. No message
-          is sent automatically. Are you sure all items are ready?
+          sets the whole order to ready, and the customer sees it on the tracking page.
+          Are you sure all items are ready?
         </p>
+        {items.some(item => item.kind === 'custom' && (!item.formComplete || !item.petName || item.photos.length === 0)) ? <p role="alert">Some custom ornaments are missing form details or photos. Check them before marking the order ready.</p> : null}
         <ul className={styles.list}>
           {items.map(item => {
             const ready = item.productionStatus === 'finished' || item.id === pendingItemId

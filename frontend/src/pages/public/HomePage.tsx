@@ -39,7 +39,7 @@ export function HomePage() {
           </span>
           {t('trackCta')}
         </Button>
-        <ButtonLink to="/buy" size="lg" fullWidth variant="secondary" className={styles.buyBtn}>
+        <ButtonLink to="/buy" size="lg" fullWidth className={styles.buyBtn}>
           {t('buyCta')}
         </ButtonLink>
       </div>

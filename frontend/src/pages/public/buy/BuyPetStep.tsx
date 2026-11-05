@@ -12,7 +12,7 @@ export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, a
     <Field label={t('petName')} htmlFor={`pet-${item.uid}`} error={err(`pet-${item.uid}`)}>
       <input
 
-        id={`pet-${item.uid}`}
+        id={`pet-${item.uid}`} maxLength={60}
 
         value={item.petName}
 
@@ -70,7 +70,7 @@ export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, a
 
         aria-hidden="true"
 
-        onChange={(event) => { void addFiles(item.uid, event.target.files); event.target.value = '' }} />
+        onChange={(event) => { const files = Array.from(event.target.files ?? []); void addFiles(item.uid, files); event.target.value = '' }} />
       {err(`photos-${item.uid}`) && <p className={styles.error} id={`photos-${item.uid}-error`} role="alert">
         {err(`photos-${item.uid}`)}</p>}{photoErrors[item.uid] && <p className={styles.error} role="alert">
           {photoErrors[item.uid]}</p>}
@@ -78,7 +78,7 @@ export function BuyPetStep({ t, draft, patchItem, err, described, photoErrors, a
     <Field label={t('note')} htmlFor={`note-${item.uid}`}>
       <textarea
 
-        id={`note-${item.uid}`}
+        id={`note-${item.uid}`} maxLength={1000}
 
         value={item.note}
 

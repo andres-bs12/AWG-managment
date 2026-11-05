@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
-import { useMockStoreVersion } from '../../api/mock/useMockStore'
+import { useMockStoreVersion } from 'demo-source'
 import { PaintStudio } from '../../components/staff/PaintStudio'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'

@@ -8,7 +8,7 @@ export function BuyContactStep({ t, draft, patch, err, described }: Pick<BuyStep
     <Field label={t('yourName')} htmlFor="buy-name" error={err('buy-name')}>
       <input
 
-        id="buy-name"
+        id="buy-name" maxLength={120}
 
         autoComplete="name"
 
@@ -22,7 +22,7 @@ export function BuyContactStep({ t, draft, patch, err, described }: Pick<BuyStep
     <Field label={t('email')} htmlFor="buy-email" error={err('buy-email')}>
       <input
 
-        id="buy-email"
+        id="buy-email" maxLength={200}
 
         type="email"
 
@@ -38,7 +38,7 @@ export function BuyContactStep({ t, draft, patch, err, described }: Pick<BuyStep
     <Field label={t('phone')} htmlFor="buy-phone" error={err('buy-phone')}>
       <input
 
-        id="buy-phone"
+        id="buy-phone" maxLength={40}
 
         type="tel"
 

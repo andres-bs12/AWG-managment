@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { getDataSource } from '../../api/client'
-import { resetStore } from '../../api/mock/store'
+import { resetStore, demoEmail, demoAccounts } from 'demo-source'
 import { useAuth } from '../../auth/AuthContext'
 import { Button } from '../../components/ui/Button'
 import { Field } from '../../components/ui/Field'
@@ -13,7 +13,7 @@ export function LoginPage() {
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from ?? '/staff/agenda'
   const isMock = getDataSource() === 'mock'
-  const [email, setEmail] = useState(isMock ? 'gaby@artwithgab.com' : '')
+  const [email, setEmail] = useState(demoEmail)
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -69,9 +69,7 @@ export function LoginPage() {
       </form>
       {isMock ? (
         <p className={styles.accounts}>
-          gaby@artwithgab.com / gaby
-          <br />
-          andres@artwithgab.com / andres
+          {demoAccounts}
         </p>
       ) : null}
       {isMock ? (

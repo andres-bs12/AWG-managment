@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
-import { useMockStoreVersion } from '../../api/mock/useMockStore'
+import { useMockStoreVersion } from 'demo-source'
 import dialogStyles from '../../components/staff/CompleteOrderDialog.module.css'
 import { CompleteOrderDialog } from '../../components/staff/CompleteOrderDialog'
 import { OrderItemCard } from '../../components/staff/OrderItemCard'
@@ -97,6 +97,7 @@ function OrderDetail({ id }: { id: string }) {
   function handleItemStatus(itemId: string, status: ProductionStatus, noticeLabel: string) {
     const item = items.find(entry => entry.id === itemId)
     if (!item) return
+    if (status === 'finished' && item.kind === 'custom' && (!item.formComplete || !item.petName || !item.photos.length) && !window.confirm('This custom ornament is missing form details or photos. Mark it ready anyway?')) return
     if (status === 'finished' && item.productionStatus !== 'finished' && finishedCount === items.length - 1) {
       setPendingCompleteItemId(itemId)
       return
@@ -146,6 +147,7 @@ function OrderDetail({ id }: { id: string }) {
       <div><p className={styles.eyebrow}>Order</p><h1>{order.code}</h1><p className={styles.customer}>{customer.name || 'Customer details pending'}</p></div>
       <span className={styles.status} data-ready={allFinished || order.handedOver}>{production}</span>
     </header>
+    {order.paymentReview ? <p role="alert">Payment needs review in Stripe</p> : null}
     <div className={styles.overview} data-delivery={Boolean(deliveryItem)}>
       <div><span>{deliveryItem ? 'Delivery' : 'Pickup'}</span><strong>{handoffs.join(' / ') || 'Not scheduled'}</strong>
         {deliveryItem ? <div className={styles.handoffActions}>

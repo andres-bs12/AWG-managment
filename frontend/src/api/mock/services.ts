@@ -77,8 +77,10 @@ function nextDeliveryDates(itemCount: number) {
   return out
 }
 
+const saleKeys = new Map<string, import('../../domain/types').Order>()
+
 export const mockApi: Api = {
-  inventory: { list: () => later(() => listInventory().map(row => ({ ...row }))), update: (id, quantity) => later(() => updateInventory(id, quantity)) },
+  inventory: { list: () => later(() => listInventory().map(row => ({ ...row }))), update: (id, quantity, expectedQuantity) => later(() => updateInventory(id, quantity, expectedQuantity)) },
   paintingDays: { list: (from, to) => later(() => { const dates = []; const d = new Date(`${from}T12:00:00Z`); while (d.toISOString().slice(0, 10) <= to && dates.length < 62) { dates.push(paintingDay(d.toISOString().slice(0, 10))); d.setUTCDate(d.getUTCDate() + 1) } return dates }), update: (date, open, max) => later(() => updatePaintingDay(date, open, max)) },
   auth: {
     login: (email, password) => later(() => mockLogin(email, password), 280),
@@ -113,7 +115,7 @@ export const mockApi: Api = {
     getOrder: (id) => later(() => getOrder(id)),
     getOrderByCode: (code) => later(() => getOrderByCode(code)),
     getOrderBundle: (id) => later(() => getOrderBundle(id)),
-    createSale: (input) => later(() => createSale(input), 320),
+    createSale: (input, key) => later(() => { const existing = saleKeys.get(key); if (existing) return existing; const order = createSale(input); saleKeys.set(key, order); return order }, 320),
     cancelOrder: (id) => later(() => cancelOrder(id)),
     setItemStatus: (orderId, itemId, status) =>
       later(() => {
@@ -139,6 +141,7 @@ export const mockApi: Api = {
     toPhoto: (file) => fileToPhoto(file),
   },
   shop: {
+    abandonCheckout: () => later(() => undefined),
     joinWaitlist: (email) => later(() => joinWaitlist(email)),
     getConfig: () =>
       later(() => ({

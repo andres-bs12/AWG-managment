@@ -19,11 +19,15 @@ const NETWORK_ERROR = 'Could not reach the server. Check your connection.'
 
 const baseUrl: string = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
 
-class HttpError extends Error {
+export class HttpError extends Error {
   status: number
-  constructor(message: string, status: number) {
+  code?: string
+  field?: string
+  constructor(message: string, status: number, code?: string, field?: string) {
     super(message)
     this.status = status
+    this.code = code
+    this.field = field
   }
 }
 
@@ -89,13 +93,17 @@ async function request<T>(path: string, init: RequestInit = {}, opts: RequestOpt
       window.location.assign(LOGIN_ROUTE)
     }
     let message = ''
+    let code: string | undefined
+    let field: string | undefined
     try {
-      const body = (await response.json()) as { message?: string }
+      const body = (await response.json()) as { message?: string; code?: string; field?: string }
       message = body?.message ?? ''
+      code = body.code
+      field = body.field
     } catch {
       /* body was not JSON */
     }
-    throw new HttpError(message || `Request failed (${response.status}).`, response.status)
+    throw new HttpError(message || `Request failed (${response.status}).`, response.status, code, field)
   }
 
   if (response.status === 204) return undefined as T
@@ -198,7 +206,7 @@ function buildCheckoutFormData(input: ShopCheckoutInput): FormData {
 const enc = encodeURIComponent
 
 export const httpApi: Api = {
-  inventory: { list: () => request('/api/inventory', {}, staff), update: (id, quantity) => request(`/api/inventory/${enc(id)}`, jsonInit('PATCH', { quantity }), staff) },
+  inventory: { list: () => request('/api/inventory', {}, staff), update: (id, quantity, expectedQuantity) => request(`/api/inventory/${enc(id)}`, jsonInit('PATCH', { quantity, expectedQuantity }), staff) },
   paintingDays: { list: (from, to) => request(`/api/painting-days?from=${enc(from)}&to=${enc(to)}`, {}, staff), update: (date, open, maxPaintings) => request(`/api/painting-days/${enc(date)}`, jsonInit('PATCH', { open, maxPaintings }), staff) },
   auth: {
     login: (email, password) =>
@@ -243,7 +251,7 @@ export const httpApi: Api = {
       fixItems(bundle.items)
       return bundle
     },
-    createSale: (input) => request('/api/orders', jsonInit('POST', input), staff),
+    createSale: (input, key) => request('/api/orders', { ...jsonInit('POST', input), headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key } }, staff),
     cancelOrder: (id) => request(`/api/orders/${enc(id)}/cancel`, { method: 'POST' }, staff),
     setItemStatus: (orderId, itemId, status) =>
       request(
@@ -292,6 +300,7 @@ export const httpApi: Api = {
     toPhoto: (file) => fileToPhoto(file),
   },
   shop: {
+    abandonCheckout: (code) => request(`/api/shop/checkout/${enc(code)}/abandon`, { method: 'POST', headers: formTokenHeader(code) }),
     joinWaitlist: (email, locale) => request('/api/shop/waitlist', jsonInit('POST', { email, locale })),
     getConfig: () => request<ShopConfig>('/api/shop/config'),
     listDeliveryDates: (items) => request<ShopDeliveryDate[]>('/api/shop/delivery-dates', jsonInit('POST', { items })),

@@ -71,6 +71,7 @@ export type Order = {
   itemIds: string[]
   /** True once staff marks market pickup / Vienna handoff as done. Drives Track `delivered`. */
   handedOver: boolean
+  paymentReview?: boolean
   /** Append-only payment entries. Older records may not have this field yet. */
   paymentEntries?: PaymentEntry[]
   /** Previously recorded amount from legacy orders without individual receipts. */
@@ -200,6 +201,9 @@ export type TrackView = {
 }
 
 export type CustomerFormView = {
+  needsAddress: boolean
+  address: Address | null
+  editable: boolean
   handoffs?: TrackWhen[]
   total?: number
   paymentState?: PaymentState
@@ -221,6 +225,7 @@ export type ItemFormPayload = {
 }
 
 export type CustomerFormPayload = {
+  address?: Address
   customerName: string
   phone: string
   email: string

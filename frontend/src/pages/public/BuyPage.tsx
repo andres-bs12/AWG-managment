@@ -46,6 +46,7 @@ export function BuyPage() {
     return () => { active = false }
   }, [configRetry])
   useEffect(() => { saveBuyDraft(draft) }, [draft])
+  useEffect(() => { const code = params.get('cancelled'); if (code) void api.shop.abandonCheckout(code).catch(() => {}) }, [params])
   useEffect(() => {
     if (!didNavigate.current || pendingErrorFocus.current) return
     headingRef.current?.focus()
@@ -78,7 +79,7 @@ export function BuyPage() {
   const stepLabels = [t('shopStepItems'), t('shopStepPet'), t('shopStepDate'), t('shopStepContact'), t('shopStepPay')]
   if (configFailed) return <div className={panel.panel}><h1>{t('shopTitle')}</h1><p role="alert">{t('shopLoadError')}</p><Button onClick={() => { setConfigFailed(false); setConfigRetry((value) => value + 1) }}>{t('shopRetry')}</Button></div>
   if (!config) return <div className={panel.panel}><OrnamentLoader /></div>
-  if (config.seasonOver || (datesState === 'ready' && dates.length === 0)) return <SeasonClosed />
+  if (config.seasonOver) return <SeasonClosed />
   if (!config.enabled) return <div className={panel.panel}><h1>{t('shopSoonTitle')}</h1><p className={panel.lead}>{t('shopSoonBody')}</p></div>
 
   const shopConfig = config
@@ -87,10 +88,10 @@ export function BuyPage() {
   const total = draft.items.length ? itemsTotal + shopConfig.deliveryFee : 0
   const err = (key: string) => errors[key]
   const described = (key: string, hint = false) => [hint ? `${key}-hint` : '', err(key) ? `${key}-error` : ''].filter(Boolean).join(' ') || undefined
-  function patch(partial: Partial<BuyDraft>) { setDraft((current) => ({ ...current, ...partial })); setErrors({}); setServerError('') }
+  function patch(partial: Partial<BuyDraft>) { setDraft((current) => ({ ...current, ...partial })); const fields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', postalCode: 'buy-postal', deliveryDate: 'buy-date', acceptTerms: 'buy-terms' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[fields[key]]); return next }); setServerError('') }
   function patchItem(uid: string, partial: Partial<BuyItem>) {
     setDraft((current) => ({ ...current, items: current.items.map((item) => item.uid === uid ? { ...item, ...partial } : item) }))
-    setErrors({}); setServerError('')
+    const fields: Record<string, string> = { color: 'color', backName: 'back', petName: 'pet', photos: 'photos' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[`${fields[key]}-${uid}`]); return next }); setServerError('')
   }
   function validate(currentStep: number) {
     const found: Record<string, string> = {}
@@ -122,21 +123,22 @@ export function BuyPage() {
     if (Object.keys(found).length) {
       pendingErrorFocus.current = true
       window.setTimeout(() => {
-        document.getElementById(Object.keys(found)[0])?.focus()
+        const target = document.getElementById(Object.keys(found)[0]); target?.focus(); target?.scrollIntoView({ block: 'center' })
         pendingErrorFocus.current = false
       }, 0)
     }
     return Object.keys(found).length > 0
   }
   function go(next: number) { didNavigate.current = true; setErrors({}); setServerError(''); setStep(next) }
-  async function addFiles(uid: string, files: FileList | null) {
+  async function addFiles(uid: string, files: File[] | null) {
     if (!files) return
     const available = MAX_PHOTOS - (draft.items.find((item) => item.uid === uid)?.photos.length ?? MAX_PHOTOS)
-    const results = await Promise.allSettled(Array.from(files).slice(0, available).map((file) => api.uploads.toPhoto(file)))
+    const selected = files.slice(0, available)
+    const results = await Promise.allSettled(selected.map((file) => api.uploads.toPhoto(file)))
     const added = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []) as Photo[]
-    setPhotoErrors((current) => ({ ...current, [uid]: results.some((result) => result.status === 'rejected') ? t('shopPhotoError') : files.length > available ? t('shopPhotoLimit') : '' }))
+    setPhotoErrors((current) => ({ ...current, [uid]: results.some((result) => result.status === 'rejected') ? (selected.some(file => !file.type.startsWith('image/')) ? (locale === 'de' ? 'Bitte wähle eine Bilddatei.' : 'Please choose an image file.') : selected.some(file => file.size > 10 * 1024 * 1024) ? (locale === 'de' ? 'Das Foto ist größer als 10 MB.' : 'The photo is larger than 10 MB.') : (locale === 'de' ? 'Das Foto konnte nicht gelesen werden.' : 'Could not read the photo.')) : files.length > available ? t('shopPhotoLimit') : '' }))
     setDraft((current) => ({ ...current, items: current.items.map((item) => item.uid === uid ? { ...item, photos: [...item.photos, ...added].slice(0, MAX_PHOTOS), photosNeedReload: added.length ? false : item.photosNeedReload } : item) }))
-    setErrors({})
+    setErrors(current => { const next = { ...current }; delete next[`photos-${uid}`]; return next })
   }
   async function pay() {
     if (busyRef.current || showErrors(validate(4))) return
@@ -154,8 +156,9 @@ export function BuyPage() {
         items: draft.items.map((item) => ({ kind: 'custom', withName: item.withName, color: item.color || undefined, petName: item.petName.trim(), backName: item.withName ? item.backName.trim() : undefined, note: item.note.trim() || undefined, photos: item.photos })),
       })
       window.location.assign(result.checkoutUrl)
-    } catch {
-      setServerError(t('shopCheckoutError'))
+    } catch (error) {
+      const problem = error as { code?: string; field?: string }; const field = problem.field ?? ''; const match = field.match(/^items\[(\d+)\]\.(\w+)/); const item = match ? draft.items[Number(match[1])] : undefined; const itemFields: Record<string, [number, string]> = { petName: [1, 'pet'], photos: [1, 'photos'], color: [0, 'color'], backName: [0, 'back'] }; const simple: Record<string, [number, string]> = { customerName: [3, 'buy-name'], email: [3, 'buy-email'], phone: [3, 'buy-phone'], 'address.line1': [3, 'buy-line1'], 'address.postalCode': [3, 'buy-postal'], deliveryDate: [2, 'buy-date'] }; const target = match && item && itemFields[match[2]] ? [itemFields[match[2]][0], `${itemFields[match[2]][1]}-${item.uid}`] as const : simple[field];
+      if (target) { go(target[0]); showErrors({ [target[1]]: problem.code === 'POSTAL_OUTSIDE_VIENNA' ? t('shopPostalInvalid') : t('required') }) } else setServerError(problem.code === 'DAY_FULL' ? t('shopDatesNone') : t('shopCheckoutError'))
       busyRef.current = false; setBusy(false)
     }
   }

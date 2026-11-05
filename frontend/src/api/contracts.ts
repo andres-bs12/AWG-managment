@@ -71,7 +71,7 @@ export type OrderService = {
     items: import('../domain/types').OrderItem[]
     blocks: import('../domain/types').TimeBlock[]
   }>
-  createSale: (input: CreateSaleInput) => Promise<Order>
+  createSale: (input: CreateSaleInput, idempotencyKey: string) => Promise<Order>
   cancelOrder: (orderId: string) => Promise<void>
   setItemStatus: (
     orderId: string,
@@ -111,10 +111,11 @@ export type ShopService = {
   listDeliveryDates: (items: Pick<ShopItemInput, 'kind' | 'withName'>[]) => Promise<ShopDeliveryDate[]>
   /** Creates the order and a Stripe Checkout session; the browser then redirects to `checkoutUrl`. */
   checkout: (input: ShopCheckoutInput) => Promise<ShopCheckoutResult>
+  abandonCheckout: (code: string) => Promise<void>
 }
 
 export type Api = {
-  inventory: { list: () => Promise<InventoryItem[]>; update: (id: string, quantity: number) => Promise<InventoryItem> }
+  inventory: { list: () => Promise<InventoryItem[]>; update: (id: string, quantity: number, expectedQuantity?: number) => Promise<InventoryItem> }
   paintingDays: { list: (from: string, to: string) => Promise<PaintingDay[]>; update: (date: string, open: boolean, maxPaintings: number) => Promise<PaintingDay> }
   auth: AuthService
   markets: MarketService

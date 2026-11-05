@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
-import { useMockStoreVersion } from '../../api/mock/useMockStore'
+import { useMockStoreVersion } from 'demo-source'
 import { ButtonLink } from '../../components/ui/ButtonLink'
 import type { Market, MarketDay } from '../../domain/types'
 import { formatEur } from '../../lib/money'

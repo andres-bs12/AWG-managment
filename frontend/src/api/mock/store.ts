@@ -157,9 +157,10 @@ function blocksForDay(dayId: string): TimeBlock[] {
 export function listInventory(): InventoryItem[] {
   return state.inventory ??= [...(['red', 'grey', 'green', 'white'] as const).map(color => ({ id: `custom-${color}`, kind: 'custom' as const, color, quantity: 3 })), { id: 'finished', kind: 'finished', color: null, quantity: 10 }]
 }
-export function updateInventory(id: string, quantity: number): InventoryItem {
+export function updateInventory(id: string, quantity: number, expectedQuantity?: number): InventoryItem {
   if (!Number.isInteger(quantity) || quantity < 0 || quantity > 10000) throw new Error('Quantity must be between 0 and 10000.')
   const item = listInventory().find(row => row.id === id); if (!item) throw new Error('Stock item not found.')
+  if (expectedQuantity != null && item.quantity !== expectedQuantity) throw Object.assign(new Error('Stock changed. Reload and try again.'), { code: 'STOCK_CHANGED', status: 409 })
   item.quantity = quantity; emit(); return { ...item }
 }
 export function paintingDay(date: string): PaintingDay {
@@ -907,6 +908,9 @@ export function getForm(token: string): CustomerFormView {
         untilHour: day?.closeHour ?? null,
       }
     }),
+    needsAddress: items.some((i) => i.delivery.kind === 'vienna'),
+    address: items.find((i) => i.delivery.kind === 'vienna')?.delivery.address ?? null,
+    editable: !order.handedOver && items.filter(i => i.kind === 'custom').every((i) => i.productionStatus === 'not_started'),
     withName: items.some((i) => i.withName),
     alreadySubmitted: items.every((i) => i.formComplete),
     customer,
@@ -921,6 +925,12 @@ export function submitForm(token: string, payload: CustomerFormPayload): { order
   const items = state.items.filter((i) => i.orderId === order.id)
   const item = items.find((i) => i.kind === 'custom') ?? items[0]
   if (!customer || !item) throw new Error('Form data missing')
+  if (!getForm(token).editable) throw Object.assign(new Error('Form is locked.'), { code: 'FORM_LOCKED', status: 409 })
+  if (getForm(token).needsAddress) {
+    if (!payload.address?.line1 || !payload.address.city) throw Object.assign(new Error('Address required.'), { code: 'VALIDATION', field: 'address' })
+    if (!/^1(0[1-9]|1[0-9]|2[0-3])0$/.test(payload.address.postalCode)) throw Object.assign(new Error('Invalid postal code.'), { code: 'POSTAL_OUTSIDE_VIENNA', field: 'address.postalCode' })
+    items.filter(i => i.delivery.kind === 'vienna').forEach(i => { i.delivery.address = payload.address })
+  }
   customer.name = payload.customerName.trim()
   customer.phone = payload.phone.trim()
   customer.email = payload.email.trim()

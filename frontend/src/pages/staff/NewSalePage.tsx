@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { QrCode } from '../../components/staff/QrCode'
@@ -48,14 +48,12 @@ function clampPaintMinutes(value: number): number {
 }
 
 function fillDayRefs(item: DraftItem, days: MarketDay[], markets: Market[]): DraftItem {
+  if (item.delivery.mode === 'now') return item
   if (item.delivery.mode === 'vienna') {
     const date = item.delivery.pickupDate
-    const md =
-      days.find((d) => d.id === item.delivery.marketDayId) ??
-      days.find((d) => d.date === date) ??
-      days.find((d) => isViennaWeekday(d.date) && (!date || d.date >= date)) ??
-      days.find((d) => isViennaWeekday(d.date))
-    if (!md || !isViennaWeekday(md.date)) return item
+    const eligible = days.filter(d => (isViennaWeekday(d.date) || d.date.endsWith('-12-24')) && d.date <= '2026-12-24' && !days.some(other => other.date === d.date && markets.find(m => m.id === other.marketId)?.kind === 'market'))
+    const md = eligible.find(d => d.id === item.delivery.marketDayId) ?? eligible.find(d => d.date === date)
+    if (!md) return item
     return {
       ...item,
       delivery: {
@@ -107,10 +105,13 @@ export function NewSalePage() {
   const [suggestions, setSuggestions] = useState<Record<string, CapacityResult>>({})
   const [moveSuggestions, setMoveSuggestions] = useState<Record<string, MoveSuggestion | null>>({})
   const [busy, setBusy] = useState(false)
+  const submitLock = useRef(false)
+  const saleKey = useRef(draft.idempotencyKey ?? crypto.randomUUID())
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [payMethod, setPayMethod] = useState<PaymentMethod | null>(null)
   const [payState, setPayState] = useState<PaymentState>('paid')
+  const [depositAmount, setDepositAmount] = useState('')
   const [paidNote, setPaidNote] = useState('')
   const paramKey = `${params.get('date')}|${params.get('start')}|${params.get('end')}|${params.get('placeItem')}|${params.get('fresh')}`
 
@@ -135,7 +136,7 @@ export function NewSalePage() {
       if (draft.phase === 'done') clearStoredDraft()
       return
     }
-    writeStoredDraft(draft)
+    writeStoredDraft({ ...draft, idempotencyKey: saleKey.current })
   }, [draft])
 
   const today = days.find((d) => d.isToday)
@@ -397,6 +398,7 @@ export function NewSalePage() {
 
   function startOver() {
     clearStoredDraft()
+    saleKey.current = crypto.randomUUID()
     setPayMethod(null)
     setPayState('paid')
     setPaidNote('')
@@ -407,10 +409,12 @@ export function NewSalePage() {
   }
 
   async function createOrder(): Promise<NonNullable<SaleDraft['order']>> {
+    if (draft.order) return draft.order
+    writeStoredDraft({ ...draft, idempotencyKey: saleKey.current })
     const created = await api.orders.createSale({
       items: toCreateItems(draft.items, days, today),
       plannedMove: draft.items.find((item) => item.plannedMove)?.plannedMove,
-    })
+    }, saleKey.current)
     const ref = { id: created.id, code: created.code, formToken: created.formToken, total: created.total }
     setDraft((current) => ({ ...current, order: ref }))
     return ref
@@ -421,22 +425,27 @@ export function NewSalePage() {
       setError('Choose cash or card.')
       return
     }
+    if (submitLock.current) return
+    submitLock.current = true
     setBusy(true)
     setError('')
     try {
       const created = await createOrder()
       if (state !== 'unpaid') {
-        const amount = state === 'deposit' ? Math.round((created.total / 2) * 100) / 100 : created.total
+        const amount = state === 'deposit' ? (depositAmount ? Number(depositAmount) : Math.round((created.total / 2) * 100) / 100) : created.total
+        if (state === 'deposit' && (!Number.isFinite(amount) || amount <= 0 || amount >= created.total)) throw new Error('Enter a deposit greater than zero and less than the total.')
         if (!payMethod) throw new Error('Choose cash or card.')
-        await api.payments.setPaymentState(created.id, state, payMethod)
+        await api.payments.setPaymentState(created.id, state, payMethod, amount)
         setPaidNote(`${formatEur(amount)} received · ${payMethod === 'cash' ? 'cash' : 'card'}`)
       } else {
         setPaidNote('Not paid yet')
       }
+      if (draft.items.every(item => item.kind === 'finished' && item.delivery.mode === 'now')) await api.orders.setHandedOver(created.id, true)
       setDraft((current) => ({ ...current, order: created, phase: 'done' }))
     } catch (err) {
       setError(saleErrorMessage(err, 'Could not record sale'))
     } finally {
+      submitLock.current = false
       setBusy(false)
     }
   }
@@ -453,6 +462,8 @@ export function NewSalePage() {
       setError('Assign a paint slot — use the suggestion or place on the board.')
       return
     }
+    if (submitLock.current) return
+    submitLock.current = true
     setBusy(true)
     setError('')
     try {
@@ -461,6 +472,7 @@ export function NewSalePage() {
     } catch (err) {
       setError(saleErrorMessage(err, 'Could not create sale'))
     } finally {
+      submitLock.current = false
       setBusy(false)
     }
   }
@@ -471,15 +483,20 @@ export function NewSalePage() {
       setError('Choose cash or card.')
       return
     }
-    const amount = state === 'deposit' ? Math.round((order.total / 2) * 100) / 100 : order.total
+    const amount = state === 'deposit' ? (depositAmount ? Number(depositAmount) : Math.round((order.total / 2) * 100) / 100) : order.total
+    if (state === 'deposit' && (!Number.isFinite(amount) || amount <= 0 || amount >= order.total)) { setError('Enter a deposit greater than zero and less than the total.'); return }
+    if (submitLock.current) return
+    submitLock.current = true
     setBusy(true)
+    setError('')
     try {
-      if (state !== 'unpaid') await api.payments.setPaymentState(order.id, state, payMethod)
+      if (state !== 'unpaid') await api.payments.setPaymentState(order.id, state, payMethod, amount)
       setPaidNote(state === 'unpaid' ? 'Not paid yet' : `${formatEur(amount)} received · ${payMethod === 'cash' ? 'cash' : 'card'}`)
       setPhase('done')
     } catch (err) {
       setError(saleErrorMessage(err, 'Could not record payment'))
     } finally {
+      submitLock.current = false
       setBusy(false)
     }
   }
@@ -604,6 +621,7 @@ export function NewSalePage() {
                       { value: 'card', label: 'Card' },
                     ]}
                   />
+                  <Field label="Deposit received (€; defaults to 50%)" htmlFor="finished-deposit"><input id="finished-deposit" type="number" min="0.01" step="0.01" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} /></Field>
                   <SegmentedControl
                     legend="Payment state"
                     name="finished-state"
@@ -681,6 +699,8 @@ export function NewSalePage() {
                   { value: 'card', label: 'Card' },
                 ]}
               />
+              <Field label="Deposit received (€; defaults to 50%)" htmlFor="sale-deposit"><input id="sale-deposit" type="number" min="0.01" step="0.01" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} /></Field>
+              {!payMethod ? <p>Choose cash or card to record a payment.</p> : null}
               <div className={styles.actions}>
                 <Button tone="staff" size="lg" disabled={busy || !payMethod} onClick={() => void recordPayment('paid')}>
                   Mark paid ({formatEur(order.total)})
@@ -913,7 +933,7 @@ function DeliveryCard({
     : today?.marketId
   const daysOfMarket = marketDays.filter((d) => !chosenMarketId || d.marketId === chosenMarketId)
   const futureDays = marketDays.filter((d) => (today ? d.date > today.date : !d.isToday))
-  const viennaDays = allDays.filter((d) => isViennaWeekday(d.date) && (!today || d.date >= today.date))
+  const viennaDays = allDays.filter((d) => (isViennaWeekday(d.date) || d.date.endsWith('-12-24')) && d.date <= '2026-12-24' && (!today || d.date >= today.date) && !marketDays.some(m => m.date === d.date))
   const viennaDay = viennaDays.find((d) => d.id === item.delivery.marketDayId) ??
     viennaDays.find((d) => d.date === item.delivery.pickupDate)
   const mixedMarkets = new Set(futureDays.map((d) => d.marketId)).size > 1
