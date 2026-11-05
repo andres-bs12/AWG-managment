@@ -1,7 +1,9 @@
+import { mockPricing } from './pricing'
 import { validatePhoto } from '../../lib/photoValidation'
 import type { Api, BuyMetric } from '../contracts'
 import type { Photo } from '../../domain/types'
 import {
+  searchOrders, attentionOrders,
   createMockCheckout, abandonMockCheckout,
   listInventory, updateInventory, paintingDay, updatePaintingDay, joinWaitlist, confirmWaitlist, unsubscribeWaitlist,
   checkCapacity,
@@ -142,6 +144,8 @@ export const mockApi: Api = {
     findMoveSuggestion: (input) => later(() => findMoveSuggestion(input), 120),
   },
   orders: {
+    search: (query) => later(() => searchOrders(query)),
+    attention: () => later(() => attentionOrders()),
     getOrder: (id) => later(() => getOrder(id)),
     getOrderByCode: (code) => later(() => getOrderByCode(code)),
     getOrderBundle: (id) => later(() => getOrderBundle(id)),
@@ -189,8 +193,7 @@ export const mockApi: Api = {
         seasonEnd: '2026-12-24',
         deliveriesFrom: '2026-11-30',
         seasonOver: new Date() >= new Date('2026-12-25T00:00:00'),
-        customPrice: 49.99,
-        nameExtra: 12.99,
+        ...mockPricing,
         deliveryFee: 0,
         maxItems: 10,
         colors: [

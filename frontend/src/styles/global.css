@@ -87,3 +87,17 @@ p {
     scroll-behavior: auto !important;
   }
 }
+
+/* Staff role scope also covers native modal portals and standalone sign in. */
+[data-staff-page] { font-family: var(--font-staff); font-size: var(--type-staff-body-size); line-height: var(--type-staff-body-line); font-variant-numeric: tabular-nums lining-nums; }
+[data-staff-page] :is(h1, h2, h3, h4) { font-family: var(--font-staff); overflow-wrap: anywhere; }
+[data-staff-page] h1 { font-size: var(--type-staff-h1-size); line-height: var(--type-staff-h1-line); font-weight: var(--type-staff-h1-weight); }
+[data-staff-page] :is(h2, h3, h4) { font-size: var(--type-staff-h2-size); line-height: var(--type-staff-h2-line); font-weight: var(--type-staff-h2-weight); }
+[data-staff-page] :is(small, summary) { font-size: var(--type-staff-meta-size); }
+[data-staff-page] :is(button, summary, input:not([type=radio]):not([type=checkbox]), select, textarea) { min-height: var(--size-control-staff); }
+[data-staff-page] summary { cursor: pointer; padding-block: var(--space-3); }
+[data-staff-page] label:has(> input:is([type=radio], [type=checkbox])) { min-height: var(--size-control-staff); display: flex; align-items: center; gap: var(--space-3); }
+[data-staff-page] input:is([type=radio], [type=checkbox]) { accent-color: var(--color-selected); }
+[data-staff-page] :is(a, button, label, input, select) { scroll-margin-block: calc(var(--size-staff-tabs) + var(--staff-actions-height) + var(--space-4)); }
+
+html:has([data-staff-page]) { scroll-padding-bottom: calc(var(--size-staff-tabs) + var(--staff-actions-height) + var(--space-4)); }

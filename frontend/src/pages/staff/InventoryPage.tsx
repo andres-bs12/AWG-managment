@@ -2,19 +2,64 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import type { InventoryItem } from '../../domain/types'
 import { Button } from '../../components/ui/Button'
+import { StaffBackLink } from '../../components/staff/StaffBackLink'
+import { NumberStepper } from '../../components/staff/NumberStepper'
+import { InsetNote } from '../../components/public/PublicForm'
 import styles from './SettingsRows.module.css'
 
 export function InventoryPage() {
   const [rows, setRows] = useState<InventoryItem[]>([])
-  const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [retry, setRetry] = useState(0)
-  useEffect(() => { api.inventory.list().then(rows => { setRows(rows); setError('') }).catch(() => setError('Could not load stock.')).finally(() => setLoading(false)) }, [retry])
-  return <main className={styles.page}><h1>Stock</h1><p>Custom = bases ready to paint. Finished = painted in advance.</p>{loading && <p role="status">Loading stock…</p>}{error && <><p role="alert">{error}</p><Button tone="staff" onClick={() => { setLoading(true); setRetry(n => n + 1) }}>Retry</Button></>}<div className={styles.list}>{rows.filter(row => row.color !== 'grey' && row.color !== 'white').map(row => <StockRow key={row.id} item={row} />)}{rows.some(row => row.color === 'grey' || row.color === 'white') && <><h2>No longer sold</h2>{rows.filter(row => row.color === 'grey' || row.color === 'white').map(row => <StockRow key={row.id} item={row} />)}</>}</div></main>
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [retry, setRetry] = useState(0)
+  useEffect(() => {
+    let active = true
+    api.inventory.list().then(next => { if (active) { setRows(next); setError('') } }).catch(err => { if (active) setError(err instanceof Error ? err.message : 'Could not load stock.') }).finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [retry])
+  return <section className={styles.page}>
+    <StaffBackLink to="/staff/agenda" label="Agenda" /><h1>Stock</h1><p>Custom = bases ready to paint. Finished = painted in advance.</p>
+    {loading && <p role="status">Loading stock…</p>}
+    {error && <div role="alert"><p>{error}</p><Button tone="staff" onClick={() => { setLoading(true); setRetry(n => n + 1) }}>Retry</Button></div>}
+    {!loading && !error && !rows.length && <p>No stock rows configured.</p>}
+    <div className={styles.list}>{rows.filter(row => row.color !== 'grey' && row.color !== 'white').map(row => <StockRow key={row.id} item={row} />)}
+      {rows.some(row => row.color === 'grey' || row.color === 'white') && <><h2>No longer sold</h2>{rows.filter(row => row.color === 'grey' || row.color === 'white').map(row => <StockRow key={row.id} item={row} />)}</>}
+    </div>
+  </section>
 }
 function StockRow({ item }: { item: InventoryItem }) {
-  const [quantity, setQuantity] = useState(String(item.quantity)); const [saved, setSaved] = useState(item.quantity)
-  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('')
-  const value = Number(quantity); const valid = quantity.trim() !== '' && Number.isInteger(value) && value >= 0 && value <= 10000
-  const name = item.kind === 'finished' ? 'Finished ornaments' : `Custom · ${item.color} · ${item.finish ?? "shiny"}`
-  async function save() { if (!valid) { setError('Enter a whole number from 0 to 10000.'); return } setBusy(true); setError(''); setNotice(''); try { const result = await api.inventory.update(item.id, value, saved); setQuantity(String(result.quantity)); setSaved(result.quantity); setNotice('Saved') } catch (e) { if ((e as { code?: string }).code === 'STOCK_CHANGED') { try { const fresh = (await api.inventory.list()).find(row => row.id === item.id); if (fresh) { setQuantity(String(fresh.quantity)); setSaved(fresh.quantity) } setError('Stock changed. The latest quantity was loaded; review and save again.') } catch { setError('Stock changed, but could not reload. Please retry.') } } else setError('Could not save stock. Please retry.') } finally { setBusy(false) } }
-  return <div className={styles.row} data-low={saved <= 1}><span className={styles.name}>{name}{saved <= 1 && ' · Low stock'}{value !== saved && ' · Unsaved changes'}{notice && <small role="status"> · {notice}</small>}</span><div className={styles.stepper}><button type="button" aria-label={`Decrease ${name}`} disabled={busy} onClick={() => setQuantity(String(Math.max(0, (valid ? value : 0) - 1)))}>−</button><input type="number" min="0" max="10000" step="1" aria-label={`${name} quantity`} value={quantity} disabled={busy} onChange={e => setQuantity(e.target.value)} /><button type="button" aria-label={`Increase ${name}`} disabled={busy} onClick={() => setQuantity(String(Math.min(10000, (valid ? value : 0) + 1)))}>+</button></div><Button tone="staff" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</Button>{error && <p className={styles.error} role="alert">{error}</p>}</div>
+  const [quantity, setQuantity] = useState(String(item.quantity))
+  const [saved, setSaved] = useState(item.quantity)
+  const [conflict, setConflict] = useState<number | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const value = Number(quantity)
+  const valid = quantity.trim() !== '' && Number.isInteger(value) && value >= 0 && value <= 10000
+  const name = item.kind === 'finished' ? 'Finished ornaments' : `Custom · ${item.color} · ${item.finish ?? 'shiny'}`
+  async function save() {
+    if (busy) return
+    if (!valid) { setError('Enter a whole number from 0 to 10000.'); return }
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const result = await api.inventory.update(item.id, value, saved)
+      setQuantity(String(result.quantity)); setSaved(result.quantity); setConflict(null); setNotice('Saved')
+    } catch (err) {
+      if ((err as { code?: string }).code === 'STOCK_CHANGED') {
+        try {
+          const fresh = (await api.inventory.list()).find(row => row.id === item.id)
+          if (!fresh) throw new Error('Stock row no longer exists.')
+          setSaved(fresh.quantity); setConflict(fresh.quantity)
+          setError(`Stock changed. Server now has ${fresh.quantity} (you typed ${quantity}). Choose which value to keep.`)
+        } catch (reloadError) { setError(reloadError instanceof Error ? reloadError.message : 'Could not reload stock. Retry.') }
+      } else setError(err instanceof Error ? err.message : 'Could not save stock. Retry.')
+    } finally { setBusy(false) }
+  }
+  return <article className={styles.row}>
+    <div className={styles.name}><h2>{name}</h2>{value !== saved && <p>Unsaved changes</p>}{notice && <p role="status">{notice}</p>}{saved <= 1 && <InsetNote><p>{saved === 0 ? 'Sold out' : 'Low stock: last one'}</p></InsetNote>}</div>
+    <NumberStepper label={`${name} quantity`} value={quantity} onChange={setQuantity} max={10000} disabled={busy} />
+    <Button tone="staff" disabled={busy || conflict !== null} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</Button>
+    {error && <p className={styles.error} role="alert">{error}</p>}
+    {conflict !== null && <div className={styles.conflict}><Button tone="staff" disabled={busy} onClick={() => void save()}>Use mine</Button><Button tone="staff" variant="secondary" disabled={busy} onClick={() => { setQuantity(String(conflict)); setConflict(null); setError('') }}>Keep {conflict}</Button></div>}
+  </article>
 }

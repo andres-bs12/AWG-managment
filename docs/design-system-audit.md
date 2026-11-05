@@ -280,3 +280,18 @@ These are source-level implementations, not closed visual/accessibility findings
 ## Fix b-2 follow-up (2026-11-05)
 
 The mobile trace reports calendar radio targets partially obscured by the sticky action bar (axe `target-size`); this remains open. The owner requested removal of outdated PNG references for regeneration and visual review. Earlier instructions to preserve those references are historical.
+
+
+## Task 11 staff source follow-up (2026-11-05)
+
+The staff migration now has its own normative [Staff layer](design-system.md#staff) and [implementation handoff](task11-staff-handoff.md). This adds token aliases, IBM Plex roles/density, C1 native selections, shared controls and native dialogs, tablet navigation and functional fixes. The public audit above remains a historical source snapshot; no public finding is closed by the staff implementation. Browser validation and independent review remain pending. No screenshots were removed or accepted and no accessibility checks were relaxed.
+
+## Fix e-3 source follow-up (2026-11-05)
+
+The owner-reported external run passed 377 cases, failed four and skipped two out of 383. The four local traces contain nine missing-reference errors and one desktop photo-counter focus failure. Shared `PhotoTiles` now restores focus after the React commit, using local refs for the add button or counter; removal follows the same path. The QR regression keeps the existing focus and axe assertions and adds retained-photo and remove/re-add checks. Nine PNG references were removed at the owner's request; Claude must review regenerated candidates and retain approved references for the next normal comparison. No browser-dependent audit row is closed by this source change. Current verification and handoff: [UX validation](ux-validation.md#estado-y-ejecución).
+
+## Fix e-4 reference review (2026-11-05)
+
+The latest owner-reported external run passed 378 cases, failed three and skipped two out of 383. The three current traces contain only nine missing-reference errors, with no pixel-difference, functional or axe errors recorded. All nine regenerated design/delivery/review references for mobile/tablet/desktop were visually inspected and verified byte-for-byte against their corresponding actual images. They are retained; deleting these fresh references would repeat initialization failures. No application code, test assertions, screenshot tolerances or accessibility checks changed. This supersedes earlier instructions to delete/regenerate these nine references for this version.
+
+Claude must rerun the normal comparison with the references present, without `--update-snapshots`. These viewport-sized images do not capture the entire public scroll container: calendar/contact and review totals/terms need further scroll inspection; the ornament review card also shows substantial vertical whitespace. No broader visual, reflow, focus or accessibility finding is closed by retaining a regression baseline. Build, lint (existing warnings) and 23 Node tests pass; Playwright was not run here. Current handoff: [UX validation](ux-validation.md#estado-y-ejecución).

@@ -96,9 +96,15 @@ public class AgendaService {
                 .orElseThrow(() -> new ResourceNotFoundException("No market day on that date."));
         List<AgendaSlotDto> slots = s.items().stream()
                 .filter(i -> i.getPaintStart() != null && i.getPaintStart().toLocalDate().equals(day.getDate()))
-                .filter(i -> !i.getOrder().isUnconfirmedWeb())
                 .sorted(Comparator.comparing(OrderItem::getPaintStart))
-                .map(i -> new AgendaSlotDto(mapper.block(i, index), mapper.order(i.getOrder()), mapper.item(i, index), mapper.customer(i.getOrder().getCustomer())))
+                .map(i -> {
+                    Order order = i.getOrder();
+                    if (order.isUnconfirmedWeb()) {
+                        return new AgendaSlotDto(mapper.block(i, index), null, null, null, true,
+                                order.getCheckoutExpiresAt() == null || order.isPaymentReview() ? null : order.getCheckoutExpiresAt().toString());
+                    }
+                    return new AgendaSlotDto(mapper.block(i, index), mapper.order(order), mapper.item(i, index), mapper.customer(order.getCustomer()), false, null);
+                })
                 .toList();
         return new AgendaDayDto(mapper.marketDay(day, index.today()), mapper.market(day.getMarket()), slots, deliveries(s, day.getDate()));
     }
@@ -122,7 +128,7 @@ public class AgendaService {
                     hour == null ? null : Hours.format(hour),
                     customer.getPhone(),
                     market ? null : addressLabel(order),
-                    photoUrl));
+                    photoUrl, order.getTotal().subtract(order.getAmountPaid()).max(java.math.BigDecimal.ZERO), order.getPaymentState()));
         }
         rows.sort(Comparator.<AgendaDeliveryDto>comparingInt(r -> r.deliveryKind() == DeliveryKind.MARKET ? 0 : 1)
                 .thenComparingDouble(r -> r.pickupHour() == null ? 99 : r.pickupHour()));

@@ -9,6 +9,7 @@ import type {
 } from '../../domain/types'
 import { homePaintHours, stallHours } from '../../lib/calendar'
 import { itemCost } from '../../lib/money'
+import { mockPricing } from './pricing'
 
 export const DEMO_NOW_HOUR = 15 + 10 / 60
 /** Bump when demo orders change. load() reseeds if revision mismatches. */
@@ -121,8 +122,8 @@ export function createSeed(): MockState {
   ]
 
   const dog = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=max&w=1800`
-  const costName = itemCost('custom', true)
-  const costPlain = itemCost('custom', false)
+  const costName = itemCost('custom', true, mockPricing)
+  const costPlain = itemCost('custom', false, mockPricing)
 
   const items: OrderItem[] = [
     {

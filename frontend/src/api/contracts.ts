@@ -64,6 +64,8 @@ export type AgendaService = {
 }
 
 export type OrderService = {
+  search: (query: string) => Promise<import('../domain/types').OrderSummary[]>
+  attention: () => Promise<import('../domain/types').OrderSummary[]>
   getOrder: (id: string) => Promise<Order>
   getOrderByCode: (code: string) => Promise<Order | null>
   getOrderBundle: (id: string) => Promise<{

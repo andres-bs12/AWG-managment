@@ -25,6 +25,8 @@ public record OrderDto(
         List<String> itemIds,
         boolean handedOver,
         boolean paymentReview,
-        List<Object> paymentEntries
+        List<Object> paymentEntries,
+        String checkoutStatus,
+        com.artwithgab.awg_tracking.enums.OrderSource source
 ) {
 }

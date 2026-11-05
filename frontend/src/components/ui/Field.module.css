@@ -79,3 +79,11 @@
 :global([data-public-page]) .control :is(input, textarea, select):disabled { background: var(--color-disabled-surface); color: var(--color-disabled-text); }
 :global([data-public-page]) .error { color: var(--color-error); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
 :global([data-public-page]) .invalid :is(input, textarea, select) { border-color: var(--color-error); }
+
+:global([data-staff-page]) .field { margin-bottom: var(--space-4); max-width: var(--layout-field-max); }
+:global([data-staff-page]) .label { font-size: var(--type-staff-body-size); font-weight: 600; }
+:global([data-staff-page]) .hint { color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
+:global([data-staff-page]) .control :is(input, textarea, select) { min-height: var(--size-control-staff); padding: var(--space-2) var(--space-3); border: 1px solid var(--color-control-border); border-radius: var(--radius-control); color: var(--staff-ink); background: var(--staff-surface); }
+:global([data-staff-page]) .control textarea { min-height: var(--size-textarea-min); }
+:global([data-staff-page]) .error { color: var(--color-error); font-size: var(--type-staff-meta-size); }
+:global([data-staff-page]) .invalid :is(input, textarea, select) { border-color: var(--color-error); }

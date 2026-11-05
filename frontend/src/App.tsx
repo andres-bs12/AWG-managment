@@ -22,6 +22,7 @@ const NewSalePage = lazy(() => import('./pages/staff/NewSalePage').then(module =
 const OrderDetailPage = lazy(() => import('./pages/staff/OrderDetailPage').then(module => ({ default: module.OrderDetailPage })))
 const PaintPage = lazy(() => import('./pages/staff/PaintPage').then(module => ({ default: module.PaintPage })))
 
+const OrderLookupPage = lazy(() => import('./pages/staff/OrderLookupPage').then(module => ({ default: module.OrderLookupPage })))
 const ChangePasswordPage = lazy(() => import('./pages/staff/ChangePasswordPage').then(module => ({ default: module.ChangePasswordPage })))
 const LegalPage = lazy(() => import('./pages/public/LegalPage').then(module => ({ default: module.LegalPage })))
 
@@ -30,7 +31,7 @@ const DesignGuide = import.meta.env.DEV ? lazy(() => import('./pages/dev/DesignG
 
 function RouteFallback() {
   const { pathname } = useLocation()
-  return pathname.startsWith('/staff') ? <p role="status" style={{ minHeight: '100vh', margin: 0, padding: 24, background: 'var(--staff-bg)', color: 'var(--staff-ink)' }}>Loading…</p> : <OrnamentLoader />
+  return pathname.startsWith('/staff') ? <p role="status" style={{ minHeight: '100vh', margin: 0, padding: 'var(--space-5)', background: 'var(--staff-bg)', color: 'var(--staff-ink)' }}>Loading…</p> : <OrnamentLoader />
 }
 
 export default function App() {
@@ -59,6 +60,8 @@ export default function App() {
             <Route path="/staff/login" element={<LoginPage />} />
             <Route element={<StaffGuard />}>
               <Route element={<StaffLayout />}>
+                <Route path="/staff/search" element={<OrderLookupPage />} />
+                <Route path="/staff/attention" element={<OrderLookupPage attention />} />
                 <Route path="/staff/password" element={<ChangePasswordPage />} />
                 <Route path="/staff/inventory" element={<InventoryPage />} />
                 <Route path="/staff/painting-days" element={<PaintingDaysPage />} />

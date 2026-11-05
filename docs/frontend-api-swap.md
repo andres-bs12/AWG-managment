@@ -52,3 +52,16 @@ Hecho. En modo `http` el login ya no muestra credenciales demo ni «Reset demo d
 ## Estado del swap
 
 Hecho (2026-11-04): todos los métodos implementados, proxy `/api` en Vite, Entregas recarga tras cada cambio, pagos por estado. El mock queda para demos (`VITE_DATA_SOURCE=mock`).
+
+
+## Task 11 staff contract additions (2026-11-05)
+
+- `orders.search(q)` → `GET /api/orders/search?q=…`; `orders.attention()` → `GET /api/orders/attention`. Both return `OrderSummary[]`: id, code, customerName, phone, createdAt, paymentState, checkoutStatus (lowercase/null), total, items (count), nextHandoffDate and handedOver.
+- `ShopConfig.finishedPrice` joins customPrice/nameExtra. Staff must have all three finite server prices before creating a sale; there is no client price fallback. The shop still sells custom ornaments only.
+- Order/bundle responses add lowercase `checkoutStatus` and `source` (`web`/`stall`). PENDING disables manual collection; PENDING/REVIEW disable painting actions.
+- `AgendaSlot` adds `held` and nullable `holdUntil` (ISO instant). A held slot has `order/item/customer = null`; REVIEW holds have no expiry promise. Keep held blocks in overlap/capacity geometry.
+- `AgendaDelivery` adds `remaining` and `paymentState`. The balance uses amountPaid, including deposits that differ from 50%. UI confirms before handing over a balance-due order and re-reads the bundle before handover.
+- Staff HTTP mutations dispatch a data-change event after a successful response; readers also refetch on focus/visibility and every minute. HTTP 401 emits a session event; the router keeps `next` and the draft, without a full reload. Offline bootstrap retains the token.
+- New stall dates with Vienna deliveries retain 400 `DAY_HAS_DELIVERIES`, field `days`; the mock follows the same rejection. Painted custom bases are not returned to stock on cancellation.
+
+These are additive DTO changes with no entity/schema change. Deploy the matching backend before the staff frontend; the old config does not contain finishedPrice. The handover/payment pair consists of two absolute server operations; if collection succeeds and handover fails, the balance is already paid and retry completes handover. Order-level handover and hard cancellation remain pending owner decisions.

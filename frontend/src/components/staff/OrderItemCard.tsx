@@ -28,8 +28,8 @@ export function OrderItemCard({ item, block, days, selected, showHandoff, naviga
         {photo ? <Link to={paintTo} state={navigationState} className={styles.photo} aria-label={`View ${title} reference`}><img src={photo.dataUrl} alt="" /></Link> : <div className={styles.placeholder} aria-hidden="true">✧</div>}
         <div className={styles.title}>
           <span className={styles.status} data-status={item.productionStatus}>{status}</span>
-          <h3>{title}</h3>
-          <p>{item.kind === 'custom' ? 'Custom ornament' : 'Ready-made'} · {formatEur(item.cost)}</p>
+          <h3 title={title}>{title}</h3>
+          <p>{item.kind === 'custom' ? 'Custom ornament' : 'Ready-made'} · {formatEur(item.cost, 'en')}</p>
         </div>
       </div>
       <dl className={styles.specs}>
@@ -45,7 +45,7 @@ export function OrderItemCard({ item, block, days, selected, showHandoff, naviga
       <details className={styles.adjust}>
         <summary>Adjust production status</summary>
         <div className={styles.statusOptions}>
-          {([{value:'not_started',label:'To paint'}, {value:'in_progress',label:'Painting'}, {value:'finished',label:'Ready'}] as const).map(option => <Button key={option.value} tone="staff" variant="secondary" selected={item.productionStatus === option.value} disabled={busy || item.productionStatus === option.value} onClick={() => onStatus(option.value)}>{option.label}</Button>)}
+          {([{value:'not_started',label:'To paint'}, {value:'in_progress',label:'Painting'}, {value:'finished',label:'Ready'}] as const).map(option => <Button key={option.value} tone="staff" variant="secondary" selected={item.productionStatus === option.value} disabled={busy} onClick={() => onStatus(option.value)}>{option.label}</Button>)}
         </div>
       </details>
     </article>

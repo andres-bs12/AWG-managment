@@ -1,8 +1,8 @@
-# ArtWithGab public design system
+# ArtWithGab design system
 
 **Version:** 1.0 · **Date:** 2026-11-05 · **Status:** normative specification; application migration is pending.
 
-This is the source of truth for customer-facing UI: `/`, `/buy`, checkout return, `/form/:token`, `/track`, waitlist, legal pages, and their shared layout, dialogs and states. Staff UI: **later**. Code and comments must be English; customer copy must be localized German/English.
+This is the source of truth for customer-facing UI: `/`, `/buy`, checkout return, `/form/:token`, `/track`, waitlist, legal pages, and their shared layout, dialogs and states. Staff UI follows the **Staff** layer at the end of this document. Code and comments must be English; customer copy must be localized German/English.
 
 Use **must**, **must not** and the values below as implementation requirements. The [audit](design-system-audit.md) describes the current source, not completed fixes. This task changes documentation only. Proposed tokens and components below are not claims that they exist today.
 
@@ -823,3 +823,27 @@ These exact tokens support the existing globe turn and truthful read-only legacy
 | `--portrait-unknown` | `var(--color-disabled-surface)` | Neutral unrecorded order colour; never a beige selection |
 
 The layer tokens already specified in §6 are now present in `tokens.css`. Shared `PublicPage`, `PageHeader`, `StickyActions`, `InsetNote`, `PhotoTiles`, `ContactFields`, `OptionalNote`, `OrderTimeline` and `PublicState` implementations live in `components/public/`. The shop and QR form use these production components rather than importing each other's page CSS. Fixed Vienna city text is “Wien”; the QR payload retains the existing server city value. Public field styles are scoped with `data-public-page` so staff consumers retain their styling.
+
+## Staff
+
+**Added:** 2026-11-05 · Task 11. This is the staff layer of the same system, scoped by `[data-staff-page]`. It covers sign in, the staff shell, new sale, agenda, search/attention, order detail, deliveries, painting, inventory, painting days, markets and password changes. Staff copy is English. Public component contracts and the owner-approved public layouts remain in force on customer routes.
+
+Use the existing spacing, radius, elevation, focus, reduced-motion and semantic feedback tokens. C1 also applies to staff: a 2px `--color-selected` boundary, `--color-selected-surface` tint, ink text and weight 600; no dark filled selection or inset ring. Unselected controls compensate for their 1px boundary with 1px padding. Native radios supply arrow-key behaviour. Slot colours are production statuses, each with an explicit label; they are not selection colours. Pending/review web reservations use the tokenized hatch and opaque text backplates, with no customer details.
+
+Staff-specific tokens in `tokens.css`:
+
+- `--color-staff-bg: #f0f3f3` is the neutral canvas; `--color-staff-surface` aliases the raised surface. `--color-staff-text`, `--color-staff-muted` and `--color-staff-line` alias text, muted text and decorative border roles. Existing `--staff-bg/surface/ink/muted/line` are compatibility aliases. Inputs use `--color-control-border`, rather than the decorative line.
+- `--staff-btn/selected/pressed/hover/ok/warn/danger` alias the shared primary, selected, pressed, hover, success, warning and error roles. Preserve `--staff-slot-*` for labelled operational statuses.
+- IBM Plex Sans (`--font-staff`) applies everywhere, including native dialogs. Four role tuples supply size, line-height and weight: `--type-staff-h1-*` = 1.375rem / 1.25 / 700; `h2` = 1.125rem / 1.35 / 600; `body` = 1rem / 1.5 / 400; `meta` = 0.875rem / 1.45 / 400. No smaller staff copy. Times, quantities and money use tabular lining numerals.
+- `--size-control-staff: 44px` is the minimum target. Card padding is 16px, row/group gaps 8–12px and larger section gaps 16–24px. Use the shared radius tokens, not page-specific radii.
+- `--layout-staff-max: 1280px`, `--layout-staff-side: 340px`; the two-pane workspace begins at 1024px. Below 1101px, the fixed bottom navigation contains Agenda, Deliveries, New sale, Search and More. More contains Stock, Markets, Painting days, Password and Log out. `--size-staff-tabs: 68px`, `--size-staff-header: 80px` and safe-area insets provide clearance. The staff-only navigation threshold is an explicit exception to the public layout thresholds.
+- `--size-agenda-hour: 80px` supplies both CSS and the board's numeric geometry. `--hour-h` remains the permitted local component alias. Whole-hour grid lines start at the floor of opening time; bookings retain their true offsets. Overlaps use separate lanes and a warning.
+- Central support sizes: `--size-staff-name: 180px`, `--size-staff-handoff: 132px`, `--size-staff-quantity: 80px`, `--layout-staff-dialog: 520px`, `--size-staff-qr: 220px`, `--size-staff-qr-large: 560px`, `--size-staff-qr-render: 720px`. QR render resolution is separate from its displayed size. Canvas-only colours `--staff-canvas`, `--staff-canvas-raised`, `--staff-canvas-text`, `--staff-canvas-muted` preserve the dark painting reference workspace; ordinary controls remain neutral.
+
+Shared implementation: `Button`/`ButtonLink` retain `tone="staff"` and use `StaffButton.module.css`, preserving the public branch; `Field` uses staff density under the scope; `SegmentedControl` uses native radios; `ChoiceList`, `HelpTip` and `InsetNote` are reused. `StaffDialog` is the native modal primitive for completion, balance, cancellation, customer handoff and market deletion. `NumberStepper` composes Field and Button for stock and daily limits. `StaffActions` keeps the sale total and primary action near the bottom on narrow screens. Below 1101px the shell reserves separate header, scrollport, action and tab rows; sale actions dock below 1024px, and actions are portalled to their row so no control can sit behind the bar. It measures `--staff-actions-height` and returns actions to the scroll flow when the visual viewport is too short. The summary aside supplies the desktop total. Focus clearance includes the measured bar, tabs and safe areas.
+
+All staff modules consume tokens. Media conditions use 639/767/1023px end thresholds, 1024px wide layout and the explicit 1100/1101px navigation boundary. No hex/RGB/HSL colours or pixel lengths outside `tokens.css`, except 1px borders and these conditions. UI transitions animate transform/opacity only; the existing global reduced-motion override wins. Runtime schedule/photo coordinates and measured obstruction sizes are geometry, not independent design constants.
+
+`npm run lint` enforces these contracts with `scripts/lint-staff-styles.mjs`, using the installed PostCSS parser. It checks raw colours/lengths, motion properties, invalid declarations and unknown tokens in staff modules and their shared controls. `.stylelintrc.json` also defines the raw-colour/pixel bans for Stylelint. Installing the Stylelint binary was blocked by registry DNS in this sandbox; the repository token check runs without downloading dependencies. Do not claim Stylelint itself ran.
+
+Required review sizes: iPad Air 11" 820×1180 and 1180×820, 390px phones and desktop. Verify keyboard focus, native radio arrows, modal focus/restore, safe-area/virtual-keyboard clearance, 44px targets, long names, stock and HTTP errors, plus axe on every staff page. Source migration and local checks do not certify visual/accessibility results: Claude runs Playwright and reviews the rendered UI externally. See [Task 11 handoff](task11-staff-handoff.md).

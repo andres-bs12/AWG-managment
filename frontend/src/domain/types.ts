@@ -60,7 +60,18 @@ export type OrderItem = {
   }
 }
 
+export type CheckoutStatus = 'pending' | 'review' | 'confirmed'
+
+export type OrderSummary = {
+  id: string; code: string; customerName: string; phone: string; createdAt: string
+  paymentState: PaymentState; checkoutStatus: CheckoutStatus | null; total: number
+  items: number; nextHandoffDate: string | null; handedOver: boolean
+}
+
 export type Order = {
+  checkoutStatus?: CheckoutStatus | null
+  source?: 'web' | 'stall'
+
   id: string
   customerId: string
   code: string
@@ -136,6 +147,8 @@ export type TimeBlock = {
 }
 
 export type AgendaSlot = {
+  held?: boolean
+  holdUntil?: string | null
   block: TimeBlock
   order: Order | null
   item: OrderItem | null
@@ -143,6 +156,8 @@ export type AgendaSlot = {
 }
 
 export type AgendaDelivery = {
+  remaining?: number
+  paymentState?: PaymentState
   customerName?: string
   color?: OrnamentColor
   finish?: CustomFinish
@@ -288,7 +303,7 @@ export type ShopConfig = {
   seasonOver: boolean
   enabled: boolean
   customPrice: number
-  finishedPrice?: number
+  finishedPrice: number
   nameExtra: number
   deliveryFee: number
   maxItems: number

@@ -2,28 +2,75 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import type { PaintingDay } from '../../domain/types'
 import { Button } from '../../components/ui/Button'
-import { ButtonLink } from '../../components/ui/ButtonLink'
+import { NumberStepper } from '../../components/staff/NumberStepper'
+import { StaffBackLink } from '../../components/staff/StaffBackLink'
+import { InsetNote } from '../../components/public/PublicForm'
+import { addUtcDays, formatDateLabel, utcWeekday } from '../../lib/time'
+import { useStaffClock } from '../../lib/staffClock'
 import styles from './SettingsRows.module.css'
 
-function localDate(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` }
 export function PaintingDaysPage() {
-  const [seasonEndDate, setSeasonEndDate] = useState('2026-12-24')
-  useEffect(() => { let active = true; api.shop.getConfig().then(config => { if (active) setSeasonEndDate(config.seasonEnd) }).catch(() => {}); return () => { active = false } }, [])
-  const [days, setDays] = useState<PaintingDay[]>([]); const [error, setError] = useState('')
-  const [offset, setOffset] = useState(0); const [retry, setRetry] = useState(0); const [loading, setLoading] = useState(true)
-  const today = new Date(); today.setHours(12, 0, 0, 0); today.setDate(today.getDate() - ((today.getDay() + 6) % 7))
-  const start = new Date(today); start.setDate(start.getDate() + offset * 28)
-  const end = new Date(start); end.setDate(end.getDate() + 27)
-  const seasonEnd = new Date(`${seasonEndDate}T12:00:00`); if (end > seasonEnd) end.setTime(seasonEnd.getTime())
-  const from = localDate(start); const to = localDate(end)
-  useEffect(() => { let active = true; if (from > to) return; api.paintingDays.list(from, to).then(rows => { if (active) { setDays(rows); setError('') } }).catch(() => { if (active) setError('Could not load painting days.') }).finally(() => { if (active) setLoading(false) }); return () => { active = false } }, [from, to, retry])
+  const clock = useStaffClock()
+  const [today, setToday] = useState(clock.date)
+  const [seasonEnd, setSeasonEnd] = useState<string | null>(null)
+  const [days, setDays] = useState<PaintingDay[]>([])
+  const [error, setError] = useState('')
+  const [offset, setOffset] = useState(0)
+  const [retry, setRetry] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const from = addUtcDays(today, -((utcWeekday(today) + 6) % 7) + offset * 28)
+  const to = seasonEnd ? [addUtcDays(from, 27), seasonEnd].sort()[0] : from
+  useEffect(() => {
+    let active = true
+    Promise.all([api.shop.getConfig(), api.agenda.listDays()]).then(([config, agenda]) => {
+      if (active) { setSeasonEnd(config.seasonEnd); setToday(agenda.find(day => day.marketDay.isToday)?.marketDay.date ?? clock.date) }
+    }).catch(err => { if (active) { setError(err instanceof Error ? err.message : 'Could not load calendar.'); setLoading(false) } })
+    return () => { active = false }
+  }, [retry, clock.date])
+  useEffect(() => {
+    if (!seasonEnd) return
+    if (from > to) { setDays([]); setLoading(false); return }
+    let active = true
+    api.paintingDays.list(from, to).then(rows => { if (active) { setDays(rows); setError('') } }).catch(err => { if (active) setError(err instanceof Error ? err.message : 'Could not load painting days.') }).finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [from, to, seasonEnd, retry])
   const weeks = Array.from({ length: Math.ceil(days.length / 7) }, (_, index) => days.slice(index * 7, index * 7 + 7))
-  return <main className={styles.page}><ButtonLink to="/staff/agenda" tone="staff" variant="ghost">← Agenda</ButtonLink><h1>Painting days</h1><p>Automatic suggestions respect these limits. Manual moves and sales can go over the limit.</p><nav aria-label="Painting day ranges"><Button tone="staff" variant="secondary" disabled={offset === 0} onClick={() => { setLoading(true); setOffset(n => n - 1) }}>Previous 4 weeks</Button> <Button tone="staff" variant="secondary" disabled={end >= seasonEnd} onClick={() => { setLoading(true); setOffset(n => n + 1) }}>Next 4 weeks</Button></nav>{loading && <p role="status">Loading painting days…</p>}{error && <><p role="alert">{error}</p><Button tone="staff" onClick={() => { setLoading(true); setRetry(n => n + 1) }}>Retry</Button></>}{weeks.map(week => <section key={week[0].date}><h2>Week of {week[0].date}</h2><div className={styles.list}>{week.map(day => <DayRow key={day.date} day={day} />)}</div></section>)}</main>
+  return <section className={styles.page}>
+    <StaffBackLink to="/staff/agenda" label="Agenda" /><h1>Painting days</h1>
+    <InsetNote><p>These limits apply to automatic suggestions, including stall days. Manual moves and sales may exceed them. Weekday and stall defaults are awaiting the owner's decision.</p></InsetNote>
+    <nav className={styles.range} aria-label="Painting day ranges"><Button tone="staff" variant="secondary" disabled={offset === 0 || loading} onClick={() => { setLoading(true); setOffset(n => n - 1) }}>Previous 4 weeks</Button><Button tone="staff" variant="secondary" disabled={!seasonEnd || to >= seasonEnd || loading} onClick={() => { setLoading(true); setOffset(n => n + 1) }}>Next 4 weeks</Button></nav>
+    {loading && <p role="status">Loading painting days…</p>}
+    {error && <div role="alert"><p>{error}</p><Button tone="staff" onClick={() => { setLoading(true); setRetry(n => n + 1) }}>Retry</Button></div>}
+    {!loading && !error && !days.length && <p>No painting days in this range.</p>}
+    {weeks.map(week => <section key={week[0].date}><h2>Week of {formatDateLabel(week[0].date)}</h2><div className={styles.list}>{week.map(day => <DayRow key={day.date} day={day} />)}</div></section>)}
+  </section>
 }
 function DayRow({ day }: { day: PaintingDay }) {
-  const [open, setOpen] = useState(day.open); const [max, setMax] = useState(String(day.maxPaintings)); const [booked, setBooked] = useState(day.booked)
-  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [saved, setSaved] = useState({ open: day.open, max: day.maxPaintings }); const [notice, setNotice] = useState(''); const number = Number(max); const valid = max.trim() !== '' && Number.isInteger(number) && number >= 0 && number <= 10
-  async function save() { if (!valid) { setError('Enter a whole number from 0 to 10.'); return } setBusy(true); setError(''); try { const result = await api.paintingDays.update(day.date, open, number); setOpen(result.open); setMax(String(result.maxPaintings)); setBooked(result.booked); setSaved({ open: result.open, max: result.maxPaintings }); setNotice('Saved') } catch (e) { setError(e instanceof Error ? e.message : 'Could not save day.') } finally { setBusy(false) } }
-  const label = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${day.date}T12:00:00`))
-  return <div className={styles.row}><span className={styles.name}>{label}<br /><small>{booked} / {max || '0'} booked / max{(open !== saved.open || number !== saved.max) ? ' · Unsaved changes' : notice ? ` · ${notice}` : ''}</small></span><label><input type="checkbox" role="switch" checked={open} disabled={busy} onChange={e => setOpen(e.target.checked)} /> {open ? 'Open' : 'Closed'}</label><div className={styles.stepper}><button type="button" aria-label={`Decrease max for ${label}`} disabled={busy} onClick={() => setMax(String(Math.max(0, (valid ? number : 0) - 1)))}>−</button><input type="number" aria-label={`Max paintings for ${label}`} min="0" max="10" step="1" value={max} disabled={busy} onChange={e => setMax(e.target.value)} /><button type="button" aria-label={`Increase max for ${label}`} disabled={busy} onClick={() => setMax(String(Math.min(10, (valid ? number : 0) + 1)))}>+</button></div><Button tone="staff" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</Button>{error && <p className={styles.error} role="alert">{error}</p>}</div>
+  const [open, setOpen] = useState(day.open)
+  const [max, setMax] = useState(String(day.maxPaintings))
+  const [booked, setBooked] = useState(day.booked)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState({ open: day.open, max: day.maxPaintings })
+  const [notice, setNotice] = useState('')
+  const number = Number(max)
+  const valid = max.trim() !== '' && Number.isInteger(number) && number >= 0 && number <= 10
+  async function save() {
+    if (busy) return
+    if (!valid) { setError('Enter a whole number from 0 to 10.'); return }
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const result = await api.paintingDays.update(day.date, open, number)
+      setOpen(result.open); setMax(String(result.maxPaintings)); setBooked(result.booked); setSaved({ open: result.open, max: result.maxPaintings }); setNotice('Saved')
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not save day.') }
+    finally { setBusy(false) }
+  }
+  const label = formatDateLabel(day.date)
+  return <article className={styles.row}>
+    <div className={styles.name}><h3>{label}</h3><p>{booked}/{saved.max} booked{(open !== saved.open || number !== saved.max) ? ' · Unsaved changes' : ''}</p>{notice && <p role="status">{notice}</p>}</div>
+    <label><input type="checkbox" role="switch" aria-label={`Painting open ${label}`} checked={open} disabled={busy} onChange={event => setOpen(event.target.checked)} /> {open ? 'Open' : 'Closed'}</label>
+    <NumberStepper label={`Max paintings for ${label}`} value={max} onChange={setMax} max={10} disabled={busy} />
+    <Button tone="staff" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</Button>
+    {error && <p className={styles.error} role="alert">{error}</p>}
+  </article>
 }

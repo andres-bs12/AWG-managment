@@ -22,3 +22,9 @@ test('sold-out text and muted text meet 4.5:1 using the actual tokens', () => {
     assert.ok(contrastRatio(value(foreground), value(background)) >= 4.5, `${foreground} / ${background}`)
   }
 })
+
+test('staff slot status labels retain 4.5:1 contrast on their status surfaces', () => {
+  const css = readFileSync(new URL('../src/styles/tokens.css', import.meta.url), 'utf8')
+  const value = name => css.match(new RegExp(`${name}:\\s*(#[\\da-f]+);`, 'i'))[1]
+  for (const status of ['idle', 'painting', 'ready', 'done']) assert.ok(contrastRatio(value(`--staff-slot-${status}-ink`), value(`--staff-slot-${status}`)) >= 4.5, status)
+})

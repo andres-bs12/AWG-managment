@@ -1,0 +1,20 @@
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: var(--size-control); padding: var(--space-2) var(--space-4); border-radius: var(--radius-control); border: 1px solid transparent; font-weight: var(--type-button-weight); text-decoration: none; text-align: center; transition: transform var(--dur-press) var(--ease-press); }
+.btn:disabled { background: var(--color-disabled-surface); color: var(--color-disabled-text); border-color: var(--color-control-border); cursor: not-allowed; }
+.btn:active:not(:disabled) { transform: scale(var(--motion-press-scale)); }
+.btn:focus-visible { outline: none; box-shadow: var(--focus); }
+.lg { min-height: var(--touch-lg); padding-inline: var(--space-5); }
+.full { width: 100%; }
+.primary { background: var(--color-primary); color: var(--color-on-primary); }
+.primary:hover:not(:disabled) { background: var(--color-primary-hover); }
+.secondary, .choice { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-control-border); }
+.ghost { background: transparent; color: inherit; }
+.secondary:hover:not(:disabled), .ghost:hover:not(:disabled), .choice:hover:not(:disabled) { background: var(--color-selection-hover); }
+.danger { background: var(--color-error); color: var(--color-on-primary); }
+.danger:hover:not(:disabled) { text-decoration: underline; }
+.choice { min-height: var(--size-choice-card); justify-content: flex-start; text-align: left; }
+.staff { min-height: var(--size-control-staff); font-family: var(--font-staff); }
+.btn[data-selected='false'] { padding: calc(var(--space-2) + var(--border-thin)) calc(var(--space-4) + var(--border-thin)); }
+.btn[data-selected='true'] { background: var(--color-selected-surface); color: var(--color-text); border: var(--border-control) solid var(--color-selected); font-weight: 600; }
+.btn[data-selected='true']:hover:not(:disabled) { background: var(--color-selected-surface); }
+
+.btn[data-selected='true']:disabled { background: var(--color-disabled-surface); color: var(--color-disabled-text); border-color: var(--color-control-border); border-style: dashed; }

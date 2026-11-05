@@ -35,7 +35,7 @@ Compose construye `DB_URL` como `jdbc:postgresql://postgres:5432/<POSTGRES_DB>` 
 
 ## HTTPS y Stripe
 
-Configura un proxy inverso o servicio de hosting con certificado TLS para dirigir el tráfico HTTPS del dominio al puerto 8081 del servidor. Restringe el acceso directo a ese puerto según la configuración de red del hosting. Configura los límites de carga del proxy externo para permitir solicitudes de hasta 60 MB. El servidor nginx incluido no termina TLS.
+Configura un proxy inverso o servicio de hosting con certificado TLS para dirigir el tráfico HTTPS del dominio al puerto 8081 del servidor. El puerto 8081 solo escucha en `127.0.0.1` (`docker-compose.yml`), así que el proxy TLS debe correr en el mismo servidor; si el proxy es un contenedor, quita la publicación del puerto y conéctalo por una red privada de Docker. Configura los límites de carga del proxy externo para permitir solicitudes de hasta 60 MB. El servidor nginx incluido no termina TLS.
 
 En Stripe, crea un endpoint de webhook para `https://<dominio>/api/shop/stripe/webhook` y selecciona estos eventos:
 
@@ -50,7 +50,7 @@ Copia el secreto de firma a `STRIPE_WEBHOOK_SECRET`, configura la clave en `STRI
 Guarda las copias fuera del servidor y verifica periódicamente que puedas restaurarlas. Para un volcado lógico de PostgreSQL, ejecuta desde la raíz:
 
 ```bash
-docker compose --env-file .env exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > awg-postgres.dump
+docker compose --env-file .env exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > ~/awg-backups/awg-postgres-$(date +%F).dump
 ```
 
 Para respaldar las fotos, identifica el nombre real del volumen y crea un archivo comprimido en el directorio actual:
@@ -59,7 +59,7 @@ Para respaldar las fotos, identifica el nombre real del volumen y crea un archiv
 docker compose --env-file .env config --volumes
 docker volume ls
 # Reemplaza NOMBRE_DEL_VOLUMEN por el volumen del proyecto que termina en uploads_data.
-docker run --rm -v NOMBRE_DEL_VOLUMEN:/data:ro -v "$PWD":/backup alpine:3.21 tar czf /backup/awg-uploads.tar.gz -C /data .
+docker run --rm -v NOMBRE_DEL_VOLUMEN:/data:ro -v ~/awg-backups:/backup alpine:3.21 tar czf /backup/awg-uploads-$(date +%F).tar.gz -C /data .
 ```
 
 Coordina las copias de la base y las fotos para que representen el mismo momento; detener temporalmente las escrituras durante ambas evita que queden desincronizadas. No uses `docker compose down -v` salvo que quieras eliminar los datos persistentes.
@@ -90,3 +90,7 @@ Cada noche (03:30, hora de Viena) el backend borra las fotos y los datos persona
 ## Client IP and rate limits
 
 nginx overwrites `X-Forwarded-For` with the address it sees, so clients cannot spoof it. When the stack runs behind another TLS proxy or load balancer, add `set_real_ip_from <proxy CIDR>;` and `real_ip_header X-Forwarded-For;` to `frontend/nginx.conf`. Without them, every visitor shares the proxy's address and therefore one rate-limit bucket. Keep `FORWARD_HEADERS=native` on the backend only when nginx is the sole entry point.
+
+## Copias de seguridad y datos personales
+
+Las copias contienen datos de clientes, fotos, hashes de contraseñas y tokens. Guárdalas fuera del repositorio, en `~/awg-backups/` con permisos `chmod 700`, y cifradas si salen del servidor. Conserva como máximo 30 días de copias. Antes de reabrir una restauración, ejecuta la limpieza de retención para volver a borrar los datos que ya habían caducado.

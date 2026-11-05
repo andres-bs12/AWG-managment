@@ -56,7 +56,8 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "8081:80"
+      # Loopback only: the TLS proxy on the host is the single public entry point.
+      - "127.0.0.1:8081:80"
     depends_on:
       backend:
         condition: service_healthy

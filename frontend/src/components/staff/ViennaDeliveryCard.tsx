@@ -1,3 +1,4 @@
+import { formatEur } from '../../lib/money'
 import { Link } from 'react-router-dom'
 import { Button } from '../ui/Button'
 import type { AgendaDelivery } from '../../domain/types'
@@ -19,7 +20,7 @@ export function ViennaDeliveryCard({ row, from, busy, onToggle }: Props) {
       {row.photoUrl ? <img src={row.photoUrl} alt="" width={56} height={56} /> : <span className={styles.thumb} />}
       <div className={styles.body}>
         <div className={styles.head}>
-          <h3>
+          <h3 title={row.addressLabel ?? 'Address pending'}>
             {row.addressLabel ?? 'Address pending'}
           </h3>
           <span className={styles.status}>{deliveryStatusLabel(row)}</span>
@@ -34,6 +35,7 @@ export function ViennaDeliveryCard({ row, from, busy, onToggle }: Props) {
           )}
           {row.addressLabel ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.addressLabel)}`} target="_blank" rel="noreferrer">Map ↗</a> : null}
         </div>
+        {row.remaining != null && row.remaining > 0 && <p className={styles.note}><strong>Collect {formatEur(row.remaining, 'en')}</strong> · {row.paymentState}</p>}
         <div className={styles.actions}>
           <Button
             tone="staff"

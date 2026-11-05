@@ -27,6 +27,12 @@ public class GlobalExceptionHandler {
         return body(e.getStatus(), e.getMessage(), e.getCode(), e.getField());
     }
 
+    /** Two writers changed the same order at once; the later one must reload instead of overwriting. */
+    @ExceptionHandler({org.springframework.orm.ObjectOptimisticLockingFailureException.class, jakarta.persistence.OptimisticLockException.class})
+    ResponseEntity<ErrorResponse> concurrentChange(Exception e) {
+        return body(HttpStatus.CONFLICT, "This order was changed at the same time. Please reload and try again.", "CONFLICT", null);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ErrorResponse> invalid(MethodArgumentNotValidException e) {
         var field = e.getBindingResult().getFieldError();

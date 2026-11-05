@@ -2,6 +2,8 @@
 
 ## Hecho
 
+- [x] 2026-11-05 · Task 11 — implementación de staff (P0/P1 solicitados, mock/HTTP, capa de diseño y suite escrita). Build/lint, 23 pruebas Node y 92 backend pasan. Sin Playwright ni commits; detalles y matriz en `docs/task11-staff-handoff.md`.
+
 - [x] 2026-11-05 · Task 8 — implementación QR de dos pantallas y componentes compartidos con `/buy`, DE/EN, errores/foco, borrador/fotos y estados de enlace; suite `e2e/form.spec.ts` escrita. Validación de navegador pendiente; ver `docs/task8-form-handoff.md`.
 
 - [x] Frontend v1 con mocks (agenda, venta, pedido, form, Track) y pulido UX staff
@@ -18,7 +20,11 @@
 
 ## Pendiente (ver `tasks/preguntas-pendientes.md` para decisiones del dueño)
 
-- [ ] Fix b-2 / Task 8: resolver el solapamiento de la barra fija con radios del calendario móvil (axe `target-size`), sin debilitar los checks; Claude debe regenerar y revisar las nueve referencias, repetir los 193 casos y comprobar ratón, teclado y táctil. El resultado comunicado fue 190/193; las trazas también muestran el fallo axe móvil. Ver `docs/ux-validation.md`.
+- [ ] Fix e-4 (seguimiento actual, sustituye e-1/e-2/e-3): referencias preparadas; Claude debe repetir normalmente los 383 casos conservando los nueve PNG ya regenerados, revisados e idénticos byte a byte a los `*-actual.png`, sin borrarlos ni `--update-snapshots`. Último resultado externo: 378 aprobados, 3 fallidos exclusivamente por referencias ausentes, 2 omitidos; el foco de fotos ya no falla. No se cambió app/tests/axe. Build/lint y 23 pruebas Node pasan; sin Playwright ni commits aquí. Revisar contenido desplazable además de comparar los PNG. Ver `docs/ux-validation.md`.
+
+- [ ] Task 11: Claude debe ejecutar `staff-review.spec.ts` en ipadPortrait/ipadLandscape/desktop (34 casos, 102 ejecuciones previstas), verificar axe cero en todas las páginas, teclado/toque, 390px, 820×1180/1180×820, HTTP real y cambios visuales. Revisar DTOs añadidos antes de desplegar el frontend. Stylelint binario pendiente de instalar cuando haya red; el lint de tokens está activo. P1-14/17/18/22 pendientes del dueño; P2-21 historial/referencia Stripe y P2-24 back-off por cuenta no implementados. Ver `docs/task11-staff-handoff.md`.
+
+- [ ] Seguimiento histórico Fix b-2 / Task 8: la ejecución externa más reciente (378 aprobados de 383, Fix e-4) no registra de nuevo el fallo axe móvil; las trazas visuales actuales solo muestran referencias ausentes. Revisar el calendario y la barra durante el scroll; conservar las capturas ya regeneradas. El seguimiento vigente de navegador es Fix e-4 en `docs/ux-validation.md`, sin debilitar los checks.
 
 - [ ] Seguimiento histórico Fix b-1 / Task 8: Claude debe repetir la suite de 193 ejecuciones, validar el foco y envío del código postal con ratón, teclado y táctil, y regenerar y revisar las nueve referencias visuales eliminadas por instrucción del dueño. Revisar DE/EN, axe, recarga, enlaces, varias Kugeln/finished, 360×640/reflow/zoom y regresiones de `/buy`. Handoff en `docs/task8-form-handoff.md`.
 

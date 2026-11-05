@@ -17,7 +17,7 @@ Java + Spring Boot · React + TypeScript · PostgreSQL. **En el puesto** el due�
 
 ## Decisiones de producto (cerradas)
 
-- Form = datos; el staff confirma el pago después de verificar su recepción; estados: unpaid / deposit (50% del total) / paid. Con el flujo actual, `deposit` representa exactamente la mitad porque el estado por sí solo no guarda otro importe.
+- Form = datos; el staff confirma el pago después de verificar su recepción; estados: unpaid / deposit / paid. El depósito tiene un importe real (`amountPaid`), 50 % por defecto, editable a un valor mayor que cero y menor que el total. El saldo usa ese importe.
 - Name en puesto (+12,99 €); sin refund al quitarlo. Track público en v1 (código/enlace).
 - Tienda web: solo Viena (CP 1010–1230), entrega mié/vie. El cliente solo ve días en los que todos sus adornos custom caben en la agenda de pintura antes de ese día; al pagar, los bloques se reservan solos y el pedido aparece en Agenda y Entregas como uno más (pagado, tarjeta).
 - Pintura ≠ pickup. Capacidad **antes** de comprometer. Pedido puede mezclar custom + finished.
@@ -86,3 +86,5 @@ Rutas: `/staff/agenda`, `/deliveries`, `/markets`, `/sales/new`, `/orders/:id`, 
 ## Qué no cargar
 
 `references/html-mocks/`, `mocks/`, diagramas `docs/flujo-venta.*` — no son canon.
+
+Staff Task 11: [handoff y matriz de correcciones](task11-staff-handoff.md), [capa de diseño Staff](design-system.md#staff). Validación de navegador pendiente; pruebas locales: 23 Node y 92 backend.

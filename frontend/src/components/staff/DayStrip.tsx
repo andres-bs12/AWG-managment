@@ -20,7 +20,7 @@ export function DayStrip({ days, value, onChange, today }: Props) {
 
   useEffect(() => {
     const selected = trackRef.current?.querySelector<HTMLElement>('[data-selected="true"]')
-    selected?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+    selected?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'instant' })
   }, [value])
 
   function go(delta: number) {

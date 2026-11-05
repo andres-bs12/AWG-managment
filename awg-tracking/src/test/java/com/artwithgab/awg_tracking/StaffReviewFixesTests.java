@@ -87,4 +87,50 @@ class StaffReviewFixesTests extends ApiTestSupport {
         }
         assertThat(List.of(token)).isNotEmpty();
     }
+
+    @Test
+    void unconfirmedCheckoutSlotsRemainVisibleWithoutCustomerData() throws Exception {
+        String token = login();
+        String id = saleOk(token, customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0));
+        tx.executeWithoutResult(t -> {
+            var order = orderRepository.findById(UUID.fromString(id)).orElseThrow();
+            order.setSource(com.artwithgab.awg_tracking.enums.OrderSource.WEB);
+            order.setCheckoutStatus(com.artwithgab.awg_tracking.enums.CheckoutStatus.PENDING);
+            order.setCheckoutExpiresAt(java.time.Instant.parse("2026-11-24T09:00:00Z"));
+        });
+        mvc.perform(get("/api/agenda/days/" + TUE).header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.slots[0].held").value(true))
+                .andExpect(jsonPath("$.slots[0].holdUntil").value("2026-11-24T09:00:00Z"))
+                .andExpect(jsonPath("$.slots[0].order").isEmpty())
+                .andExpect(jsonPath("$.slots[0].item").isEmpty())
+                .andExpect(jsonPath("$.slots[0].customer").isEmpty());
+        mvc.perform(get("/api/orders/" + id + "/bundle").header("Authorization", bearer(token)))
+                .andExpect(jsonPath("$.order.checkoutStatus").value("pending"))
+                .andExpect(jsonPath("$.order.source").value("web"));
+        tx.executeWithoutResult(t -> orderRepository.findById(UUID.fromString(id)).orElseThrow()
+                .setCheckoutStatus(com.artwithgab.awg_tracking.enums.CheckoutStatus.REVIEW));
+        mvc.perform(get("/api/agenda/days/" + TUE).header("Authorization", bearer(token)))
+                .andExpect(jsonPath("$.slots[0].held").value(true))
+                .andExpect(jsonPath("$.slots[0].holdUntil").isEmpty());
+    }
+
+    @Test
+    void deliveryBalanceUsesActualDeposit() throws Exception {
+        String token = login();
+        String id = saleOk(token, customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0));
+        mvc.perform(patch("/api/orders/" + id + "/payment-state").header("Authorization", bearer(token))
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(json(java.util.Map.of("state", "deposit", "method", "cash", "amountPaid", 20))))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/agenda/days/" + SAT).header("Authorization", bearer(token)))
+                .andExpect(jsonPath("$.deliveries[0].remaining").value(29.99))
+                .andExpect(jsonPath("$.deliveries[0].paymentState").value("deposit"));
+    }
+
+    @Test
+    void serverConfigIncludesFinishedOrnamentPrice() throws Exception {
+        mvc.perform(get("/api/shop/config")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.finishedPrice").value(39.99));
+    }
 }

@@ -47,6 +47,10 @@ public class OrderItem {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    /** Optimistic lock: concurrent writers get 409 CONFLICT instead of overwriting each other. */
+    @jakarta.persistence.Version
+    private long version;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;

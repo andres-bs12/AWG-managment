@@ -8,17 +8,18 @@ import { Field } from '../../components/ui/Field'
 import styles from './LoginPage.module.css'
 
 export function LoginPage() {
-  const { user, login } = useAuth()
+  const { user, login, expired, offline, retrySession } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: string } | null)?.from ?? '/staff/agenda'
+  const next = new URLSearchParams(location.search).get('next') ?? (location.state as { from?: string } | null)?.from
+  const from = next?.startsWith('/staff/') && !next.startsWith('/staff/login') ? next : '/staff/agenda'
   const isMock = getDataSource() === 'mock'
   const [email, setEmail] = useState(demoEmail)
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  if (user) return <Navigate to="/staff/agenda" replace />
+  if (user) return <Navigate to={from} replace />
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -35,9 +36,11 @@ export function LoginPage() {
   }
 
   return (
-    <div className={styles.page}>
+    <main data-staff-page className={styles.page}>
     <div className={styles.card}>
       <h1>Staff sign in</h1>
+      {expired || new URLSearchParams(location.search).has('expired') ? <p role="status">Session expired, sign in again.</p> : null}
+      {offline && <p role="status">Offline — retrying <Button tone="staff" variant="secondary" onClick={retrySession}>Retry session</Button></p>}
       {isMock ? <p className={styles.hint}>Two accounts: Gaby and Andres. Same permissions.</p> : null}
       <form onSubmit={onSubmit}>
         {error ? (
@@ -64,7 +67,7 @@ export function LoginPage() {
           />
         </Field>
         <Button type="submit" tone="staff" fullWidth size="lg" disabled={busy}>
-          Enter
+          {busy ? 'Signing in…' : 'Enter'}
         </Button>
       </form>
       {isMock ? (
@@ -85,6 +88,6 @@ export function LoginPage() {
         </Button>
       ) : null}
     </div>
-    </div>
+    </main>
   )
 }

@@ -26,6 +26,7 @@ import type {
   TrackWhen,
 } from '../../domain/types'
 import { itemCost } from '../../lib/money'
+import { mockPricing } from './pricing'
 import { marketPickupDates, paintDatesToTry } from '../../lib/calendar'
 import { hasPaintOverlap } from '../../lib/slots'
 import { formatDateLabel, formatHour, formatMinutes, hoursOverlap, utcWeekday } from '../../lib/time'
@@ -280,7 +281,7 @@ export function cancelOrder(id: string) {
   const order = requireOrder(id)
   if (order.handedOver) throw new Error('Cannot cancel an order that has been handed over.')
   const cancelled = state.items.filter(item => item.orderId === id)
-  for (const item of cancelled) { const stock = listInventory().find(row => row.kind === item.kind && (item.kind === 'finished' || (row.color === item.color && row.finish === (item.finish ?? 'shiny')))); if (stock) stock.quantity++ }
+  for (const item of cancelled) { if (item.kind === 'custom' && item.productionStatus !== 'not_started') continue; const stock = listInventory().find(row => row.kind === item.kind && (item.kind === 'finished' || (row.color === item.color && row.finish === (item.finish ?? 'shiny')))); if (stock) stock.quantity++ }
   const itemIds = new Set(cancelled.map(item => item.id))
   state.blocks = state.blocks.filter((block) => !block.orderItemId || !itemIds.has(block.orderItemId))
   state.items = state.items.filter((item) => item.orderId !== id)
@@ -306,13 +307,13 @@ export function createMockCheckout(input: ShopCheckoutInput) {
   const items: OrderItem[] = input.items.map(item => ({
     id: uid('orn'), orderId, kind: 'custom', petName: item.petName ?? '', withName: item.withName,
     color: item.color ?? 'red', finish: item.finish, backName: item.backName ?? '', note: item.note ?? '',
-    cost: itemCost('custom', item.withName), productionStatus: 'not_started', photos: item.photos,
+    cost: itemCost('custom', item.withName, mockPricing), productionStatus: 'not_started', photos: item.photos,
     formComplete: true, delivery: input.deliveryKind === 'market'
       ? { kind: 'market', marketDayId: state.marketDays.find(day => day.date === input.deliveryDate && state.markets.some(m => m.id === day.marketId && m.kind === 'market'))?.id, marketId: state.marketDays.find(day => day.date === input.deliveryDate)?.marketId, pickupHour: input.pickupTime ? Number(input.pickupTime.slice(0, 2)) + Number(input.pickupTime.slice(3)) / 60 : null }
       : { kind: 'vienna', address: input.address, deliveryDate: input.deliveryDate },
   }))
   const order: Order = { id: orderId, customerId: customer.id, code, trackToken: uid('trk'), formToken: token,
-    paymentState: 'paid', paymentMethod: 'card', amountPaid: items.reduce((sum, item) => sum + item.cost, 0), total: items.reduce((sum, item) => sum + item.cost, 0),
+    source: 'web', checkoutStatus: 'confirmed', paymentState: 'paid', paymentMethod: 'card', amountPaid: items.reduce((sum, item) => sum + item.cost, 0), total: items.reduce((sum, item) => sum + item.cost, 0),
     createdAt: new Date().toISOString(), itemIds: items.map(item => item.id), handedOver: false, paymentEntries: [] }
   for (const [id, count] of counts) inventory.find(row => row.id === id)!.quantity -= count
   state.customers.push(customer); state.orders.push(order); state.items.push(...items)
@@ -346,10 +347,10 @@ export function mockLogin(email: string, password: string): { token: string; use
 }
 
 export function mockMe(token: string): StaffUser {
-  if (!token.startsWith('mock.')) throw new Error('Invalid session')
+  if (!token.startsWith('mock.')) throw Object.assign(new Error('Invalid session'), { status: 401 })
   const id = token.split('.')[1]
   const user = state.staff.find((s) => s.id === id)
-  if (!user) throw new Error('Invalid session')
+  if (!user) throw Object.assign(new Error('Invalid session'), { status: 401 })
   return user
 }
 
@@ -417,6 +418,11 @@ export function saveMarket(input: SaveMarketInput): { market: Market; days: Mark
     if (!Number.isFinite(day.openHour) || !Number.isFinite(day.closeHour) || !(day.closeHour > day.openHour)) {
       throw new Error(`${formatDateLabel(day.date)}: close must be after open`)
     }
+  }
+
+  for (const day of input.days) {
+    const alreadyStall = state.marketDays.some(row => row.date === day.date && row.marketId === input.id)
+    if (!alreadyStall && state.items.some(item => item.delivery.kind === 'vienna' && deliveryDateForItem(item) === day.date)) throw Object.assign(new Error(`${formatDateLabel(day.date)} has Vienna deliveries; move them first.`), { code: 'DAY_HAS_DELIVERIES', field: 'days' })
   }
 
   const existing = input.id ? state.markets.find((row) => row.id === input.id) : undefined
@@ -559,6 +565,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
     const order = state.orders.find((o) => o.id === item.orderId)
     const customer = order ? state.customers.find((c) => c.id === order.customerId) : null
     if (!order || !customer) continue
+    if (order.checkoutStatus === 'pending' || order.checkoutStatus === 'review' || order.paymentReview) continue
     const title = item.petName || customer.name || 'Ornament'
     const photoUrl = item.photos[0]?.dataUrl
     if (item.delivery.kind === 'market') {
@@ -610,7 +617,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
     if (a.deliveryKind !== b.deliveryKind) return a.deliveryKind === 'market' ? -1 : 1
     return (a.pickupHour ?? 99) - (b.pickupHour ?? 99)
   })
-  return rows
+  return rows.map(row => ({ ...row, remaining: paymentSummary(requireOrder(row.orderId)).remaining, paymentState: requireOrder(row.orderId).paymentState }))
 }
 
 export function getAgendaDay(date: string): AgendaDay {
@@ -620,7 +627,7 @@ export function getAgendaDay(date: string): AgendaDay {
   return {
     marketDay,
     market,
-    slots: blocksForDay(marketDay.id).map(slotView),
+    slots: blocksForDay(marketDay.id).map(slotView).map(slot => slot.order?.checkoutStatus === 'pending' || slot.order?.checkoutStatus === 'review' || slot.order?.paymentReview ? { block: slot.block, held: true, order: null, item: null, customer: null } : slot),
     deliveries: deliveriesForDate(marketDay.date),
   }
 }
@@ -730,7 +737,7 @@ export function createSale(input: CreateSaleInput): Order {
   for (const row of rows) {
     const itemId = uid('orn')
     const withName = row.kind === 'custom' && row.withName
-    const cost = itemCost(row.kind, withName)
+    const cost = itemCost(row.kind, withName, mockPricing)
     createdItems.push({
       id: itemId,
       orderId,
@@ -835,8 +842,10 @@ export function createSale(input: CreateSaleInput): Order {
 
 export function setPaymentState(orderId: string, paymentState: PaymentState, method?: PaymentMethod | null, amountPaid?: number) {
   const order = requireOrder(orderId)
+  if (order.checkoutStatus === 'pending') throw Object.assign(new Error('Check this payment in Stripe first; Checkout is still pending.'), { code: 'PAYMENT_PENDING' })
   const amount = paymentState === 'paid' ? order.total : paymentState === 'unpaid' ? 0 : amountPaid ?? Math.round(order.total * 50) / 100
   if (!Number.isFinite(amount) || (paymentState === 'deposit' && (amount <= 0 || amount >= order.total))) throw new Error('Deposit must be greater than zero and less than the total.')
+  if (order.checkoutStatus === 'review' || order.paymentReview) { order.checkoutStatus = 'confirmed'; order.paymentReview = false }
   order.amountPaid = amount
   order.paymentState = paymentState
   if (method !== undefined) order.paymentMethod = method
@@ -1086,4 +1095,22 @@ export function findMoveSuggestion(input: {
     }
   }
   return null
+}
+
+export function searchOrders(query: string): import('../../domain/types').OrderSummary[] {
+  const needle = query.trim().toLowerCase()
+  if (needle.length < 2) return []
+  const phone = needle.replace(/\D/g, '')
+  return state.orders.filter(order => {
+    const customer = state.customers.find(row => row.id === order.customerId)
+    return order.code.toLowerCase().includes(needle) || (customer?.name ?? '').toLowerCase().includes(needle) || (phone.length >= 3 && (customer?.phone ?? '').replace(/\D/g, '').includes(phone))
+  }).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 20).map(orderSummary)
+}
+function orderSummary(order: Order): import('../../domain/types').OrderSummary {
+  const bundle = getOrderBundle(order.id)
+  const dates = bundle.items.map(item => item.delivery.deliveryDate ?? state.marketDays.find(day => day.id === item.delivery.marketDayId)?.date).filter((date): date is string => Boolean(date)).sort()
+  return { id: order.id, code: order.code, customerName: bundle.customer.name, phone: bundle.customer.phone, createdAt: order.createdAt, paymentState: order.paymentState, checkoutStatus: order.checkoutStatus ?? (order.paymentReview ? 'review' : null), total: order.total, items: bundle.items.length, nextHandoffDate: dates[0] ?? null, handedOver: order.handedOver }
+}
+export function attentionOrders() {
+  return state.orders.filter(order => order.paymentReview || order.checkoutStatus === 'pending' || order.checkoutStatus === 'review').map(orderSummary)
 }

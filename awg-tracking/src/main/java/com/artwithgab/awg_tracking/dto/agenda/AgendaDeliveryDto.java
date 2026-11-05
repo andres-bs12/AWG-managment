@@ -23,6 +23,8 @@ public record AgendaDeliveryDto(
         String timeLabel,
         String phone,
         String addressLabel,
-        String photoUrl
+        String photoUrl,
+        java.math.BigDecimal remaining,
+        com.artwithgab.awg_tracking.enums.PaymentState paymentState
 ) {
 }

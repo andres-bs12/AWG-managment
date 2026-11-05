@@ -4,7 +4,8 @@ import type { BuyDraft, BuyItem } from '../../lib/buyDraft'
 /** Synthetic guide fixtures. No customer, order or network state is read. */
 export const guideConfig: ShopConfig = {
   seasonEnd: '2026-12-24', deliveriesFrom: '2026-11-30', seasonOver: false, enabled: true,
-  customPrice: 49.99, nameExtra: 12.99, deliveryFee: 0, maxItems: 3,
+  customPrice: 49.99,
+  finishedPrice: 39.99, nameExtra: 12.99, deliveryFee: 0, maxItems: 3,
   colors: (['red', 'green', 'beige'] as const).flatMap(color => (['shiny', 'matte'] as const).map(finish => ({ color, finish, inStock: !(color === 'green' && finish === 'matte') }))),
 }
 export const guideItem = (uid = 'guide-item'): BuyItem => ({ uid, color: 'red', finish: 'shiny', withName: true, backName: 'LUNA', petName: 'Luna', note: '', photos: [], photosNeedReload: false })

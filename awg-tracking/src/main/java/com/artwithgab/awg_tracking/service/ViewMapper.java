@@ -82,7 +82,9 @@ public class ViewMapper {
                 o.getOrderItems().stream().map(i -> i.getId().toString()).toList(),
                 o.isHandedOver(),
                 o.isPaymentReview(),
-                List.of());
+                List.of(),
+                o.getCheckoutStatus() == null ? null : o.getCheckoutStatus().name().toLowerCase(java.util.Locale.ROOT),
+                o.getSource());
     }
 
     /** Day the item is handed off, resolved against the calendar. */

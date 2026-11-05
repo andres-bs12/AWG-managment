@@ -26,6 +26,10 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    /** Optimistic lock: concurrent writers get 409 CONFLICT instead of overwriting each other. */
+    @jakarta.persistence.Version
+    private long version;
+
     /** Public code (AWG + 4 digits). Used by Track and in links. */
     @Column(nullable = false, unique = true)
     private String code;

@@ -1,7 +1,7 @@
 import type { Address, CapacityResult, CustomFinish, CreateSaleItemInput, ItemKind, Market, MarketDay, OrnamentColor } from '../../domain/types'
 import { isMarketPickupWeekday } from '../../lib/calendar'
 import { formatDateLabel, formatHour, formatMinutes, hoursOverlap } from '../../lib/time'
-import { itemCost } from '../../lib/money'
+import { itemCost, type Pricing } from '../../lib/money'
 
 export const SALE_DRAFT_KEY = 'awg-sale-draft'
 
@@ -154,8 +154,8 @@ export function applySlot(item: DraftItem, date: string, start: number, end: num
   }
 }
 
-export function draftTotal(items: DraftItem[]): number {
-  return items.reduce((sum, item) => sum + itemCost(item.kind, item.withName), 0)
+export function draftTotal(items: DraftItem[], prices: Pricing): number {
+  return Math.round(items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0) * 100) / 100
 }
 
 export function paintMinutes(items: DraftItem[]): number {
@@ -222,8 +222,6 @@ export const SLOT_TAKEN_COPY = 'That hour is taken · change / place on board'
 
 export function saleErrorMessage(err: unknown, fallback = 'Could not create sale'): string {
   const msg = err instanceof Error ? err.message : ''
-  if ((err as { code?: string })?.code === 'DELIVERY_DAY_INVALID') return 'Choose a Wednesday, Friday or 24 December without a market, before the season ends.'
-  if (/overlap/i.test(msg) || /hour is taken/i.test(msg)) return SLOT_TAKEN_COPY
   return msg || fallback
 }
 

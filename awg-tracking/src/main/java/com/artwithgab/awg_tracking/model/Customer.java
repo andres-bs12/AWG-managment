@@ -34,6 +34,10 @@ public class Customer {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    /** Optimistic lock: concurrent writers get 409 CONFLICT instead of overwriting each other. */
+    @jakarta.persistence.Version
+    private long version;
+
     @Column(nullable = false)
     private String name = "";
     @Column(nullable = false)

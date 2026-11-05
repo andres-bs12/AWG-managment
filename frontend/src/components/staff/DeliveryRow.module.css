@@ -1,28 +1,24 @@
 .dlv {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: var(--space-7) minmax(0, 1fr) auto;
+  gap: var(--space-3);
   width: 100%;
   text-align: left;
-  background: #fff;
-  border: 1px solid var(--staff-line);
-  border-radius: 10px;
-  padding: 10px;
-  margin-bottom: 8px;
-  min-height: var(--touch-lg);
+  background: var(--staff-surface);
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--space-3);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+  min-height: var(--size-control-staff);
   color: inherit;
-  transition:
-    background 0.12s ease,
-    color 0.12s ease,
-    border-color 0.12s ease,
-    transform 0.12s ease;
+  transition: transform var(--dur-press) var(--ease-press);
 }
 
 .dlv:hover,
 .dlv:focus-visible {
   border-color: var(--staff-btn);
-  background: var(--staff-btn);
-  color: #f7f3ea;
+  background: var(--color-selection-hover);
+  color: var(--staff-ink);
 }
 
 .dlv:hover span,
@@ -31,9 +27,9 @@
 }
 
 .dlv:active {
-  transform: translateY(1px);
-  background: #11100e;
-  color: #f7f3ea;
+  transform: translateY(var(--border-thin));
+  background: var(--color-selection-hover);
+  color: var(--staff-ink);
 }
 
 .dlv:focus-visible {
@@ -43,45 +39,47 @@
 
 .dlv img,
 .thumb {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
+  width: var(--space-7);
+  height: var(--space-7);
+  border-radius: var(--space-2);
   object-fit: cover;
-  background: #e4ddd0;
+  background: var(--color-selection-hover);
 }
 
 .dlvBody {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
   min-width: 0;
 }
 
 .dlvBody strong {
-  font-size: 0.95rem;
+  font-size: var(--type-staff-meta-size);
 }
 
 .dlvBody span {
   color: var(--staff-muted);
-  font-size: var(--fs-small);
+  font-size: var(--type-staff-meta-size);
 }
 
 .dlvAside {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
+  gap: var(--space-1);
   color: var(--staff-muted);
-  font-size: 12px;
+  font-size: var(--type-staff-meta-size);
 }
 
 .dlvTime {
   color: var(--staff-ink);
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: var(--type-staff-meta-size);
 }
 
 .dlv:hover .dlvTime,
 .dlv:focus-visible .dlvTime {
-  color: #f7f3ea;
+  color: var(--staff-canvas-text);
 }
+
+.dlv { border-color: var(--color-control-border); }

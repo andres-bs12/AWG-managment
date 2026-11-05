@@ -1,5 +1,4 @@
 import { validatePhoto } from '../../lib/photoValidation'
-import { apiError } from '../../lib/apiError'
 import type { Api } from '../contracts'
 import type {
   AgendaDay,
@@ -16,7 +15,6 @@ import type {
 } from '../../domain/types'
 
 const TOKEN_KEY = 'awg-staff-token'
-const LOGIN_ROUTE = '/staff/login'
 const NETWORK_ERROR = 'Could not reach the server. Check your connection.'
 
 const baseUrl: string = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
@@ -26,7 +24,7 @@ export class HttpError extends Error {
   code?: string
   field?: string
   constructor(message: string, status: number, code?: string, field?: string) {
-    super(apiError({ code, message }, 'en', message).text)
+    super(message)
     this.status = status
     this.code = code
     this.field = field
@@ -92,7 +90,7 @@ async function request<T>(path: string, init: RequestInit = {}, opts: RequestOpt
       } catch {
         /* ignore */
       }
-      window.location.assign(LOGIN_ROUTE)
+      window.dispatchEvent(new Event('awg-session-expired'))
     }
     let message = ''
     let code: string | undefined
@@ -108,6 +106,9 @@ async function request<T>(path: string, init: RequestInit = {}, opts: RequestOpt
     throw new HttpError(message || `Request failed (${response.status}).`, response.status, code, field)
   }
 
+  if (opts.auth && init.method && !['GET', 'HEAD'].includes(init.method)) {
+    window.dispatchEvent(new Event('awg-staff-data-changed'))
+  }
   if (response.status === 204) return undefined as T
   const text = await response.text()
   return (text ? JSON.parse(text) : undefined) as T
@@ -234,6 +235,8 @@ export const httpApi: Api = {
       (await request('/api/agenda/move-suggestion', jsonInit('POST', input), staff)) ?? null,
   },
   orders: {
+    search: (query) => request(`/api/orders/search?q=${enc(query)}`, {}, staff),
+    attention: () => request('/api/orders/attention', {}, staff),
     getOrder: (id) => request(`/api/orders/${enc(id)}`, {}, staff),
     getOrderByCode: async (code) => {
       try {

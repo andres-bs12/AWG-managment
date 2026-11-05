@@ -43,3 +43,21 @@ Actualizado 2026-11-05 con tus respuestas y con lo que encontró la auditoría f
 - **Base de datos:** migraciones Flyway (V1, V2 y V3).
 - **Contraseñas del staff:** pantalla *Change password*.
 - **`package-lock.json` de la raíz:** borrado (estaba vacío).
+
+## Staff Task 11 — decisiones reservadas al dueño
+
+Por instrucción expresa del dueño, no se implementan en Task 11:
+
+- **P1-14:** edición de ítems después de vender (fecha, hora, color/acabado, añadir/retirar y nombre sin reembolso). Falta definir alcance y API bajo el lock de agenda.
+- **P1-17:** entrega por ítem frente a entrega por pedido en pedidos mixtos. Se conserva el modelo por pedido; la lista agrupa las filas equivalentes y comprueba todos los adornos antes de entregar.
+- **P1-18:** cancelación lógica, motivo y conservación contable. Se conserva el borrado actual con confirmación explícita de lo que se pierde y del dinero recibido. La corrección de Claude que evita reponer bases ya pintadas sí se mantiene y está reflejada en el mock.
+- **P1-22:** capacidad por día de la semana y límite separado para el puesto. La UI muestra los límites que da el servidor y advierte sobre reservas manuales; no cambia los máximos acordados anteriormente sin una nueva decisión.
+
+## 12. Pedidos web sin pagar que bloquean stock y horas (seguridad, 2026-11-05)
+
+Al empezar el pago, la tienda reserva enseguida la bola y la hora de pintura. Hoy los límites son 5 intentos por minuto por IP y 15 pedidos pendientes en total. Alguien que no paga podría bloquear los colores que quedan durante el tiempo que dura la sesión de Stripe (30 minutos).
+
+- **Opción A (recomendada):** limitar a 2 pedidos pendientes por e-mail y por dispositivo, y acortar la reserva a 15 minutos.
+- **Opción B:** no reservar hasta que Stripe confirme el pago. Esto conlleva el riesgo de vender dos veces la última bola.
+
+¿Cuál prefieres?

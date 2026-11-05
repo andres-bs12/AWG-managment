@@ -232,7 +232,7 @@ class ShopApiTests extends ApiTestSupport {
     void configListsColorsWithStock() throws Exception {
         mvc.perform(get("/api/shop/config")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.colors[?(@.color=='red')].inStock").value(org.hamcrest.Matchers.hasItem(true)))
-                .andExpect(jsonPath("$.finishedPrice").doesNotExist());
+                .andExpect(jsonPath("$.finishedPrice").value(39.99));
     }
 
     @Test
