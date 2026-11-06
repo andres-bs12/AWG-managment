@@ -1,8 +1,10 @@
+import { apiError } from '../../lib/apiError'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import { OrderReceipt } from '../../components/public/OrderReceipt'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
+import { readFormToken } from '../../api/formTokens'
 import { GiftBoxReady } from '../../components/public/GiftBoxReady'
 import { PaintingOrnament } from '../../components/public/PaintingOrnament'
 import { SleighWipe } from '../../components/public/SleighWipe'
@@ -25,6 +27,8 @@ export function TrackPage() {
   const { t, locale } = useLocale()
   const { code: codeParam } = useParams()
   const navigate = useNavigate()
+  // Arriving from the QR form: confirm the save once, here where the order state is shown.
+  const formSaved = !!(useLocation().state as { formSaved?: boolean } | null)?.formSaved
   const timers = useRef<number[]>([])
 
   const [fetchPhase, setPhase] = useState<Phase>(codeParam ? 'checking' : 'idle')
@@ -35,6 +39,10 @@ export function TrackPage() {
   const [addr, setAddr] = useState<Address>({ line1: '', city: 'Vienna', postalCode: '' })
   const [editing, setEditing] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [copyMessage, setCopyMessage] = useState('')
+  const [savingAddress, setSavingAddress] = useState(false)
+  const [addressError, setAddressError] = useState('')
+  const [addressField, setAddressField] = useState('')
 
   useEffect(() => {
     if (!codeParam) return
@@ -66,10 +74,10 @@ export function TrackPage() {
           }, MIN_WIPE_MS),
         )
       })
-      .catch((err: Error) => {
+      .catch((err) => {
         if (cancelled) return
         setLoaded(null)
-        setError(err.message || t('trackNotFound'))
+        setError(apiError(err, locale, t('trackNotFound')).text)
         setPhase('done')
         setDialogOpen(true)
       })
@@ -79,7 +87,7 @@ export function TrackPage() {
       timers.current.forEach(window.clearTimeout)
       timers.current = []
     }
-  }, [codeParam, reloadKey, t])
+  }, [codeParam, reloadKey, t, locale])
 
   /** Without a code in the URL there is nothing to show, whatever a previous lookup left behind. */
   const phase: Phase = codeParam ? fetchPhase : 'idle'
@@ -87,19 +95,31 @@ export function TrackPage() {
   const error = codeParam ? fetchError : ''
 
   async function saveAddress() {
-    if (!view) return
-    const next = await api.tracking.updateViennaAddress(view.code, addr)
-    setLoaded(next)
-    setEditing(false)
-    setSaved(true)
+    if (!view || savingAddress) return
+    setSavingAddress(true)
+    setAddressError('')
+    setAddressField('')
+    try {
+      const next = await api.tracking.updateViennaAddress(view.code, addr)
+      setLoaded(next)
+      setEditing(false)
+      setSaved(true)
+    } catch (err) {
+      const problem = apiError(err, locale, t('addressSaveError'))
+      const field = problem.field?.replace(/^address\./, '') ?? ''
+      setAddressField(['line1', 'line2', 'postalCode', 'city'].includes(field) ? field : '')
+      setAddressError(problem.text)
+    } finally {
+      setSavingAddress(false)
+    }
   }
 
+  const hasFormToken = !!view && !!readFormToken(view.code)
   const status = view?.status ?? 'preparing'
-  const homeDelivery = view?.delivery.kind === 'vienna'
   const statusLabel =
-    status === 'delivered' ? t('delivered') : status === 'ready' ? (homeDelivery ? t('outForDelivery') : t('ready')) : t('preparing')
+    status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
   const stepIndex = status === 'delivered' ? 2 : status === 'ready' ? 1 : 0
-  const steps = [t('stepPainting'), homeDelivery ? t('outForDelivery') : t('stepReady'), t('stepHandover')]
+  const steps = [t('stepPainting'), t('ready'), t('stepHandover')]
   /** Sleigh only after a hit — misses stay in the dialog without this animation. */
   const showWipe = phase === 'loading' || phase === 'leaving'
 
@@ -108,7 +128,7 @@ export function TrackPage() {
   if (view) {
     const when = view.when
     if (when.kind === 'vienna') {
-      whenLines.push(t('whenVienna'))
+      whenLines.push([t('whenVienna'), when.date ? formatDateLabel(when.date, locale === 'de' ? 'de-AT' : 'en-GB') : ''].filter(Boolean).join(' · '))
     } else if (when.kind === 'market') {
       const head = [
         when.date ? formatDateLabel(when.date, locale === 'de' ? 'de-AT' : 'en-GB') : null,
@@ -127,6 +147,8 @@ export function TrackPage() {
   return (
     <div className={styles.page}>
       {showWipe ? <SleighWipe label={t('sleigh')} leaving={phase === 'leaving'} /> : null}
+      {/* The form was saved even if loading the order below fails: confirm it regardless. */}
+      {formSaved && <p className={styles.savedBanner} role="status">{t('formSavedBanner')}</p>}
 
       {view && phase === 'done' ? (
         <section className={styles.card} aria-live="polite">
@@ -146,14 +168,16 @@ export function TrackPage() {
             >
               {statusLabel}
             </span>
-            <h1 className={styles.title}>{t('trackGreeting', { name: view.customerName })}</h1>
+            <h1 className={styles.title}>{view.customerName && view.customerName !== 'Walk-in' ? t('trackGreeting', { name: view.customerName }) : (locale === 'de' ? 'Deine Bestellung' : 'Your order')}</h1>
 
             <ProgressSteps labels={steps} current={stepIndex} label={statusLabel} />
 
             <dl className={styles.facts}>
               <div>
                 <dt>{t('trackCode')}</dt>
-                <dd className={styles.code}>{view.code}</dd>
+                <dd className={styles.codeRow}><span className={styles.code}>{view.code}</span>
+                  <Button variant="secondary" onClick={() => { void navigator.clipboard.writeText(view.code).then(() => setCopyMessage('copiedCode')).catch(() => setCopyMessage('copyFailed')) }}>{t('copyCode')}</Button>
+                  <span role="status" className={styles.copyStatus}>{copyMessage && t(copyMessage)}</span></dd>
               </div>
               <div>
                 <dt>{t('pickupWhen')}</dt>
@@ -171,38 +195,39 @@ export function TrackPage() {
                 {!editing ? (
                   <>
                     {saved ? <p className={styles.saved}>{t('addressSaved')}</p> : null}
-                    <Button variant="secondary" fullWidth onClick={() => setEditing(true)}>
+                    {hasFormToken ? <Button variant="secondary" fullWidth onClick={() => setEditing(true)}>
                       {t('editAddress')}
-                    </Button>
+                    </Button> : <p>{locale === 'de' ? 'Öffne deinen persönlichen Formularlink, um die Lieferadresse zu ändern.' : 'Open your personal form link to change the delivery address.'}</p>}
                   </>
                 ) : (
                   <div>
-                    <Field label={t('street')} htmlFor="line1">
+                    <Field label={t('street')} htmlFor="line1" error={addressField === 'line1' ? addressError : undefined}>
                       <input
                         id="line1"
                         value={addr.line1}
                         onChange={(e) => setAddr({ ...addr, line1: e.target.value })}
                       />
                     </Field>
-                    <Field label={t('extra')} htmlFor="line2">
+                    <Field label={t('extra')} htmlFor="line2" error={addressField === 'line2' ? addressError : undefined}>
                       <input
                         id="line2"
                         value={addr.line2 ?? ''}
                         onChange={(e) => setAddr({ ...addr, line2: e.target.value })}
                       />
                     </Field>
-                    <Field label={t('postal')} htmlFor="postal">
+                    <Field label={t('postal')} htmlFor="postal" error={addressField === 'postalCode' ? addressError : undefined}>
                       <input
                         id="postal"
                         value={addr.postalCode}
                         onChange={(e) => setAddr({ ...addr, postalCode: e.target.value })}
                       />
                     </Field>
-                    <Field label={t('city')} htmlFor="city">
+                    <Field label={t('city')} htmlFor="city" error={addressField === 'city' ? addressError : undefined}>
                       <input id="city" value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} />
                     </Field>
-                    <Button fullWidth onClick={() => void saveAddress()}>
-                      {t('saveAddress')}
+                    {addressError && !addressField ? <p role="alert" className={styles.addressError}>{addressError}</p> : null}
+                    <Button fullWidth disabled={savingAddress} onClick={() => void saveAddress()}>
+                      {savingAddress ? t('saving') : t('saveAddress')}
                     </Button>
                   </div>
                 )}

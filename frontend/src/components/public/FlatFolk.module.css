@@ -1,0 +1,203 @@
+/**
+ * Limb pivots are in the figure's own viewBox units (`transform-box: view-box`), so the hip,
+ * shoulder and neck coordinates below match the paths in FlatFolk.tsx.
+ */
+.legA,
+.legB,
+.armA,
+.armB,
+.wave,
+.pedalA,
+.spin,
+.yetiWave,
+.nod,
+.swing,
+.step,
+.stepSlow,
+.ride {
+  transform-box: view-box;
+}
+
+.legA {
+  transform-origin: 18px 42px;
+  animation: stride 0.64s ease-in-out infinite;
+}
+
+.legB {
+  transform-origin: 22px 42px;
+  animation: stride 0.64s ease-in-out -0.32s infinite;
+}
+
+.armA {
+  transform-origin: 21px 30.5px;
+  animation: stride 0.64s ease-in-out -0.32s infinite;
+}
+
+.armB {
+  transform-origin: 19px 30.5px;
+  animation: stride 0.64s ease-in-out infinite;
+}
+
+.stepSlow .legA,
+.stepSlow .legB,
+.stepSlow .armA,
+.stepSlow .armB {
+  animation-duration: 0.84s;
+}
+
+.stepSlow .legB,
+.stepSlow .armA {
+  animation-delay: -0.42s;
+}
+
+.step {
+  animation: bob 0.32s ease-in-out infinite alternate;
+}
+
+.stepSlow {
+  animation: bob 0.42s ease-in-out infinite alternate;
+}
+
+.wave {
+  transform-origin: 21.4px 31.2px;
+  animation: wave 1s ease-in-out infinite;
+}
+
+.ride {
+  animation: bob 0.5s ease-in-out infinite alternate;
+}
+
+.pedalA {
+  transform-origin: 28px 30px;
+  animation: pedal 0.7s ease-in-out infinite;
+}
+
+.spin {
+  animation: spin 0.7s linear infinite;
+}
+
+.yetiWave {
+  transform-origin: 40px 40px;
+  animation: yetiWave 1.4s ease-in-out infinite;
+}
+
+.nod {
+  transform-origin: 49px 32px;
+  animation: nod 4.2s ease-in-out infinite;
+}
+
+.swing {
+  animation: swing 2.6s ease-in-out infinite;
+}
+
+.lampGlow {
+  animation: glow 3.2s ease-in-out infinite alternate;
+}
+
+@keyframes stride {
+  0%,
+  100% {
+    transform: rotate(-20deg);
+  }
+  50% {
+    transform: rotate(20deg);
+  }
+}
+
+@keyframes bob {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-1.2px);
+  }
+}
+
+@keyframes wave {
+  0%,
+  100% {
+    transform: rotate(-8deg);
+  }
+  50% {
+    transform: rotate(22deg);
+  }
+}
+
+@keyframes pedal {
+  0%,
+  100% {
+    transform: rotate(-10deg);
+  }
+  50% {
+    transform: rotate(14deg);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes yetiWave {
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(18deg);
+  }
+}
+
+/** Mostly still, with an occasional look around — reads as alive without fidgeting. */
+@keyframes nod {
+  0%,
+  70%,
+  100% {
+    transform: rotate(0deg);
+  }
+  78% {
+    transform: rotate(8deg);
+  }
+  88% {
+    transform: rotate(-3deg);
+  }
+}
+
+@keyframes swing {
+  0%,
+  100% {
+    transform: rotate(-9deg);
+  }
+  50% {
+    transform: rotate(11deg);
+  }
+}
+
+@keyframes glow {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .legA,
+  .legB,
+  .armA,
+  .armB,
+  .wave,
+  .pedalA,
+  .spin,
+  .yetiWave,
+  .nod,
+  .swing,
+  .step,
+  .stepSlow,
+  .ride,
+  .lampGlow {
+    animation: none;
+  }
+}

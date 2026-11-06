@@ -1,165 +1,32 @@
-.shell {
-  min-height: 100vh;
-  width: 100%;
-  background: var(--staff-bg);
-  color: var(--staff-ink);
-  font-family: var(--font-staff);
-}
+.shell { min-height: 100dvh; width: 100%; background: var(--staff-bg); color: var(--staff-ink); font-family: var(--font-staff); }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--staff-surface); border-bottom: 1px solid var(--staff-line); }
+.brand { font-weight: 700; display: flex; gap: var(--space-2); align-items: baseline; }
+.brand span { color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
+.search { display: flex; gap: var(--space-2); flex: 1 1 var(--size-staff-search-min); min-width: min(100%, var(--size-staff-search-min)); }
+.search input { min-width: 0; width: 100%; min-height: var(--size-control-staff); padding: var(--space-2) var(--space-3); border: 1px solid var(--color-control-border); border-radius: var(--radius-control); color: var(--staff-ink); background: var(--staff-surface); }
+.desktopNav { display: flex; gap: var(--space-2); }
+.main { max-width: var(--layout-staff-max); padding: var(--space-4) var(--space-4) calc(var(--size-staff-tabs) + var(--space-6) + env(safe-area-inset-bottom)); margin: 0 auto; min-width: 0; }
+.mainBleed { height: 100%; min-height: 0; }
+.shellPaint { height: 100dvh; overflow: hidden; }
+.bottomTabs { position: fixed; bottom: 0; inset-inline: 0; z-index: var(--z-staff-tabs); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-1); padding: var(--space-2) var(--space-2) calc(var(--space-2) + env(safe-area-inset-bottom)); background: var(--staff-surface); border-top: 1px solid var(--staff-line); }
+.bottomTabs > * { min-width: 0; padding-inline: var(--space-1); font-size: var(--type-staff-meta-size); text-align: center; white-space: nowrap; }
+.more { display: grid; gap: var(--space-2); }
+.more > * { justify-content: flex-start; }
+/* Logging out costs a password on the shared iPad: set it apart from navigation. */
+.more > :last-child { margin-top: var(--space-3); border-top: var(--border-thin) solid var(--staff-line); border-radius: 0; color: var(--staff-danger); }
+.session { min-height: 100dvh; display: grid; align-content: center; justify-items: center; gap: var(--space-4); padding: var(--space-5); background: var(--staff-bg); color: var(--staff-ink); }
+.status { padding: var(--space-3) var(--space-4); color: var(--staff-muted); }
+@media (max-width: 1100px) { .desktopNav { display: none; } }
+@media (min-width: 1101px) { .bottomTabs { display: none; } .main { padding-bottom: var(--space-6); } }
+/* Phones: the Search tab already opens order search, so the header keeps one row and the page gets the height. */
+@media (max-width: 639px) { .search { display: none; } }
 
-.bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
-  background: var(--staff-surface);
-  border-bottom: 1px solid var(--staff-line);
-}
-
-.brand {
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.nav {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.nav a {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 14px;
-  border-radius: 999px;
-  text-decoration: none;
-  font-weight: 650;
-}
-
-.nav a:hover {
-  background: var(--staff-hover);
-}
-
-.nav a:active {
-  transform: translateY(1px);
-  background: #ddd6c6;
-}
-
-.nav a:focus-visible {
-  outline: none;
-  box-shadow: var(--focus);
-}
-
-.nav a[data-selected='true'],
-.nav a[data-active='true'] {
-  background: var(--staff-selected);
-  color: #f7f3ea;
-  border-color: var(--staff-selected);
-  box-shadow: inset 0 0 0 2px #f7f3ea;
-}
-
-.nav a[data-selected='true']::before,
-.nav a[data-active='true']::before {
-  content: none;
-}
-
-.nav a[data-selected='true']:hover,
-.nav a[data-active='true']:hover {
-  background: #2c2923;
-  border-color: #2c2923;
-}
-
-.nav a[data-selected='true']:active,
-.nav a[data-active='true']:active {
-  background: var(--staff-pressed);
-}
-
-.nav a[data-selected='true']:focus-visible,
-.nav a[data-active='true']:focus-visible {
-  box-shadow: var(--focus), inset 0 0 0 2px #f7f3ea;
-}
-
-.who {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  color: var(--staff-muted);
-  font-size: var(--fs-small);
-  font-weight: 500;
-  min-width: 0;
-}
-
-.whoName {
-  padding: 0 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 12rem;
-}
-
-.who button.logout {
-  min-height: 32px;
-  padding: 0 8px;
-  border-color: transparent;
-  font-size: var(--fs-small);
-  font-weight: 500;
-  color: var(--staff-muted);
-  letter-spacing: 0;
-}
-
-.who button.logout:hover:not(:disabled) {
-  background: var(--staff-hover);
-  color: var(--staff-ink);
-  border-color: transparent;
-}
-
-.who button.logout:active:not(:disabled) {
-  background: #ddd6c6;
-  border-color: transparent;
-}
-
-@media (max-width: 720px) {
-  .bar {
-    flex-wrap: wrap;
-  }
-
-  .brand {
-    order: 1;
-  }
-
-  .who {
-    order: 2;
-    margin-left: auto;
-  }
-
-  .nav {
-    order: 3;
-    flex: 1 1 100%;
-  }
-}
-
-.main {
-  padding: 16px 20px 32px;
-  max-width: 1280px;
-  margin: 0 auto;
-}
-
-.shellPaint {
-  height: 100%;
-  height: 100dvh;
-  overflow: hidden;
-}
-
-.mainBleed {
-  height: 100%;
-  min-height: 0;
-  padding: 0;
-  max-width: none;
-}
-
-@media (max-width: 720px) {
-  .nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-1); }
-  .nav a { padding: 0 var(--space-2); justify-content: center; font-size: var(--fs-small); border-radius: var(--radius); }
+.actionsRoot:empty { display: none; }
+@media (max-width: 1100px) {
+  .shell { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+  .headerArea, .actionsRoot, .bottomTabs { flex-shrink: 0; }
+  .main { flex: 1; min-height: 0; width: 100%; overflow: auto; padding-bottom: var(--space-4); overscroll-behavior: contain; scroll-padding-block: var(--space-4); }
+  .actionsRoot { padding-inline: var(--space-4); }
+  .bottomTabs { position: static; }
+  .shellPaint { display: block; }
 }

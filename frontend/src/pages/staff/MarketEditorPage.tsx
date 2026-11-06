@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
+import { StaffDialog } from '../../components/staff/StaffDialog'
+import { parseEuroAmount } from '../../lib/staffInput'
 import { StaffBackLink } from '../../components/staff/StaffBackLink'
 import { Button } from '../../components/ui/Button'
 import { Field } from '../../components/ui/Field'
@@ -61,6 +63,8 @@ function clock(value: string): string {
   return match ? `${match[1]}:${match[2]}` : value
 }
 
+
+const STALL_ERROR = 'Stall number must be a whole number of 1 or more'
 export function MarketEditorPage() {
   const { id } = useParams()
   return <MarketEditor key={id ?? 'new'} />
@@ -82,6 +86,13 @@ function MarketEditor() {
   const [missing, setMissing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const actionErrorRef = useRef<HTMLParagraphElement>(null)
+  // A day-level conflict from the server names the day first ("Fri 11 Dec: …"); mark that row too.
+  const [conflictDate, setConflictDate] = useState<string | null>(null)
+  // Save sits at the bottom of a long form: show the error there and move focus to it (Save is disabled while busy).
+  useEffect(() => { if (error) actionErrorRef.current?.focus() }, [error])
+  const [deleting, setDeleting] = useState<DayDraft | 'market' | null>(null)
+  const [originalBusy, setOriginalBusy] = useState(false)
   const [notice, setNotice] = useState(
     () => (location.state as { notice?: string } | null)?.notice ?? '',
   )
@@ -109,7 +120,9 @@ function MarketEditor() {
         setCost(String(market.totalCost))
         setStall(market.stall == null ? '' : String(market.stall))
         setDays(marketDays.map(toDraft).sort((a, b) => a.date.localeCompare(b.date)))
-        setBusyIds(busyDayIds(agenda, marketId))
+        const used = busyDayIds(agenda, marketId)
+        setBusyIds(used)
+        setOriginalBusy(marketDays.some(day => used.has(day.id)))
         setReady(true)
       })
       .catch((err: unknown) => {
@@ -142,13 +155,13 @@ function MarketEditor() {
     if (!start || !finish) return 'Season start and end are required'
     if (finish < start) return 'Season end must be on or after the start'
     if (!marketPickupDates(start, finish).length) return 'No Friday, Saturday, or Sunday in this range'
-    const costNumber = Number(cost)
+    const costNumber = parseEuroAmount(cost)
     if (cost.trim() === '' || !Number.isFinite(costNumber) || costNumber < 0) {
       return 'Season cost must be zero or more'
     }
     const stallNumber = Number(stall)
     if (stall.trim() === '' || !Number.isInteger(stallNumber) || stallNumber < 1) {
-      return 'Stall number must be a whole number of 1 or more'
+      return STALL_ERROR
     }
     for (const day of days) {
       const open = parseHour(clock(day.open))
@@ -170,13 +183,14 @@ function MarketEditor() {
     }
     setBusy(true)
     setError('')
+    setConflictDate(null)
     try {
       const saved = await api.markets.saveMarket({
         id: marketId,
         name: name.trim(),
         startDate: start,
         finishDate: finish,
-        totalCost: Number(cost),
+        totalCost: parseEuroAmount(cost),
         stall: Number(stall),
         days: days.map((day) => ({
           date: day.date,
@@ -186,40 +200,34 @@ function MarketEditor() {
       })
       if (!marketId) {
         setNotice('Market created')
-        window.scrollTo({ top: 0, behavior: 'smooth' })
+        document.getElementById('staff-main')?.scrollTo({ top: 0, behavior: 'instant' })
+        window.scrollTo({ top: 0, behavior: 'instant' })
         navigate(`/staff/markets/${saved.market.id}`, { replace: true, state: { notice: 'Market created' } })
         return
       }
+      removedRef.current.clear()
       setDays(saved.days.map(toDraft))
       setNotice('Market updated')
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      document.getElementById('staff-main')?.scrollTo({ top: 0, behavior: 'instant' })
+      window.scrollTo({ top: 0, behavior: 'instant' })
     } catch (err) {
       setNotice('')
-      setError(err instanceof Error ? err.message : 'Could not save market')
+      const message = err instanceof Error ? err.message : 'Could not save market'
+      const field = err && typeof err === 'object' && 'field' in err ? (err as { field?: string }).field : undefined
+      const plain = (text: string) => text.replace(/,/g, '').toLowerCase()
+      setConflictDate(field === 'days' ? days.find(day => plain(message).startsWith(plain(formatDateLabel(day.date))))?.date ?? null : null)
+      setError(message)
     } finally {
       setBusy(false)
     }
   }
 
-  async function onDeleteDay(day: DayDraft) {
+  function stageDeleteDay(day: DayDraft) {
     if (day.id && busyIds.has(day.id)) return
-    setError('')
-    setNotice('')
-    if (!day.id) {
-      removedRef.current.add(day.date)
-      setDays((current) => current.filter((row) => row.date !== day.date))
-      return
-    }
-    setBusy(true)
-    try {
-      await api.markets.deleteMarketDay(day.id)
-      removedRef.current.add(day.date)
-      setDays((current) => current.filter((row) => row.date !== day.date))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not delete this day')
-    } finally {
-      setBusy(false)
-    }
+    removedRef.current.add(day.date)
+    setDays(current => current.filter(row => row.date !== day.date))
+    setNotice('Day removed from draft. Save to apply all changes.')
+    setDeleting(null)
   }
 
   async function onDeleteMarket() {
@@ -231,11 +239,12 @@ function MarketEditor() {
       navigate('/staff/markets')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete market')
+      setDeleting(null)
       setBusy(false)
     }
   }
 
-  const marketLocked = days.some((day) => day.id && busyIds.has(day.id))
+  const marketLocked = originalBusy || days.some((day) => day.id && busyIds.has(day.id))
   const seasonHint = (() => {
     if (start && finish && finish < start) return 'Season end must be on or after the start.'
     if (start && finish && !marketPickupDates(start, finish).length) {
@@ -264,16 +273,11 @@ function MarketEditor() {
       </div>
 
       <form className={styles.form} onSubmit={(event) => void onSave(event)}>
-        {error ? (
-          <p className={styles.error} role="alert">
-            {error}
-          </p>
-        ) : null}
         {notice ? (
           <section className={styles.notice} role="status">
             <h2>{notice}</h2>
             <p>{name} · Stall {stall} · {days.length} days</p>
-            <a href="/staff/agenda">View agenda →</a>
+            <Link to="/staff/agenda">View agenda →</Link>
           </section>
         ) : null}
 
@@ -308,7 +312,7 @@ function MarketEditor() {
               onChange={(event) => changeFinish(event.target.value)}
             />
           </Field>
-          <Field label="Season cost" htmlFor="market-cost" hint="Euros for the whole season">
+          <Field label="Season cost (€, whole season)" htmlFor="market-cost">
             <input
               id="market-cost"
               className={styles.input}
@@ -320,7 +324,7 @@ function MarketEditor() {
               }}
             />
           </Field>
-          <Field label="Stall number" htmlFor="market-stall">
+          <Field label="Stall number" htmlFor="market-stall" error={error === STALL_ERROR ? 'Use a whole number of 1 or more.' : undefined} announceError={false}>
             <input
               id="market-stall"
               className={styles.input}
@@ -336,6 +340,12 @@ function MarketEditor() {
 
         <div className={styles.days}>
           <h2>Market days</h2>
+          <p className={styles.hint}>All day and hour changes are staged until Save.</p>
+          {days.length > 1 && <Button tone="staff" variant="secondary" onClick={() => {
+            const first = days[0]
+            setDays(current => current.map(day => ({ ...day, open: first.open, close: first.close })))
+            setNotice('Hours copied from the first day. Save to apply all changes.')
+          }}>Apply first day hours to all days</Button>}
           <p className={styles.hint}>{seasonHint}</p>
           {days.length === 0 ? (
             <p className={styles.empty}>No pickup days in this season.</p>
@@ -344,8 +354,8 @@ function MarketEditor() {
               {days.map((day) => {
                 const locked = Boolean(day.id && busyIds.has(day.id))
                 return (
-                  <li key={day.date} className={styles.day}>
-                    <p className={styles.dayDate}>{formatDateLabel(day.date)}</p>
+                  <li key={day.date} className={styles.day} data-invalid={conflictDate === day.date || undefined}>
+                    <p className={styles.dayDate}>{formatDateLabel(day.date)}{conflictDate === day.date ? <span className={styles.dayConflict}>Has Vienna deliveries</span> : null}</p>
                     <label className={styles.time}>
                       <span>Open</span>
                       <input
@@ -384,11 +394,13 @@ function MarketEditor() {
                       {locked ? <span className={styles.locked}>Has orders</span> : null}
                       <Button
                         tone="staff"
-                        variant="danger"
+                        variant="ghost"
+                        className={styles.removeDay}
                         disabled={locked || busy}
-                        onClick={() => void onDeleteDay(day)}
+                        aria-label={`Remove ${formatDateLabel(day.date)}`}
+                        onClick={() => setDeleting(day)}
                       >
-                        Delete day
+                        Remove
                       </Button>
                     </div>
                   </li>
@@ -402,16 +414,22 @@ function MarketEditor() {
           <Button type="submit" tone="staff" variant="primary" size="lg" disabled={busy}>
             Save
           </Button>
+          {error ? <p ref={actionErrorRef} tabIndex={-1} className={styles.error} role="alert">{error}</p> : null}
           {marketId ? (
             <div className={styles.deleteMarket}>
               {marketLocked ? <p className={styles.locked}>This market has orders and cannot be deleted.</p> : null}
-              <Button tone="staff" variant="danger" disabled={marketLocked || busy} onClick={() => void onDeleteMarket()}>
+              <Button tone="staff" variant="ghost" className={styles.deleteMarketBtn} disabled={marketLocked || busy} onClick={() => setDeleting('market')}>
                 Delete market
               </Button>
             </div>
           ) : null}
         </div>
       </form>
+      {deleting && <StaffDialog title={deleting === 'market' ? 'Delete market?' : 'Remove day?'} busy={busy} onClose={() => setDeleting(null)}>
+        <p>{deleting === 'market' ? 'This permanently deletes the market and all its unused days. Unsaved edits will be discarded.' : `Remove ${formatDateLabel(deleting.date)} from this draft? The day is deleted only when you Save.`}</p>
+        <Button tone="staff" variant="secondary" disabled={busy} onClick={() => setDeleting(null)}>{deleting === 'market' ? 'Keep market' : 'Keep day'}</Button>
+        <Button tone="staff" variant="danger" disabled={busy} onClick={() => { if (deleting === 'market') void onDeleteMarket(); else stageDeleteDay(deleting) }}>{deleting === 'market' ? (busy ? 'Deleting…' : 'Delete market') : 'Remove day from draft'}</Button>
+      </StaffDialog>}
     </section>
   )
 }

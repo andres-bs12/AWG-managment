@@ -61,6 +61,8 @@
   right: var(--space-2);
   width: var(--touch);
   height: var(--touch);
+  min-width: 44px;
+  min-height: 44px;
   display: grid;
   place-items: center;
   border: 0;
@@ -151,7 +153,8 @@
 }
 
 .codeInput::placeholder {
-  color: #9fb0c4;
+  color: #7a879a;
+  opacity: 1;
   font-weight: 600;
   letter-spacing: 0.08em;
 }

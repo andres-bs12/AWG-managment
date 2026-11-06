@@ -1,3 +1,4 @@
+import { apiError } from '../../lib/apiError'
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/client'
@@ -12,13 +13,14 @@ type Props = {
   onSubmit: (code: string) => void
   initialCode?: string
   error?: string
+  lookup?: typeof api.tracking.getByCode
 }
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
 /** Mount only while the pop-up should be visible — mounting is what resets and focuses it. */
-export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Props) {
-  const { t } = useLocale()
+export function TrackDialog({ onClose, onSubmit, initialCode = '', error, lookup = api.tracking.getByCode }: Props) {
+  const { t, locale } = useLocale()
   const titleId = useId()
   const hintId = useId()
   const cardRef = useRef<HTMLDivElement>(null)
@@ -68,14 +70,14 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
       inputRef.current?.focus()
       return
     }
+    if (!/^AWG[A-Z0-9]{4,6}$/i.test(next)) { setLocalError(t('trackNotFound')); inputRef.current?.focus(); return }
     setLocalError('')
     setBusy(true)
     try {
-      await api.tracking.getByCode(next)
+      await lookup(next)
       onSubmit(next)
     } catch (err) {
-      const message = err instanceof Error && err.message ? err.message : t('trackNotFound')
-      setLocalError(message)
+      setLocalError(apiError(err, locale, t('trackNotFound')).text)
       inputRef.current?.focus()
     } finally {
       setBusy(false)
@@ -146,7 +148,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
               autoComplete="off"
               autoCapitalize="characters"
               spellCheck={false}
-              placeholder="AWG-2026"
+              placeholder="AWGK7Q2MX"
               disabled={busy}
               aria-invalid={shownError ? 'true' : 'false'}
               value={code}

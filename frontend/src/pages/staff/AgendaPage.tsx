@@ -2,19 +2,21 @@ import { AgendaSessionList } from '../../components/staff/AgendaSessionList'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
-import { useMockStoreVersion } from '../../api/mock/useMockStore'
-import { DEMO_NOW_HOUR } from '../../api/mock/seed'
+import { useStaffRefresh } from '../../lib/useStaffRefresh'
+import { useStaffClock } from '../../lib/staffClock'
+import { layoutAgendaSlots } from '../../lib/agendaLayout'
+import { StaffDialog } from '../../components/staff/StaffDialog'
+import { Field } from '../../components/ui/Field'
 import { dayChipLabel, DeliveryRow } from '../../components/staff/DeliveryRow'
 import { DayStrip } from '../../components/staff/DayStrip'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
-import type { AgendaDay, AgendaSlot } from '../../domain/types'
+import type { AgendaDay, AgendaSlot, PaintingDay } from '../../domain/types'
 import { handoffLabel } from '../../lib/handoff'
-import { hasPaintOverlap, keepNonOverlapping } from '../../lib/slots'
-import { formatDateLabel, formatHour, formatMinutes, hourToY, yToHour } from '../../lib/time'
+import { hasPaintOverlap } from '../../lib/slots'
+import { formatDateLabel, formatHour, formatMinutes, parseHour, hourToY, yToHour } from '../../lib/time'
 import styles from './AgendaPage.module.css'
 
-const HOUR_H = 80
 const HOLD_MS = 350
 const HOLD_SLOP_PX = 8
 
@@ -43,7 +45,15 @@ function slotRange(slot: AgendaSlot) {
 }
 
 export function AgendaPage() {
-  const version = useMockStoreVersion()
+  const version = useStaffRefresh()
+  const { hour: nowHour } = useStaffClock()
+  // The board is laid out in px, so the hour height follows the text size (5rem at 16px is the 80px token); at 200% text an hour doubles.
+  const [{ HOUR_H, REM }] = useState(() => {
+    const css = getComputedStyle(document.documentElement)
+    const rem = Number.parseFloat(css.fontSize) || 16
+    return { HOUR_H: Math.max(Number.parseFloat(css.getPropertyValue('--size-agenda-hour')), 5 * rem), REM: rem }
+  })
+  const [paintingRule, setPaintingRule] = useState<PaintingDay | null>(null)
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const placeItem = params.get('place')
@@ -69,16 +79,19 @@ export function AgendaPage() {
   const [loadError, setLoadError] = useState('')
   const [retry, setRetry] = useState(0)
   const [arranging, setArranging] = useState(false)
-  const [view, setView] = useState<'list' | 'calendar'>(() => params.get('view') === 'list' ? 'list' : params.get('view') === 'calendar' || placeItem ? 'calendar' : window.matchMedia('(max-width: 600px)').matches ? 'list' : 'calendar')
+  const [view, setView] = useState<'list' | 'calendar'>(() => params.get('view') === 'list' ? 'list' : params.get('view') === 'calendar' || placeItem ? 'calendar' : window.matchMedia('(max-width: 639px)').matches ? 'list' : 'calendar')
   const editing = arranging || Boolean(placeItem)
 
   useEffect(() => {
+    let active = true
     api.agenda.listDays().then((list) => {
+      if (!active) return
       setDays(list)
       const today = list.find((d) => d.marketDay.isToday) ?? list[0]
       setDate((current) => dateParam || current || today?.marketDay.date || '')
       setLoadError('')
-    }).catch((err: Error) => setLoadError(err.message))
+    }).catch((err: Error) => { if (active) setLoadError(err.message) })
+    return () => { active = false }
   }, [version, dateParam, retry])
 
   useEffect(() => {
@@ -97,19 +110,24 @@ export function AgendaPage() {
     setParams(query, { replace: true })
   }
 
+  useEffect(() => {
+    if (!date) return
+    let active = true
+    api.paintingDays.list(date, date).then(rows => { if (active) setPaintingRule(rows[0] ?? null) }).catch(() => { if (active) setPaintingRule(null) })
+    return () => { active = false }
+  }, [date, version, retry])
+
   const day = days.find((d) => d.marketDay.date === date) ?? days[0]
   const hours = useMemo(() => {
     if (!day) return []
     const out: number[] = []
-    for (let h = day.marketDay.openHour; h < day.marketDay.closeHour; h += 1) out.push(h)
+    for (let h = Math.floor(day.marketDay.openHour); h < day.marketDay.closeHour; h += 1) out.push(h)
     return out
   }, [day])
 
-  const boardSlots = useMemo(() => {
-    if (!day) return []
-    const kept = new Set(keepNonOverlapping(day.slots.map(slotRange)).map((block) => block.id))
-    return day.slots.filter((slot) => kept.has(slot.block.id))
-  }, [day])
+  const boardSlots = useMemo(() => day?.slots ?? [], [day])
+  const slotLayout = layoutAgendaSlots(boardSlots)
+  const boardStart = day ? Math.floor(day.marketDay.openHour) : 0
 
   const paintRanges = useMemo(() => boardSlots.map(slotRange), [boardSlots])
   const marketDays = useMemo(() => days.map((row) => row.marketDay), [days])
@@ -136,12 +154,12 @@ export function AgendaPage() {
   function hourFromEvent(e: ReactPointerEvent) {
     if (!day || !gridRef.current) return day?.marketDay.openHour ?? 12
     const rect = gridRef.current.getBoundingClientRect()
-    return clampHour(yToHour(e.clientY - rect.top, HOUR_H, day.marketDay.openHour))
+    return clampHour(yToHour(e.clientY - rect.top, HOUR_H, boardStart))
   }
 
   function deliveryAllows(slot: AgendaSlot, startHour: number, endHour: number): boolean {
-    if (!day || !slot.item) return false
-    if (day.marketDay.isToday && startHour < DEMO_NOW_HOUR) return false
+    if (!day || !slot.item || slot.held) return false
+    if (day.marketDay.isToday && startHour < nowHour) return false
     const deliveryDay = marketDays.find((row) => row.id === slot.item?.delivery.marketDayId)
     if (!deliveryDay || day.marketDay.date > deliveryDay.date) return false
     if (slot.item.delivery.kind === 'vienna' && day.marketDay.date >= deliveryDay.date) return false
@@ -176,7 +194,7 @@ export function AgendaPage() {
 
   function newSlotProblem(start: number, end: number): string | null {
     if (!day) return 'No market day'
-    if (day.marketDay.isToday && start < DEMO_NOW_HOUR - 0.01) return 'That time has already passed.'
+    if (day.marketDay.isToday && start < nowHour - 0.01) return 'That time has already passed.'
     if (hasPaintOverlap(paintRanges, start, end)) return 'That time overlaps another session.'
     return null
   }
@@ -212,7 +230,7 @@ export function AgendaPage() {
       ? boardSlots.find((slot) => slot.block.id === slotElement.dataset.slotId)
       : undefined
     if (slotElement) {
-      if (!editing || !movingSlot || movingSlot.block.status !== 'not_started') return
+      if (!editing || !movingSlot || movingSlot.held || movingSlot.order?.handedOver || movingSlot.block.status !== 'not_started') return
       e.preventDefault()
       const pointerHour = hourFromEvent(e)
       const duration = movingSlot.block.endHour - movingSlot.block.startHour
@@ -309,6 +327,8 @@ export function AgendaPage() {
 
   function startSaleFromProposal() {
     if (!newProposal || !day) return
+    const problem = newSlotProblem(newProposal.start, newProposal.end)
+    if (problem || newProposal.end <= newProposal.start || newProposal.end > day.marketDay.closeHour || newProposal.start < day.marketDay.openHour) { setMoveError(problem ?? 'Choose a valid time within opening hours.'); return }
     const q = new URLSearchParams({
       kind: 'custom',
       date: day.marketDay.date,
@@ -323,9 +343,8 @@ export function AgendaPage() {
     const hold = pendingHold.current
     if (hold && hold.pointerId === e.pointerId && day) {
       clearHold()
-      const start = Math.max(day.marketDay.openHour, Math.floor(hold.startHour * 2) / 2)
-      const end = Math.min(start + 1, day.marketDay.closeHour)
-      proposeNew(start, end)
+      // A short touch can dismiss the proposal; only a held drag or explicit add creates one.
+      setNewProposal(null)
       return
     }
     if (!drag.current || drag.current.pointerId !== e.pointerId) return
@@ -361,6 +380,7 @@ export function AgendaPage() {
     try {
       await api.agenda.moveBlock(moveProposal.slot.block.id, day.marketDay.date, moveProposal.startHour)
       setMoveProposal(null)
+      setRetry(value => value + 1)
     } catch (err) {
       setMoveError(err instanceof Error ? err.message : 'Could not move the session')
     } finally {
@@ -368,10 +388,10 @@ export function AgendaPage() {
     }
   }
 
-  if (loadError) return <section><h1>Agenda</h1><p role="alert">{loadError}</p><Button tone="staff" onClick={() => setRetry(value => value + 1)}>Try again</Button></section>
+  if (loadError) return <section><h1>Agenda</h1><ButtonLink to="/staff/painting-days" tone="staff" variant="secondary">Painting days</ButtonLink><p role="alert">{loadError}</p><Button tone="staff" onClick={() => setRetry(value => value + 1)}>Try again</Button></section>
   if (!day) return <p role="status">{date ? 'No days scheduled.' : 'Loading agenda…'}</p>
 
-  const height = (day.marketDay.closeHour - day.marketDay.openHour) * HOUR_H
+  const height = (day.marketDay.closeHour - boardStart) * HOUR_H
   const shownPreview = preview ?? (newProposal ? { ...newProposal, invalid: false } : null)
   const proposalMinutes = newProposal ? Math.round((newProposal.end - newProposal.start) * 60) : 0
   const deliveries = day.deliveries ?? []
@@ -385,10 +405,11 @@ export function AgendaPage() {
   return (
     <section style={{ '--hour-h': `${HOUR_H}px` } as CSSProperties}>
       <div className={styles.head}>
-        <h1>Agenda</h1>
+        <h1>Agenda</h1><ButtonLink to="/staff/painting-days" tone="staff" variant="secondary">Painting days</ButtonLink>
         <p className={styles.context}>
           {day.market.name} · {formatDateLabel(day.marketDay.date)}
         </p>
+        {paintingRule && <p className={styles.context}>{paintingRule.booked} {paintingRule.booked === 1 ? 'session' : 'sessions'} {day.marketDay.isToday ? 'today' : 'scheduled'}{!paintingRule.open ? ' · Web booking closed' : paintingRule.booked >= paintingRule.maxPaintings ? ` · Web booking full (${Math.min(paintingRule.booked, paintingRule.maxPaintings)}/${paintingRule.maxPaintings})` : ''}</p>}
       </div>
 
       <DayStrip
@@ -399,6 +420,14 @@ export function AgendaPage() {
       />
 
       <div className={styles.toolbar}>
+        {view === 'calendar' && <Button tone="staff" variant="secondary" onClick={() => {
+          const earliest = day.marketDay.isToday ? Math.max(nowHour, day.marketDay.openHour) : day.marketDay.openHour
+          for (let start = Math.ceil(earliest * 4) / 4; start + 1 <= day.marketDay.closeHour; start += .25) {
+            if (!newSlotProblem(start, start + 1)) { proposeNew(start, start + 1); return }
+          }
+          setMoveError('No free hour on this day. Choose another day or move a session.')
+        }}>+ Add paint session</Button>}
+
         <div className={styles.viewSwitch} role="group" aria-label="Agenda view">
           {(['list', 'calendar'] as const).map(option => <Button key={option} tone="staff" variant="secondary" selected={view === option} disabled={Boolean(placeItem)} onClick={() => {
             setView(option)
@@ -410,7 +439,7 @@ export function AgendaPage() {
             setParams(query, { replace: true })
           }}>{option === 'list' ? 'List' : 'Calendar'}</Button>)}
         </div>
-        {marketDeliveries.length || viennaDeliveries.length ? <a href="#agenda-pickups" className={styles.jump}>{marketDeliveries.length ? `${marketDeliveries.length} pickups` : `${viennaDeliveries.length} deliveries`} ↓</a> : null}
+        {marketDeliveries.length || viennaDeliveries.length ? <a href="#agenda-pickups" className={styles.jump}>{marketDeliveries.length ? `${marketDeliveries.length} ${marketDeliveries.length === 1 ? 'pickup' : 'pickups'}` : `${viennaDeliveries.length} ${viennaDeliveries.length === 1 ? 'delivery' : 'deliveries'}`} ↓</a> : null}
         {view === 'calendar' && !placeItem ? <Button tone="staff" variant="ghost" selected={arranging} onClick={() => { setArranging(!arranging); setMoveProposal(null); setNewProposal(null); setPreview(null); drag.current = null }}>{arranging ? 'Done moving' : 'Move sessions'}</Button> : null}
       </div>
       {view === 'calendar' ? (
@@ -419,16 +448,16 @@ export function AgendaPage() {
             ? 'Tap or drag free time to paint this ornament.'
             : arranging
               ? 'Drag an unstarted session to a new time.'
-              : 'Tap free time, or hold and drag, to start a custom sale.'}
+              : 'Use + Add paint session, or hold and drag free time, to start a custom sale.'}
         </p>
       ) : null}
 
-      {moveError ? <p className={styles.moveError} role="alert">{moveError}</p> : null}
+      {moveError && !moveProposal ? <p className={styles.moveError} role="alert">{moveError}</p> : null}
 
       {moveProposal ? (
-        <section className={styles.moveConfirm} aria-label="Confirm schedule change">
+        <StaffDialog title="Confirm schedule change" busy={moving} onClose={() => { setMoveProposal(null); setMoveError('') }}>
           <div>
-            <strong>Move {moveProposal.slot.order?.code ?? moveProposal.slot.item?.petName ?? 'session'}?</strong>
+            <strong>Move {[moveProposal.slot.item?.petName, moveProposal.slot.order?.code ? `(${moveProposal.slot.order.code})` : null].filter(Boolean).join(' ') || 'session'}?</strong>
             <p>
               {formatHour(moveProposal.slot.block.startHour)}–{formatHour(moveProposal.slot.block.endHour)}
               <span aria-hidden="true"> → </span>
@@ -436,20 +465,22 @@ export function AgendaPage() {
             </p>
             <small>Pickup stays {moveProposal.slot.item ? handoffLabel(moveProposal.slot.item, marketDays) : 'unchanged'}.</small>
           </div>
+          {moveError ? <p role="alert">{moveError}</p> : null}
           <div className={styles.moveActions}>
-            <Button tone="staff" variant="ghost" onClick={() => setMoveProposal(null)} disabled={moving}>
+            <Button tone="staff" variant="ghost" onClick={() => { setMoveProposal(null); setMoveError('') }} disabled={moving}>
               Cancel
             </Button>
             <Button tone="staff" onClick={confirmMove} disabled={moving}>
               {moving ? 'Saving…' : 'Save move'}
             </Button>
           </div>
-        </section>
+        </StaffDialog>
       ) : null}
 
+      {[...slotLayout.values()].some(layout => layout.lanes > 1) && <p className={styles.moveError} role="status">Overlapping sessions are shown side by side. Review the schedule.</p>}
       <div className={styles.workspace}>
         {view === 'list' ? <AgendaSessionList slots={day.slots} days={marketDays} selectedId={selectedBlockId} onOpen={openOrder} /> : <div>
-          <div className={styles.board} style={{ ['--hour-h' as string]: `${HOUR_H}px` }}>
+          <div className={styles.board}>
             <div className={styles.hours}>
               {hours.map((h) => (
                 <div key={h} className={styles.hour}>
@@ -471,17 +502,20 @@ export function AgendaPage() {
               {hours.map((h) => (
                 <div key={h} className={styles.gridline} />
               ))}
-              {day.marketDay.isToday ? (
+              {day.marketDay.isToday && nowHour >= day.marketDay.openHour && nowHour <= day.marketDay.closeHour ? (
                 <div
                   className={styles.now}
-                  style={{ top: hourToY(DEMO_NOW_HOUR, HOUR_H, day.marketDay.openHour) }}
+                  role="img"
+                  data-now={formatHour(nowHour)}
+                  aria-label={`Current time ${formatHour(nowHour)} in Vienna`}
+                  style={{ top: hourToY(nowHour, HOUR_H, boardStart) }}
                 />
               ) : null}
               {shownPreview ? (
                 <div
                   className={shownPreview.invalid ? styles.previewBad : styles.preview}
                   style={{
-                    top: hourToY(shownPreview.start, HOUR_H, day.marketDay.openHour),
+                    top: hourToY(shownPreview.start, HOUR_H, boardStart),
                     height: Math.max(8, (shownPreview.end - shownPreview.start) * HOUR_H),
                   }}
                 >
@@ -489,43 +523,53 @@ export function AgendaPage() {
                 </div>
               ) : null}
               {boardSlots.map((slot) => {
-                const name = slot.item?.petName || slot.customer?.name || 'Block'
+                const name = slot.held ? 'Held by web checkout' : slot.item?.petName || slot.customer?.name || 'Block'
                 const range = `${formatHour(slot.block.startHour)}–${formatHour(slot.block.endHour)}`
                 const code = slot.order?.code
                 const handoff = slot.item ? handoffLabel(slot.item, marketDays) : null
-                const tone = slot.order?.handedOver ? 'delivered' : slot.block.status
-                const statusLabel = tone === 'delivered' ? 'Delivered' : tone === 'finished' ? 'Ready' : tone === 'in_progress' ? 'Painting' : 'To paint'
+                const tone = slot.held ? 'held' : slot.order?.handedOver ? 'delivered' : slot.block.status
+                const slotHeight = (slot.block.endHour - slot.block.startHour) * HOUR_H - 4
+                // Three lines need about 4.75rem (76px at 16px); shorter blocks get one line instead of overlapping text.
+                const compact = slotHeight < 4.75 * REM
+                const statusLabel = slot.held ? (slot.holdUntil ? `Held until ${new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Vienna', hour: '2-digit', minute: '2-digit' }).format(new Date(slot.holdUntil))}` : 'Held by web checkout') : tone === 'delivered' ? 'Delivered' : tone === 'finished' ? 'Ready' : tone === 'in_progress' ? 'Painting' : 'To paint'
                 return (
                   <button
                     key={slot.block.id}
                     type="button"
                     className={styles.slot}
                     data-slot="true"
+                    data-held={slot.held || undefined}
+                    disabled={slot.held}
                     data-slot-id={slot.block.id}
-                    data-movable={slot.block.status === 'not_started' && !slot.order?.handedOver ? 'true' : 'false'}
+                    data-movable={!slot.held && slot.block.status === 'not_started' && !slot.order?.handedOver ? 'true' : 'false'}
                     data-status={tone}
                     data-selected={selectedBlockId === slot.block.id ? 'true' : 'false'}
                     aria-pressed={selectedBlockId === slot.block.id}
                     aria-label={[name, `paint ${range}`, code, statusLabel, handoff].filter(Boolean).join(', ')}
                     style={{
-                      top: hourToY(slot.block.startHour, HOUR_H, day.marketDay.openHour),
-                      height: (slot.block.endHour - slot.block.startHour) * HOUR_H - 4,
+                      left: `${100 * (slotLayout.get(slot.block.id)?.lane ?? 0) / (slotLayout.get(slot.block.id)?.lanes ?? 1)}%`,
+                      width: `calc(${100 / (slotLayout.get(slot.block.id)?.lanes ?? 1)}% - var(--space-2))`,
+                      top: hourToY(slot.block.startHour, HOUR_H, boardStart),
+                      height: slotHeight,
                     }}
+                    data-compact={compact || undefined}
                     onClick={() => openOrder(slot)}
                   >
-                    <strong>{name}</strong>
-                    <span className={styles.slotRange}>
-                      {range}
-                      {code ? ` · ${code}` : ''}
-                    </span>
-                    <span className={styles.slotHandoff}>{statusLabel}</span>
+                    {compact ? <span className={styles.slotLine}><strong>{name}</strong> · {range} · {statusLabel}</span> : <>
+                      <strong>{name}</strong>
+                      <span className={styles.slotRange}>
+                        {range}
+                        {code ? ` · ${code}` : ''}
+                      </span>
+                      <span className={styles.slotHandoff}>{statusLabel}</span>
+                    </>}
                   </button>
                 )
               })}
             </div>
           </div>
           {newProposal ? (
-            <section className={styles.newConfirm} aria-label="New paint session">
+            <StaffDialog title="New paint session" onClose={() => setNewProposal(null)}>
               <div>
                 <strong>{placeItem ? 'Paint this ornament' : 'New custom ornament'}</strong>
                 <p>
@@ -533,6 +577,9 @@ export function AgendaPage() {
                   <span className={styles.newDuration}> · {formatMinutes(proposalMinutes)}</span>
                 </p>
               </div>
+              <Field label="Paint start" htmlFor="proposal-start"><input id="proposal-start" type="time" step="900" value={formatHour(newProposal.start)} onChange={event => setNewProposal({ ...newProposal, start: parseHour(event.target.value) })} /></Field>
+              <Field label="Paint end" htmlFor="proposal-end"><input id="proposal-end" type="time" step="900" value={formatHour(newProposal.end)} onChange={event => setNewProposal({ ...newProposal, end: parseHour(event.target.value) })} /></Field>
+              {moveError && <p role="alert">{moveError}</p>}
               <div className={styles.moveActions}>
                 <Button tone="staff" variant="ghost" onClick={() => setNewProposal(null)}>
                   Cancel
@@ -541,7 +588,7 @@ export function AgendaPage() {
                   {placeItem ? 'Use this time' : 'Start sale'}
                 </Button>
               </div>
-            </section>
+            </StaffDialog>
           ) : null}
         </div>}
 
@@ -553,7 +600,7 @@ export function AgendaPage() {
             </ButtonLink>
           </div>
           <p className={styles.sideMeta}>
-            {marketDeliveries.length} pickups · {viennaDeliveries.length} home deliveries
+            {marketDeliveries.length} {marketDeliveries.length === 1 ? 'pickup' : 'pickups'} · {viennaDeliveries.length} home {viennaDeliveries.length === 1 ? 'delivery' : 'deliveries'}
           </p>
           {marketDeliveries.length === 0 && viennaDeliveries.length === 0 ? (
             <p className={styles.sideMeta}>No deliveries for this day.</p>

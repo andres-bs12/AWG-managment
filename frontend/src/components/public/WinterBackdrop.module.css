@@ -1,91 +1,102 @@
+/**
+ * Fixed to the viewport, so a long page (form, tracking) scrolls over one continuous sky instead
+ * of running past the end of it into a hard colour change.
+ */
 .backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
+  /** Isolates the scenery so its animations never trigger layout or paint in the page above. */
+  contain: layout paint;
 }
 
+/** One gradient for the whole sky with many close stops, so no band edge is ever visible. */
 .sky {
   position: absolute;
   inset: 0;
   background: linear-gradient(
     180deg,
     var(--sky-top) 0%,
-    var(--sky-mid) 32%,
-    var(--sky-low) 50%,
-    var(--sky-horizon) 60%
+    var(--sky-mid) 26%,
+    var(--sky-low) 46%,
+    var(--sky-horizon) 60%,
+    var(--sky-horizon) 100%
   );
 }
 
-.auroraA,
-.auroraB {
+/** Soft daylight from the top right, behind the clouds. */
+.sun {
   position: absolute;
-  left: -20%;
-  width: 140%;
-  filter: blur(26px);
-  opacity: 0.85;
-}
-
-.auroraA {
-  top: -6%;
-  height: 46%;
-  background: radial-gradient(60% 70% at 24% 60%, var(--aurora-a) 0%, transparent 70%),
-    radial-gradient(50% 60% at 62% 40%, var(--aurora-b) 0%, transparent 72%);
-  animation: auroraDrift 22s ease-in-out infinite alternate;
-}
-
-.auroraB {
-  top: 6%;
-  height: 40%;
-  background: radial-gradient(45% 60% at 78% 50%, var(--aurora-a) 0%, transparent 70%),
-    radial-gradient(40% 50% at 40% 30%, var(--aurora-b) 0%, transparent 74%);
-  animation: auroraDrift 31s ease-in-out -8s infinite alternate-reverse;
-}
-
-.stars {
-  position: absolute;
-  inset: 0 0 42% 0;
-}
-
-.star {
-  position: absolute;
+  top: -18%;
+  right: -10%;
+  width: min(70vw, 760px);
+  aspect-ratio: 1;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 6px rgba(255, 255, 255, 0.9);
-  animation: twinkle ease-in-out infinite alternate;
+  background: radial-gradient(circle, rgba(255, 252, 228, 0.5) 0%, rgba(255, 252, 228, 0.16) 38%, transparent 66%);
 }
 
 /**
- * Parked below the header band. The language toggle owns the top-right, so we never slide this
- * pale disc (or its halo) underneath white-on-transparent controls.
+ * Clouds drift only in two bands that never cross the title and countdown: a thin one above the
+ * title, cropped by the top edge, and one level with the stall roof, which hides them as they pass.
  */
-.moon {
+.cloud {
   position: absolute;
-  top: max(11%, 80px);
-  right: 16%;
-  width: clamp(54px, 9vw, 96px);
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
+  display: block;
+  height: auto;
+  will-change: transform;
 }
 
-.moon::before {
-  content: '';
-  position: absolute;
-  inset: -70%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 246, 216, 0.34) 0%, transparent 62%);
-  animation: moonPulse 7s ease-in-out infinite;
+.cloudA {
+  top: 35%;
+  left: 0;
+  width: clamp(110px, 16vw, 230px);
+  animation: drift 120s linear -40s infinite;
 }
 
-.moonBody {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 34% 32%, #fffdf2 0%, var(--moon) 58%, #ecd9a6 100%);
-  box-shadow: inset -6px -6px 0 rgba(0, 0, 0, 0.05);
+.cloudB {
+  top: 39%;
+  left: 0;
+  width: clamp(80px, 11vw, 160px);
+  opacity: 0.9;
+  animation: drift 160s linear -110s infinite;
+}
+
+.cloudC {
+  top: -14px;
+  left: 0;
+  width: clamp(60px, 7vw, 110px);
+  opacity: 0.8;
+  animation: drift 190s linear -20s infinite;
+}
+
+.turbine {
+  position: absolute;
+  bottom: 52%;
+  display: block;
+  height: auto;
+  color: #e9f7fc;
+  opacity: 0.85;
+}
+
+.turbineA {
+  left: 7%;
+  width: clamp(34px, 4vw, 60px);
+}
+
+.turbineB {
+  left: 16%;
+  bottom: 50%;
+  width: clamp(26px, 3vw, 46px);
+  opacity: 0.7;
+}
+
+.blades {
+  transform-box: view-box;
+  transform-origin: 30px 30px;
+  /** Stepped so the tiny SVG repaints ~8 times a second instead of every frame. */
+  animation: spin 9s steps(72) infinite;
 }
 
 .ridgeFar,
@@ -109,55 +120,50 @@
   fill: var(--ridge-near);
 }
 
-.pinesBack {
-  bottom: 36.5%;
-  height: clamp(56px, 12vh, 132px);
+/** Haze bands: sky-coloured veils laid over the base of each far layer to push it back. */
+.hazeFar,
+.hazeTown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: linear-gradient(180deg, transparent 0%, var(--haze) 100%);
 }
 
-.pineGroup {
-  transform-origin: 50% 100%;
-  animation: sway 11s ease-in-out infinite alternate;
-}
-
-/** The denser "life" layer only shows from tablet up; phones keep the simple scene. */
-.village,
-.walkers,
-.farSleigh {
-  display: none;
-}
-
-/** Sits just high enough that the booth roofs and the wheel clear the snow field's crest. */
-.village {
-  bottom: 41.4%;
-  height: clamp(56px, 11vh, 124px);
-  color: #1a2747;
-}
-
-.villageBody {
-  fill: #1a2747;
+.hazeFar {
+  bottom: 39%;
+  height: clamp(70px, 14vh, 160px);
   opacity: 0.8;
 }
 
-.wheel {
-  color: #1a2747;
-  opacity: 0.66;
-  transform-box: fill-box;
-  transform-origin: 50% 50%;
-  animation: wheelTurn 48s linear infinite;
+/**
+ * Town and tree line use `slice` viewBoxes: the height tracks the width on desktop so nothing is
+ * cropped, and phones simply see the middle of the row instead of a squashed one.
+ */
+.village {
+  bottom: 40.6%;
+  height: max(60px, min(10.8vw, 150px));
 }
 
-.villageLights {
-  fill: var(--gold);
-  animation: windowGlow 7s ease-in-out infinite alternate;
+.hazeTown {
+  bottom: 40%;
+  height: max(36px, min(6vw, 90px));
+  opacity: 0.7;
 }
 
+.pinesBack {
+  bottom: 39.4%;
+  height: max(54px, min(10.8vw, 140px));
+}
+
+/** Sky traffic is desktop-only; phones keep the sky calm. */
 .farSleigh {
+  display: none;
   position: absolute;
-  top: 13%;
+  top: 15%;
   left: 0;
   width: clamp(70px, 7vw, 108px);
-  color: #0d1730;
-  opacity: 0.3;
+  color: #2f6fd6;
+  opacity: 0.35;
   animation: crossSky 46s linear infinite;
 }
 
@@ -168,83 +174,25 @@
   animation: skyBob 3.6s ease-in-out infinite;
 }
 
-.walkers {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 30%;
-  height: 40px;
-}
-
-.walkA,
-.walkB {
-  position: absolute;
-  bottom: 0;
-  width: clamp(34px, 3.2vw, 50px);
-  color: #2c3d6b;
-  opacity: 0.46;
-}
-
-.walkA {
-  animation: strollRight 58s linear infinite;
-}
-
-.walkB {
-  bottom: 46%;
-  width: clamp(38px, 3.6vw, 58px);
-  opacity: 0.36;
-  animation: strollLeft 74s linear -14s infinite;
-}
-
-.bob,
-.bobSlow {
-  display: block;
-  animation: stepBob 0.72s ease-in-out infinite;
-}
-
-.bobSlow {
-  animation-duration: 0.95s;
-}
-
-.walkerArt {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
 .field {
   position: absolute;
   left: -6%;
   right: -6%;
   bottom: 0;
   height: 42%;
-  background: linear-gradient(180deg, #fbfdff 0%, #e6f0fb 46%, var(--snow-shade) 100%);
-  border-top-left-radius: 58% 26%;
-  border-top-right-radius: 58% 26%;
-  box-shadow: 0 -8px 30px rgba(120, 160, 210, 0.35);
+  background: linear-gradient(180deg, #ffffff 0%, #f2f9fd 40%, var(--snow-shade) 100%);
+  /** A low, wide curve: a tall dome read as a hard white cut-out on narrow screens. */
+  border-top-left-radius: 50% 12%;
+  border-top-right-radius: 50% 12%;
 }
 
-.drift,
-.driftTwo {
+.drift {
   position: absolute;
   inset: 0;
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
-}
-
-.drift {
   background: radial-gradient(60% 40% at 18% 0%, rgba(255, 255, 255, 0.95) 0%, transparent 60%),
     radial-gradient(50% 36% at 84% 6%, rgba(255, 255, 255, 0.9) 0%, transparent 60%);
-}
-
-.driftTwo {
-  background: radial-gradient(30% 22% at 50% 96%, rgba(174, 203, 232, 0.5) 0%, transparent 70%);
-  animation: shimmer 9s ease-in-out infinite alternate;
-}
-
-.calm .auroraA,
-.calm .auroraB {
-  opacity: 0.4;
 }
 
 .calm .field {
@@ -259,106 +207,56 @@
   bottom: 48%;
 }
 
-.calm .pinesBack {
-  bottom: 47.5%;
+.calm .hazeFar {
+  bottom: 50%;
 }
 
-/** Reading routes stay quiet: no village, no strollers, no sky traffic. */
+.calm .pinesBack {
+  bottom: 51.4%;
+}
+
+.calm .turbine {
+  bottom: 62%;
+}
+
+/** Reading routes stay quiet: no village and no sky traffic. */
 .calm .village,
-.calm .walkers,
+.calm .hazeTown,
 .calm .farSleigh {
   display: none;
 }
 
 @media (min-width: 1024px) {
-  .village,
-  .walkers,
   .farSleigh {
     display: block;
   }
 }
 
-/**
- * On phones and short windows the toggle sits in the top-right. The left sky is empty on home
- * (the brand is hidden there), so the moon moves across and shrinks its halo.
- */
-@media (max-width: 900px), (max-height: 700px) {
-  .moon {
-    right: auto;
-    left: 6%;
-    top: max(10%, 56px);
-    width: clamp(36px, 11vw, 72px);
+/** Phones: one turbine and two clouds are enough; the sun stays smaller. */
+@media (max-width: 600px) {
+  .turbineB,
+  .cloudC {
+    display: none;
   }
 
-  .moon::before {
-    inset: -28%;
+  .sun {
+    width: 110vw;
+    top: -30%;
   }
 }
 
-@keyframes auroraDrift {
+@keyframes drift {
   from {
-    transform: translate3d(-4%, 0, 0) scaleY(1);
-    opacity: 0.55;
+    transform: translateX(-30vw);
   }
   to {
-    transform: translate3d(5%, 2%, 0) scaleY(1.14);
-    opacity: 0.95;
+    transform: translateX(120vw);
   }
 }
 
-@keyframes twinkle {
-  from {
-    opacity: 0.25;
-    transform: scale(0.7);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes moonPulse {
-  0%,
-  100% {
-    opacity: 0.7;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.08);
-  }
-}
-
-@keyframes sway {
-  from {
-    transform: skewX(-0.7deg);
-  }
-  to {
-    transform: skewX(0.7deg);
-  }
-}
-
-@keyframes shimmer {
-  from {
-    opacity: 0.4;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes wheelTurn {
+@keyframes spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@keyframes windowGlow {
-  from {
-    opacity: 0.5;
-  }
-  to {
-    opacity: 0.9;
   }
 }
 
@@ -381,46 +279,9 @@
   }
 }
 
-@keyframes strollRight {
-  from {
-    transform: translateX(-8vw);
-  }
-  to {
-    transform: translateX(108vw);
-  }
-}
-
-@keyframes strollLeft {
-  from {
-    transform: translateX(108vw) scaleX(-1);
-  }
-  to {
-    transform: translateX(-10vw) scaleX(-1);
-  }
-}
-
-@keyframes stepBob {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-1.5px);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .auroraA,
-  .auroraB,
-  .star,
-  .moon::before,
-  .pineGroup,
-  .driftTwo,
-  .wheel,
-  .villageLights,
-  .farSleighArt,
-  .bob,
-  .bobSlow {
+  .blades,
+  .farSleighArt {
     animation: none;
   }
 
@@ -430,13 +291,18 @@
     transform: translateX(62vw);
   }
 
-  .walkA {
+  .cloudA {
     animation: none;
-    transform: translateX(22vw);
+    transform: translateX(8vw);
   }
 
-  .walkB {
+  .cloudB {
     animation: none;
-    transform: translateX(74vw) scaleX(-1);
+    transform: translateX(70vw);
+  }
+
+  .cloudC {
+    animation: none;
+    transform: translateX(44vw);
   }
 }

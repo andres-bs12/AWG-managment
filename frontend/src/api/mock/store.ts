@@ -1,5 +1,7 @@
 import { paymentSummary } from '../../lib/paymentSummary'
+import { readFormToken, rememberFormToken } from '../formTokens'
 import type {
+  InventoryItem, PaintingDay, ShopCheckoutInput,
   Address,
   AgendaDay,
   AgendaDelivery,
@@ -25,9 +27,10 @@ import type {
   TrackWhen,
 } from '../../domain/types'
 import { itemCost } from '../../lib/money'
+import { mockPricing } from './pricing'
 import { marketPickupDates, paintDatesToTry } from '../../lib/calendar'
 import { hasPaintOverlap } from '../../lib/slots'
-import { formatDateLabel, formatHour, formatMinutes, hoursOverlap, utcWeekday } from '../../lib/time'
+import { addUtcDays, formatDateLabel, formatHour, formatMinutes, hoursOverlap, utcWeekday } from '../../lib/time'
 import { createSeed, DEMO_NOW_HOUR, SEED_REVISION, STAFF_ACCOUNTS, STORAGE_KEY, type MockState } from './seed'
 
 let state: MockState = load()
@@ -37,8 +40,7 @@ const listeners = new Set<() => void>()
 function isCurrentSeed(parsed: MockState): boolean {
   return (
     parsed.seedRevision === SEED_REVISION &&
-    Array.isArray(parsed.orders) &&
-    parsed.orders.some((order) => order.code === 'ABS100')
+    Array.isArray(parsed.orders)
   )
 }
 
@@ -53,7 +55,10 @@ function readStored(): MockState | null {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as MockState
-    if (isCurrentSeed(parsed)) return parsed
+    if (isCurrentSeed(parsed)) {
+      for (const order of parsed.orders) { if (/^ABS10[0-7]$/.test(order.code)) order.code = `AWG0${order.code.slice(3)}`; if (order.code === 'AWG000') order.code = 'AWG0000' }
+      return parsed
+    }
   } catch {
     /* use seed */
   }
@@ -134,7 +139,11 @@ function todayDay(): MarketDay {
 
 function dayByDate(date: string, marketId?: string): MarketDay | undefined {
   const rows = state.marketDays.filter((d) => d.date === date && (!marketId || d.marketId === marketId))
-  if (!rows.length) return undefined
+  if (!rows.length) {
+    const home = state.markets.find(m => m.kind === 'home')
+    if (!home || (marketId && marketId !== home.id)) return undefined
+    return { id: `home-${date}`, marketId: home.id, date, openHour: 10, closeHour: 13, isToday: false }
+  }
   if (marketId) return rows[0]
   const rank = (day: MarketDay) => (state.markets.find((m) => m.id === day.marketId)?.kind === 'market' ? 0 : 1)
   return rows.slice().sort((a, b) => rank(a) - rank(b))[0]
@@ -147,6 +156,45 @@ function blocksForDay(dayId: string): TimeBlock[] {
     .sort((a, b) => a.startHour - b.startHour)
 }
 
+export function listInventory(): InventoryItem[] {
+  const rows = state.inventory ??= []
+  for (const color of ['red', 'green', 'beige'] as const) for (const finish of ['shiny', 'matte'] as const) {
+    if (!rows.some(row => row.kind === 'custom' && row.color === color && row.finish === finish)) {
+      const legacy = finish === 'shiny' ? rows.find(row => row.kind === 'custom' && row.color === color && !row.finish) : undefined
+      if (legacy) { legacy.finish = finish; legacy.id = `custom-${color}-${finish}` }
+      else rows.push({ id: `custom-${color}-${finish}`, kind: 'custom', color, finish, quantity: 3 })
+    }
+  }
+  for (const row of rows) if (row.kind === 'custom' && !row.finish) row.finish = 'shiny'
+  if (!rows.some(row => row.kind === 'finished')) rows.push({ id: 'finished', kind: 'finished', color: null, finish: null, quantity: 10 })
+  return rows
+
+}
+export function updateInventory(id: string, quantity: number, expectedQuantity?: number): InventoryItem {
+  if (!Number.isInteger(quantity) || quantity < 0 || quantity > 10000) throw new Error('Quantity must be between 0 and 10000.')
+  const item = listInventory().find(row => row.id === id); if (!item) throw new Error('Stock item not found.')
+  if (expectedQuantity != null && item.quantity !== expectedQuantity) throw Object.assign(new Error('Stock changed. Reload and try again.'), { code: 'STOCK_CHANGED', status: 409 })
+  item.quantity = quantity; emit(); return { ...item }
+}
+export function paintingDay(date: string): PaintingDay {
+  const settings = state.paintingDays?.[date] ?? { open: true, maxPaintings: 2 }
+  const ids = new Set(state.marketDays.filter(day => day.date === date).map(day => day.id))
+  const booked = state.blocks.filter(block => ids.has(block.marketDayId) && state.items.some(item => item.id === block.orderItemId && item.kind === 'custom')).length
+  return { date, ...settings, booked }
+}
+export function updatePaintingDay(date: string, open: boolean, maxPaintings: number): PaintingDay {
+  if (!Number.isInteger(maxPaintings) || maxPaintings < 0 || maxPaintings > 10) throw new Error('Maximum must be between 0 and 10.')
+  state.paintingDays ??= {}; state.paintingDays[date] = { open, maxPaintings }; emit(); return paintingDay(date)
+}
+export function joinWaitlist(email: string) { const token = crypto.randomUUID(); (state.waitlistTokens ??= {})[token] = { email: email.toLowerCase(), confirmed: false }; emit() }
+export function confirmWaitlist(token: string) { const entry = state.waitlistTokens?.[token]; if (!entry) throw Object.assign(new Error('Unknown token'), { status: 404 }); entry.confirmed = true; state.waitlist ??= []; if (!state.waitlist.includes(entry.email)) state.waitlist.push(entry.email); emit() }
+export function unsubscribeWaitlist(token: string) { const entry = state.waitlistTokens?.[token]; if (entry) { state.waitlist = (state.waitlist ?? []).filter(email => email !== entry.email); delete state.waitlistTokens![token]; emit() } }
+export function makeOrderCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let code: string
+  do { code = 'AWG' + Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('') } while (state.orders.some(order => order.code === code))
+  return code
+}
+
 export function findFreeSlot(
   date: string,
   durationHours: number,
@@ -156,6 +204,9 @@ export function findFreeSlot(
   ignoreBlockId?: string,
   beforeHour?: number,
 ): CapacityResult {
+  const setting = paintingDay(date)
+  const ignored = ignoreBlockId && state.blocks.some(block => block.id === ignoreBlockId && state.marketDays.some(day => day.id === block.marketDayId && day.date === date)) ? 1 : 0
+  if (!setting.open || setting.booked - ignored + extraBusy.length >= setting.maxPaintings) return { ok: false, slot: null, remainingHours: 0, message: 'Painting day is closed or full.' }
   const day = dayByDate(date, marketId) ?? dayByDate(date)
   if (!day) {
     return { ok: false, slot: null, remainingHours: 0, message: 'No market day on that date.' }
@@ -213,9 +264,80 @@ export function findFreeSlot(
   }
 }
 
+const PASSWORDS_KEY = 'awg-mock-passwords'
+
+function mockPasswords(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(PASSWORDS_KEY) || '{}') as Record<string, string> } catch { return {} }
+}
+
+export function mockChangePassword(currentPassword: string, newPassword: string) {
+  const token = localStorage.getItem('awg-staff-token')
+  const account = STAFF_ACCOUNTS.find((entry) => token?.startsWith(`mock.${entry.id}.`))
+  if (!account || (mockPasswords()[account.id] ?? account.password) !== currentPassword) throw new Error('Current password is wrong.')
+  if (newPassword.length < 10) throw new Error('Use at least 10 characters.')
+  localStorage.setItem(PASSWORDS_KEY, JSON.stringify({ ...mockPasswords(), [account.id]: newPassword }))
+}
+
+export function cancelOrder(id: string) {
+  const order = requireOrder(id)
+  if (order.handedOver) throw new Error('Cannot cancel an order that has been handed over.')
+  const cancelled = state.items.filter(item => item.orderId === id)
+  for (const item of cancelled) { if (item.kind === 'custom' && item.productionStatus !== 'not_started') continue; const stock = listInventory().find(row => row.kind === item.kind && (item.kind === 'finished' || (row.color === item.color && row.finish === (item.finish ?? 'shiny')))); if (stock) stock.quantity++ }
+  const itemIds = new Set(cancelled.map(item => item.id))
+  state.blocks = state.blocks.filter((block) => !block.orderItemId || !itemIds.has(block.orderItemId))
+  state.items = state.items.filter((item) => item.orderId !== id)
+  state.orders = state.orders.filter((entry) => entry.id !== id)
+  emit()
+}
+
+export function createMockCheckout(input: ShopCheckoutInput) {
+  const inventory = listInventory()
+  const counts = new Map<string, number>()
+  for (const item of input.items) {
+    if (!item.finish || !item.color || !['red', 'green', 'beige'].includes(item.color)) throw Object.assign(new Error('Choose a valid colour and finish.'), { code: 'VALIDATION', field: `items[${input.items.indexOf(item)}].${!item.finish ? 'finish' : 'color'}` })
+    const id = `custom-${item.color}-${item.finish}`
+    counts.set(id, (counts.get(id) ?? 0) + 1)
+  }
+  for (const [id, count] of counts) {
+    if ((inventory.find(row => row.id === id)?.quantity ?? 0) < count) throw Object.assign(new Error('Out of stock.'), { code: 'OUT_OF_STOCK' })
+  }
+  const customer: Customer = { id: uid('cus'), name: input.customerName, email: input.email, phone: input.phone }
+  const orderId = uid('ord')
+  const code = makeOrderCode()
+  const token = uid('frm')
+  const items: OrderItem[] = input.items.map(item => ({
+    id: uid('orn'), orderId, kind: 'custom', petName: item.petName ?? '', withName: item.withName,
+    color: item.color ?? 'red', finish: item.finish, backName: item.backName ?? '', note: item.note ?? '',
+    cost: itemCost('custom', item.withName, mockPricing), productionStatus: 'not_started', photos: item.photos,
+    formComplete: true, delivery: input.deliveryKind === 'market'
+      ? { kind: 'market', marketDayId: state.marketDays.find(day => day.date === input.deliveryDate && state.markets.some(m => m.id === day.marketId && m.kind === 'market'))?.id, marketId: state.marketDays.find(day => day.date === input.deliveryDate)?.marketId, pickupHour: input.pickupTime ? Number(input.pickupTime.slice(0, 2)) + Number(input.pickupTime.slice(3)) / 60 : null }
+      : { kind: 'vienna', address: input.address, deliveryDate: input.deliveryDate },
+  }))
+  const order: Order = { id: orderId, customerId: customer.id, code, trackToken: uid('trk'), formToken: token,
+    source: 'web', checkoutStatus: 'confirmed', paymentState: 'paid', paymentMethod: 'card', amountPaid: items.reduce((sum, item) => sum + item.cost, 0), total: items.reduce((sum, item) => sum + item.cost, 0),
+    createdAt: new Date().toISOString(), itemIds: items.map(item => item.id), handedOver: false, paymentEntries: [] }
+  for (const [id, count] of counts) inventory.find(row => row.id === id)!.quantity -= count
+  state.customers.push(customer); state.orders.push(order); state.items.push(...items)
+  // The mock checkout redirects directly to success, so it simulates confirmed payment.
+  emit()
+  rememberFormToken(code, token)
+  return { orderCode: code, formToken: token, checkoutUrl: `/buy/thanks?code=${code}` }
+}
+
+export function abandonMockCheckout(code: string) {
+  const token = state.pendingCheckouts?.[code]
+  const suppliedToken = readFormToken(code)
+  if (!token || suppliedToken !== token) return
+  const order = state.orders.find(row => row.code === code && row.formToken === token)
+  if (!token || !order || order.paymentState !== 'unpaid') return
+  delete state.pendingCheckouts![code]
+  state.customers = state.customers.filter(row => row.id !== order.customerId)
+  cancelOrder(order.id)
+}
+
 export function mockLogin(email: string, password: string): { token: string; user: StaffUser } {
   const row = STAFF_ACCOUNTS.find(
-    (a) => a.email.toLowerCase() === email.trim().toLowerCase() && a.password === password,
+    (a) => a.email.toLowerCase() === email.trim().toLowerCase() && (mockPasswords()[a.id] ?? a.password) === password,
   )
   if (!row) throw new Error('Unknown account. Use Gaby or Andres.')
   const user: StaffUser = { id: row.id, name: row.name, email: row.email }
@@ -225,10 +347,10 @@ export function mockLogin(email: string, password: string): { token: string; use
 }
 
 export function mockMe(token: string): StaffUser {
-  if (!token.startsWith('mock.')) throw new Error('Invalid session')
+  if (!token.startsWith('mock.')) throw Object.assign(new Error('Invalid session'), { status: 401 })
   const id = token.split('.')[1]
   const user = state.staff.find((s) => s.id === id)
-  if (!user) throw new Error('Invalid session')
+  if (!user) throw Object.assign(new Error('Invalid session'), { status: 401 })
   return user
 }
 
@@ -296,6 +418,11 @@ export function saveMarket(input: SaveMarketInput): { market: Market; days: Mark
     if (!Number.isFinite(day.openHour) || !Number.isFinite(day.closeHour) || !(day.closeHour > day.openHour)) {
       throw new Error(`${formatDateLabel(day.date)}: close must be after open`)
     }
+  }
+
+  for (const day of input.days) {
+    const alreadyStall = state.marketDays.some(row => row.date === day.date && row.marketId === input.id)
+    if (!alreadyStall && state.items.some(item => item.delivery.kind === 'vienna' && deliveryDateForItem(item) === day.date)) throw Object.assign(new Error(`${formatDateLabel(day.date)} has Vienna deliveries; move them first.`), { code: 'DAY_HAS_DELIVERIES', field: 'days' })
   }
 
   const existing = input.id ? state.markets.find((row) => row.id === input.id) : undefined
@@ -413,16 +540,24 @@ function deliveryDateForItem(item: OrderItem): string | null {
     return marketDayDate(item.delivery.marketDayId)
   }
   if (item.delivery.marketDayId) return marketDayDate(item.delivery.marketDayId)
+  // Web Vienna orders carry the chosen date directly (like the backend's handoff date).
+  if (item.delivery.deliveryDate) return item.delivery.deliveryDate
   const block = state.blocks.find((b) => b.orderItemId === item.id)
-  if (block) return marketDayDate(block.marketDayId)
+  if (!block) return null
+  const paintDate = marketDayDate(block.marketDayId)
+  if (!paintDate) return null
+  // Legacy undated Vienna item: the first Wednesday or Friday after painting, so it shows on exactly one day.
+  for (let offset = 1; offset <= 7; offset++) {
+    const date = addUtcDays(paintDate, offset)
+    if (utcWeekday(date) === 3 || utcWeekday(date) === 5) return date
+  }
   return null
 }
 
 function viennaBelongsToDate(item: OrderItem, date: string): boolean {
   if (item.delivery.kind !== 'vienna') return false
   if (item.delivery.marketDayId) return marketDayDate(item.delivery.marketDayId) === date
-  const weekday = utcWeekday(date)
-  return weekday === 3 || weekday === 5
+  return deliveryDateForItem(item) === date
 }
 
 function addressLabel(address?: { line1: string; line2?: string; city: string; postalCode: string } | null): string | null {
@@ -438,6 +573,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
     const order = state.orders.find((o) => o.id === item.orderId)
     const customer = order ? state.customers.find((c) => c.id === order.customerId) : null
     if (!order || !customer) continue
+    if (order.checkoutStatus === 'pending' || order.checkoutStatus === 'review' || order.paymentReview) continue
     const title = item.petName || customer.name || 'Ornament'
     const photoUrl = item.photos[0]?.dataUrl
     if (item.delivery.kind === 'market') {
@@ -449,6 +585,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         itemId: item.id,
         customerName: customer.name,
         color: item.color,
+        finish: item.finish,
         backName: item.backName,
         title,
         productionStatus: item.productionStatus,
@@ -460,6 +597,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         phone: customer.phone,
         addressLabel: null,
         photoUrl,
+        source: order.source ?? 'stall',
       })
     } else if (item.delivery.kind === 'vienna') {
       if (!viennaBelongsToDate(item, date)) continue
@@ -469,17 +607,19 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         itemId: item.id,
         customerName: customer.name,
         color: item.color,
+        finish: item.finish,
         backName: item.backName,
         title,
         productionStatus: item.productionStatus,
         handedOver: Boolean(order.handedOver),
         deliveryKind: 'vienna',
         pickupHour: null,
-        methodLabel: 'Vienna · Wed/Fri',
+        methodLabel: `Vienna · ${new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '')}`,
         timeLabel: null,
         phone: customer.phone,
         addressLabel: addressLabel(item.delivery.address),
         photoUrl,
+        source: order.source ?? 'stall',
       })
     }
   }
@@ -487,7 +627,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
     if (a.deliveryKind !== b.deliveryKind) return a.deliveryKind === 'market' ? -1 : 1
     return (a.pickupHour ?? 99) - (b.pickupHour ?? 99)
   })
-  return rows
+  return rows.map(row => ({ ...row, remaining: paymentSummary(requireOrder(row.orderId)).remaining, paymentState: requireOrder(row.orderId).paymentState }))
 }
 
 export function getAgendaDay(date: string): AgendaDay {
@@ -497,7 +637,7 @@ export function getAgendaDay(date: string): AgendaDay {
   return {
     marketDay,
     market,
-    slots: blocksForDay(marketDay.id).map(slotView),
+    slots: blocksForDay(marketDay.id).map(slotView).map(slot => slot.order?.checkoutStatus === 'pending' || slot.order?.checkoutStatus === 'review' || slot.order?.paymentReview ? { block: slot.block, held: true, order: null, item: null, customer: null } : slot),
     deliveries: deliveriesForDate(marketDay.date),
   }
 }
@@ -544,6 +684,7 @@ export function moveBlock(blockId: string, date: string, startHour: number) {
   ) {
     throw new Error(`This session must finish before pickup at ${formatHour(item.delivery.pickupHour)}`)
   }
+  if (!state.marketDays.some(row => row.id === day.id)) state.marketDays.push(day)
   block.marketDayId = day.id
   block.startHour = startHour
   block.endHour = end
@@ -599,14 +740,14 @@ export function createSale(input: CreateSaleInput): Order {
     email: (input.email ?? '').trim(),
   }
   const orderId = uid('ord')
-  const code = `AWG${Math.floor(100 + Math.random() * 900)}`
+  const code = makeOrderCode()
   const createdItems: OrderItem[] = []
   const createdBlocks: TimeBlock[] = []
 
   for (const row of rows) {
     const itemId = uid('orn')
     const withName = row.kind === 'custom' && row.withName
-    const cost = itemCost(row.kind, withName)
+    const cost = itemCost(row.kind, withName, mockPricing)
     createdItems.push({
       id: itemId,
       orderId,
@@ -614,10 +755,11 @@ export function createSale(input: CreateSaleInput): Order {
       petName: '',
       withName,
       color: row.color ?? 'red',
+      finish: row.kind === 'custom' ? row.finish ?? 'shiny' : undefined,
       backName: '',
       note: '',
       cost,
-      productionStatus: 'not_started',
+      productionStatus: row.kind === 'finished' ? 'finished' : 'not_started',
       photos: [],
       formComplete: false,
       delivery: {
@@ -664,6 +806,21 @@ export function createSale(input: CreateSaleInput): Order {
     }
   }
 
+  const stockCounts = new Map<InventoryItem, number>()
+  for (const item of createdItems) {
+    const stock = listInventory().find(row => row.kind === item.kind && (item.kind === 'finished' || (row.color === item.color && row.finish === item.finish)))
+    if (!stock) throw Object.assign(new Error('Out of stock.'), { code: 'OUT_OF_STOCK' })
+    stockCounts.set(stock, (stockCounts.get(stock) ?? 0) + 1)
+  }
+  for (const [stock, count] of stockCounts) if (stock.quantity < count) throw Object.assign(new Error('Out of stock.'), { code: 'OUT_OF_STOCK' })
+  for (const [stock, count] of stockCounts) stock.quantity -= count
+
+  for (const block of createdBlocks) {
+    if (!state.marketDays.some(day => day.id === block.marketDayId)) {
+      const date = block.marketDayId.replace(/^home-/, ''); const day = dayByDate(date); if (day) state.marketDays.push(day)
+    }
+  }
+  if (destination && !state.marketDays.some(day => day.id === destination.id)) state.marketDays.push(destination)
   const order: Order = {
     id: orderId,
     customerId: customer.id,
@@ -672,6 +829,7 @@ export function createSale(input: CreateSaleInput): Order {
     formToken: uid('frm'),
     paymentState: 'unpaid',
     paymentMethod: null,
+    amountPaid: 0,
     total: createdItems.reduce((sum, item) => sum + item.cost, 0),
     createdAt: new Date().toISOString(),
     itemIds: createdItems.map((item) => item.id),
@@ -692,8 +850,13 @@ export function createSale(input: CreateSaleInput): Order {
   return order
 }
 
-export function setPaymentState(orderId: string, paymentState: PaymentState, method?: PaymentMethod | null) {
+export function setPaymentState(orderId: string, paymentState: PaymentState, method?: PaymentMethod | null, amountPaid?: number) {
   const order = requireOrder(orderId)
+  if (order.checkoutStatus === 'pending') throw Object.assign(new Error('Check this payment in Stripe first; Checkout is still pending.'), { code: 'PAYMENT_PENDING' })
+  const amount = paymentState === 'paid' ? order.total : paymentState === 'unpaid' ? 0 : amountPaid ?? Math.round(order.total * 50) / 100
+  if (!Number.isFinite(amount) || (paymentState === 'deposit' && (amount <= 0 || amount >= order.total))) throw new Error('Deposit must be greater than zero and less than the total.')
+  if (order.checkoutStatus === 'review' || order.paymentReview) { order.checkoutStatus = 'confirmed'; order.paymentReview = false }
+  order.amountPaid = amount
   order.paymentState = paymentState
   if (method !== undefined) order.paymentMethod = method
   emit()
@@ -716,6 +879,7 @@ export function recordPayment(orderId: string, amount: number, method: PaymentMe
   if (!entries.length && totalPaid > 0) order.paymentOpeningBalance = totalPaid
   order.paymentEntries = [...entries, entry]
   const nextPaid = totalPaid + paid
+  order.amountPaid = nextPaid
   order.paymentState = nextPaid >= order.total - 0.001 ? 'paid' : 'deposit'
   order.paymentMethod = method
   emit()
@@ -746,6 +910,7 @@ export function setHandedOver(orderId: string, handedOver: boolean) {
     throw new Error('Finish all ornaments before marking handed over')
   }
   order.handedOver = handedOver
+  order.handedOverAt = handedOver ? new Date().toISOString() : undefined
   emit()
 }
 
@@ -761,6 +926,9 @@ export function getTrackByCode(code: string): TrackView {
   const customer = state.customers.find((c) => c.id === order.customerId)
   const items = state.items.filter((i) => i.orderId === order.id)
   const first = items[0]
+  const owner = readFormToken(order.code) === order.formToken
+    && !(order.handedOver && order.handedOverAt && Date.now() - Date.parse(order.handedOverAt) >= 30 * 86400000)
+  const personal = owner || order.code.length >= 9
   const market = first?.delivery.marketId
     ? state.markets.find((m) => m.id === first.delivery.marketId)
     : undefined
@@ -769,7 +937,7 @@ export function getTrackByCode(code: string): TrackView {
     : undefined
   const when: TrackWhen =
     first?.delivery.kind === 'vienna'
-      ? { kind: 'vienna', date: null, fromHour: null, marketName: null, untilHour: null }
+      ? { kind: 'vienna', date: first.delivery.deliveryDate ?? null, fromHour: null, marketName: null, untilHour: null }
       : day
         ? {
             kind: 'market',
@@ -785,17 +953,18 @@ export function getTrackByCode(code: string): TrackView {
     paymentState: order.paymentState,
     code: order.code,
     status: trackStatusFor(order, items),
-    customerName: customer?.name.split(' ')[0] ?? 'there',
+    customerName: personal ? customer?.name.split(' ')[0] ?? '' : '',
     items: items.map((i) => ({
       color: i.color,
+      finish: i.finish,
       cost: i.cost,
-      petName: i.petName,
+      petName: personal ? i.petName : '',
       kind: i.kind,
       productionStatus: i.productionStatus,
       withName: i.withName,
-      backName: i.backName,
+      backName: personal ? i.backName : '',
     })),
-    delivery: first?.delivery ?? { kind: 'market' },
+    delivery: first ? { ...first.delivery, address: owner ? first.delivery.address : undefined } : { kind: 'market' },
     when,
   }
 }
@@ -803,6 +972,11 @@ export function getTrackByCode(code: string): TrackView {
 export function updateViennaAddress(code: string, address: Address): TrackView {
   const order = getOrderByCode(code)
   if (!order) throw new Error('Order not found')
+  if (readFormToken(order.code) !== order.formToken
+    || (order.handedOver && order.handedOverAt && Date.now() - Date.parse(order.handedOverAt) >= 30 * 86400000)) {
+    throw Object.assign(new Error('Open the link from your order form to change the address.'), { status: 403, code: 'FORBIDDEN' })
+  }
+  if (order.handedOver) throw Object.assign(new Error('This order was already delivered'), { status: 409, code: 'CONFLICT' })
   state.items
     .filter((i) => i.orderId === order.id && i.delivery.kind === 'vienna')
     .forEach((i) => {
@@ -815,6 +989,7 @@ export function updateViennaAddress(code: string, address: Address): TrackView {
 export function getForm(token: string): CustomerFormView {
   const order = state.orders.find((o) => o.formToken === token)
   if (!order) throw new Error('This form link is not valid.')
+  if (order.handedOver && order.handedOverAt && Date.now() - Date.parse(order.handedOverAt) >= 30 * 86400000) throw Object.assign(new Error('Form expired.'), { code: 'FORM_EXPIRED', status: 404 })
   const customer = state.customers.find((c) => c.id === order.customerId)
   const items = state.items.filter((i) => i.orderId === order.id)
   const item = items.find((i) => i.kind === 'custom') ?? items[0]
@@ -836,6 +1011,9 @@ export function getForm(token: string): CustomerFormView {
         untilHour: day?.closeHour ?? null,
       }
     }),
+    needsAddress: items.some((i) => i.delivery.kind === 'vienna'),
+    address: items.find((i) => i.delivery.kind === 'vienna')?.delivery.address ?? null,
+    editable: !order.handedOver && items.filter(i => i.kind === 'custom').every((i) => i.productionStatus === 'not_started'),
     withName: items.some((i) => i.withName),
     alreadySubmitted: items.every((i) => i.formComplete),
     customer,
@@ -846,10 +1024,17 @@ export function getForm(token: string): CustomerFormView {
 export function submitForm(token: string, payload: CustomerFormPayload): { orderCode: string } {
   const order = state.orders.find((o) => o.formToken === token)
   if (!order) throw new Error('This form link is not valid.')
+  if (order.handedOver && order.handedOverAt && Date.now() - Date.parse(order.handedOverAt) >= 30 * 86400000) throw Object.assign(new Error('Form expired.'), { code: 'FORM_EXPIRED', status: 404 })
   const customer = state.customers.find((c) => c.id === order.customerId)
   const items = state.items.filter((i) => i.orderId === order.id)
   const item = items.find((i) => i.kind === 'custom') ?? items[0]
   if (!customer || !item) throw new Error('Form data missing')
+  if (!getForm(token).editable) throw Object.assign(new Error('Form is locked.'), { code: 'FORM_LOCKED', status: 409 })
+  if (getForm(token).needsAddress) {
+    if (!payload.address?.line1 || !payload.address.city) throw Object.assign(new Error('Address required.'), { code: 'VALIDATION', field: 'address' })
+    if (!/^1(0[1-9]|1[0-9]|2[0-3])0$/.test(payload.address.postalCode)) throw Object.assign(new Error('Invalid postal code.'), { code: 'POSTAL_OUTSIDE_VIENNA', field: 'address.postalCode' })
+    items.filter(i => i.delivery.kind === 'vienna').forEach(i => { i.delivery.address = payload.address })
+  }
   customer.name = payload.customerName.trim()
   customer.phone = payload.phone.trim()
   customer.email = payload.email.trim()
@@ -885,6 +1070,7 @@ export function findMoveSuggestion(input: {
   beforeHour?: number
 }): MoveSuggestion | null {
   const targetDay = dayByDate(input.date)
+  if (!paintingDay(input.date).open || paintingDay(input.date).booked > paintingDay(input.date).maxPaintings) return null
   if (!targetDay || input.date > input.handoffDate || input.date < todayDay().date || input.durationHours <= 0) return null
 
   for (const block of blocksForDay(targetDay.id)) {
@@ -927,4 +1113,22 @@ export function findMoveSuggestion(input: {
     }
   }
   return null
+}
+
+export function searchOrders(query: string): import('../../domain/types').OrderSummary[] {
+  const needle = query.trim().toLowerCase()
+  if (needle.length < 2) return []
+  const phone = needle.replace(/\D/g, '')
+  return state.orders.filter(order => {
+    const customer = state.customers.find(row => row.id === order.customerId)
+    return order.code.toLowerCase().includes(needle) || (customer?.name ?? '').toLowerCase().includes(needle) || (phone.length >= 3 && (customer?.phone ?? '').replace(/\D/g, '').includes(phone))
+  }).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 20).map(orderSummary)
+}
+function orderSummary(order: Order): import('../../domain/types').OrderSummary {
+  const bundle = getOrderBundle(order.id)
+  const dates = bundle.items.map(item => item.delivery.deliveryDate ?? state.marketDays.find(day => day.id === item.delivery.marketDayId)?.date).filter((date): date is string => Boolean(date)).sort()
+  return { id: order.id, code: order.code, customerName: bundle.customer.name, phone: bundle.customer.phone, createdAt: order.createdAt, paymentState: order.paymentState, checkoutStatus: order.checkoutStatus ?? (order.paymentReview ? 'review' : null), total: order.total, items: bundle.items.length, nextHandoffDate: dates[0] ?? null, handedOver: order.handedOver }
+}
+export function attentionOrders() {
+  return state.orders.filter(order => order.paymentReview || order.checkoutStatus === 'pending' || order.checkoutStatus === 'review').map(orderSummary)
 }

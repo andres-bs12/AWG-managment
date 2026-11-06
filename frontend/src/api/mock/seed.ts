@@ -9,10 +9,11 @@ import type {
 } from '../../domain/types'
 import { homePaintHours, stallHours } from '../../lib/calendar'
 import { itemCost } from '../../lib/money'
+import { mockPricing } from './pricing'
 
 export const DEMO_NOW_HOUR = 15 + 10 / 60
 /** Bump when demo orders change. load() reseeds if revision mismatches. */
-export const SEED_REVISION = 11
+export const SEED_REVISION = 12
 export const STORAGE_KEY = `awg-mock-store-v${SEED_REVISION}`
 
 export const STAFF_ACCOUNTS: Array<StaffUser & { password: string }> = [
@@ -31,6 +32,11 @@ export const STAFF_ACCOUNTS: Array<StaffUser & { password: string }> = [
 ]
 
 export type MockState = {
+  pendingCheckouts?: Record<string, string>
+  inventory?: import('../../domain/types').InventoryItem[]
+  paintingDays?: Record<string, { open: boolean; maxPaintings: number }>
+  waitlist?: string[]
+  waitlistTokens?: Record<string, { email: string; confirmed: boolean }>
   seedRevision: number
   staff: StaffUser[]
   customers: Customer[]
@@ -94,14 +100,14 @@ export function createSeed(): MockState {
   ]
 
   /**
-   * Track demos (codes ABS100+):
-   *   ABS100 pickup · In the workshop
-   *   ABS101 pickup · Ready to pick up
-   *   ABS102 pickup · Handed over
-   *   ABS103 Vienna · In the workshop
-   *   ABS104 Vienna · Out for delivery
-   *   ABS105 Vienna · Handed over
-   * Extras: ABS106 not started, ABS107 multi-item workshop, AWG000 form pending.
+   * Track demos (codes AWG0100+):
+   *   AWG0100 pickup · In the workshop
+   *   AWG0101 pickup · Ready to pick up
+   *   AWG0102 pickup · Handed over
+   *   AWG0103 Vienna · In the workshop
+   *   AWG0104 Vienna · Out for delivery
+   *   AWG0105 Vienna · Handed over
+   * Extras: AWG0106 not started, AWG0107 multi-item workshop, AWG0000 form pending.
    */
   const customers: Customer[] = [
     { id: 'cus-100', name: 'Sarah Müller', phone: '+43 664 123 4567', email: 'sarah.mueller@example.com' },
@@ -116,8 +122,8 @@ export function createSeed(): MockState {
   ]
 
   const dog = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=max&w=1800`
-  const costName = itemCost('custom', true)
-  const costPlain = itemCost('custom', false)
+  const costName = itemCost('custom', true, mockPricing)
+  const costPlain = itemCost('custom', false, mockPricing)
 
   const items: OrderItem[] = [
     {
@@ -281,7 +287,7 @@ export function createSeed(): MockState {
     {
       id: 'ord-100',
       customerId: 'cus-100',
-      code: 'ABS100',
+      code: 'AWG0100',
       trackToken: 'trk-abs100',
       formToken: 'frm-abs100',
       paymentState: 'paid',
@@ -294,7 +300,7 @@ export function createSeed(): MockState {
     {
       id: 'ord-101',
       customerId: 'cus-101',
-      code: 'ABS101',
+      code: 'AWG0101',
       trackToken: 'trk-abs101',
       formToken: 'frm-abs101',
       paymentState: 'paid',
@@ -307,7 +313,7 @@ export function createSeed(): MockState {
     {
       id: 'ord-102',
       customerId: 'cus-102',
-      code: 'ABS102',
+      code: 'AWG0102',
       trackToken: 'trk-abs102',
       formToken: 'frm-abs102',
       paymentState: 'paid',
@@ -320,7 +326,7 @@ export function createSeed(): MockState {
     {
       id: 'ord-103',
       customerId: 'cus-103',
-      code: 'ABS103',
+      code: 'AWG0103',
       trackToken: 'trk-abs103',
       formToken: 'frm-abs103',
       paymentState: 'deposit',
@@ -333,7 +339,7 @@ export function createSeed(): MockState {
     {
       id: 'ord-104',
       customerId: 'cus-104',
-      code: 'ABS104',
+      code: 'AWG0104',
       trackToken: 'trk-abs104',
       formToken: 'frm-abs104',
       paymentState: 'paid',
@@ -346,7 +352,7 @@ export function createSeed(): MockState {
     {
       id: 'ord-105',
       customerId: 'cus-105',
-      code: 'ABS105',
+      code: 'AWG0105',
       trackToken: 'trk-abs105',
       formToken: 'frm-abs105',
       paymentState: 'paid',
@@ -359,7 +365,7 @@ export function createSeed(): MockState {
     {
       id: 'ord-106',
       customerId: 'cus-106',
-      code: 'ABS106',
+      code: 'AWG0106',
       trackToken: 'trk-abs106',
       formToken: 'frm-abs106',
       paymentState: 'paid',
@@ -372,7 +378,7 @@ export function createSeed(): MockState {
     {
       id: 'ord-107',
       customerId: 'cus-107',
-      code: 'ABS107',
+      code: 'AWG0107',
       trackToken: 'trk-abs107',
       formToken: 'frm-abs107',
       paymentState: 'deposit',
@@ -385,7 +391,7 @@ export function createSeed(): MockState {
     {
       id: 'ord-wait',
       customerId: 'cus-wait',
-      code: 'AWG000',
+      code: 'AWG0000',
       trackToken: 'trk-wait',
       formToken: 'frm-wait',
       paymentState: 'unpaid',

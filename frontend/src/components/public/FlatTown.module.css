@@ -1,0 +1,101 @@
+/*
+ * Slow, transform/opacity-only motion for the flat town pieces. These run inside SVGs, which the
+ * browser repaints on every animated frame, so the lights use `steps()` — they blink like real
+ * fairy lights and only repaint on each change instead of 60 times a second.
+ */
+
+.glowA,
+.glowB,
+.glowC {
+  animation: glow 8s steps(2, jump-none) infinite;
+}
+
+.glowB {
+  animation-duration: 11s;
+  animation-delay: -3s;
+}
+
+.glowC {
+  animation-duration: 9.5s;
+  animation-delay: -6s;
+}
+
+@keyframes glow {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.wheel {
+  transform-box: fill-box;
+  transform-origin: center;
+  /** 240 steps over 48s: five repaints a second still read as a smooth, slow turn. */
+  animation: spin 48s steps(240) infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.twinkleA,
+.twinkleB,
+.twinkleC {
+  animation: twinkle 2.4s steps(2, jump-none) infinite;
+}
+
+.twinkleB {
+  animation-duration: 3.1s;
+  animation-delay: -0.9s;
+}
+
+.twinkleC {
+  animation-duration: 2.8s;
+  animation-delay: -1.7s;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.starGlow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glowA,
+  .glowB,
+  .glowC,
+  .wheel,
+  .twinkleA,
+  .twinkleB,
+  .twinkleC,
+  .starGlow {
+    animation: none;
+  }
+}

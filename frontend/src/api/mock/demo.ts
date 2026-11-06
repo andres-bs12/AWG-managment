@@ -1,0 +1,5 @@
+export { useMockStoreVersion } from './useMockStore'
+export { resetStore } from './store'
+export { DEMO_NOW_HOUR } from './seed'
+export const demoEmail = 'gaby@artwithgab.com'
+export const demoAccounts = 'gaby@artwithgab.com / gaby\nandres@artwithgab.com / andres'

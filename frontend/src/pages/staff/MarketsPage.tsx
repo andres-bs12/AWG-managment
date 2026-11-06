@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
-import { useMockStoreVersion } from '../../api/mock/useMockStore'
+import { useStaffRefresh } from '../../lib/useStaffRefresh'
 import { ButtonLink } from '../../components/ui/ButtonLink'
 import type { Market, MarketDay } from '../../domain/types'
 import { formatEur } from '../../lib/money'
@@ -20,7 +20,7 @@ function dayCountLabel(count: number): string {
 }
 
 export function MarketsPage() {
-  const version = useMockStoreVersion()
+  const version = useStaffRefresh()
   const [markets, setMarkets] = useState<Market[]>([])
   const [days, setDays] = useState<MarketDay[]>([])
   const [ready, setReady] = useState(false)
@@ -33,6 +33,7 @@ export function MarketsPage() {
         if (cancel) return
         setMarkets(nextMarkets.filter((market) => market.kind === 'market'))
         setDays(nextDays)
+        setError('')
         setReady(true)
       })
       .catch((err: unknown) => {
@@ -73,7 +74,7 @@ export function MarketsPage() {
             const count = days.filter((day) => day.marketId === market.id).length
             const meta = [
               market.stall == null ? 'No stall' : `Stall ${market.stall}`,
-              formatEur(market.totalCost),
+              formatEur(market.totalCost, 'en'),
               seasonLabel(market),
               dayCountLabel(count),
             ].join(' · ')
