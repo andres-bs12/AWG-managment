@@ -131,7 +131,7 @@ Rama `feat/backend-domain` (PR #2 a `main`). Sprints 1–5 terminados con audito
 
 Informes en `tasks/audit-results/`. Backlog en `tasks/todo.md`; decisiones del dueño en `tasks/preguntas-pendientes.md`.
 
-Forma de trabajo: Codex CLI (`gpt-6.1-terra`/`sol`, esfuerzo high para implementar, medium/high para auditar; siempre `< /dev/null`) y Claude para backend delicado, integración y navegador. Nunca audita el mismo LLM que escribió el código.
+Forma de trabajo: Opus orquesta y decide; el reparto de modelos (Codex astra/sol/terra; GLM-5.3 y DeepSeek V4.1 Flash por Mistral Vibe; los modelos propios de Mistral no se usan) y el registro de resultados están en `docs/agent-routing.md`, que se actualiza tras cada delegación. Siempre `< /dev/null`. Nunca audita el mismo LLM que escribió el código.
 
 Staff (auditorías del 2026-11-05 `staff-ux-sale-orders-*` y `staff-ux-agenda-ops-*`): P0 y todos los P1 corregidos, junto con la mayoría de los P2. Cambios principales:
 - botones grandes de 56 px: la regla global `[data-staff-page]` ya no usa `:is()` con el selector de `input`;
