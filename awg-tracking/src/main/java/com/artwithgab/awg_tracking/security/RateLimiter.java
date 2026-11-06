@@ -24,11 +24,23 @@ public class RateLimiter {
     }
 
     public void check(String bucket, String client, int maxPerMinute) {
+        if (record(bucket, client) > maxPerMinute) throw new TooManyRequestsException();
+    }
+
+    /** Counts one event without enforcing a limit (e.g. a failed login); returns the window count. */
+    public int record(String bucket, String client) {
         long now = clock.millis();
-        String key = bucket + "|" + client;
-        Window w = windows.compute(key, (k, old) ->
+        Window w = windows.compute(bucket + "|" + client, (k, old) ->
                 old == null || now - old.start() >= 60_000 ? new Window(now, 1) : new Window(old.start(), old.count() + 1));
-        if (w.count() > maxPerMinute) throw new TooManyRequestsException();
         if (windows.size() > 50_000) windows.entrySet().removeIf(e -> now - e.getValue().start() >= 60_000);
+        return w.count();
+    }
+
+    /** Rejects when the current window already holds {@code maxPerMinute} events; does not count. */
+    public void requireBelow(String bucket, String client, int maxPerMinute) {
+        Window w = windows.get(bucket + "|" + client);
+        if (w != null && clock.millis() - w.start() < 60_000 && w.count() >= maxPerMinute) {
+            throw new TooManyRequestsException();
+        }
     }
 }

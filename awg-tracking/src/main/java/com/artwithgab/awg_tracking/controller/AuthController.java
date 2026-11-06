@@ -3,6 +3,7 @@ package com.artwithgab.awg_tracking.controller;
 import com.artwithgab.awg_tracking.dto.auth.AuthResponse;
 import com.artwithgab.awg_tracking.dto.auth.LoginRequest;
 import com.artwithgab.awg_tracking.dto.auth.StaffUserDto;
+import com.artwithgab.awg_tracking.exception.UnauthorizedException;
 import com.artwithgab.awg_tracking.model.StaffUser;
 import com.artwithgab.awg_tracking.security.AuthService;
 import com.artwithgab.awg_tracking.security.BearerTokenFilter;
@@ -28,7 +29,17 @@ public class AuthController {
     @PostMapping("/staff/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest body, HttpServletRequest request) {
         rateLimiter.check("login", request.getRemoteAddr(), 10);
-        return authService.login(body.email(), body.password());
+        // Per-account cap on failed guesses as well: rotating client addresses (e.g. IPv6 ranges)
+        // must not multiply the attempts against one staff account. One-minute window only, so an
+        // attacker can delay but never lock out a staff member for longer.
+        String account = body.email().trim().toLowerCase(java.util.Locale.ROOT);
+        rateLimiter.requireBelow("login-failed", account, 20);
+        try {
+            return authService.login(body.email(), body.password());
+        } catch (UnauthorizedException e) {
+            rateLimiter.record("login-failed", account);
+            throw e;
+        }
     }
 
     @GetMapping("/staff/me")

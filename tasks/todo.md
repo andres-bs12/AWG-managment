@@ -35,7 +35,7 @@
 - [ ] `/buy` premium: verificar en navegador a 360/768/1280 px y completar las mejoras y pruebas de `docs/plan-buy-premium.md`.
 - [ ] Stripe: `stripe login`, claves de prueba, prueba real del checkout y webhook (`docs/stripe-setup.md`); luego claves live y `SHOP_ENABLED=true`.
 - [ ] SMTP (`MAIL_*`, `OWNER_EMAIL`) y prueba real de los e-mails.
-- [ ] Despliegue: proveedor, dominio, HTTPS, copias de seguridad de Postgres (`docs/deploy.md`).
+- [x] 2026-11-06 · Despliegue v1: artwithgab.com (Cloudflare, Full strict) → AWS EC2 t4g.small en Estocolmo con Caddy, firewall solo Cloudflare, snapshots diarios (7). `deploy/deploy.sh` y `deploy/status.sh`. Ver `docs/deploy.md`.
 - [ ] Datos reales en los textos legales y revisión por un asesor.
 - [ ] Dominio y correo (buzón + SMTP transaccional): ver `docs/siguiente-fase.md`.
 - [ ] Stock real de las 6 combinaciones (rojo/verde/beige × brillante/mate) en `/staff/inventory`.

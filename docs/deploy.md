@@ -9,6 +9,7 @@ Este despliegue ejecuta PostgreSQL, el backend y el frontend. El frontend queda 
 - **HTTPS:** Cloudflare en modo Full (strict). Caddy en el servidor obtiene y renueva solo el certificado de Let's Encrypt (desafío HTTP por el puerto 80 a través de Cloudflare), redirige `www` al dominio principal y añade HSTS.
 - **Respaldos:** política de Data Lifecycle Manager con snapshot diario del disco (02:30 UTC) y 7 copias.
 - **Desplegar una versión nueva:** `deploy/deploy.sh` compila las imágenes en el Mac (arm64), las sube por SSH y reinicia; el servidor no compila nada.
+- **Contraseñas iniciales del staff:** después de cambiarlas en la app, deja `STAFF_GABY_PASSWORD` y `STAFF_ANDRES_PASSWORD` vacías en `/opt/awg/.env` y vuelve a desplegar (Codex P2-6).
 - **Estado:** `deploy/status.sh` (web, créditos, memoria, disco, contenedores, errores y caducidad del certificado).
 
 ## Configuración y arranque

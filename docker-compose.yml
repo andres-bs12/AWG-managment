@@ -13,6 +13,13 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   backend:
     build: ./awg-tracking
@@ -20,8 +27,9 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       DB_USERNAME: ${DB_USERNAME:?Set DB_USERNAME in .env}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
-      STAFF_GABY_PASSWORD: ${STAFF_GABY_PASSWORD:?Set STAFF_GABY_PASSWORD in .env}
-      STAFF_ANDRES_PASSWORD: ${STAFF_ANDRES_PASSWORD:?Set STAFF_ANDRES_PASSWORD in .env}
+      # Only needed to create the accounts; blank them in .env after the first password change.
+      STAFF_GABY_PASSWORD: ${STAFF_GABY_PASSWORD:-}
+      STAFF_ANDRES_PASSWORD: ${STAFF_ANDRES_PASSWORD:-}
       SHOP_ENABLED: ${SHOP_ENABLED:-false}
       SHOP_DELIVERIES_FROM: ${SHOP_DELIVERIES_FROM:-2026-11-30}
       SHOP_SEASON_END: ${SHOP_SEASON_END:-2026-12-24}
@@ -52,6 +60,9 @@ services:
       retries: 10
       start_period: 60s
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging: *logging
 
   frontend:
     build: ./frontend
@@ -62,6 +73,9 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging: *logging
 
 volumes:
   postgres_data:
