@@ -715,6 +715,75 @@ test('leaving a created sale is explicit, the QR stays reachable from payment, a
   expect(fixture.mutations.filter(entry => entry.path.endsWith('/payment-state'))).toHaveLength(0)
 })
 
+test('after the QR, Change date asks first, cancels the order and offers only pickup hours with paint time', async ({ page }) => {
+  const fixture = await httpFixture(page)
+  await signedIn(page, `/staff/sales/new?date=${today}&start=13&end=14`)
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  await page.getByRole('button', { name: 'Create order & show QR', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Enlarge customer QR code', exact: true })).toBeVisible()
+  await expect.poll(() => fixture.saleRequests.length).toBe(1)
+  const firstId = fixture.saleRequests[0].id
+
+  // Only hours from 17:00 leave time to paint.
+  await page.route('**/api/agenda/capacity', async route => {
+    const body = route.request().postDataJSON() as { beforeHour?: number }
+    return route.fulfill({ json: body.beforeHour != null && body.beforeHour < 17
+      ? { ok: false, slot: null, remainingHours: 0, message: 'No free paint slot before this handoff.' }
+      : { ok: true, slot: { date: today, startHour: 13, endHour: 14 }, remainingHours: 3, message: 'Available' } })
+  })
+
+  await page.getByRole('button', { name: 'Change date', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Change the date?', exact: true })
+  await expect(dialog).toContainText('will be cancelled')
+  await expect(dialog).toContainText('The customer already sent the form')
+  await axe(page)
+  await dialog.getByRole('button', { name: 'Not yet', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(fixture.mutations.filter(entry => entry.path.endsWith('/cancel'))).toHaveLength(0)
+
+  await page.getByRole('button', { name: 'Change date', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Cancel order & choose new date', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Pickup and paint', exact: true })).toBeVisible()
+  expect(fixture.mutations.map(entry => entry.path)).toContain(`/api/orders/${firstId}/cancel`)
+
+  const late = page.getByRole('button', { name: '17:00', exact: true })
+  await expect(late).toBeEnabled()
+  const hours = page.locator('[class*="hours"] button')
+  // The hour chosen before stays pressable and explains why it no longer works; other early hours are disabled.
+  await expect(page.getByText('Pickup 14:00 · no painting time left before it.')).toBeVisible()
+  for (const button of await hours.all()) {
+    const label = (await button.textContent())!.trim()
+    if (Number(label.slice(0, 2)) < 17 && await button.getAttribute('aria-pressed') !== 'true') await expect(button).toBeDisabled()
+  }
+  await late.hover()
+  await expect(page.getByText(/Pickup 17:00 · paint 13:00–14:00/)).toBeVisible()
+  await late.click()
+  const create = page.getByRole('button', { name: 'Create order & show QR', exact: true })
+  await expect(create).toBeEnabled()
+  await create.click()
+  await expect(page.getByRole('button', { name: 'Enlarge customer QR code', exact: true })).toBeVisible()
+  await expect.poll(() => fixture.saleRequests.length).toBe(2)
+  expect(fixture.saleRequests[1].key).not.toBe(fixture.saleRequests[0].key)
+  expect(fixture.saleRequests[1].input.items).toEqual([expect.objectContaining({ pickupHour: 17, paintStart: 13, paintEnd: 14 })])
+})
+
+test('Change date refuses to cancel an order that already has a payment', async ({ page }) => {
+  const fixture = await httpFixture(page)
+  await signedIn(page, `/staff/sales/new?date=${today}&start=13&end=14`)
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  await page.getByRole('button', { name: 'Create order & show QR', exact: true }).click()
+  await expect.poll(() => fixture.saleRequests.length).toBe(1)
+  const id = fixture.saleRequests[0].id
+  // A payment committed elsewhere (or with a lost response) shows up when the order is re-read.
+  Object.assign(fixture.records.get(id)!, { paymentState: 'paid', paymentMethod: 'cash', amountPaid: fixture.records.get(id)!.total })
+  await page.getByRole('button', { name: 'Change date', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Change the date?', exact: true })
+  await expect(dialog).toContainText('already has a payment recorded')
+  await expect(dialog.getByRole('button', { name: 'Cancel order & choose new date', exact: true })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: 'Open order', exact: true })).toBeVisible()
+  expect(fixture.mutations.filter(entry => entry.path.endsWith('/cancel'))).toHaveLength(0)
+})
+
 test('mock: one finished ornament, Deliver now, Paid in cash completes the sale', async ({ page }) => {
   await page.goto('/staff/login')
   // The demo email is prefilled, so the password has focus.

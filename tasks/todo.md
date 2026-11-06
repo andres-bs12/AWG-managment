@@ -26,6 +26,9 @@
 - [ ] Staff UX — pendiente tras los arreglos del 2026-11-05 (informes `tasks/audit-results/staff-ux-*`):
   - P2 que quedan (el resto se hizo el 2026-11-05):
     - venta: resumen con «Delivery» sin día (#13). El espacio vertical en móvil (#27) y la marca «Web» en entregas (P2-10) se hicieron el 2026-11-06.
+  - Venta: «Change date» tras el QR (cancela y vuelve a planificar) y horas de recogida sin tiempo de pintura desactivadas, con el horario de pintura al pasar el mouse (2026-11-06). Revisión de Codex en `tasks/audit-results/codex-review-sale-change-date-2026-11-06.md`; quedan dos P2:
+    - Si ninguna hora tiene tiempo, el plan «one change makes room» no se ofrece; solo «place it on the agenda».
+    - En iPad no hay explicación por hora para las horas desactivadas; solo el texto general.
   - HSTS se verifica en el proxy TLS real. Sigue abierto el conflicto de tipos Playwright/axe en `e2e/helpers.ts:45`.
   - Revisión cruzada de Codex hecha (`tasks/audit-results/codex-review-staff-*.md`): 5 P1 y 3 P2, corregidos y verificados de nuevo por Codex. Los guardados de días de pintura que fallan después de salir ya se muestran al volver, con «Retry» (2026-11-06). Queda un punto:
     - En el mock, los ítems de Viena sin fecha toman el primer miércoles o viernes después de pintar.

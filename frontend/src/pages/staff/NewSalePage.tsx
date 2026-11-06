@@ -131,6 +131,8 @@ export function NewSalePage() {
   const [paidNote, setPaidNote] = useState('')
   const [finishedHandoff, setFinishedHandoff] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
+  // null = closed. The order is re-read first: a paid order must not be deleted, and a sent form means a cancellation e-mail.
+  const [changeDate, setChangeDate] = useState<{ state: 'checking' | 'ready' | 'unknown' | 'paid'; formSent: boolean } | null>(null)
   const [planRetry, setPlanRetry] = useState(0)
 
   // One-shot commands are consumed before reload or a remembered back link can replay them.
@@ -526,6 +528,55 @@ export function NewSalePage() {
     }
   }
 
+  const appliedMove = draft.items.find((item) => item.plannedMove)?.plannedMove
+
+  function openChangeDate() {
+    if (!order) return
+    setError('')
+    setChangeDate({ state: 'checking', formSent: false })
+    api.orders.getOrderBundle(order.id)
+      .then((bundle) => {
+        const paid = bundle.order.paymentState !== 'unpaid' || (bundle.order.amountPaid ?? 0) > 0
+        setChangeDate((current) => current && { state: paid ? 'paid' : 'ready', formSent: Boolean(bundle.customer?.email?.trim()) })
+      })
+      .catch(() => setChangeDate((current) => current && { state: 'unknown', formSent: false }))
+  }
+
+  /** The order was created for one date; to pick another, delete it (paint time and stock come back) and plan again. */
+  async function cancelAndChangeDate() {
+    if (!order || submitLock.current) return
+    submitLock.current = true
+    setBusy(true)
+    setError('')
+    try {
+      try {
+        await api.orders.cancelOrder(order.id)
+      } catch (err) {
+        // The delete may have committed with the response lost: an order that no longer exists counts as cancelled.
+        const stillThere = await api.orders.getOrderByCode(order.code).catch(() => undefined)
+        if (stillThere !== null) throw err
+      }
+      saleKey.current = crypto.randomUUID()
+      setSuggestions({})
+      setMoveSuggestions({})
+      setCopied(false)
+      setChangeDate(null)
+      setDraft((current) => ({
+        ...current,
+        order: undefined,
+        phase: 'delivery',
+        items: current.items.map((row) => row.kind === 'custom'
+          ? { ...row, paintDate: undefined, paintStart: undefined, paintEnd: undefined, slotLocked: false, fromCalendar: false, plannedMove: undefined }
+          : row),
+      }))
+    } catch (err) {
+      setError(saleErrorMessage(err, 'Could not cancel the order'))
+    } finally {
+      submitLock.current = false
+      setBusy(false)
+    }
+  }
+
   async function recordPayment(state: PaymentState) {
     if (!order) return
     if (state !== 'unpaid' && !payMethod) {
@@ -600,6 +651,22 @@ export function NewSalePage() {
         <Button tone="staff" variant="secondary" onClick={() => setLeaveOpen(false)}>Keep working</Button>
         <Button tone="staff" variant="secondary" onClick={() => { clearStoredDraft(); navigate(`/staff/orders/${order.id}`, { state: { from: '/staff/sales/new' } }) }}>Open order</Button>
         <Button tone="staff" onClick={() => { setLeaveOpen(false); startOver() }}>Start new sale</Button>
+      </StaffDialog>}
+      {changeDate && order && <StaffDialog title="Change the date?" busy={busy} onClose={() => setChangeDate(null)}>
+        {changeDate.state === 'paid' ? (
+          <p><strong>{order.code} already has a payment recorded.</strong> It cannot be cancelled here: open the order to sort out the payment first.</p>
+        ) : (
+          <p>Order {order.code} will be cancelled: its paint time and stock are released. You then choose a new date, and a new order with a new QR code is created.</p>
+        )}
+        {changeDate.state === 'checking' ? <p>Checking the order…</p> : null}
+        {changeDate.state === 'unknown' ? <p><strong>Could not check the order.</strong> If the customer already sent the form, they get a cancellation e-mail and must fill the new one.</p> : null}
+        {changeDate.state === 'ready' && changeDate.formSent ? <p><strong>The customer already sent the form.</strong> They get a cancellation e-mail and must scan the new code and fill it again.</p> : null}
+        {appliedMove && changeDate.state !== 'paid' ? <p>The change already made to {appliedMove.orderCode} stays: its painting remains on {formatDateLabel(appliedMove.to.date)} · {formatHour(appliedMove.to.startHour)}–{formatHour(appliedMove.to.endHour)}.</p> : null}
+        {changeDate.state === 'paid'
+          ? <Button tone="staff" onClick={() => { clearStoredDraft(); navigate(`/staff/orders/${order.id}`, { state: { from: '/staff/sales/new' } }) }}>Open order</Button>
+          : <Button tone="staff" disabled={busy || changeDate.state === 'checking'} onClick={() => void cancelAndChangeDate()}>{busy ? 'Cancelling…' : 'Cancel order & choose new date'}</Button>}
+        <Button tone="staff" variant="ghost" disabled={busy} onClick={() => setChangeDate(null)}>Not yet</Button>
+        {error && <p role="alert">{error}</p>}
       </StaffDialog>}
       {finishedHandoff && <StaffDialog title="Balance due" busy={busy} onClose={() => setFinishedHandoff(false)}>
         <p>Collect the remaining balance before handing over the whole order. {prices ? formatEur((order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0)) - (payState === 'deposit' ? depositValue(depositAmount, order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0)) : 0), 'en') : ''} is still due.</p>
@@ -723,6 +790,7 @@ export function NewSalePage() {
                     Continue to payment
                   </Button>
                   <CustomerHandoff token={order.formToken} label="Fill on this device instead" />
+                  <Button tone="staff" variant="ghost" onClick={openChangeDate}>Change date</Button>
                   <button
                     type="button"
                     className={styles.textBtn}
@@ -746,6 +814,7 @@ export function NewSalePage() {
                   {busy ? 'Saving…' : payState === 'unpaid' ? 'Leave unpaid' : payState === 'deposit' ? `Mark deposit · ${formatEur(depositValue(depositAmount, order.total), 'en')}` : `Mark paid · ${formatEur(order.total, 'en')}`}
                 </Button>
                 {order.formToken ? <Button tone="staff" variant="secondary" disabled={busy} onClick={() => setPhase('qr')}>Show QR again</Button> : null}
+                {order.formToken ? <Button tone="staff" variant="ghost" disabled={busy} onClick={openChangeDate}>Change date</Button> : null}
               </StaffActions>
             </div>
           ) : null}
@@ -997,6 +1066,15 @@ function DeliveryCard({
   const hours = pickupDay
     ? pickupHourOptions(pickupDay.openHour, pickupDay.closeHour, pickupDay.isToday ? nowHour : undefined)
     : []
+  // Ornaments the planner will place for this pickup; board-chosen ones count as busy time.
+  const previewItems = paintItems.filter((row) => !row.slotLocked)
+  const previewBusy = allItems.flatMap((row) => row.kind === 'custom' && !previewItems.includes(row) && row.paintDate && row.paintStart != null && row.paintEnd != null
+    ? [{ date: row.paintDate, startHour: row.paintStart, endHour: row.paintEnd }]
+    : [])
+  // Agenda refreshes (another device booking or freeing time) re-run the preview.
+  const agendaKey = agendaDays.map((day) => `${day.marketDay.date}:${day.slots.map((slot) => `${slot.block.id}@${slot.block.startHour}`).join(',')}`).join(';')
+  const hourPreview = usePickupHourPreview(item.delivery.mode === 'market' && pickupDay && previewItems.length ? pickupDay.date : null, hours, previewItems, previewBusy, currentDate, agendaKey)
+  const [hintHour, setHintHour] = useState<number | null>(null)
 
   const chosenMarketId = item.delivery.mode === 'market'
     ? item.delivery.marketId ?? today?.marketId
@@ -1225,24 +1303,42 @@ function DeliveryCard({
       {!datePickerOpen && !viennaPickerOpen && item.delivery.mode === 'market' && pickupDay && hours.length ? (
         <div className={styles.pickupTime}>
           <p className={styles.legend}>Pickup hour</p>
-          <div className={styles.hours}>
+          <div className={styles.hours} onMouseLeave={() => setHintHour(null)}>
             {hours.map((hour) => {
               const tooEarly = paintItems.some((row) => row.slotLocked && row.paintDate === pickupDay.date && row.paintEnd != null && hour < row.paintEnd)
+              const plan = hourPreview?.[hour]
+              const checking = previewItems.length > 0 && !hourPreview
+              const noTime = plan?.ok === false
+              const selected = item.delivery.pickupHour === hour
+              // Disabled buttons get no mouse events, so the wrapper carries the hover hint.
               return (
-                <Button
-                  key={hour}
-                  tone="staff"
-                  variant="secondary"
-                  disabled={tooEarly}
-                  title={tooEarly ? 'Painting will not be finished yet' : undefined}
-                  selected={item.delivery.pickupHour === hour}
-                  onClick={() => onDelivery({ ...item.delivery, pickupHour: hour })}
-                >
-                  {formatHour(hour)}
-                </Button>
+                <span key={hour} className={styles.hourWrap} title={tooEarly ? 'Painting will not be finished yet' : noTime ? `No painting time before ${formatHour(hour)}` : plan?.ok ? `Paint ${paintSlotsLabel(plan.slots, pickupDay.date)}` : undefined} onMouseEnter={() => setHintHour(hour)}>
+                  <Button
+                    tone="staff"
+                    variant="secondary"
+                    // A chosen hour stays selectable so staff can see why it no longer works.
+                    disabled={tooEarly || (!selected && (checking || noTime))}
+                    aria-describedby={`pickup-hint-${item.id}`}
+                    selected={selected}
+                    onFocus={() => setHintHour(hour)}
+                    onBlur={() => setHintHour(null)}
+                    onClick={() => onDelivery({ ...item.delivery, pickupHour: hour })}
+                  >
+                    {formatHour(hour)}
+                  </Button>
+                </span>
               )
             })}
           </div>
+          <p className={styles.hourHint} id={`pickup-hint-${item.id}`} aria-live="polite">
+            {pickupHint(hintHour ?? item.delivery.pickupHour ?? null, hourPreview, previewItems.length, pickupDay.date)}
+          </p>
+          {hourPreview && previewItems.length > 0 && hours.every(hour => hourPreview[hour]?.ok === false) ? (
+            <p className={styles.planPrompt}>
+              No painting time before any pickup hour on this day. Choose another day or{' '}
+              <button type="button" className={styles.textBtn} onClick={() => onPlace(previewItems[0])}>place it on the agenda</button>.
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -1327,6 +1423,70 @@ function DeliveryCard({
 
     </article>
   )
+}
+
+type PaintSlot = { date: string; startHour: number; endHour: number }
+type HourPreview = Record<number, { ok: boolean; slots: PaintSlot[] }>
+
+/** For each pickup hour, the paint times the automatic planner would choose (same order and rules). */
+async function previewPickupHours(date: string, hours: number[], items: DraftItem[], busy: PaintSlot[], currentDate: string): Promise<HourPreview> {
+  const cache = new Map<string, Promise<CapacityResult>>()
+  const check = (input: Parameters<typeof api.agenda.checkCapacity>[0]) => {
+    const key = JSON.stringify(input)
+    let result = cache.get(key)
+    if (!result) { result = api.agenda.checkCapacity(input); cache.set(key, result) }
+    return result
+  }
+  const dates = paintDatesToTry(date, currentDate)
+  const out: HourPreview = {}
+  await Promise.all(hours.map(async (hour) => {
+    const planned = [...busy]
+    const slots: PaintSlot[] = []
+    for (const item of items) {
+      const candidates = await Promise.all(dates.map((day) => check({
+        date: day,
+        durationHours: minutesToHours(item.durationMinutes),
+        beforeHour: day === date ? hour : undefined,
+        extraBusy: planned.filter((slot) => slot.date === day).map(({ startHour, endHour }) => ({ startHour, endHour })),
+      })))
+      const hit = candidates.find((candidate) => candidate.ok && candidate.slot)?.slot
+      if (!hit) { out[hour] = { ok: false, slots }; return }
+      slots.push(hit)
+      planned.push(hit)
+    }
+    out[hour] = { ok: true, slots }
+  }))
+  return out
+}
+
+function usePickupHourPreview(date: string | null, hours: number[], items: DraftItem[], busy: PaintSlot[], currentDate: string, refreshKey: string): HourPreview | null {
+  const key = date
+    ? [refreshKey, date, currentDate, hours.join(','), items.map((row) => `${row.id}:${row.durationMinutes}`).join(','), busy.map((slot) => `${slot.date}@${slot.startHour}-${slot.endHour}`).join(',')].join('|')
+    : ''
+  const [state, setState] = useState<{ key: string; value: HourPreview } | null>(null)
+  useEffect(() => {
+    if (!date) return
+    let cancelled = false
+    // On a failed check nothing is disabled; the normal planner still reports the problem.
+    previewPickupHours(date, hours, items, busy, currentDate)
+      .then((value) => { if (!cancelled) setState({ key, value }) })
+      .catch(() => { if (!cancelled) setState({ key, value: {} }) })
+    return () => { cancelled = true }
+  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
+  return state && state.key === key ? state.value : null
+}
+
+function paintSlotsLabel(slots: PaintSlot[], pickupDate: string) {
+  return slots.map((slot) => `${slot.date === pickupDate ? '' : `${formatDateLabel(slot.date)} `}${formatHour(slot.startHour)}–${formatHour(slot.endHour)}`).join(', ')
+}
+
+function pickupHint(hour: number | null, preview: HourPreview | null, count: number, pickupDate: string) {
+  if (!count) return ''
+  if (!preview) return 'Checking paint times…'
+  const plan = hour == null ? undefined : preview[hour]
+  if (hour == null || !plan) return 'Grey hours leave no time to paint before pickup.'
+  if (!plan.ok) return `Pickup ${formatHour(hour)} · no painting time left before it.`
+  return `Pickup ${formatHour(hour)} · paint ${paintSlotsLabel(plan.slots, pickupDate)}`
 }
 
 function stockLabel(quantity: number) { return quantity === 0 ? 'Sold out' : quantity === 1 ? 'Last one' : `${quantity} left` }
