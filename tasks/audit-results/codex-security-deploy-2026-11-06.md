@@ -54,7 +54,7 @@ The current nginx `X-Forwarded-Proto` is `http` because Caddy connects to it ove
 | P2-3 Confianza en toda la red de Docker | Aceptado: requiere un contenedor comprometido. Pendiente separar redes. |
 | P2-4 Tokens en el error log de nginx | Pendiente (bajo: solo en el servidor). |
 | P2-5 Logs sin rotación | Corregido: `json-file` 10 MB × 3 en los tres servicios. |
-| P2-6 Contraseñas iniciales en el entorno | Corregido: `STAFF_*` ahora opcionales; vaciarlas en `.env` tras el primer cambio. Snapshots: 7 días, cifrados. |
-| P3-7 HSTS en www y HTTP hasta el origen | En curso: certificado de origen de Cloudflare (CSR generada en el servidor), cerrar el puerto 80 y "Always Use HTTPS" en Cloudflare. |
+| P2-6 Contraseñas iniciales en el entorno | Corregido: `STAFF_*` opcionales y ya vaciadas en el servidor tras el cambio de contraseñas. Snapshots: 7 días, cifrados. |
+| P3-7 HSTS en www y HTTP hasta el origen | Corregido: certificado de origen de Cloudflare (CSR generada en el servidor), puerto 80 cerrado, "Always Use HTTPS" en Cloudflare y HSTS en los dos hosts. |
 | P3-8 Endurecimiento de contenedores | Parcial: `no-new-privileges` en los tres. |
 | Nota `X-Forwarded-Proto` | Corregido: nginx reenvía `https` cuando lo manda Caddy. |
