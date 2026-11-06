@@ -102,7 +102,7 @@ Paquete `com.artwithgab.awg_tracking` (con guion bajo; no cambiarlo). Capas: `mo
 - `RetentionService` (cada noche): borra fotos y datos personales 60 días tras la entrega (365 si nunca se entregó) y la lista de espera sin confirmar a los 7 días. Lista de espera con doble opt-in (`/waitlist/confirm#token`, `/waitlist/unsubscribe#token`).
 - E-mails al dueño y al cliente por evento de pedido (`NotificationService`, tras commit, asíncrono); sin `MAIL_HOST` no se envía nada.
 - Contraseñas iniciales del staff: mínimo 10 caracteres fuera de dev. Fotos JPEG/PNG se decodifican antes de guardarse.
-- Despliegue: `docker-compose.yml` + `docs/deploy.md`; nginx con cabeceras de seguridad y sin registrar enlaces `/form/`.
+- Despliegue: `docker-compose.yml` + `docs/deploy.md`; nginx con cabeceras de seguridad, sin registrar enlaces `/form/` y con la IP real desde `CF-Connecting-IP`. **En producción desde 2026-11-06:** artwithgab.com (Cloudflare) → AWS EC2 t4g.small en Estocolmo con Caddy; `deploy/deploy.sh` para publicar y `deploy/status.sh` para revisar. Tienda (`SHOP_ENABLED`), Stripe y SMTP aún sin configurar en el servidor.
 - Las auditorías usan Codex CLI (`codex exec -s read-only`) como revisor independiente además de subagentes.
 
 ## Tienda pública y formulario QR

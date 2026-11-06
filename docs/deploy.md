@@ -2,6 +2,15 @@
 
 Este despliegue ejecuta PostgreSQL, el backend y el frontend. El frontend queda disponible en el puerto 8081 del servidor; nginx entrega la aplicación y reenvía `/api/` al backend. Solo PostgreSQL y los archivos subidos usan volúmenes persistentes.
 
+## Producción actual (2026-11-06)
+
+- **Servidor:** AWS EC2 `awg-prod`, t4g.small (ARM, 2 GB + 2 GB de swap), Ubuntu 24.04, región **eu-north-1 (Estocolmo)**: la cuenta está en el plan gratis (100 USD de créditos hasta 2027-05-06) y ese plan bloquea Frankfurt. IP fija 13.62.252.19. Código en `/opt/awg`, `.env` con permisos 600 y contraseñas generadas en el propio servidor.
+- **Firewall (security group `awg-web`):** 80 y 443 solo desde los rangos IPv4 de Cloudflare; 22 solo desde la IP del dueño (actualízala si cambia).
+- **HTTPS:** Cloudflare en modo Full (strict). Caddy en el servidor obtiene y renueva solo el certificado de Let's Encrypt (desafío HTTP por el puerto 80 a través de Cloudflare), redirige `www` al dominio principal y añade HSTS.
+- **Respaldos:** política de Data Lifecycle Manager con snapshot diario del disco (02:30 UTC) y 7 copias.
+- **Desplegar una versión nueva:** `deploy/deploy.sh` compila las imágenes en el Mac (arm64), las sube por SSH y reinicia; el servidor no compila nada.
+- **Estado:** `deploy/status.sh` (web, créditos, memoria, disco, contenedores, errores y caducidad del certificado).
+
 ## Configuración y arranque
 
 1. Instala Docker y Docker Compose en el servidor.
@@ -89,9 +98,9 @@ Los e-mails se envían en segundo plano después de guardar el cambio. Si el SMT
 
 Cada noche (03:30, hora de Viena) el backend borra las fotos y los datos personales (nombre, e-mail, teléfono, dirección, nombre de la mascota, nota) de los pedidos entregados hace más de 60 días. Los pedidos que nunca se entregaron se borran al cumplir un año. Se conservan el código, las fechas, los adornos y los importes para la contabilidad. El enlace del formulario deja de funcionar 30 días después de la entrega. Las inscripciones a la lista de espera sin confirmar se borran a los 7 días. Los plazos se cambian con `RETENTION_FORM_LINK_DAYS`, `RETENTION_PERSONAL_DATA_DAYS`, `RETENTION_STALE_ORDER_DAYS` y `RETENTION_WAITLIST_UNCONFIRMED_DAYS`; confírmalos con tu asesor.
 
-## Client IP and rate limits
+## IP del cliente y límites de intentos
 
-nginx overwrites `X-Forwarded-For` with the address it sees, so clients cannot spoof it. When the stack runs behind another TLS proxy or load balancer, add `set_real_ip_from <proxy CIDR>;` and `real_ip_header X-Forwarded-For;` to `frontend/nginx.conf`. Without them, every visitor shares the proxy's address and therefore one rate-limit bucket. Keep `FORWARD_HEADERS=native` on the backend only when nginx is the sole entry point.
+En producción el tráfico pasa por Cloudflare, luego por Caddy en el servidor y luego por nginx. `frontend/nginx.conf` toma la IP del visitante de la cabecera `CF-Connecting-IP` cuando la petición llega desde la red de Docker (`set_real_ip_from 172.16.0.0/12`). Esto solo es seguro si el firewall del servidor (security group) acepta el puerto 443 únicamente desde los rangos de Cloudflare: si alguien llegara directo, podría inventar esa cabecera. Sin Cloudflare la cabecera no existe y nginx usa la dirección que ve. nginx reemplaza `X-Forwarded-For` (no lo concatena), y el backend con `FORWARD_HEADERS=native` confía solo en nginx.
 
 ## Copias de seguridad y datos personales
 
