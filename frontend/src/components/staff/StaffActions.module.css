@@ -3,3 +3,9 @@
 .total strong { white-space: nowrap; }
 .bar[data-docked='true'] { margin-top: 0; margin-bottom: var(--space-2); box-shadow: var(--shadow-up); }
 @media (min-width: 1024px) { .total { display: none; } .bar { padding: 0; border: 0; background: transparent; } }
+/* Phones: the total sits beside the main action instead of on its own row. */
+@media (max-width: 639px) {
+  .bar[data-docked='true'] { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-2) var(--space-3); }
+  .bar[data-docked='true'] > :not(.total) { grid-column: 2; }
+  .bar[data-docked='true'] .total { display: grid; gap: 0; grid-row: 1; }
+}

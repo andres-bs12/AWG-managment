@@ -25,7 +25,7 @@ export function ViennaDeliveryCard({ row, from, busy, onToggle }: Props) {
           </h3>
           <span className={styles.status}>{deliveryStatusLabel(row)}</span>
         </div>
-        <p className={styles.customer}><strong>{row.customerName || 'Customer pending'}</strong><span>{row.orderCode}</span></p>
+        <p className={styles.customer}><strong>{row.customerName || 'Customer pending'}</strong><span>{row.source === 'web' ? 'Web · ' : ''}{row.orderCode}</span></p>
         <p className={styles.item}>{[row.title, row.color, row.finish, row.backName ? `Name: ${row.backName}` : null].filter(Boolean).join(' · ')}</p>
         <div className={styles.quickLinks}>
           {row.phone ? (

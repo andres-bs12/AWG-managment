@@ -25,11 +25,9 @@
 - [x] 2026-11-05 · Validación de navegador cerrada: suite completa en verde para `/buy`, `/form`, recogida en mercado, SEC-F (399/404 con tres timeouts por carga que pasan aislados) y capturas regeneradas y revisadas. Sustituye los seguimientos de Fix 9–12, a–e, Task 5–8, 7B y 11.
 - [ ] Staff UX — pendiente tras los arreglos del 2026-11-05 (informes `tasks/audit-results/staff-ux-*`):
   - P2 que quedan (el resto se hizo el 2026-11-05):
-    - venta: resumen con «Delivery» sin día (#13) y espacio vertical en móvil (#27);
-    - prioridad visual de los pedidos web en entregas (P2-10, falta la marca «Web»; el nombre del cliente ya se muestra).
+    - venta: resumen con «Delivery» sin día (#13). El espacio vertical en móvil (#27) y la marca «Web» en entregas (P2-10) se hicieron el 2026-11-06.
   - HSTS se verifica en el proxy TLS real. Sigue abierto el conflicto de tipos Playwright/axe en `e2e/helpers.ts:45`.
-  - Revisión cruzada de Codex hecha (`tasks/audit-results/codex-review-staff-*.md`): 5 P1 y 3 P2, corregidos y verificados de nuevo por Codex. Quedan dos puntos:
-    - Si un guardado automático de día de pintura falla después de salir de la página, no se ve el error.
+  - Revisión cruzada de Codex hecha (`tasks/audit-results/codex-review-staff-*.md`): 5 P1 y 3 P2, corregidos y verificados de nuevo por Codex. Los guardados de días de pintura que fallan después de salir ya se muestran al volver, con «Retry» (2026-11-06). Queda un punto:
     - En el mock, los ítems de Viena sin fecha toman el primer miércoles o viernes después de pintar.
 - [ ] `/buy` premium: verificar en navegador a 360/768/1280 px y completar las mejoras y pruebas de `docs/plan-buy-premium.md`.
 - [ ] Stripe: `stripe login`, claves de prueba, prueba real del checkout y webhook (`docs/stripe-setup.md`); luego claves live y `SHOP_ENABLED=true`.

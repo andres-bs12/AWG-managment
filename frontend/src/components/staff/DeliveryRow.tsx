@@ -52,6 +52,7 @@ export function DeliveryRow({ row, from }: Props) {
       )}
       <span className={styles.dlvBody}>
         <strong>
+          {row.source === 'web' ? <span className={styles.webTag}>Web</span> : null}
           {row.orderCode} · {row.title}
         </strong>
         <span>{[row.customerName, row.color, row.finish, deliveryStatusLabel(row)].filter(Boolean).join(' · ')}</span>
@@ -59,7 +60,7 @@ export function DeliveryRow({ row, from }: Props) {
       <span className={styles.dlvAside}>
 <span>{row.methodLabel}</span>
         {row.remaining != null && row.remaining > 0 && <strong>Collect {formatEur(row.remaining, 'en')}</strong>}
-        {row.timeLabel ? <span className={styles.dlvTime}>{row.timeLabel}</span> : null}
+        {row.timeLabel ? <span className={styles.dlvTime}>{row.source === 'web' ? `Arrives ${row.timeLabel}` : row.timeLabel}</span> : null}
       </span>
     </button>
   )

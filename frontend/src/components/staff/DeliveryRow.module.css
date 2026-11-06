@@ -83,3 +83,16 @@
 }
 
 .dlv { border-color: var(--color-control-border); }
+
+/* Web pickups: the customer booked online and says when they arrive. */
+.webTag {
+  display: inline-block;
+  margin-inline-end: var(--space-2);
+  padding: 0 var(--space-2);
+  border: var(--border-thin) solid var(--color-control-border);
+  border-radius: var(--radius-pill);
+  color: var(--staff-ink);
+  font-size: var(--type-staff-meta-size);
+  font-weight: 600;
+  vertical-align: middle;
+}

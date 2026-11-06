@@ -131,7 +131,7 @@ public class AgendaService {
                     hour == null ? null : Hours.format(hour),
                     customer.getPhone(),
                     market ? null : addressLabel(order),
-                    photoUrl, order.getTotal().subtract(order.getAmountPaid()).max(java.math.BigDecimal.ZERO), order.getPaymentState()));
+                    photoUrl, order.getTotal().subtract(order.getAmountPaid()).max(java.math.BigDecimal.ZERO), order.getPaymentState(), order.getSource()));
         }
         rows.sort(Comparator.<AgendaDeliveryDto>comparingInt(r -> r.deliveryKind() == DeliveryKind.MARKET ? 0 : 1)
                 .thenComparingDouble(r -> r.pickupHour() == null ? 99 : r.pickupHour()));

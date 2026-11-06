@@ -33,3 +33,6 @@
 .stockRow .error, .stockRow .conflict { grid-column: 1 / -1; }
 .swatch { flex: none; width: var(--size-swatch); height: var(--size-swatch); border-radius: var(--radius-circle); border: var(--border-thin) solid var(--ornament-swatch-border); }
 @media (max-width: 639px) { .stockRow { grid-template-columns: auto auto; justify-content: space-between; } .stockRow .name { grid-column: 1 / -1; } }
+
+.lost { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-inline-start: var(--border-inset) solid var(--staff-danger); background: var(--color-error-surface); }
+.lost p { margin: 0; flex: 1 1 var(--size-staff-name); }

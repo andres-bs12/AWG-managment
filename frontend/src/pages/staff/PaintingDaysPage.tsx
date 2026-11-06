@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { api } from '../../api/client'
 import type { PaintingDay } from '../../domain/types'
 import { Button } from '../../components/ui/Button'
@@ -8,6 +8,39 @@ import { InsetNote } from '../../components/public/PublicForm'
 import { addUtcDays, formatDateLabel, utcWeekday } from '../../lib/time'
 import { useStaffClock } from '../../lib/staffClock'
 import styles from './SettingsRows.module.css'
+
+/**
+ * Saves that failed after their row was gone (range change or leaving the page). They stay here for this
+ * browser session, so the page can show them and retry instead of losing the edit silently.
+ */
+type LostSave = { date: string; open: boolean; max: number; message: string }
+let lostSaves: LostSave[] = []
+const lostListeners = new Set<() => void>()
+function setLostSaves(next: LostSave[]) { lostSaves = next; lostListeners.forEach(listener => listener()) }
+function subscribeLost(listener: () => void) { lostListeners.add(listener); return () => { lostListeners.delete(listener) } }
+function recordLostSave(save: LostSave) { setLostSaves([...lostSaves.filter(row => row.date !== save.date), save]) }
+function clearLostSave(date: string) { if (lostSaves.some(row => row.date === date)) setLostSaves(lostSaves.filter(row => row.date !== date)) }
+
+function LostSaves({ onSaved }: { onSaved: () => void }) {
+  const rows = useSyncExternalStore(subscribeLost, () => lostSaves)
+  const [busy, setBusy] = useState(false)
+  if (!rows.length) return null
+  async function retry() {
+    setBusy(true)
+    for (const row of rows) {
+      // A newer edit in the visible row replaces (and clears) this entry; never send the older value then.
+      if (!lostSaves.includes(row)) continue
+      try { await api.paintingDays.update(row.date, row.open, row.max); if (lostSaves.includes(row)) clearLostSave(row.date) }
+      catch (err) { if (lostSaves.includes(row)) recordLostSave({ ...row, message: err instanceof Error ? err.message : row.message }) }
+    }
+    setBusy(false)
+    onSaved()
+  }
+  return <div className={styles.lost} role="alert">
+    <p>Not saved: {rows.map(row => `${formatDateLabel(row.date)} (${row.open ? `max ${row.max}` : 'closed'})`).join(', ')}. {rows[rows.length - 1].message}</p>
+    <Button tone="staff" disabled={busy} onClick={() => void retry()}>{busy ? 'Saving…' : 'Retry'}</Button>
+  </div>
+}
 
 export function PaintingDaysPage() {
   const clock = useStaffClock()
@@ -41,10 +74,11 @@ export function PaintingDaysPage() {
     <StaffBackLink to="/staff/agenda" label="Agenda" /><h1>Painting days</h1>
     <InsetNote><p>These limits apply to automatic suggestions, including stall days. Manual moves and sales may exceed them. Changes save automatically. Weekday and stall defaults are awaiting the owner's decision.</p></InsetNote>
     <nav className={styles.range} aria-label="Painting day ranges"><Button tone="staff" variant="secondary" disabled={offset === 0 || loading} onClick={() => { setLoading(true); setOffset(n => n - 1) }}>Previous 4 weeks</Button><Button tone="staff" variant="secondary" disabled={!seasonEnd || to >= seasonEnd || loading} onClick={() => { setLoading(true); setOffset(n => n + 1) }}>Next 4 weeks</Button></nav>
+    <LostSaves onSaved={() => setRetry(n => n + 1)} />
     {loading && <p role="status">Loading painting days…</p>}
     {error && <div role="alert"><p>{error}</p><Button tone="staff" onClick={() => { setLoading(true); setRetry(n => n + 1) }}>Retry</Button></div>}
     {!loading && !error && !upcoming.length && <p>No painting days in this range.</p>}
-    {weeks.map(week => <section key={week[0].date}><h2>Week of {formatDateLabel(week[0].date)}</h2><div className={styles.list}>{week.map(day => <DayRow key={day.date} day={day} />)}</div></section>)}
+    {weeks.map(week => <section key={week[0].date}><h2>Week of {formatDateLabel(week[0].date)}</h2><div className={styles.list}>{week.map(day => <DayRow key={`${day.date}|${day.open}|${day.maxPaintings}`} day={day} />)}</div></section>)}
   </section>
 }
 /** One compact row per day. Every change saves on its own (toggles at once, typed numbers after a pause), in order. */
@@ -62,6 +96,8 @@ function DayRow({ day }: { day: PaintingDay }) {
   const running = useRef(false)
   const timer = useRef<number | undefined>(undefined)
   const flushRef = useRef<() => void>(() => {})
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   async function flush() {
     if (running.current) return
     running.current = true
@@ -72,14 +108,17 @@ function DayRow({ day }: { day: PaintingDay }) {
         setState('saving'); setError('')
         try {
           const result = await api.paintingDays.update(day.date, next.open, next.max)
+          clearLostSave(day.date)
           setBooked(result.booked)
           // Only reflect the server when nothing newer was typed meanwhile.
           if (next.revision !== revision.current) continue
           setOpen(result.open); setMax(String(result.maxPaintings)); latest.current = { open: result.open, max: result.maxPaintings }
           setState(queue.current || timer.current !== undefined ? 'saving' : 'saved')
         } catch (err) {
+          const message = err instanceof Error ? err.message : 'Could not save day.'
+          if (!mounted.current) { recordLostSave({ date: day.date, open: next.open, max: next.max, message }); continue }
           if (next.revision !== revision.current) continue
-          setError(err instanceof Error ? err.message : 'Could not save day.'); setState('error')
+          setError(message); setState('error')
         }
       }
     } finally { running.current = false }
@@ -96,6 +135,7 @@ function DayRow({ day }: { day: PaintingDay }) {
   function change(nextOpen: boolean, nextMax: string, wait: number) {
     setOpen(nextOpen); setMax(nextMax)
     revision.current += 1
+    clearLostSave(day.date)
     window.clearTimeout(timer.current); timer.current = undefined
     const number = Number(nextMax)
     if (nextMax.trim() === '' || !Number.isInteger(number) || number < 0 || number > 10) { setError('Enter a whole number from 0 to 10.'); setState('error'); return }

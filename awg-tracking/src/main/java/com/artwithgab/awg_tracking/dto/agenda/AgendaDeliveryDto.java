@@ -25,6 +25,8 @@ public record AgendaDeliveryDto(
         String addressLabel,
         String photoUrl,
         java.math.BigDecimal remaining,
-        com.artwithgab.awg_tracking.enums.PaymentState paymentState
+        com.artwithgab.awg_tracking.enums.PaymentState paymentState,
+        /** Where the order was placed, so staff can tell web pickups from stall sales. */
+        com.artwithgab.awg_tracking.enums.OrderSource source
 ) {
 }

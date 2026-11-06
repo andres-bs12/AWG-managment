@@ -175,6 +175,7 @@ export type AgendaDelivery = {
   phone: string
   addressLabel: string | null
   photoUrl?: string
+  source?: 'stall' | 'web'
 }
 
 export type AgendaDay = {

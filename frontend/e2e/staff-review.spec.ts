@@ -58,6 +58,7 @@ async function httpFixture(page: Page, options: FixtureOptions = {}) {
   const inventory = [...config.colors.map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, quantity: 3 })), { id: 'stock-finished', kind: 'finished', color: null, finish: null, quantity: 3 }]
   let allMarkets = [market, spareMarket]
   let allDays = [marketDay, ...spareDays]
+  let paintingDays = [{ date: '2026-11-05', open: true, maxPaintings: 2, booked: 0 }, { date: today, open: true, maxPaintings: 2, booked: 1 }, { date: '2026-11-07', open: true, maxPaintings: 2, booked: 3 }]
 
   const bundle = (id: string) => {
     const parent = records.get(id)!
@@ -89,11 +90,13 @@ async function httpFixture(page: Page, options: FixtureOptions = {}) {
     if (path === '/api/inventory') return json(route, inventory)
     if (path === '/api/markets' && method === 'GET') return json(route, allMarkets)
     if (path === '/api/market-days') return json(route, allDays.filter(row => !url.searchParams.has('marketId') || row.marketId === url.searchParams.get('marketId')))
-    if (path === '/api/painting-days') return json(route, [{ date: '2026-11-05', open: true, maxPaintings: 2, booked: 0 }, { date: today, open: true, maxPaintings: 2, booked: 1 }, { date: '2026-11-07', open: true, maxPaintings: 2, booked: 3 }])
+    if (path === '/api/painting-days') return json(route, paintingDays)
     if (path.startsWith('/api/painting-days/') && method === 'PATCH') {
       const body = request.postDataJSON() as { open: boolean; maxPaintings: number }
       mutations.push({ path, body })
-      return json(route, { date: decodeURIComponent(path.split('/').pop()!), ...body, booked: 1 })
+      const date = decodeURIComponent(path.split('/').pop()!)
+      paintingDays = paintingDays.map(row => row.date === date ? { ...row, ...body } : row)
+      return json(route, paintingDays.find(row => row.date === date))
     }
     if (path === '/api/agenda/days' || path.startsWith('/api/agenda/days/')) {
       dayReads++
@@ -862,4 +865,24 @@ test('painting-day edits typed quickly are all sent, even when leaving during th
   // Leave before the 400ms pause ends: the last value is still saved.
   await navigation(page, '/staff/agenda')
   await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 5 }])
+})
+
+test('a painting-day save that fails after leaving is shown on return and can be retried', async ({ page }) => {
+  const fixture = await httpFixture(page)
+  let fail = true
+  await page.route(url => url.pathname.startsWith('/api/painting-days/'), route => fail ? route.fulfill({ status: 503, json: { code: 'UNAVAILABLE', message: 'Server is busy, try again.' } }) : route.fallback())
+  await signedIn(page, '/staff/painting-days')
+  await page.getByRole('button', { name: /^Increase Max paintings/ }).first().click()
+  await navigation(page, '/staff/agenda')
+  await expect(page.getByRole('heading', { name: 'Agenda', exact: true })).toBeVisible()
+  await navigation(page, '/staff/painting-days')
+  const lost = page.getByRole('alert').filter({ hasText: /^Not saved:/ })
+  await expect(lost).toContainText('max 3')
+  await axe(page)
+  fail = false
+  await lost.getByRole('button', { name: 'Retry', exact: true }).click()
+  await expect(lost).toHaveCount(0)
+  // The visible row shows the value that was finally saved.
+  await expect(page.getByRole('spinbutton').first()).toHaveValue('3')
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 3 }])
 })

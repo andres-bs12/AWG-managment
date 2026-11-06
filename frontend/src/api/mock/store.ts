@@ -597,6 +597,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         phone: customer.phone,
         addressLabel: null,
         photoUrl,
+        source: order.source ?? 'stall',
       })
     } else if (item.delivery.kind === 'vienna') {
       if (!viennaBelongsToDate(item, date)) continue
@@ -618,6 +619,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         phone: customer.phone,
         addressLabel: addressLabel(item.delivery.address),
         photoUrl,
+        source: order.source ?? 'stall',
       })
     }
   }
