@@ -106,7 +106,7 @@ public class ShopService {
         if (!TrackingService.ownsOrder(order, formToken)) {
             throw new com.artwithgab.awg_tracking.exception.ForbiddenException("This checkout belongs to another browser.");
         }
-        if (!order.isAwaitingPayment()) return;
+        if (order.isCancelled() || !order.isAwaitingPayment()) return;
         // Paid meanwhile: keep it; the webhook (or the cleanup job) confirms it.
         if (order.getStripeSessionId() != null && stripe.expireOrReconcile(order.getStripeSessionId()).equals("complete")) return;
         release(order);
@@ -288,7 +288,7 @@ public class ShopService {
     // ─── Checkout ───────────────────────────────────────────────────────────
 
     @Transactional
-    public CheckoutResponse checkout(CheckoutRequest req, Map<String, MultipartFile> files) {
+    public CheckoutResponse checkout(CheckoutRequest req, Map<String, MultipartFile> files, String clientIp) {
         if (!isOpen()) throw new StripeClient.ShopUnavailableException();
         boolean pickup = req.isPickup();
         if (!pickup) {
@@ -302,9 +302,14 @@ public class ShopService {
 
         calendarService.lockSchedule();
         // Unpaid checkouts hold painting time and stock; cap how many can be open at once (counted under the lock).
-        if (orderRepository.countByCheckoutStatus(CheckoutStatus.PENDING) >= Math.max(1, props.shop().maxOpenCheckouts())) {
+        if (orderRepository.countByCheckoutStatusAndStatusNot(CheckoutStatus.PENDING, "CANCELLED") >= Math.max(1, props.shop().maxOpenCheckouts())) {
             throw new com.artwithgab.awg_tracking.exception.TooManyRequestsException()
                     .code("TOO_MANY_OPEN_CHECKOUTS");
+        }
+        String clientHash = hashClientIp(clientIp);
+        if (orderRepository.countPendingForEmail(CheckoutStatus.PENDING, req.email().trim().toLowerCase(Locale.ROOT)) >= 2
+                || orderRepository.countByCheckoutStatusAndCheckoutClientHashAndStatusNot(CheckoutStatus.PENDING, clientHash, "CANCELLED") >= 2) {
+            throw new com.artwithgab.awg_tracking.exception.TooManyRequestsException().code("PENDING_CHECKOUT_LIMIT");
         }
         AgendaService.Snapshot s = agendaService.snapshot();
         LocalDate today = s.index().today();
@@ -363,9 +368,8 @@ public class ShopService {
         order.setCreatedAt(now);
         order.setSource(OrderSource.WEB);
         order.setCheckoutStatus(CheckoutStatus.PENDING);
-        // Stripe needs expires_at >= 30 min after the session is created; the buffer covers photo
-        // writes and the API call that happen after this timestamp.
-        order.setCheckoutExpiresAt(now.plusSeconds(60L * Math.max(30, props.shop().checkoutMinutes()) + 120));
+        order.setCheckoutExpiresAt(now.plusSeconds(15 * 60));
+        order.setCheckoutClientHash(clientHash);
         order.setPaymentState(PaymentState.UNPAID);
         order.setFormSubmitted(true);
         BigDecimal deliveryFee = pickup ? BigDecimal.ZERO : fee();
@@ -433,7 +437,7 @@ public class ShopService {
             }
             if (deliveryFee.signum() > 0) lines.add(new StripeClient.Line("Delivery in Vienna", deliveryFee, 1));
             session = stripe.createCheckoutSession(order.getId().toString(), order.getCode(),
-                    customer.getEmail(), lines, order.getCheckoutExpiresAt());
+                    customer.getEmail(), lines, clock.instant().plusSeconds(32 * 60));
             order.setStripeSessionId(session.id());
         } catch (RuntimeException e) {
             written.forEach(photoStorage::deleteFile);
@@ -469,6 +473,10 @@ public class ShopService {
             return;
         }
         Order order = found.get();
+        if (order.isCancelled()) {
+            if ("paid".equals(session.path("payment_status").asString(""))) log.error("Paid Stripe session {} belongs to a cancelled order; review refund manually", sessionId);
+            return;
+        }
         switch (type) {
             case "checkout.session.completed", "checkout.session.async_payment_succeeded" -> {
                 if (order.getCheckoutStatus() == CheckoutStatus.PENDING) confirmIfPaid(order, session);
@@ -482,35 +490,34 @@ public class ShopService {
         }
     }
 
-    /**
-     * Safety net in case the "expired" webhook never arrives. Asks Stripe first: a session that was
-     * paid but whose webhook is late gets confirmed instead of deleted.
-     */
-    @Scheduled(fixedDelayString = "PT5M")
+    /** Expire overdue sessions, or reconcile payments completed before expiration. */
+    @Scheduled(fixedDelayString = "PT1M")
     @Transactional
     public void releaseExpired() {
-        Instant cutoff = clock.instant().minusSeconds(600);
-        if (orderRepository.findByCheckoutStatusAndCheckoutExpiresAtBefore(CheckoutStatus.PENDING, cutoff).isEmpty()) return;
+        Instant cutoff = clock.instant();
+        if (orderRepository.findByCheckoutStatusAndCheckoutExpiresAtBeforeAndStatusNot(CheckoutStatus.PENDING, cutoff, "CANCELLED").isEmpty()) return;
         calendarService.lockSchedule();
-        for (Order order : orderRepository.findByCheckoutStatusAndCheckoutExpiresAtBefore(CheckoutStatus.PENDING, cutoff)) {
+        for (Order order : orderRepository.findByCheckoutStatusAndCheckoutExpiresAtBeforeAndStatusNot(CheckoutStatus.PENDING, cutoff, "CANCELLED")) {
             if (order.getStripeSessionId() == null) {
                 release(order);
                 continue;
             }
-            JsonNode session;
             try {
-                session = stripe.retrieveSession(order.getStripeSessionId());
+                String status = stripe.expireOrReconcile(order.getStripeSessionId());
+                if ("expired".equals(status)) release(order);
+                else if ("complete".equals(status)) confirmIfPaid(order, stripe.retrieveSession(order.getStripeSessionId()));
             } catch (RuntimeException e) {
-                log.warn("Could not check Stripe session for order {}; will retry", order.getCode());
-                continue;
+                log.warn("Could not expire or reconcile Stripe session for order {}; will retry", order.getCode());
             }
-            String status = session.path("status").asString("");
-            if ("complete".equals(status)) {
-                confirmIfPaid(order, session);
-            } else if ("expired".equals(status)) {
-                release(order);
-            }
-            // "open": Stripe has not expired it yet; try again next run.
+        }
+    }
+
+    private static String hashClientIp(String ip) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(ip.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
         }
     }
 
@@ -522,12 +529,14 @@ public class ShopService {
                     session.path("amount_total").asLong(-1), session.path("currency").asString(""));
             // Keep the order (it may be paid) but stop the automatic release; staff checks it in Stripe.
             if (order.getCheckoutStatus() == CheckoutStatus.PENDING) {
+                order.setCheckoutClientHash(null);
                 order.setCheckoutStatus(CheckoutStatus.REVIEW);
                 events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.PAYMENT_REVIEW));
             }
             return;
         }
         buyMetrics.paid();
+        order.setCheckoutClientHash(null);
         order.setCheckoutStatus(CheckoutStatus.CONFIRMED);
         order.setPaymentState(PaymentState.PAID);
         order.setPaymentMethod(PaymentMethod.CARD);

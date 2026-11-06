@@ -21,7 +21,7 @@ function summary(parent: Order, checkoutStatus: string | null = null) {
   return { id: parent.id, code: parent.code, customerName: 'Alex Review', phone: '+43 660 1234567', createdAt: parent.createdAt, paymentState: parent.paymentState, checkoutStatus, total: parent.total, items: parent.itemIds.length, nextHandoffDate: today, handedOver: parent.handedOver }
 }
 
-type FixtureOptions = { finished?: boolean; handedOver?: boolean; held?: boolean; attention?: boolean; missingForm?: boolean; controlledClock?: boolean; checkoutStatus?: 'pending' | 'review' }
+type FixtureOptions = { multi?: boolean; finished?: boolean; handedOver?: boolean; held?: boolean; attention?: boolean; missingForm?: boolean; controlledClock?: boolean; checkoutStatus?: 'pending' | 'review' }
 
 /**
  * Serve the actual HTTP entry in the existing Vite test server. Only the selected
@@ -43,8 +43,10 @@ async function httpFixture(page: Page, options: FixtureOptions = {}) {
   await page.route('**/src/api/mock/entry.ts', route => route.fulfill({ contentType: 'application/javascript', body: "export { httpApi as selectedApi } from '/src/api/http/services.ts'" }))
   await page.route('**/src/api/mock/demo.ts', route => route.fulfill({ contentType: 'application/javascript', body: "export * from '/src/api/http/demo.ts'" }))
   const original = order('order-review', { handedOver: options.handedOver ?? false, ...(options.checkoutStatus ? { source: 'web', checkoutStatus: options.checkoutStatus, paymentState: 'unpaid', paymentMethod: null, amountPaid: 0 } : {}) })
+  if (options.multi) original.itemIds.push('item-second')
   const records = new Map([[original.id, original]])
   const items = new Map([[original.id, item(original, { productionStatus: options.finished ? 'finished' : 'not_started', formComplete: !options.missingForm })]])
+  const extraItem = options.multi ? item(original, { id: 'item-second', petName: 'Milo', productionStatus: 'finished', handedOver: options.handedOver ?? false }) : null
   const blocks = new Map<string, TimeBlock>([[original.id, { id: 'block-review', marketDayId: marketDay.id, orderItemId: original.itemIds[0], startHour: 12, endHour: 13, status: options.finished ? 'finished' : 'not_started' }]])
   const createdByKey = new Map<string, Order>()
   const mutations: { path: string; body: unknown }[] = []
@@ -62,7 +64,7 @@ async function httpFixture(page: Page, options: FixtureOptions = {}) {
 
   const bundle = (id: string) => {
     const parent = records.get(id)!
-    return { order: parent, customer: { id: parent.customerId, name: 'Alex Review', phone: '+43 660 1234567', email: 'alex@example.com' }, items: [items.get(id)!], blocks: blocks.has(id) ? [blocks.get(id)!] : [] }
+    return { order: parent, customer: { id: parent.customerId, name: 'Alex Review', phone: '+43 660 1234567', email: 'alex@example.com' }, items: [items.get(id)!, ...(id === original.id && extraItem ? [extraItem] : [])], blocks: blocks.has(id) ? [blocks.get(id)!] : [] }
   }
   const day = (): AgendaDay => {
     const current = records.get(original.id)
@@ -146,9 +148,9 @@ async function httpFixture(page: Page, options: FixtureOptions = {}) {
         return json(route, parent)
       }
       const handed = /^\/api\/orders\/([^/]+)\/handed-over$/.exec(path)
-      if (handed) { records.get(handed[1])!.handedOver = body.handedOver; return route.fulfill({ status: 204 }) }
+      if (handed) { const parent = records.get(handed[1])!; const list = [items.get(handed[1])!, ...(handed[1] === original.id && extraItem ? [extraItem] : [])]; for (const row of list) if (!body.itemIds || body.itemIds.includes(row.id)) row.handedOver = body.handedOver; parent.handedOver = list.every(row => row.handedOver); return route.fulfill({ status: 204 }) }
       const cancelled = /^\/api\/orders\/([^/]+)\/cancel$/.exec(path)
-      if (cancelled) { records.delete(cancelled[1]); return route.fulfill({ status: 204 }) }
+      if (cancelled) { Object.assign(records.get(cancelled[1])!, { status: 'CANCELLED', cancelledAt: new Date().toISOString(), cancellationReason: body.reason }); return route.fulfill({ status: 204 }) }
       const status = /^\/api\/orders\/([^/]+)\/items\/[^/]+\/status$/.exec(path)
       if (status) { items.get(status[1])!.productionStatus = body.status; return route.fulfill({ status: 204 }) }
       if (method === 'DELETE' && path.startsWith('/api/markets/')) { allMarkets = allMarkets.filter(row => row.id !== path.split('/').at(-1)); return route.fulfill({ status: 204 }) }
@@ -447,7 +449,7 @@ test('handover with balance due requires confirmation and can mark paid before h
   const fixture = await httpFixture(page, { finished: true })
   await signedIn(page, `/staff/orders/${fixture.original.id}`)
   await page.getByRole('button', { name: 'Mark picked up', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Balance due', exact: true })
+  const dialog = page.getByRole('dialog', { name: 'Confirm handover', exact: true })
   await expect(dialog).toBeVisible()
   await expect(dialog).toContainText(/37[.,]00/)
   // The recorded payment method is preselected, so the safe action is ready; the risky one is quiet.
@@ -471,6 +473,47 @@ test('handover with balance due requires confirmation and can mark paid before h
   await expect(page.getByRole('button', { name: 'Cancel order', exact: true })).toBeDisabled()
 })
 
+test('order handover lets staff choose ornaments and leave the rest pending', async ({ page }) => {
+  const fixture = await httpFixture(page, { finished: true, multi: true })
+  fixture.original.paymentState = 'paid'; fixture.original.amountPaid = fixture.original.total
+  await signedIn(page, `/staff/orders/${fixture.original.id}`)
+  await page.getByRole('button', { name: 'Mark picked up', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Confirm handover' })
+  await expect(dialog.getByRole('checkbox', { name: 'Luna' })).toBeChecked()
+  await expect(dialog.getByRole('checkbox', { name: 'Milo' })).toBeChecked()
+  await dialog.getByRole('checkbox', { name: 'Milo' }).uncheck()
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  expect(fixture.original.handedOver).toBe(false)
+  await expect(page.getByRole('article', { name: 'Luna' }).getByRole('button', { name: 'Undo handover' })).toBeVisible()
+  await expect(page.getByRole('article', { name: 'Milo' }).getByRole('button', { name: 'Mark handed over' })).toBeVisible()
+})
+
+test('item handover and undo allow selecting other ornaments', async ({ page }) => {
+  const fixture = await httpFixture(page, { finished: true, multi: true })
+  fixture.original.paymentState = 'paid'; fixture.original.amountPaid = fixture.original.total
+  await signedIn(page, `/staff/orders/${fixture.original.id}`)
+  await page.getByRole('article', { name: 'Luna' }).getByRole('button', { name: 'Mark handed over' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Confirm handover' })
+  await expect(dialog).toContainText('1 more item')
+  await expect(dialog.getByRole('checkbox', { name: 'Luna' })).toBeChecked()
+  await expect(dialog.getByRole('checkbox', { name: 'Milo' })).not.toBeChecked()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Only this one' }).click()
+  await expect(page.getByRole('article', { name: 'Luna' }).getByRole('button', { name: 'Undo handover' })).toBeVisible()
+  expect(fixture.original.handedOver).toBe(false)
+  await page.getByRole('article', { name: 'Milo' }).getByRole('button', { name: 'Mark handed over' }).click()
+  await page.getByRole('dialog', { name: 'Confirm handover' }).getByRole('button', { name: 'Save' }).click()
+  expect(fixture.original.handedOver).toBe(true)
+  await page.getByRole('button', { name: 'Undo pickup' }).click()
+  const undo = page.getByRole('dialog', { name: 'Undo handover' })
+  await expect(undo.getByRole('checkbox', { name: 'Luna' })).toBeChecked()
+  await expect(undo.getByRole('checkbox', { name: 'Milo' })).toBeChecked()
+  await undo.getByRole('checkbox', { name: 'Milo' }).uncheck()
+  await undo.getByRole('button', { name: 'Save' }).click()
+  expect(fixture.original.handedOver).toBe(false)
+})
+
 test('delivery rows show the amount to collect before handover', async ({ page }) => {
   await httpFixture(page, { finished: true })
   await signedIn(page, `/staff/deliveries?day=${today}`)
@@ -483,7 +526,7 @@ test('delivery rows show the amount to collect before handover', async ({ page }
   })
   expect(gap.inside).toBeLessThan(gap.after)
   await page.getByRole('button', { name: /Mark picked up|Picked up/ }).click()
-  const dialog = page.getByRole('dialog', { name: 'Balance due', exact: true })
+  const dialog = page.getByRole('dialog', { name: 'Confirm handover', exact: true })
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: /Mark paid.*hand over/i }).click()
   // The handed-over order keeps its place and the change is announced.
@@ -537,12 +580,14 @@ test('cancel explains received money and started painting, and changes nothing u
   await expect(dialog).toContainText(/painting|in progress/i)
   expect(fixture.records.has(fixture.original.id)).toBe(true)
   await axe(page)
-  await dialog.getByRole('button', { name: 'Keep order', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Not yet', exact: true }).click()
   expect(fixture.mutations).toHaveLength(0)
   await page.getByRole('button', { name: 'Cancel order', exact: true }).click()
+  await dialog.getByLabel('Reason (optional)').fill('Customer request')
   await dialog.getByRole('button', { name: 'Cancel order', exact: true }).click()
-  await expect(page).toHaveURL(/\/staff\/agenda$/)
-  expect(fixture.records.has(fixture.original.id)).toBe(false)
+  await expect(page.getByRole('heading', { name: 'Cancelled order' })).toBeVisible()
+  await expect(page.getByText('Reason: Customer request')).toBeVisible()
+  expect(fixture.records.get(fixture.original.id)?.status).toBe('CANCELLED')
 })
 
 test('last ornament completion uses the same confirmation in the paint workspace', async ({ page }) => {
@@ -811,7 +856,7 @@ test('painting days hide past days, flag over-limit days and save each change wi
   const fixture = await httpFixture(page)
   await signedIn(page, '/staff/painting-days')
   await expect(page.getByRole('heading', { level: 3 })).toHaveCount(2)
-  await expect(page.getByText('3/2 booked · Over limit')).toBeVisible()
+  await expect(page.getByText('3/2 booked · Over limit; existing bookings remain')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0)
   const toggle = page.getByRole('switch', { name: /^Open\b/ }).first()
   const box = await toggle.boundingBox()
@@ -901,11 +946,14 @@ test('mock: a multi-ornament order is grouped before production filters and rows
   const ready = page.locator('[class*="item"]').filter({ has: page.getByRole('button', { name: 'Mark picked up', exact: true, disabled: false }) }).first()
   const code = (await ready.locator('strong').first().textContent())!.split(' · ')[0]
   await ready.getByRole('button', { name: 'Mark picked up', exact: true }).click()
-  const balance = page.getByRole('dialog', { name: 'Balance due', exact: true })
-  if (await balance.isVisible().catch(() => false)) await balance.getByRole('button', { name: /Mark paid.*hand over/i }).click()
+  const balance = page.getByRole('dialog', { name: 'Confirm handover', exact: true })
+  await expect(balance).toBeVisible()
+  if (await balance.getByRole('button', { name: /Mark paid.*hand over/i }).isVisible()) await balance.getByRole('button', { name: /Mark paid.*hand over/i }).click()
+  else await balance.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: `${code} handed over.` })).toBeVisible()
   expect(await codes()).toEqual(before)
   await page.locator('[class*="item"]').filter({ hasText: code }).getByRole('button', { name: 'Undo handover', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Undo handover' }).getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: `${code} handover undone.` })).toBeVisible()
   expect(await codes()).toEqual(before)
 })
@@ -954,4 +1002,18 @@ test('a painting-day save that fails after leaving is shown on return and can be
   // The visible row shows the value that was finally saved.
   await expect(page.getByRole('spinbutton').first()).toHaveValue('3')
   await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 3 }])
+})
+
+
+test('agenda painting capacity saves changes and warns without removing bookings', async ({ page }) => {
+  const fixture = await httpFixture(page)
+  await signedIn(page, '/staff/agenda')
+  const row = page.locator('article').filter({ has: page.getByRole('spinbutton', { name: /Max paintings for/ }) })
+  await expect(row.getByText('1/2 booked')).toBeVisible()
+  await row.getByRole('button', { name: /^Decrease Max paintings/ }).click()
+  await row.getByRole('button', { name: /^Decrease Max paintings/ }).click()
+  await expect(row.getByText('1/0 booked · Over limit; existing bookings remain')).toBeVisible()
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: true, maxPaintings: 0 })
+  await row.getByRole('switch').uncheck()
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: false, maxPaintings: 0 })
 })

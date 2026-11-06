@@ -61,15 +61,17 @@ public class OrderController {
 
     @PatchMapping("/{id}/handed-over")
     public ResponseEntity<Void> setHandedOver(@PathVariable UUID id, @Valid @RequestBody HandedOverRequest body) {
-        orderService.setHandedOver(id, body.handedOver());
+        orderService.setHandedOver(id, body.handedOver(), body.itemIds());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/cancel")
-    public org.springframework.http.ResponseEntity<Void> cancel(@PathVariable UUID id) {
-        orderService.cancelOrder(id);
+    public org.springframework.http.ResponseEntity<Void> cancel(@PathVariable UUID id, @RequestBody(required = false) CancelRequest body) {
+        orderService.cancelOrder(id, body == null ? null : body.reason());
         return org.springframework.http.ResponseEntity.noContent().build();
     }
+
+    public record CancelRequest(String reason) {}
 
     @PatchMapping("/{id}/payment-state")
     public OrderDto setPaymentState(@PathVariable UUID id, @Valid @RequestBody PaymentStateRequest body) {

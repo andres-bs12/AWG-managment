@@ -81,6 +81,10 @@ public class ViewMapper {
                 o.getCreatedAt().toString(),
                 o.getOrderItems().stream().map(i -> i.getId().toString()).toList(),
                 o.isHandedOver(),
+                o.getHandedOverAt() == null ? null : o.getHandedOverAt().toString(),
+                o.getStatus(),
+                o.getCancelledAt() == null ? null : o.getCancelledAt().toString(),
+                o.getCancellationReason(),
                 o.isPaymentReview(),
                 List.of(),
                 o.getCheckoutStatus() == null ? null : o.getCheckoutStatus().name().toLowerCase(java.util.Locale.ROOT),
@@ -123,6 +127,7 @@ public class ViewMapper {
                         .map(p -> new PhotoDto(p.getPhotoId().toString(), p.getName(), photoUrl(p)))
                         .toList(),
                 i.getOrder().isFormSubmitted() || i.getItemKind() == ItemKind.GENERIC,
+                i.isHandedOver(),
                 delivery(i, index));
     }
 

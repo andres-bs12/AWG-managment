@@ -89,6 +89,10 @@ public class Order {
     /** A PENDING web order is released after this instant. */
     private Instant checkoutExpiresAt;
 
+    /** Client network address for limiting pending checkouts; cleared after payment. */
+    @Column(length = 64)
+    private String checkoutClientHash;
+
     /** Vienna delivery fee charged online; included in total. */
     @Column(precision = 10, scale = 2)
     private BigDecimal deliveryFee;
@@ -103,6 +107,14 @@ public class Order {
 
     /** Set once the customer's personal data and photos were deleted (data retention). */
     private Instant anonymizedAt;
+
+    @Column(nullable = false, length = 16)
+    private String status = "ACTIVE";
+    private Instant cancelledAt;
+    @Column(length = 500)
+    private String cancellationReason;
+
+    public boolean isCancelled() { return "CANCELLED".equals(status); }
 
     public boolean isPaymentReview() {
         return checkoutStatus == CheckoutStatus.REVIEW;

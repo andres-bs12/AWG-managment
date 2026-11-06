@@ -142,3 +142,11 @@ Staff (auditorías del 2026-11-05 `staff-ux-sale-orders-*` y `staff-ux-agenda-op
 - diálogos con «Not yet» como única forma de cerrar sin actuar.
 
 Codex hizo la revisión cruzada (`tasks/audit-results/codex-review-staff-*.md`) y sus hallazgos están corregidos. Lo pendiente está en `tasks/todo.md`. E2E: 429 casos en verde; backend: 95 tests.
+
+
+## AWG 1.1 work in progress (2026-11-06)
+
+- Partial, uncommitted: Agenda embeds the existing painting-day control and warns when bookings exceed the limit. Backend integration and Playwright coverage added; browser verification remains pending.
+- Item-level handover implemented with migration V8, batch selection, item undo and last-item expiry; Playwright and visual verification remain pending. Existing handed-over orders are backfilled.
+- Soft cancellation in progress with V9: records and optional reason retained, eligible stock returned, slots excluded, Track shows cancelled and retention clears the reason. Browser verification remains pending.
+- Pending checkout limits and 15-minute application expiry implemented with V10 and `PENDING_CHECKOUT_LIMIT`; Stripe sessions are expired/reconciled by the minute. PostgreSQL migration, live Stripe and browser verification remain pending. No new error code was introduced for item handover or cancellation. Do not treat version 1.1 as complete.

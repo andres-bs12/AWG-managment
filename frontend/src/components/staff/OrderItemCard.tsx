@@ -16,10 +16,11 @@ type Props = {
   busy: boolean
   /** Online payment not confirmed: painting is possible but not the next step. */
   held?: boolean
+  onHandover: () => void
   onStatus: (status: ProductionStatus) => void
 }
 
-export function OrderItemCard({ item, block, days, selected, showHandoff, navigationState, busy, held = false, onStatus }: Props) {
+export function OrderItemCard({ item, block, days, selected, showHandoff, navigationState, busy, held = false, onHandover, onStatus }: Props) {
   const title = item.petName || (item.kind === 'custom' ? 'Custom ornament' : 'Finished ornament')
   const photo = item.photos[0]
   const paintTo = `/staff/orders/${item.orderId}/paint/${item.id}`
@@ -44,6 +45,7 @@ export function OrderItemCard({ item, block, days, selected, showHandoff, naviga
         {photo ? <ButtonLink to={paintTo} state={navigationState} tone="staff" variant={item.productionStatus === 'finished' || held ? 'secondary' : 'primary'}>{item.productionStatus === 'finished' ? 'View reference' : 'Open painting'}</ButtonLink> : <span className={styles.waiting}>{item.kind === 'custom' ? 'Waiting for reference photos' : 'No reference photo'}</span>}
         {block ? <Link className={styles.schedule} to={agendaSlotPath(block, days)}>{paintSlotLabel(block, days)}</Link> : null}
       </div>
+      <Button tone="staff" variant="secondary" disabled={busy || held || (!item.handedOver && item.productionStatus !== 'finished')} onClick={onHandover}>{item.handedOver ? 'Undo handover' : 'Mark handed over'}</Button>
       <details className={styles.adjust}>
         <summary>Adjust production status</summary>
         <div className={styles.statusOptions}>

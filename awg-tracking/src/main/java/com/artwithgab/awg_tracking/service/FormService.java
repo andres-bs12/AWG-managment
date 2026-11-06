@@ -32,7 +32,7 @@ public class FormService {
     private Order find(String token) {
         if (token == null || token.length() < 20 || token.length() > 100) throw new ResourceNotFoundException("This form link is not valid.");
         Order order = orderRepository.findByFormToken(token).orElseThrow(() -> new ResourceNotFoundException("This form link is not valid."));
-        if (formLinks.isExpired(order)) {
+        if (order.isCancelled() || formLinks.isExpired(order)) {
             throw new ResourceNotFoundException("This form link has expired.").code("FORM_EXPIRED");
         }
         return order;

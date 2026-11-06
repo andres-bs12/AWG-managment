@@ -22,6 +22,8 @@
 
 ## Pendiente (ver `tasks/preguntas-pendientes.md` para decisiones del dueño)
 
+- [ ] AWG 1.1 (2026-11-06): Agenda painting-day control implemented, pending browser verification; item-level handover implemented with Playwright verification pending; checkout limits/expiry and soft cancellation implemented, pending browser and production integration verification. See `AGENTS.md` for current state.
+
 - [x] 2026-11-05 · Validación de navegador cerrada: suite completa en verde para `/buy`, `/form`, recogida en mercado, SEC-F (399/404 con tres timeouts por carga que pasan aislados) y capturas regeneradas y revisadas. Sustituye los seguimientos de Fix 9–12, a–e, Task 5–8, 7B y 11.
 - [ ] Staff UX — pendiente tras los arreglos del 2026-11-05 (informes `tasks/audit-results/staff-ux-*`):
   - P2 que quedan (el resto se hizo el 2026-11-05):
@@ -49,3 +51,5 @@
 - [ ] Task 5A: Claude debe ejecutar los nueve casos escritos de `e2e/success.spec.ts` en 360/768/1280 px (pago, espera, calendario, SEQ, cancelación y privacidad). No ejecutados aquí; revisar también el conflicto previo de tipos Playwright/axe en `helpers.ts:45`. El mock ya expone métricas en memoria para probar privacidad sin omitir casos.
 - [ ] Task 5B: Claude debe ejecutar los siete casos escritos de `e2e/keyboard-availability.spec.ts`: teclado completo de escritorio, Tab/Shift+Tab sin controles ocultos ni solapados, fecha agotada y opciones agotadas DE/EN, fallo de red al reconsultar. Verificar los arreglos de foco, Enter y recuperación de calendario a 360/768/1280 px. Build y lint pasan; Playwright no se ejecutó por instrucción del dueño. Persiste el conflicto previo de tipos Playwright/axe en `helpers.ts:45`.
 - [ ] Task 5C: Claude debe ejecutar los siete casos completos de `e2e/journey-deep.spec.ts` en los cuatro proyectos (incluido movimiento reducido): checkout multipart exacto DE/EN, dos adornos/retirada, nombre/giro/precio, latencia, historial y recarga. Sin omisiones; cinco muestras de color y de la opción de nombre por proyecto, mediana < 100 ms (medición desde el clic en el documento, sin demora del driver/táctil). Verificar el historial nuevo de las tres pantallas y que recargar vuelve al diseño para reañadir fotos. Sin ejecutar Playwright aquí por instrucción del dueño; no se modificaron otros specs. La comprobación TypeScript del spec solo informa del conflicto previo de tipos Playwright/axe en `helpers.ts:45`.
+
+- [ ] AWG 1.1 soft cancellation: run the Playwright cancellation flow and visually verify staff detail and DE/EN Track; verify V9 on PostgreSQL.

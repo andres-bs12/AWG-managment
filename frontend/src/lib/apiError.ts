@@ -18,6 +18,7 @@ const messages: Record<string, [string, string]> = {
   OUT_OF_STOCK: ['This item is out of stock. Please choose another.', 'Dieser Artikel ist ausverkauft. Bitte wähle einen anderen.'],
   PAYMENT_PENDING: ['Payment is still pending. Please try again later.', 'Die Zahlung ist noch ausständig. Bitte versuche es später erneut.'],
   SHOP_CLOSED: ['The shop is currently closed.', 'Der Shop ist derzeit geschlossen.'],
+  PENDING_CHECKOUT_LIMIT: ['You already have two unpaid orders open. Complete one or wait for it to expire before trying again.', 'Du hast bereits zwei unbezahlte Bestellungen offen. Schließe eine ab oder warte, bis sie abläuft, bevor du es erneut versuchst.'],
   TOO_MANY_OPEN_CHECKOUTS: ['Too many checkouts are open. Please try again later.', 'Es sind zu viele Bestellungen offen. Bitte versuche es später erneut.'],
   PAYMENT_PROVIDER: ['Payment is temporarily unavailable. Please try again.', 'Die Zahlung ist vorübergehend nicht verfügbar. Bitte versuche es erneut.'],
   UNAUTHORIZED: ['Please sign in to continue.', 'Bitte melde dich an, um fortzufahren.'],

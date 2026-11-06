@@ -8,7 +8,7 @@ export type ItemKind = 'custom' | 'finished'
 export type ProductionStatus = 'not_started' | 'in_progress' | 'finished'
 export type DeliveryKind = 'market' | 'vienna'
 export type MarketKind = 'market' | 'home'
-export type TrackStatus = 'preparing' | 'ready' | 'delivered'
+export type TrackStatus = 'preparing' | 'ready' | 'delivered' | 'cancelled'
 
 export type StaffUser = {
   id: string
@@ -48,6 +48,7 @@ export type OrderItem = {
   note: string
   cost: number
   productionStatus: ProductionStatus
+  handedOver?: boolean
   photos: Photo[]
   formComplete: boolean
   delivery: {
@@ -69,6 +70,9 @@ export type OrderSummary = {
 }
 
 export type Order = {
+  status?: 'ACTIVE' | 'CANCELLED'
+  cancelledAt?: string | null
+  cancellationReason?: string | null
   checkoutStatus?: CheckoutStatus | null
   source?: 'web' | 'stall'
 

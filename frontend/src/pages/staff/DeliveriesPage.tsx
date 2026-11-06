@@ -18,7 +18,7 @@ type DayFilter = 'all' | string
 type StatusFilter = 'all' | ProductionStatus
 type KindFilter = 'all' | DeliveryKind
 
-type DatedDelivery = AgendaDelivery & { date: string; count?: number; ready?: number }
+type DatedDelivery = AgendaDelivery & { date: string; count?: number; ready?: number; members?: DatedDelivery[] }
 
 type Section = {
   key: string
@@ -53,7 +53,7 @@ function flattenDays(days: AgendaDay[]): DatedDelivery[] {
 function groupOrders(rows: DatedDelivery[]): DatedDelivery[] {
   const groups = new Map<string, DatedDelivery[]>()
   for (const row of rows) {
-    const key = `${row.orderId}|${row.deliveryKind}`
+    const key = `${row.orderId}|${row.deliveryKind}|${row.handedOver}`
     groups.set(key, [...(groups.get(key) ?? []), row])
   }
   return [...groups.values()].map(([first, ...rest]) => {
@@ -62,7 +62,7 @@ function groupOrders(rows: DatedDelivery[]): DatedDelivery[] {
     const ready = all.filter(row => row.productionStatus === 'finished').length
     const names = [...new Set(all.map(row => row.title).filter(Boolean))]
     const productionStatus: ProductionStatus = ready === all.length ? 'finished' : all.some(row => row.productionStatus !== 'not_started') ? 'in_progress' : 'not_started'
-    return { ...first, title: `${names.join(', ')} · ${all.length} ornaments`, productionStatus, count: all.length, ready, color: undefined, finish: undefined, backName: undefined }
+    return { ...first, title: `${names.join(', ')} · ${all.length} ornaments`, productionStatus, count: all.length, ready, members: all, color: undefined, finish: undefined, backName: undefined }
   })
 }
 
@@ -191,7 +191,7 @@ export function DeliveriesPage() {
   const handover = useHandover(() => setReload(n => n + 1), setHandoffError)
   function toggle(row: DatedDelivery, target: boolean) {
     setLastToggle({ orderId: row.orderId, code: row.orderCode, target })
-    void handover.request(row.orderId, target)
+    void handover.request(row.orderId, target, row.count ? undefined : row.itemId)
   }
 
   const dated = useMemo(() => flattenDays(days), [days])
@@ -281,18 +281,16 @@ export function DeliveriesPage() {
               <p className={styles.meta}>{section.meta}</p>
               {section.rows.map((row) =>
                 routeMode && row.deliveryKind === 'vienna' ? (
-                  <ViennaDeliveryCard
-                    key={`${row.orderId}-${row.itemId}-${row.date}`}
-                    row={row}
-                    from={`/staff/deliveries?${params}`}
-                    busy={handover.busy}
-                    onToggle={(_, handedOver) => toggle(row, handedOver)}
-                  />
+                  <div key={`${row.orderId}-${row.itemId}-${row.date}`}>
+                    <ViennaDeliveryCard row={row} from={`/staff/deliveries?${params}`} busy={handover.busy} onToggle={(_, handedOver) => toggle(row, handedOver)} />
+                    {row.members?.map(member => <Button key={member.itemId} tone="staff" variant="secondary" disabled={handover.busy || (!member.handedOver && member.productionStatus !== 'finished')} onClick={() => toggle(member, !member.handedOver)}>{member.handedOver ? 'Undo' : 'Hand over'} {member.title}</Button>)}
+                  </div>
                 ) : (
                   <div key={`${row.orderId}-${row.itemId}-${row.date}`} className={styles.item}>
                     <DeliveryRow row={row} from={`/staff/deliveries?${params}`} />
                     <div className={styles.itemAction}>
                       <Button tone="staff" variant="secondary" disabled={handover.busy || (!row.handedOver && row.productionStatus !== 'finished')} onClick={() => toggle(row, !row.handedOver)}>{row.handedOver ? 'Undo handover' : row.deliveryKind === 'market' ? 'Mark picked up' : 'Mark delivered'}</Button>
+                      {row.members?.map(member => <Button key={member.itemId} tone="staff" variant="secondary" disabled={handover.busy || (!member.handedOver && member.productionStatus !== 'finished')} onClick={() => toggle(member, !member.handedOver)}>{member.handedOver ? 'Undo' : 'Hand over'} {member.title}</Button>)}
                       {!row.handedOver && row.productionStatus !== 'finished' ? <span className={styles.hint}>{row.count ? `${row.ready} of ${row.count} ready` : 'Finish before handoff'}</span> : null}
                     </div>
                   </div>

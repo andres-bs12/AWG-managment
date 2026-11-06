@@ -264,6 +264,7 @@ public class OrderService {
     @Transactional
     public OrderDto updatePaymentState(UUID orderId, PaymentState state, PaymentMethod method, BigDecimal amountPaid) {
         Order order = findOrderOrThrow(orderId);
+        requireActive(order);
         if (order.isAwaitingPayment()) throw new ConflictException("This web order is waiting for its online payment.").code("PAYMENT_PENDING");
         // Staff checked a mismatched Stripe payment by hand: recording a payment (paid or deposit) resolves the review.
         if (order.isPaymentReview()) {
@@ -293,21 +294,34 @@ public class OrderService {
     }
 
     @Transactional
-    public void setHandedOver(UUID orderId, boolean handedOver) {
-        Order order = findOrderOrThrow(orderId);
-        if (handedOver && order.getOrderItems().stream().anyMatch(i -> i.getProductionStatus() != ProductionStatus.FINISHED)) {
+    public void setHandedOver(UUID orderId, boolean handedOver, java.util.List<UUID> itemIds) {
+        Order order = orderRepository.findForHandover(orderId).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+        requireActive(order);
+        var items = order.getOrderItems();
+        var selected = itemIds == null ? items : items.stream().filter(i -> itemIds.contains(i.getId())).toList();
+        if (itemIds != null && (itemIds.isEmpty() || selected.size() != new java.util.HashSet<>(itemIds).size() || selected.size() != itemIds.size())) {
+            throw new BadRequestException("Select valid items from this order.");
+        }
+        if (handedOver && selected.stream().anyMatch(i -> i.getProductionStatus() != ProductionStatus.FINISHED)) {
             throw new ConflictException("Finish all ornaments before marking handed over");
         }
-        boolean changed = order.isHandedOver() != handedOver;
-        order.setHandedOver(handedOver);
-        if (changed) order.setHandedOverAt(handedOver ? clock.instant() : null);
-        if (changed && handedOver) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.HANDED_OVER));
+        selected.forEach(i -> i.setHandedOver(handedOver));
+        updateHandover(order);
+    }
+
+    private void updateHandover(Order order) {
+        boolean complete = !order.getOrderItems().isEmpty() && order.getOrderItems().stream().allMatch(OrderItem::isHandedOver);
+        boolean changed = order.isHandedOver() != complete;
+        order.setHandedOver(complete);
+        if (changed) order.setHandedOverAt(complete ? clock.instant() : null);
+        if (changed && complete) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.HANDED_OVER));
     }
 
     /** Changes one item's production status; un-finishing an item also undoes the handoff. */
     @Transactional
     public void setItemStatus(UUID orderId, UUID itemId, ProductionStatus status) {
-        Order order = findOrderOrThrow(orderId);
+        Order order = orderRepository.findForHandover(orderId).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+        requireActive(order);
         OrderItem item = order.getOrderItems().stream().filter(i -> i.getId().equals(itemId)).findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Item not found"));
         boolean wasFinished = item.getProductionStatus() == ProductionStatus.FINISHED;
@@ -315,23 +329,28 @@ public class OrderService {
         if (!wasFinished && status == ProductionStatus.FINISHED && order.getOrderItems().stream().allMatch(i -> i.getProductionStatus() == ProductionStatus.FINISHED)) {
             events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.ALL_FINISHED));
         }
-        if (order.isHandedOver() && order.getOrderItems().stream().anyMatch(i -> i.getProductionStatus() != ProductionStatus.FINISHED)) {
-            order.setHandedOver(false);
-            order.setHandedOverAt(null);
+        if (status != ProductionStatus.FINISHED && item.isHandedOver()) {
+            item.setHandedOver(false);
+            updateHandover(order);
         }
     }
 
     /**
-     * Staff cancellation: deletes the order, returns its stock and frees its painting time.
+     * Staff cancellation: retains the order, returns eligible stock and frees its painting time.
      * Card refunds for paid web orders are done by hand in Stripe.
      */
     @Transactional
-    public void cancelOrder(UUID orderId) {
+    public void cancelOrder(UUID orderId) { cancelOrder(orderId, null); }
+
+    @Transactional
+    public void cancelOrder(UUID orderId, String reason) {
         calendarService.lockSchedule();
-        Order order = findOrderOrThrow(orderId);
-        if (order.isHandedOver()) throw new ConflictException("This order was already handed over.");
+        Order order = orderRepository.findForHandover(orderId).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+        if (order.isCancelled()) return;
+        if (reason != null && reason.length() > 500) throw new BadRequestException("Reason must be 500 characters or fewer.").code("VALIDATION").field("reason");
+        if (order.isHandedOver() || order.getOrderItems().stream().anyMatch(OrderItem::isHandedOver)) throw new ConflictException("This order contains handed-over items.");
         if (order.isAwaitingPayment() && order.getStripeSessionId() != null) {
-            // Close the Stripe page first so the customer cannot pay an order that no longer exists.
+            // Close the Stripe page first so the customer cannot pay a cancelled order.
             if (stripe.expireOrReconcile(order.getStripeSessionId()).equals("complete")) {
                 throw new ConflictException("The customer just paid this order online. Refresh before cancelling.")
                         .code("PAYMENT_PENDING");
@@ -341,7 +360,17 @@ public class OrderService {
                     order.getCode(), order.getStripeSessionId());
         }
         events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.CANCELLED));
-        deleteAndRestock(order);
+        for (OrderItem item : order.getOrderItems()) {
+            boolean resellable = item.getItemKind() == ItemKind.GENERIC || item.getProductionStatus() == ProductionStatus.NOT_STARTED;
+            if (item.getInventory() != null && resellable) item.getInventory().setQuantity(item.getInventory().getQuantity() + 1);
+        }
+        order.setStatus("CANCELLED");
+        order.setCancelledAt(clock.instant());
+        order.setCancellationReason(reason == null || reason.isBlank() ? null : reason.trim());
+    }
+
+    private static void requireActive(Order order) {
+        if (order.isCancelled()) throw new ConflictException("This order is cancelled.");
     }
 
     /** Deletes an order with its photos, puts unpainted ornaments back in stock and drops an orphan customer. */

@@ -21,7 +21,7 @@ function subscribeLost(listener: () => void) { lostListeners.add(listener); retu
 function recordLostSave(save: LostSave) { setLostSaves([...lostSaves.filter(row => row.date !== save.date), save]) }
 function clearLostSave(date: string) { if (lostSaves.some(row => row.date === date)) setLostSaves(lostSaves.filter(row => row.date !== date)) }
 
-function LostSaves({ onSaved }: { onSaved: () => void }) {
+export function LostSaves({ onSaved }: { onSaved: () => void }) {
   const rows = useSyncExternalStore(subscribeLost, () => lostSaves)
   const [busy, setBusy] = useState(false)
   if (!rows.length) return null
@@ -82,7 +82,7 @@ export function PaintingDaysPage() {
   </section>
 }
 /** One compact row per day. Every change saves on its own (toggles at once, typed numbers after a pause), in order. */
-function DayRow({ day }: { day: PaintingDay }) {
+export function DayRow({ day }: { day: PaintingDay }) {
   const [open, setOpen] = useState(day.open)
   const [max, setMax] = useState(String(day.maxPaintings))
   const [booked, setBooked] = useState(day.booked)
@@ -145,9 +145,9 @@ function DayRow({ day }: { day: PaintingDay }) {
   }
   const label = formatDateLabel(day.date)
   const limit = Number(max)
-  const over = open && Number.isFinite(limit) && booked > limit
+  const over = Number.isFinite(limit) && booked > (open ? limit : 0)
   return <article className={styles.dayRow}>
-    <div className={styles.name}><h3>{label}</h3><p data-over={over || undefined}>{booked}/{open ? max : 0} booked{over ? ' · Over limit' : ''}{!open ? ' · Closed' : ''}</p></div>
+    <div className={styles.name}><h3>{label}</h3><p data-over={over || undefined}>{booked}/{open ? max : 0} booked{over ? ' · Over limit; existing bookings remain' : ''}{!open ? ' · Closed' : ''}</p></div>
     <label className={styles.toggle}><input type="checkbox" role="switch" checked={open} onChange={event => change(event.target.checked, max, 0)} /> Open<span className="visually-hidden">, {label}</span></label>
     <NumberStepper label={`Max paintings for ${label}`} value={max} onChange={value => change(open, value, 400)} max={10} disabled={!open} />
     <p className={styles.saveState} role="status">{state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : ''}</p>

@@ -75,14 +75,14 @@ export type OrderService = {
     blocks: import('../domain/types').TimeBlock[]
   }>
   createSale: (input: CreateSaleInput, idempotencyKey: string) => Promise<Order>
-  cancelOrder: (orderId: string) => Promise<void>
+  cancelOrder: (orderId: string, reason?: string) => Promise<void>
   setItemStatus: (
     orderId: string,
     itemId: string,
     status: import('../domain/types').ProductionStatus,
   ) => Promise<void>
   /** Mark (or undo) market pickup / Vienna handoff — Track becomes `delivered`. */
-  setHandedOver: (orderId: string, handedOver: boolean) => Promise<void>
+  setHandedOver: (orderId: string, handedOver: boolean, itemIds?: string[]) => Promise<void>
 }
 
 export type PaymentService = {

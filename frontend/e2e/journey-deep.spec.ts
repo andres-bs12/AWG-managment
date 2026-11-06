@@ -371,3 +371,17 @@ test('reload from delivery restores every text field and explicitly asks to re-a
   await next(page).click()
   await expectContact(page)
 })
+
+for (const locale of ['de', 'en'] as const) {
+  test(`pending checkout limit is explained on review (${locale})`, async ({ page }) => {
+    await prepare(page)
+    await namedDesign(page)
+    if (locale === 'en') await page.getByRole('button', { name: 'EN', exact: true }).click()
+    await fillDelivery(page)
+    await next(page).click()
+    await page.locator('#buy-terms').check()
+    await page.route('**/api/shop/checkout', route => route.fulfill({ status: 429, json: { status: 429, code: 'PENDING_CHECKOUT_LIMIT', message: 'Too many requests', field: null } }))
+    await page.locator('form button[type=submit]').click()
+    await expect(page.getByText(locale === 'de' ? /bereits zwei unbezahlte Bestellungen offen/ : /already have two unpaid orders open/)).toBeVisible()
+  })
+}

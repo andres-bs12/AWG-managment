@@ -126,7 +126,7 @@ public class AgendaService {
             rows.add(new AgendaDeliveryDto(
                     customer.getName(), item.getCustomColor(), item.getCustomFinish(), ViewMapper.nz(item.getNameInOrnament()),
                     order.getId().toString(), order.getCode(), item.getId().toString(), title,
-                    item.getProductionStatus(), order.isHandedOver(), item.getDeliveryKind(), hour,
+                    item.getProductionStatus(), item.isHandedOver(), item.getDeliveryKind(), hour,
                     market ? "Market pickup" : "Vienna · " + VIENNA_DAY.format(date),
                     hour == null ? null : Hours.format(hour),
                     customer.getPhone(),

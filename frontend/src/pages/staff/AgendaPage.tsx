@@ -1,3 +1,4 @@
+import { DayRow, LostSaves } from './PaintingDaysPage'
 import { AgendaSessionList } from '../../components/staff/AgendaSessionList'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -54,6 +55,7 @@ export function AgendaPage() {
     return { HOUR_H: Math.max(Number.parseFloat(css.getPropertyValue('--size-agenda-hour')), 5 * rem), REM: rem }
   })
   const [paintingRule, setPaintingRule] = useState<PaintingDay | null>(null)
+  const [paintingError, setPaintingError] = useState('')
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const placeItem = params.get('place')
@@ -113,7 +115,7 @@ export function AgendaPage() {
   useEffect(() => {
     if (!date) return
     let active = true
-    api.paintingDays.list(date, date).then(rows => { if (active) setPaintingRule(rows[0] ?? null) }).catch(() => { if (active) setPaintingRule(null) })
+    api.paintingDays.list(date, date).then(rows => { if (active) { setPaintingRule(rows.find(row => row.date === date) ?? null); setPaintingError('') } }).catch(() => { if (active) { setPaintingRule(null); setPaintingError('Could not load painting capacity.') } })
     return () => { active = false }
   }, [date, version, retry])
 
@@ -409,7 +411,6 @@ export function AgendaPage() {
         <p className={styles.context}>
           {day.market.name} · {formatDateLabel(day.marketDay.date)}
         </p>
-        {paintingRule && <p className={styles.context}>{paintingRule.booked} {paintingRule.booked === 1 ? 'session' : 'sessions'} {day.marketDay.isToday ? 'today' : 'scheduled'}{!paintingRule.open ? ' · Web booking closed' : paintingRule.booked >= paintingRule.maxPaintings ? ` · Web booking full (${Math.min(paintingRule.booked, paintingRule.maxPaintings)}/${paintingRule.maxPaintings})` : ''}</p>}
       </div>
 
       <DayStrip
@@ -418,6 +419,10 @@ export function AgendaPage() {
         value={date}
         onChange={setAgendaDate}
       />
+
+      {paintingError && <div role="alert"><p>{paintingError}</p><Button tone="staff" variant="secondary" onClick={() => setRetry(value => value + 1)}>Retry</Button></div>}
+      <LostSaves onSaved={() => setRetry(value => value + 1)} />
+      {paintingRule && paintingRule.date === date && <DayRow key={`${paintingRule.date}|${paintingRule.open}|${paintingRule.maxPaintings}|${paintingRule.booked}`} day={paintingRule} />}
 
       <div className={styles.toolbar}>
         {view === 'calendar' && <Button tone="staff" variant="secondary" onClick={() => {

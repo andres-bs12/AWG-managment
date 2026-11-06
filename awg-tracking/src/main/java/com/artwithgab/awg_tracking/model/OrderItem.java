@@ -106,6 +106,9 @@ public class OrderItem {
 
     private LocalTime pickUpTime;
 
+    @Column(nullable = false)
+    private boolean handedOver;
+
     // ─── Personalization (filled in by the customer via the form) ───────────
 
     /** Customer paid for the name on the ornament (+€12.99). No refund if it is removed. */

@@ -542,7 +542,7 @@ export function NewSalePage() {
       .catch(() => setChangeDate((current) => current && { state: 'unknown', formSent: false }))
   }
 
-  /** The order was created for one date; to pick another, delete it (paint time and stock come back) and plan again. */
+  /** The order was created for one date; cancel it (paint time and stock come back) and plan again. */
   async function cancelAndChangeDate() {
     if (!order || submitLock.current) return
     submitLock.current = true
@@ -552,9 +552,9 @@ export function NewSalePage() {
       try {
         await api.orders.cancelOrder(order.id)
       } catch (err) {
-        // The delete may have committed with the response lost: an order that no longer exists counts as cancelled.
+        // The cancellation may have committed even if the response was lost.
         const stillThere = await api.orders.getOrderByCode(order.code).catch(() => undefined)
-        if (stillThere !== null) throw err
+        if (stillThere !== null && stillThere?.status !== 'CANCELLED') throw err
       }
       saleKey.current = crypto.randomUUID()
       setSuggestions({})

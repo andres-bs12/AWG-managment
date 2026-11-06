@@ -151,14 +151,14 @@ export const mockApi: Api = {
     getOrderByCode: (code) => later(() => getOrderByCode(code)),
     getOrderBundle: (id) => later(() => getOrderBundle(id)),
     createSale: (input, key) => later(() => { const existing = saleKeys.get(key); if (existing) return existing; const order = createSale(input); saleKeys.set(key, order); return order }, 320),
-    cancelOrder: (id) => later(() => cancelOrder(id)),
+    cancelOrder: (id, reason) => later(() => cancelOrder(id, reason)),
     setItemStatus: (orderId, itemId, status) =>
       later(() => {
         setItemStatus(orderId, itemId, status)
       }),
-    setHandedOver: (orderId, handedOver) =>
+    setHandedOver: (orderId, handedOver, itemIds) =>
       later(() => {
-        setHandedOver(orderId, handedOver)
+        setHandedOver(orderId, handedOver, itemIds)
       }),
   },
   payments: {

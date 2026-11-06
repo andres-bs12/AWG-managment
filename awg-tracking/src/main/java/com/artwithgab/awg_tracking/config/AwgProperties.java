@@ -46,7 +46,7 @@ public record AwgProperties(
      * publicBaseUrl is the frontend origin used for Stripe success/cancel redirects.
      */
     public record Shop(boolean enabled, String publicBaseUrl, String stripeSecretKey, String stripeWebhookSecret,
-                       BigDecimal deliveryFee, int checkoutMinutes, int leadDays, int maxDaysAhead,
+                       BigDecimal deliveryFee, int leadDays, int maxDaysAhead,
                        java.time.LocalDate seasonEnd, int maxOpenCheckouts, java.time.LocalDate deliveriesFrom) {
     }
 

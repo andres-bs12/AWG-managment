@@ -117,7 +117,7 @@ export function TrackPage() {
   const hasFormToken = !!view && !!readFormToken(view.code)
   const status = view?.status ?? 'preparing'
   const statusLabel =
-    status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
+    status === 'cancelled' ? (locale === 'de' ? 'Storniert' : 'Cancelled') : status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
   const stepIndex = status === 'delivered' ? 2 : status === 'ready' ? 1 : 0
   const steps = [t('stepPainting'), t('ready'), t('stepHandover')]
   /** Sleigh only after a hit — misses stay in the dialog without this animation. */
@@ -153,7 +153,7 @@ export function TrackPage() {
       {view && phase === 'done' ? (
         <section className={styles.card} aria-live="polite">
           <div className={styles.art}>
-            {status === 'preparing' ? (
+            {status === 'cancelled' ? null : status === 'preparing' ? (
               <PaintingOrnament label={t('artPainting')} />
             ) : (
               <GiftBoxReady label={t('artReady')} />
@@ -163,14 +163,14 @@ export function TrackPage() {
           <div className={styles.details}>
             <span
               className={`${styles.chip} ${
-                status === 'preparing' ? styles.chipWork : status === 'delivered' ? styles.chipDone : styles.chipReady
+                status === 'cancelled' ? '' : status === 'preparing' ? styles.chipWork : status === 'delivered' ? styles.chipDone : styles.chipReady
               }`}
             >
               {statusLabel}
             </span>
             <h1 className={styles.title}>{view.customerName && view.customerName !== 'Walk-in' ? t('trackGreeting', { name: view.customerName }) : (locale === 'de' ? 'Deine Bestellung' : 'Your order')}</h1>
 
-            <ProgressSteps labels={steps} current={stepIndex} label={statusLabel} />
+            {status === 'cancelled' ? <p>{locale === 'de' ? 'Diese Bestellung wurde storniert.' : 'This order has been cancelled.'}</p> : <ProgressSteps labels={steps} current={stepIndex} label={statusLabel} />}
 
             <dl className={styles.facts}>
               <div>
@@ -179,18 +179,18 @@ export function TrackPage() {
                   <Button variant="secondary" onClick={() => { void navigator.clipboard.writeText(view.code).then(() => setCopyMessage('copiedCode')).catch(() => setCopyMessage('copyFailed')) }}>{t('copyCode')}</Button>
                   <span role="status" className={styles.copyStatus}>{copyMessage && t(copyMessage)}</span></dd>
               </div>
-              <div>
+              {status !== 'cancelled' && <div>
                 <dt>{t('pickupWhen')}</dt>
                 <dd>
                   {whenLines[0]}
                   {whenLines[1] ? <span className={styles.whenExtra}>{whenLines[1]}</span> : null}
                 </dd>
-              </div>
+              </div>}
             </dl>
 
             <OrderReceipt items={view.items} total={view.total} paymentState={view.paymentState} />
 
-            {view.delivery.kind === 'vienna' ? (
+            {status !== 'cancelled' && view.delivery.kind === 'vienna' ? (
               <div className={styles.address}>
                 {!editing ? (
                   <>

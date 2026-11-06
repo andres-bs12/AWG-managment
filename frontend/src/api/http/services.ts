@@ -243,15 +243,15 @@ export const httpApi: Api = {
       return bundle
     },
     createSale: (input, key) => request('/api/orders', { ...jsonInit('POST', input), headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key } }, staff),
-    cancelOrder: (id) => request(`/api/orders/${enc(id)}/cancel`, { method: 'POST' }, staff),
+    cancelOrder: (id, reason) => request(`/api/orders/${enc(id)}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }, staff),
     setItemStatus: (orderId, itemId, status) =>
       request(
         `/api/orders/${enc(orderId)}/items/${enc(itemId)}/status`,
         jsonInit('PATCH', { status }),
         staff,
       ),
-    setHandedOver: (orderId, handedOver) =>
-      request(`/api/orders/${enc(orderId)}/handed-over`, jsonInit('PATCH', { handedOver }), staff),
+    setHandedOver: (orderId, handedOver, itemIds) =>
+      request(`/api/orders/${enc(orderId)}/handed-over`, jsonInit('PATCH', { handedOver, itemIds }), staff),
   },
   payments: {
     setPaymentState: (orderId, state, method, amountPaid) =>
