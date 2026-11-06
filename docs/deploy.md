@@ -5,8 +5,10 @@ Este despliegue ejecuta PostgreSQL, el backend y el frontend. El frontend queda 
 ## Producción actual (2026-11-06)
 
 - **Servidor:** AWS EC2 `awg-prod`, t4g.small (ARM, 2 GB + 2 GB de swap), Ubuntu 24.04, región **eu-north-1 (Estocolmo)**: la cuenta está en el plan gratis (100 USD de créditos hasta 2027-05-06) y ese plan bloquea Frankfurt. IP fija 13.62.252.19. Código en `/opt/awg`, `.env` con permisos 600 y contraseñas generadas en el propio servidor.
-- **Firewall (security group `awg-web`):** 80 y 443 solo desde los rangos IPv4 de Cloudflare; 22 solo desde la IP del dueño (actualízala si cambia).
-- **HTTPS:** Cloudflare en modo Full (strict). Caddy en el servidor obtiene y renueva solo el certificado de Let's Encrypt (desafío HTTP por el puerto 80 a través de Cloudflare), redirige `www` al dominio principal y añade HSTS.
+- **Firewall (security group `awg-web`):** solo 443 desde los rangos IPv4 de Cloudflare y 22 desde la IP del dueño (actualízala si cambia). El puerto 80 está cerrado: Cloudflare redirige a HTTPS ("Always Use HTTPS").
+- **HTTPS:** Cloudflare en modo Full (strict). Caddy usa un certificado de origen de Cloudflare válido hasta 2041 (`/etc/caddy/origin/`); la llave privada se generó en el servidor y nunca salió de él (solo se envió la CSR). Caddy redirige `www` al dominio principal y añade HSTS en ambos.
+- **Secretos:** `ssh -t -i ~/.ssh/awg-tracking ubuntu@13.62.252.19 'awg-secret STRIPE_SECRET_KEY'` pide el valor sin mostrarlo, lo guarda en `.env` y reinicia. Sirve para `STRIPE_*`, `MAIL_*`, `OWNER_EMAIL` y `SHOP_ENABLED`.
+- **Stripe (modo prueba):** destino de webhook `awg-production` → `/api/shop/stripe/webhook` con `checkout.session.completed`, `checkout.session.async_payment_succeeded` y `checkout.session.expired`.
 - **Respaldos:** política de Data Lifecycle Manager con snapshot diario del disco (02:30 UTC) y 7 copias.
 - **Desplegar una versión nueva:** `deploy/deploy.sh` compila las imágenes en el Mac (arm64), las sube por SSH y reinicia; el servidor no compila nada.
 - **Contraseñas iniciales del staff:** después de cambiarlas en la app, deja `STAFF_GABY_PASSWORD` y `STAFF_ANDRES_PASSWORD` vacías en `/opt/awg/.env` y vuelve a desplegar (Codex P2-6).

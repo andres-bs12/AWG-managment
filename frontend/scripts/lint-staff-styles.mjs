@@ -10,6 +10,9 @@ const errors = []
 for (const file of files) {
   const source = await readFile(file, 'utf8')
   const root = postcss.parse(source, { from: file })
+  // Custom properties declared in the module itself (e.g. a per-breakpoint column count) are known too.
+  const local = new Set()
+  root.walkDecls(/^--/, declaration => local.add(declaration.prop))
   root.walkDecls(declaration => {
     const { prop, value } = declaration
     const where = `${file}:${declaration.source.start.line}`
@@ -20,7 +23,7 @@ for (const file of files) {
     if (/(?:\d*\.)?\d+(?:rem|em|ms)\b/.test(value) && prop !== 'letter-spacing') errors.push(`${where} Use type/space/duration tokens`)
     if (prop === 'transition' && /(?:^|,)\s*(?!transform\b|opacity\b)[a-z-]+/.test(value)) errors.push(`${where} Only transform/opacity transitions`)
     for (const match of value.matchAll(/var\((--[\w-]+)/g)) {
-      if (!known.has(match[1]) && match[1] !== '--hour-h') errors.push(`${where} Unknown token ${match[1]}`)
+      if (!known.has(match[1]) && !local.has(match[1]) && match[1] !== '--hour-h') errors.push(`${where} Unknown token ${match[1]}`)
     }
   })
 }

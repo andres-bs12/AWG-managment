@@ -270,6 +270,10 @@
   --type-staff-h2-weight: 600;
   --type-staff-body-size: 1rem;
   --type-staff-body-line: 1.5;
+  /* One staff body line as a length (em: follows the element's own text size). */
+  --type-staff-body-line-box: calc(var(--type-staff-body-line) * 1em);
+  /* Search field min width: em so that with large text it wraps to its own row instead of shrinking. */
+  --size-staff-search-min: 12em;
   --type-staff-body-weight: 400;
   --type-staff-meta-size: 0.875rem;
   --type-staff-meta-line: 1.45;

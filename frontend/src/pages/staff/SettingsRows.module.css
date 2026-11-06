@@ -15,7 +15,7 @@
 .dayRow .name { grid-area: name; gap: var(--space-1); }
 .dayRow .toggle { grid-area: toggle; }
 .dayRow .stepper { grid-area: stepper; }
-.stockRow .stepper label, .dayRow .stepper label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.stockRow .stepper label, .dayRow .stepper label { position: absolute; width: var(--border-thin); height: var(--border-thin); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .dayRow .stepper, .stockRow .stepper { align-items: center; }
 .dayRow .stepper > div, .stockRow .stepper > div { width: var(--size-staff-quantity); margin: 0; }
 .stockRow .stepper input, .dayRow .stepper input { min-height: var(--size-control-staff); height: var(--size-control-staff); }
