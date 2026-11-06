@@ -370,8 +370,9 @@ public class OrderService {
         String q = query == null ? "" : query.trim();
         if (q.length() < 2) return List.of();
         String digits = q.replaceAll("\\D", "");
-        // Without at least 3 digits the phone clause must not match everything.
-        String phone = digits.length() >= 3 ? digits : "\u0000";
+        // Without at least 3 digits the phone clause must not match everything. The sentinel holds no
+        // digit, so it never occurs in a stripped phone number; PostgreSQL rejects NUL bytes in text.
+        String phone = digits.length() >= 3 ? digits : "~no-phone~";
         return orderRepository.search(q, phone, org.springframework.data.domain.PageRequest.of(0, 20)).stream().map(OrderService::summary).toList();
     }
 
