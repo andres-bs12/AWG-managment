@@ -22,12 +22,21 @@
 
 ## Pendiente (ver `tasks/preguntas-pendientes.md` para decisiones del dueño)
 
+- [ ] 2026-11-07 · Public `/buy` + `/form` vertical rhythm implemented; **browser verification pending**. Tokens 8px label/control, 24px field/action, 32px section with centred divider; trailing margins removed, compact tabs, duplicate details heading removed, shared review product row. HTTP build/lint and 50 Node tests pass. Claude: run layout/design-system/form/public-mobile and the full suite; regenerate/review the 12 public snapshots. Handoff: `tasks/audit-results/public-form-rhythm-2026-11-07.md`. No commit; incoming owner-reported E2E baseline green.
+
+- [ ] Historical checkpoint, superseded by owner-reported **681 E2E passed** before staff phone polish below. Full E2E repair: Claude baseline **639 passed / 40 failed / 2 skipped (681)**. Product contrast/photo/filter fixes and stale test repairs implemented; HTTP build/lint and 50 Node tests pass. **Partial until Claude re-runs affected behavior, regenerates and visually reviews all 12 design/delivery/details/review snapshots, then runs the full suite** (expected 683 cases with the added two-phone production filter regression). Three baseline failures were `ENOSPC`; preserve evidence and allow enough artifact space. No axe rule, timeout or screenshot tolerance changed. Per-test causes, files and commands: `tasks/audit-results/e2e-repair-2026-11-06.md`.
+
+- [ ] 2026-11-06 · Staff mobile overhaul: implemented locally (single-date Agenda + day gear/hours V11, saved paint cards, whole-cart item handover, Search states, AWG home, Sales list/API/mock, QR receipt polling, mobile hierarchy, public contrast/info-icon/stale named-control tests). **Partial: Claude must run staff phones 360×640/440×741, QR/search/sales + prior staff/iPad regressions, full public axe and fresh snapshots; real Safari and PostgreSQL V11 remain pending.** HTTP build/lint, 50 Node and 119 backend tests pass. Independent review findings fixed; CLI audit blocked by sandbox initialization. See `tasks/audit-results/staff-ux-mobile-2026-11-06.md`.
+
+- [ ] 2026-11-06 · Public mobile v1.1: implementación de scroll del documento, acciones sticky CSS, Home con presupuesto de altura, pausa visible, nombre único, compra en cuatro pasos, tarjetas identificadas y múltiples adornos. Los diez hallazgos de revisión móvil están corregidos; build HTTP/lint, 42 tests Node y 107 tests backend (Byte Buddy) pasan. **Parcial: Claude debe ejecutar Playwright (once viewports), revisar las capturas nuevas y probar Safari iOS 26 real**; no darlo por terminado antes. Detalles y comandos en `docs/v1.1-public-mobile-handoff.md`. Las capturas antiguas de compra no se regeneraron aquí; no se cambió la tolerancia.
+
+
 - [ ] AWG 1.1 (2026-11-06): Agenda painting-day control implemented, pending browser verification; item-level handover implemented with Playwright verification pending; checkout limits/expiry and soft cancellation implemented, pending browser and production integration verification. See `AGENTS.md` for current state.
 
 - [x] 2026-11-05 · Validación de navegador cerrada: suite completa en verde para `/buy`, `/form`, recogida en mercado, SEC-F (399/404 con tres timeouts por carga que pasan aislados) y capturas regeneradas y revisadas. Sustituye los seguimientos de Fix 9–12, a–e, Task 5–8, 7B y 11.
 - [ ] Staff UX — pendiente tras los arreglos del 2026-11-05 (informes `tasks/audit-results/staff-ux-*`):
   - P2 que quedan (el resto se hizo el 2026-11-05):
-    - venta: resumen con «Delivery» sin día (#13). El espacio vertical en móvil (#27) y la marca «Web» en entregas (P2-10) se hicieron el 2026-11-06.
+    - El resumen de venta ya muestra el día elegido sin repetir el calendario del servicio (#13, 2026-11-06); validar en navegador junto con el overhaul móvil. El espacio vertical en móvil (#27) y la marca «Web» en entregas (P2-10) se hicieron el 2026-11-06.
   - Venta: «Change date» tras el QR (cancela y vuelve a planificar) y horas de recogida sin tiempo de pintura desactivadas, con el horario de pintura al pasar el mouse (2026-11-06). Revisión de Codex en `tasks/audit-results/codex-review-sale-change-date-2026-11-06.md`; quedan dos P2:
     - Si ninguna hora tiene tiempo, el plan «one change makes room» no se ofrece; solo «place it on the agenda».
     - En iPad no hay explicación por hora para las horas desactivadas; solo el texto general.
@@ -53,3 +62,5 @@
 - [ ] Task 5C: Claude debe ejecutar los siete casos completos de `e2e/journey-deep.spec.ts` en los cuatro proyectos (incluido movimiento reducido): checkout multipart exacto DE/EN, dos adornos/retirada, nombre/giro/precio, latencia, historial y recarga. Sin omisiones; cinco muestras de color y de la opción de nombre por proyecto, mediana < 100 ms (medición desde el clic en el documento, sin demora del driver/táctil). Verificar el historial nuevo de las tres pantallas y que recargar vuelve al diseño para reañadir fotos. Sin ejecutar Playwright aquí por instrucción del dueño; no se modificaron otros specs. La comprobación TypeScript del spec solo informa del conflicto previo de tipos Playwright/axe en `helpers.ts:45`.
 
 - [ ] AWG 1.1 soft cancellation: run the Playwright cancellation flow and visually verify staff detail and DE/EN Track; verify V9 on PostgreSQL.
+
+- [ ] 2026-11-06 · Staff phone polish: five screenshot defects implemented, plus separator/hierarchy sweep. Incoming owner-reported baseline: **681 E2E passed**. Claude must run updated staff-mobile (48 collected cases), sales/staff-review and the full suite; review fresh staff screenshots at 360×640/360×740, nav at 320–440, plus tablet/desktop. No public snapshot files changed. Handoff: `tasks/audit-results/staff-phone-polish-2026-11-06.md`.

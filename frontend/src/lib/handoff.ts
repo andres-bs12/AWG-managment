@@ -13,9 +13,10 @@ export function handoffDate(delivery: Delivery, days: MarketDay[]): string | nul
 export function handoffLabel(item: Pick<OrderItem, 'delivery'>, days: MarketDay[]): string {
   const date = handoffDate(item.delivery, days) ?? item.delivery.deliveryDate ?? null
   if (item.delivery.kind === 'vienna') {
-    return date ? `Vienna · ${formatDateLabel(date)}` : 'Vienna Wed/Fri'
+    return date ? `Vienna · ${formatDateLabel(date)}` : 'Vienna · Date pending'
   }
-  const hour = item.delivery.pickupHour != null ? ` · ${formatHour(item.delivery.pickupHour)}` : ''
+  const marketDay = days.find(day => day.id === item.delivery.marketDayId)
+  const hour = item.delivery.pickupHour != null ? ` · ${formatHour(item.delivery.pickupHour)}` : marketDay ? ` · ${formatHour(marketDay.openHour)}–${formatHour(marketDay.closeHour)}` : ''
   if (!date) return `Market${hour}`
   return `Market · ${formatDateLabel(date)}${hour}`
 }

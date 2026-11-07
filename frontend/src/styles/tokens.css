@@ -32,6 +32,8 @@
   --color-cart-ink: #243352;
   --color-disabled-surface: #f3f5f7;
   --color-disabled-text: #5c6b80;
+  /* Opaque snow band keeps footer text readable independently of the fixed scene. */
+  --color-footer-surface: var(--snow-field);
 
   --size-control: 48px;
   --size-swatch: 24px;
@@ -46,7 +48,7 @@
   --radius-panel: 20px;
   --shadow-1: 0 4px 12px rgba(21, 32, 51, 0.1);
   --shadow-2: 0 16px 40px rgba(21, 32, 51, 0.16);
-  /* Shadow cast upwards by a bar docked to the bottom of the screen (mirror of --shadow-1). */
+  /* Upward shadow for staff action bars (mirror of --shadow-1). */
   --shadow-up: 0 -4px 12px rgba(21, 32, 51, 0.1);
   --layout-configurator-max: 1100px;
   --layout-form-max: 760px;
@@ -136,10 +138,7 @@
   --layout-calendar-max: 420px;
   --layout-gutter: var(--space-4);
   --layout-header-height: var(--space-8);
-  /* The docked action bar continues the card: no gap between the scrollport and the bar. */
-  --layout-sticky-gap: 0px;
   --public-sticky-top: 0px;
-  --public-sticky-bottom: 0px;
   --public-actions-left: 0px;
   --public-actions-width: 100%;
   --measure-prose: 65ch;
@@ -315,4 +314,15 @@
   :root {
     --motion: 0;
   }
+}
+
+:root {
+  /* Home budget includes header, growing copy, countdown, gaps and both 56px actions.
+     The scene consumes only the remaining small viewport height; a floor permits scrolling. */
+  --layout-home-reserve: 424px;
+  --size-home-stall-min: 64px;
+  --size-home-stall-max: 520px;
+  --size-home-ctas: 320px;
+  --type-home-title-min: 2.1rem;
+  --type-home-title-max: 2.75rem;
 }

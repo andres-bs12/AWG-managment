@@ -19,6 +19,7 @@ const LoginPage = lazy(() => import('./pages/staff/LoginPage').then(module => ({
 const MarketEditorPage = lazy(() => import('./pages/staff/MarketEditorPage').then(module => ({ default: module.MarketEditorPage })))
 const MarketsPage = lazy(() => import('./pages/staff/MarketsPage').then(module => ({ default: module.MarketsPage })))
 const NewSalePage = lazy(() => import('./pages/staff/NewSalePage').then(module => ({ default: module.NewSalePage })))
+const SalesPage = lazy(() => import('./pages/staff/SalesPage').then(module => ({ default: module.SalesPage })))
 const OrderDetailPage = lazy(() => import('./pages/staff/OrderDetailPage').then(module => ({ default: module.OrderDetailPage })))
 const PaintPage = lazy(() => import('./pages/staff/PaintPage').then(module => ({ default: module.PaintPage })))
 
@@ -71,6 +72,7 @@ export default function App() {
                 <Route path="/staff/markets/new" element={<MarketEditorPage />} />
                 <Route path="/staff/markets/:id" element={<MarketEditorPage />} />
                 <Route path="/staff/sales/new" element={<NewSalePage />} />
+                <Route path="/staff/sales" element={<SalesPage />} />
                 <Route path="/staff/orders/:id" element={<OrderDetailPage />} />
                 <Route path="/staff/orders/:id/paint/:itemId" element={<PaintPage />} />
               </Route>

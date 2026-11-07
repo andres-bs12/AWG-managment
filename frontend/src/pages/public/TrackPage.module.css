@@ -13,8 +13,8 @@
   margin: 12px auto 0;
   padding: 20px 20px 24px;
   border-radius: var(--public-card-radius);
-  background: var(--public-surface);
-  color: var(--public-ink);
+  background: var(--color-surface);
+  color: var(--color-text);
   box-shadow: var(--public-card-shadow);
   text-align: center;
   animation: cardIn 0.5s var(--pop-ease) both;
@@ -365,13 +365,12 @@
   }
 }
 
+/* Keep the reading surface and text opaque for every frame over the sky. */
 @keyframes cardIn {
   from {
-    opacity: 0;
     transform: translateY(20px) scale(0.96);
   }
   to {
-    opacity: 1;
     transform: translateY(0) scale(1);
   }
 }

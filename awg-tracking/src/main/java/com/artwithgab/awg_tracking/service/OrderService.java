@@ -222,8 +222,8 @@ public class OrderService {
                 String movingId = moving == null ? null : moving.getId().toString();
                 boolean clashExisting = s.busyOn(md.getDate(), movingId).stream().anyMatch(b -> Hours.overlap(start, end, b.start(), b.end()));
                 boolean outside = end <= start
-                        || start < Hours.of(md.getOpenTime()) - Hours.EPS
-                        || end > Hours.of(md.getCloseTime()) + Hours.EPS
+                        || start < s.paintingOpenHour(md.getDate()) - Hours.EPS
+                        || end > s.paintingCloseHour(md.getDate()) + Hours.EPS
                         || md.getDate().isBefore(index.today())
                         || (index.isToday(md) && start < index.nowHour())
                         || (move != null && moveDestination.getId().equals(md.getId())
@@ -398,10 +398,57 @@ public class OrderService {
     public List<OrderSummaryDto> search(String query) {
         String q = query == null ? "" : query.trim();
         if (q.length() < 2) return List.of();
+        // PostgreSQL rejects NUL bytes in text parameters; such a query can never match anyway.
+        if (q.length() > 100 || q.indexOf('\0') >= 0) throw new BadRequestException("Search must contain at most 100 characters.").code("VALIDATION").field("query");
         String digits = q.replaceAll("\\D", "");
-        // Without at least 3 digits the phone clause must not match everything.
-        String phone = digits.length() >= 3 ? digits : "\u0000";
+        // Without at least 3 digits the phone clause must not match everything. The sentinel holds no
+        // digit, so it never occurs in a stripped phone number; PostgreSQL rejects NUL bytes in text.
+        String phone = digits.length() >= 3 ? digits : "~no-phone~";
         return orderRepository.search(q, phone, org.springframework.data.domain.PageRequest.of(0, 20)).stream().map(OrderService::summary).toList();
+    }
+
+    /** Staff sales use Vienna calendar dates and bounded, deterministic database pagination. */
+    @Transactional(readOnly = true)
+    public SalesPageDto listSales(String state, String source, LocalDate from, LocalDate to, int page, int size, String query) {
+        Set<String> states = Set.of("unpaid", "deposit", "paid", "pending", "review");
+        if (state != null && !states.contains(state)) throw new BadRequestException("Choose a valid payment state.").code("VALIDATION").field("state");
+        if (source != null && !Set.of("stall", "web").contains(source)) throw new BadRequestException("Choose a valid sale source.").code("VALIDATION").field("source");
+        if (page < 0 || size < 1 || size > 50) throw new BadRequestException("Choose a valid sales page (1–50 orders).").code("VALIDATION").field("page");
+        if (from != null && to != null && from.isAfter(to)) throw new BadRequestException("From must be on or before To.").code("VALIDATION").field("from");
+        String q = query == null ? "" : query.trim();
+        if (q.length() > 100 || q.indexOf('\0') >= 0) throw new BadRequestException("Search must contain at most 100 characters.").code("VALIDATION").field("query");
+        org.springframework.data.jpa.domain.Specification<Order> filters = (root, criteria, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+            // Retention erases personal data; erased orders are not returned by staff search.
+            predicates.add(cb.isNull(root.get("anonymizedAt")));
+            if ("pending".equals(state) || "review".equals(state)) {
+                predicates.add(cb.equal(root.get("checkoutStatus"), CheckoutStatus.valueOf(state.toUpperCase(Locale.ROOT))));
+            } else if (state != null) {
+                predicates.add(cb.equal(root.get("paymentState"), PaymentState.valueOf(state.toUpperCase(Locale.ROOT))));
+                // Pending/review is the displayed payment state, rather than "unpaid".
+                predicates.add(cb.or(cb.isNull(root.get("checkoutStatus")), cb.equal(root.get("checkoutStatus"), CheckoutStatus.CONFIRMED)));
+            }
+            if ("web".equals(source)) predicates.add(cb.equal(root.get("source"), OrderSource.WEB));
+            if ("stall".equals(source)) predicates.add(cb.or(cb.isNull(root.get("source")), cb.equal(root.get("source"), OrderSource.STALL)));
+            var vienna = java.time.ZoneId.of("Europe/Vienna");
+            if (from != null) predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), from.atStartOfDay(vienna).toInstant()));
+            if (to != null) predicates.add(cb.lessThan(root.get("createdAt"), to.plusDays(1).atStartOfDay(vienna).toInstant()));
+            if (!q.isEmpty()) {
+                if (q.length() < 2) return cb.disjunction();
+                String pattern = "%" + q.toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+                var customer = root.join("customer");
+                var code = cb.like(cb.lower(root.get("code")), pattern, '\\');
+                var name = cb.like(cb.lower(customer.get("name")), pattern, '\\');
+                String digits = q.replaceAll("\\D", "");
+                jakarta.persistence.criteria.Expression<String> phone = customer.get("phone");
+                for (String mark : List.of(" ", "-", "/", "(", ")", "+", ".")) phone = cb.function("replace", String.class, phone, cb.literal(mark), cb.literal(""));
+                predicates.add(digits.length() >= 3 ? cb.or(code, name, cb.like(phone, "%" + digits + "%")) : cb.or(code, name));
+            }
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+        var result = orderRepository.findAll(filters, org.springframework.data.domain.PageRequest.of(page, size,
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt", "id")));
+        return new SalesPageDto(result.getContent().stream().map(OrderService::summary).toList(), page, size, result.getTotalElements(), result.getTotalPages());
     }
 
     /** Web orders staff must look at: still waiting for Stripe, or paid with a mismatching amount. */
@@ -417,7 +464,8 @@ public class OrderService {
         return new OrderSummaryDto(o.getId().toString(), o.getCode(), o.getCustomer() == null ? "" : o.getCustomer().getName(),
                 o.getCustomer() == null ? "" : o.getCustomer().getPhone(), o.getCreatedAt() == null ? null : o.getCreatedAt().toString(),
                 o.getPaymentState().name().toLowerCase(Locale.ROOT), o.getCheckoutStatus() == null ? null : o.getCheckoutStatus().name().toLowerCase(Locale.ROOT),
-                o.getTotal(), o.getOrderItems().size(), next, o.isHandedOver());
+                o.getTotal(), o.getOrderItems().size(), next, o.isHandedOver(),
+                o.getSource() == OrderSource.WEB ? "web" : "stall", o.getStatus());
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────

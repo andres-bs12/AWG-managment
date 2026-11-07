@@ -21,6 +21,10 @@
   color: var(--staff-ink);
 }
 
+.dlv[data-thumbnail='false'] {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .dlv:hover span,
 .dlv:focus-visible span {
   color: inherit;
@@ -79,7 +83,7 @@
 
 .dlv:hover .dlvTime,
 .dlv:focus-visible .dlvTime {
-  color: var(--staff-canvas-text);
+  color: var(--staff-ink);
 }
 
 .dlv { border-color: var(--color-control-border); }

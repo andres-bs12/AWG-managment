@@ -183,6 +183,15 @@ tudominio.com, www.tudominio.com {
 - [ ] Cambia a las claves `sk_live` y `whsec_` live.
 - [ ] Haz una compra real pequeña y reembólsala desde Stripe.
 
+### Al desplegar la v1.1 (pendiente, 2026-11-06)
+
+- [x] La clave del servidor y el webhook deben ser de **la misma cuenta o sandbox** de Stripe. Antes estaban en sandboxes distintas: el servidor usaba `acct_1UUMa917…` y el webhook vivía en `acct_1UYmTi0…`. Ya están corregidas y ambas usan `acct_1UYmTi0…`. Para comprobarlo después de cada cambio de clave, ejecuta en el servidor `curl -u "$STRIPE_SECRET_KEY:" https://api.stripe.com/v1/account` dentro del contenedor backend: el `id` debe coincidir con la cuenta del webhook.
+- [ ] Despliega la v1.1, que incluye el arreglo de Stripe: Stripe ya no acepta `payment_method_types`, y por eso todos los pagos web fallaban con 502.
+- [ ] En Stripe, en **Settings → Payment methods** de esa cuenta, deja activas solo **tarjeta** y **Apple Pay / Google Pay**. El código ya no fija los métodos de pago. El webhook solo confirma una sesión si su `payment_status` es `paid`.
+- [ ] Añade al webhook el evento `checkout.session.async_payment_failed`. El backend ya lo maneja.
+- [ ] Repite la compra de prueba con `4242 4242 4242 4242`. El pedido debe salir pagado en el staff y deben llegar los dos e-mails. Si falla, el log del backend ya muestra el error exacto de Stripe (`Stripe checkout session failed: …`).
+- [ ] Al pasar a modo **live** repite todo lo anterior con las claves live: una sola cuenta y un webhook live en esa misma cuenta.
+
 ## 7. Legal (lo deciden tú o tu asesor, no yo)
 
 - [ ] **Impressum**, **AGB** (incluida la cláusula de personalizados y el «sin reembolso del nombre») y **Datenschutz**.

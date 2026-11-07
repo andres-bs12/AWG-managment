@@ -1,3 +1,4 @@
+import { StaffText } from '../../components/staff/StaffText'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
@@ -119,7 +120,7 @@ function OrderDetail({ id }: { id: string }) {
 
   if (order.status === 'CANCELLED') return <article className={styles.page}>
     <StaffBackLink />
-    <header className={styles.hero}><div><p className={styles.eyebrow}>Order</p><h1>{order.code}</h1><p>{customer.name}</p></div><span className={styles.status}>Cancelled</span></header>
+    <header className={styles.hero}><div><h1>{order.code}</h1><p>{customer.name}</p></div><span className={styles.status}>Cancelled</span></header>
     <section className={styles.panel}><h2>Cancelled order</h2><p>This order is read-only. Painting time was released and eligible stock returned.</p>{order.cancelledAt && <p>Cancelled: {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(new Date(order.cancelledAt))} (Vienna)</p>}{order.cancellationReason && <p>Reason: {order.cancellationReason}</p>}<p>Total: {formatEur(order.total, 'en')} · Received: {formatEur(paymentSummary(order).paid, 'en')}</p><p>{items.length} {items.length === 1 ? 'ornament' : 'ornaments'}</p>{items.map(item => <div key={item.id}><h3>{item.petName || 'Ornament'}</h3><p>{item.kind} · {item.color} · {item.finish} · {item.productionStatus.replaceAll('_', ' ')} · {formatEur(item.cost, 'en')}</p>{item.backName && <p>Name: {item.backName}</p>}{item.note && <p>Note: {item.note}</p>}{item.photos.map(photo => <img key={photo.id} src={photo.dataUrl} alt={`Reference for ${item.petName || 'ornament'}`} width={120} />)}</div>)}<p>{customer.email} {customer.phone}</p></section>
     <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
   </article>
@@ -139,13 +140,13 @@ function OrderDetail({ id }: { id: string }) {
   return <article className={styles.page}>
     <StaffBackLink />
     <header className={styles.hero}>
-      <div><p className={styles.eyebrow}>Order</p><h1 title={order.code}>{order.code}</h1><p className={styles.customer} title={customer.name}>{customer.name || 'Customer details pending'}</p></div>
+      <div><h1 title={order.code}>{order.code}</h1><p className={styles.customer} title={customer.name}>{customer.name || 'Customer details pending'}</p></div>
       <span className={styles.status} data-ready={allFinished || order.handedOver}>{production}</span>
     </header>
     {order.paymentReview ? <InsetNote tone="warning"><p role="alert">Stripe reported a payment that does not match this order. Check it in Stripe, then record it as paid or deposit (or cancel the order). It remains held on the agenda until resolved.</p></InsetNote> : null}
     <details className={styles.panel}><summary>Order info</summary><p>{order.source === 'web' || order.checkoutStatus ? 'Web order' : 'Stall order'} · Created {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(new Date(order.createdAt.endsWith('Z') || /[+-]\d\d:\d\d$/.test(order.createdAt) ? order.createdAt : `${order.createdAt}Z`))} (Vienna)</p><p>Payment method: {order.paymentMethod ?? 'Not recorded'}</p></details>
     <div className={styles.overview} data-delivery={Boolean(deliveryItem)}>
-      <div><span>{deliveryItem ? 'Delivery' : 'Pickup'}</span><strong>{handoffs.join(' / ') || 'Not scheduled'}</strong>
+      <div><span>{deliveryItem ? 'Delivery' : 'Pickup'}</span><strong><StaffText>{handoffs.join(' / ') || 'Not scheduled'}</StaffText></strong>
         {deliveryItem ? <div className={styles.handoffActions}>
           {addressText ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText)}`} target="_blank" rel="noreferrer">{addressText} ↗</a> : <span>Address pending</span>}
           {customer.phone ? <a href={`tel:${customer.phone}`}>{customer.phone}</a> : null}
@@ -164,7 +165,7 @@ function OrderDetail({ id }: { id: string }) {
         </span>
       </h2>
       <section aria-labelledby="order-items" className={styles.items}>
-        {items.map(item => <OrderItemCard key={item.id} item={{ ...item, handedOver: item.handedOver ?? order.handedOver }} onHandover={() => { void handover.request(id, !(item.handedOver ?? order.handedOver), item.id) }} block={blocks.find(block => block.orderItemId === item.id)} days={days} showHandoff={handoffs.length > 1} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />)}
+        {items.map(item => <OrderItemCard key={item.id} item={{ ...item, handedOver: item.handedOver ?? order.handedOver }} onHandover={() => { void handover.request(id, !(item.handedOver ?? order.handedOver), item.id) }} block={blocks.find(block => block.orderItemId === item.id)} days={days} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />)}
       </section>
       <aside className={styles.support} aria-label="Order management">
         <section className={styles.panel} aria-labelledby="handoff-heading">

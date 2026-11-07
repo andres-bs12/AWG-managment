@@ -1,12 +1,12 @@
 /*
  * /buy — public order form. Follows "Form design rules" in docs/sprint6-buy-ux.md:
- * single column, 4-pt spacing (label 8 → input, field 24 → field, section 56 → section),
+ * single column, token spacing (label 8 → input, field 24 → field, section 32 → section),
  * three type levels (step 1.625rem display / section 1.25rem display / label 1rem sans),
  * light blue only for the product card and the cart, inset text for supporting notes.
  */
 
 .shop {
-  width: min(var(--layout-form-max), calc(100% - 2 * var(--layout-gutter)));
+  width: min(var(--layout-form-max), calc(100% - 2 * max(var(--layout-gutter), env(safe-area-inset-left), env(safe-area-inset-right))));
 }
 
 /* ── Page-level messages ─────────────────────────────────────────────── */
@@ -20,11 +20,14 @@
 /* ── Step: title, intro, sections ────────────────────────────────────── */
 
 .step {
+  display: grid;
+  gap: var(--space-5);
   margin-top: var(--space-6);
 }
+.step > * { margin-block: 0; }
 
 .step h2 {
-  margin: 0 0 var(--space-5);
+  margin: 0;
   font-family: var(--font-display);
   font-size: 1.625rem;
   font-weight: 700;
@@ -58,7 +61,7 @@
 /* Section and card titles: one level below the step title, display font so they never look like a label. */
 .step h3,
 .sectionTitle {
-  margin: 0 0 var(--space-4);
+  margin: 0;
   padding: 0;
   font-family: var(--font-display);
   font-size: 1.25rem;
@@ -100,7 +103,7 @@
 
 /* ── Supporting text ─────────────────────────────────────────────────── */
 
-.inset { composes: inset from '../../components/public/PublicForm.module.css'; margin: 0 0 var(--space-5); }
+.inset { composes: inset from '../../components/public/PublicForm.module.css'; margin: 0; }
 
 .muted {
   margin: var(--space-2) 0 0;
@@ -188,7 +191,7 @@
 /* A group of radio chips: legend is a field label (not a heading). */
 .chips {
   min-width: 0;
-  margin: 0 0 var(--space-5);
+  margin: 0;
   padding: 0;
   border: 0;
 }
@@ -201,14 +204,6 @@
   margin: 0 0 var(--space-2);
   padding: 0;
   font-weight: 600;
-}
-
-.chips:has(+ .error) {
-  margin-bottom: 0;
-}
-
-.chips + .error {
-  margin-bottom: var(--space-5);
 }
 
 /* Validation moves focus to the group: show where it went. */
@@ -542,7 +537,9 @@
 /* ── Step 5: review ──────────────────────────────────────────────────── */
 
 .reviewCard {
-  margin-bottom: var(--space-4);
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
   padding: var(--space-5);
   border: 1px solid var(--snow-2);
   border-radius: var(--radius);
@@ -587,12 +584,12 @@
 }
 
 .terms {
-  margin-top: var(--space-5);
+  margin: 0;
 }
 
 .terms .check {
   align-items: flex-start;
-  margin-top: var(--space-4);
+  margin: 0;
 }
 
 .terms .check label {
@@ -676,35 +673,38 @@
   }
   .mobileTotal strong { font-size: 1rem; }
   .stripeLine { font-size: 0.75rem; }
-  .shop { scroll-padding-bottom: 10rem; }
-  .step :is(input, textarea, button, fieldset, [role='alert']) { scroll-margin-bottom: 10rem; }
 }
 
 /* ── Configurator (docs/design-system.md L3, §7.10, §7.16) ──────────────── */
-.previewPane { position: sticky; top: 0; z-index: 3; padding: var(--space-2) 0; background: var(--color-surface); text-align: center; }
+.previewPane { position: static; top: 0; z-index: 3; padding: 0; background: var(--color-surface); text-align: center; }
 .previewPane svg { max-height: 140px; }
 /* Mobile shows the total once, in the sticky bar; the summary is desktop only. */
 .previewSummary { display: none; }
 
 /* One ornament = one panel: colour/finish, name on the back, pet. Groups 32px apart. */
+.optionsPane { display: grid; gap: var(--space-5); min-width: 0; }
+.optionsPane > * { margin-block: 0; }
+.design { display: grid; gap: var(--space-5); }
 .itemPanel { display: grid; gap: var(--space-6); }
-.itemSection { display: grid; gap: var(--space-6); }
+.itemSection { display: grid; gap: var(--space-5); }
+.choiceGroup { display: grid; gap: var(--space-5); }
+.choiceGroup > * { margin: 0; }
 .itemSection > *, .itemPanel > * { margin: 0; }
 .itemFooter { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-4); border-top: var(--border-thin) solid var(--color-border); color: var(--color-text-muted); }
 
-.deliveryContact { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--snow-2); }
 @media (max-width: 1023px) {
-  .step :is(input, textarea, button, summary, fieldset) { scroll-margin-block: var(--space-4) 10rem; }
-  .design :is(input, textarea, button, summary) { scroll-margin-top: 15rem; }
+  .step :is(input, textarea, button, summary, fieldset) { scroll-margin-block: var(--space-4); }
   .design[data-substep='0'] .nameGroup, .design[data-substep='0'] .petGroup,
   .design[data-substep='1'] .choiceGroup, .design[data-substep='1'] .petGroup,
   .design[data-substep='2'] .choiceGroup, .design[data-substep='2'] .nameGroup { display: none; }
+  /* Both groups are hidden in the photo substep; their wrapper must not leave a grid gap. */
+  .design[data-substep='2'] .itemPanel > .itemSection { display: none; }
 }
 @media (min-width: 1024px) {
-  .shop:has(.design) { width: min(var(--layout-configurator-max), calc(100% - 2 * var(--layout-gutter))); }
+  .shop:has(.design) { width: min(var(--layout-configurator-max), calc(100% - 2 * max(var(--layout-gutter), env(safe-area-inset-left), env(safe-area-inset-right)))); }
   /* Preview 5/12, options 7/12; the preview column is sticky and vertically centred. */
   .design { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-6); align-items: start; }
-  .previewPane { top: var(--space-4); display: grid; align-content: center; gap: var(--space-4); min-height: calc(100svh - 2 * var(--space-4)); max-height: calc(100svh - 2 * var(--space-4)); padding: 0; }
+  .previewPane { position: sticky; top: var(--space-4); display: grid; align-content: center; gap: var(--space-4); min-height: calc(100svh - 2 * var(--space-4)); max-height: calc(100svh - 2 * var(--space-4)); padding: 0; }
   .previewPane svg { max-height: min(48svh, 360px); }
   .previewSummary { display: flex; justify-content: center; align-items: baseline; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-radius: var(--radius-control); background: var(--color-cart-surface); color: var(--color-cart-ink); }
   .previewSummary strong { font-size: var(--fs-h2); }
@@ -721,7 +721,7 @@
 @keyframes itemEnter { from { transform: translateX(var(--motion-shift)); } to { transform: translateX(0); } }
 @media (prefers-reduced-motion: reduce) { .itemPanel { animation: none; } }
 
-.dateCards { display: grid; grid-template-columns: 1fr; gap: var(--space-3); margin: 0 0 var(--space-5); }
+.dateCards { display: grid; grid-template-columns: 1fr; gap: var(--space-3); margin: 0; }
 .dateCard, .dateSkeleton { min-height: var(--size-date-card); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-surface-raised); }
 .dateCard { display: flex; flex-wrap: wrap; align-content: center; gap: var(--space-1); padding: var(--space-3); text-align: left; color: var(--color-text); cursor: pointer; }
 .dateCard small { flex-basis: 100%; font-weight: var(--type-label-weight); }
@@ -730,9 +730,7 @@
 .dateSkeleton { background: var(--color-disabled-surface); }
 @media (min-width: 768px) { .dateCards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
-.reviewProduct { display: grid; grid-template-columns: var(--size-review-art) minmax(0, 1fr) max-content; gap: var(--space-3); align-items: start; }
-.reviewPreview { width: var(--size-review-art); }
-.afterPayment { margin: var(--space-5) 0; max-width: var(--measure-prose); }
+.afterPayment { margin: 0; max-width: var(--measure-prose); }
 .linkBtn { color: var(--color-text); text-underline-offset: var(--space-1); font-weight: var(--type-button-weight); }
 
 .shop button { transition: transform 100ms ease; }
@@ -765,9 +763,9 @@
 .waitlist { display: grid; gap: var(--space-3); }
 
 /* ── Delivery screen: method choice, pickup days, arrival time (docs/design-system.md C1) ── */
-.methodGroup { min-width: 0; margin: 0 0 var(--space-6); padding: 0; border: 0; }
-.groupLegend { margin: 0 0 var(--space-3); padding: 0; font-weight: var(--type-label-weight); }
-.sectionLead { margin: 0 0 var(--space-4); max-width: var(--measure-prose); color: var(--color-text-muted); }
+.methodGroup { min-width: 0; margin: 0; padding: 0; border: 0; }
+.groupLegend { margin: 0 0 var(--space-2); padding: 0; font-weight: var(--type-label-weight); }
+.sectionLead { margin: 0; max-width: var(--measure-prose); color: var(--color-text-muted); }
 /* Two-line selectable card. Inset 16px from the outer edge; padding = inset − border, so the
    1px → 2px selected border never shifts the text. */
 .choiceCards, .pickupDays { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
@@ -792,6 +790,40 @@
 .timeChip[data-selected='true'] { padding: 0 calc(var(--space-2) - var(--border-control)); }
 @media (min-width: 768px) { .timeRow { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
 /* The chosen date, said once and unmistakably (C1 when chosen, neutral placeholder before). */
-.selectedDate { display: grid; gap: var(--space-1); margin: var(--space-4) 0 0; padding: calc(var(--space-4) - var(--border-thin)); border: var(--border-thin) dashed var(--color-control-border); border-radius: var(--radius-control); color: var(--color-text-muted); }
+.selectedDate { display: grid; gap: var(--space-1); margin: 0; padding: calc(var(--space-4) - var(--border-thin)); border: var(--border-thin) dashed var(--color-control-border); border-radius: var(--radius-control); color: var(--color-text-muted); }
 .selectedDate small { font-size: var(--type-hint-size); font-weight: var(--type-label-weight); }
 .selectedDate[data-selected='true'] { padding: calc(var(--space-4) - var(--border-control)); border: var(--border-control) solid var(--color-selected); background: var(--color-selected-surface); color: var(--color-text); font-weight: var(--type-label-weight); }
+
+.deliverySections { display: grid; gap: var(--space-6); min-width: 0; }
+.dateSection { composes: dividedSection from '../../components/public/PublicForm.module.css'; display: grid; gap: var(--space-4); min-width: 0; }
+.dateBody { display: grid; gap: var(--space-5); min-width: 0; }
+.dateSection > h3, .dateBody > * { margin-block: 0; }
+.calendarField { display: grid; gap: var(--space-5); }
+.calendarField > div { display: grid; gap: var(--space-4); }
+.calendarField h3 { margin-block: 0; }
+.review { display: grid; gap: var(--space-5); min-width: 0; }
+.reviewCards { display: grid; gap: var(--space-4); min-width: 0; }
+.review > *, .reviewCards > * { margin-block: 0; }
+.terms { display: grid; gap: var(--space-5); }
+.terms > *, .terms .check { margin-block: 0; }
+.identifiedCard { display: grid; grid-template-columns: var(--size-icon) minmax(0, 1fr); align-items: start; gap: var(--space-3); width: 100%; }
+.identifiedCard > svg { width: var(--size-icon); height: var(--size-icon); color: var(--color-text); }
+.identifiedCard > span { display: grid; gap: var(--space-2); min-width: 0; }
+.choiceCard strong { font-weight: var(--type-body-weight); }
+.choiceCard[data-selected='true'] strong { font-weight: var(--type-label-weight); }
+.dateCards { grid-template-columns: minmax(0, 1fr); }
+.nameDetails { margin-inline-start: 0; }
+.check { flex-wrap: wrap; }
+.check > span { min-width: 0; }
+.itemFooter { flex-wrap: wrap; }
+
+/* Reserve the supporting Back action, then give the primary action the remaining width.
+   Long German payment copy wraps inside its target at 320px rather than escaping the card. */
+.actions > button[type='submit'] { flex: 2; overflow-wrap: anywhere; padding-block: var(--space-2); }
+
+.petNameSummary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+
+/* Final step: Back keeps only its own width so the legally required payment label never breaks
+   inside a word on narrow phones; it wraps only between words (no automatic hyphenation). */
+.actions:has(.stripeLine) > button:not([type='submit']) { flex: 0 0 auto; }
+.actions:has(.stripeLine) > button[type='submit'] { flex: 1 1 0; overflow-wrap: normal; hyphens: manual; }

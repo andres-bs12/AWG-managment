@@ -1,3 +1,4 @@
+import { StaffText } from './StaffText'
 import { Link } from 'react-router-dom'
 import { Button } from '../ui/Button'
 import { ButtonLink } from '../ui/ButtonLink'
@@ -11,7 +12,6 @@ type Props = {
   block?: TimeBlock
   days: MarketDay[]
   selected: boolean
-  showHandoff: boolean
   navigationState: { from?: string; itemId?: string } | undefined
   busy: boolean
   /** Online payment not confirmed: painting is possible but not the next step. */
@@ -20,7 +20,7 @@ type Props = {
   onStatus: (status: ProductionStatus) => void
 }
 
-export function OrderItemCard({ item, block, days, selected, showHandoff, navigationState, busy, held = false, onHandover, onStatus }: Props) {
+export function OrderItemCard({ item, block, days, selected, navigationState, busy, held = false, onHandover, onStatus }: Props) {
   const title = item.petName || (item.kind === 'custom' ? 'Custom ornament' : 'Finished ornament')
   const photo = item.photos[0]
   const paintTo = `/staff/orders/${item.orderId}/paint/${item.id}`
@@ -32,26 +32,30 @@ export function OrderItemCard({ item, block, days, selected, showHandoff, naviga
         <div className={styles.title}>
           <span className={styles.status} data-status={item.productionStatus}>{status}</span>
           <h3 title={title}>{title}</h3>
-          <p>{item.kind === 'custom' ? 'Custom ornament' : 'Ready-made'} · {formatEur(item.cost, 'en')}</p>
+          <p><StaffText>{`${item.kind === 'custom' ? 'Personalised' : 'Ready-made'} · ${formatEur(item.cost, 'en')}`}</StaffText></p>
         </div>
       </div>
       <dl className={styles.specs}>
-        {item.kind === 'custom' ? <div><dt>Colour</dt><dd>{item.color ? <><i className={styles.swatch} data-color={item.color} aria-hidden="true" />{item.color} · {item.finish ?? 'shiny'}</> : 'Not recorded'}</dd></div> : null}
+        {item.kind === 'custom' ? <div><dt>Colour</dt><dd>{item.color ? <><i className={styles.swatch} data-color={item.color} role="img" aria-label={`${item.color} colour`} />{item.finish ?? 'shiny'}</> : 'Not recorded'}</dd></div> : null}
         {item.withName ? <div><dt>Name to paint</dt><dd className={styles.name}>{item.backName || 'Waiting for form'}</dd></div> : null}
-        {showHandoff ? <div><dt>{item.delivery.kind === 'vienna' ? 'Delivery' : 'Pickup'}</dt><dd>{handoffLabel(item, days)}</dd></div> : null}
       </dl>
       {item.note ? <div className={styles.note}><strong>Painter’s note</strong><p>{item.note}</p></div> : null}
+      <section className={styles.production} aria-label="Production"><h4>Production</h4>
       <div className={styles.actions}>
         {photo ? <ButtonLink to={paintTo} state={navigationState} tone="staff" variant={item.productionStatus === 'finished' || held ? 'secondary' : 'primary'}>{item.productionStatus === 'finished' ? 'View reference' : 'Open painting'}</ButtonLink> : <span className={styles.waiting}>{item.kind === 'custom' ? 'Waiting for reference photos' : 'No reference photo'}</span>}
-        {block ? <Link className={styles.schedule} to={agendaSlotPath(block, days)}>{paintSlotLabel(block, days)}</Link> : null}
+        {block ? <Link className={styles.schedule} to={agendaSlotPath(block, days)}><StaffText>{paintSlotLabel(block, days)}</StaffText></Link> : null}
       </div>
-      <Button tone="staff" variant="secondary" disabled={busy || held || (!item.handedOver && item.productionStatus !== 'finished')} onClick={onHandover}>{item.handedOver ? 'Undo handover' : 'Mark handed over'}</Button>
       <details className={styles.adjust}>
         <summary>Adjust production status</summary>
         <div className={styles.statusOptions}>
           {([{value:'not_started',label:'To paint'}, {value:'in_progress',label:'Painting'}, {value:'finished',label:'Ready'}] as const).map(option => <Button key={option.value} tone="staff" variant="secondary" selected={item.productionStatus === option.value} disabled={busy} onClick={() => onStatus(option.value)}>{option.label}</Button>)}
         </div>
       </details>
+      </section>
+      <section className={styles.handover} aria-label="Handover">
+        <div><h4>Handover</h4><p><StaffText>{handoffLabel(item, days)}</StaffText></p></div>
+        <Button tone="staff" variant="secondary" disabled={busy || held || (!item.handedOver && item.productionStatus !== 'finished')} onClick={onHandover}>{item.handedOver ? 'Undo handover' : 'Mark handed over'}</Button>
+      </section>
     </article>
   )
 }

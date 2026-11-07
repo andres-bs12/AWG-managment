@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 export type Locale = 'en' | 'de'
 
@@ -11,7 +11,8 @@ const messages: Record<Locale, Dictionary> = {
     formLead: "Add the details for your order from the stall. This form does not take payment.",
     formOrnaments: "Your ornament(s)",
     formReviewStep: "Review & send",
-    formBackNameHint: "Up to 6 characters. Included in your order; we paint it as “Luna”.",
+    formBackNameHint: "This pet name is painted on the back. Letters only, up to 6. If it is longer, please enter a shorter name.",
+    formPaintedNameTooLong: "The painted pet name must contain 1–6 letters. Please enter a shorter name.",
     formNeedPet: "Enter your pet’s name.",
     formNeedBackName: "Enter the name for the back.",
     formNeedName: "Enter your name.",
@@ -252,7 +253,10 @@ const messages: Record<Locale, Dictionary> = {
     shopPhotoError: 'This photo could not be added.',
     shopRemovePhoto: 'Remove photo {name}',
     shopNameOnBack: 'Add a name on the back', namePreviewFront: 'Front: your pet', namePreviewBack: 'Back: the name',
-    shopBackNameHint: 'Up to 6 letters. Gaby paints the name in script.',
+    paintedPetName: "Your pet’s name (painted on the back)",
+    paintedNameTooLong: 'The painted pet name must contain 1–6 letters. Shorten the name yourself or turn off the name option.',
+    deliveryWhen: 'When?',
+    shopBackNameHint: 'The same pet name is painted on the back. Letters only, up to 6. For a longer name, turn off this option.',
     shopBackNameRequired: 'Enter the name for the back.',
     shopColour: 'Colour',
     shopDateLead: 'Within Vienna (postcodes 1010–1230), in the evening with no fixed time.',
@@ -293,7 +297,8 @@ const messages: Record<Locale, Dictionary> = {
     formLead: "Ergänze die Angaben zu deiner Bestellung vom Stand. Hier wird nichts bezahlt.",
     formOrnaments: "Deine Kugel(n)",
     formReviewStep: "Prüfen & absenden",
-    formBackNameHint: "Bis zu 6 Zeichen. Schon enthalten; wir malen ihn wie „Luna“.",
+    formBackNameHint: "Dieser Tiername wird auf die Rückseite gemalt. Nur Buchstaben, höchstens 6. Bitte längere Namen selbst kürzen.",
+    formPaintedNameTooLong: "Der gemalte Tiername muss 1–6 Buchstaben haben. Bitte gib einen kürzeren Namen ein.",
     formNeedPet: "Gib den Namen deines Tiers ein.",
     formNeedBackName: "Gib den Namen für die Rückseite ein.",
     formNeedName: "Gib deinen Namen ein.",
@@ -534,7 +539,10 @@ const messages: Record<Locale, Dictionary> = {
     shopPhotoError: 'Dieses Foto konnte nicht hinzugefügt werden.',
     shopRemovePhoto: 'Foto {name} entfernen',
     shopNameOnBack: 'Name auf der Rückseite hinzufügen', namePreviewFront: 'Vorne: dein Tier', namePreviewBack: 'Hinten: der Name',
-    shopBackNameHint: 'Max. 6 Buchstaben. Gaby malt den Namen in Schreibschrift.',
+    paintedPetName: 'Tiername (auf der Rückseite)',
+    paintedNameTooLong: 'Der gemalte Tiername muss 1–6 Buchstaben haben. Bitte selbst kürzen oder die Namensoption ausschalten.',
+    deliveryWhen: 'Wann?',
+    shopBackNameHint: 'Dieser Tiername wird auf die Rückseite gemalt. Nur Buchstaben, höchstens 6. Bei längeren Namen bitte diese Option ausschalten.',
     shopBackNameRequired: 'Gib den Namen für die Rückseite ein.',
     shopColour: 'Farbe',
     shopDateLead: 'Innerhalb Wiens (PLZ 1010–1230), abends ohne feste Uhrzeit.',
@@ -592,6 +600,9 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     const stored = localStorage.getItem(KEY)
     return stored === 'de' || stored === 'en' ? stored : 'en'
   })
+
+  // Screen readers pick pronunciation, and CSS hyphenation its dictionary, from <html lang>.
+  useEffect(() => { document.documentElement.lang = locale }, [locale])
 
   const setLocale = (next: Locale) => {
     setLocaleState(next)

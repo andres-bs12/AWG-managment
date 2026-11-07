@@ -12,6 +12,13 @@ export function InventoryPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [retry, setRetry] = useState(0)
+  const custom = rows.filter(row => row.kind === 'custom')
+  const colors = [...new Set(custom.map(row => row.color))]
+  const legacy = (color: InventoryItem['color']) => color === 'grey' || color === 'white'
+  const colorCards = (old: boolean) => colors.filter(color => legacy(color) === old).map(color => <article key={color} className={styles.stockCard} aria-label={`${color} bases`}>
+    <h2><span className={styles.swatch} style={{ background: `var(--ornament-${color})` }} role="img" aria-label={`${color}`} /></h2>
+    {custom.filter(row => row.color === color).map(row => <StockRow key={row.id} item={row} />)}
+  </article>)
   useEffect(() => {
     let active = true
     api.inventory.list().then(next => { if (active) { setRows(next); setError('') } }).catch(err => { if (active) setError(err instanceof Error ? err.message : 'Could not load stock.') }).finally(() => { if (active) setLoading(false) })
@@ -22,8 +29,9 @@ export function InventoryPage() {
     {loading && <p role="status">Loading stock…</p>}
     {error && <div role="alert"><p>{error}</p><Button tone="staff" onClick={() => { setLoading(true); setRetry(n => n + 1) }}>Retry</Button></div>}
     {!loading && !error && !rows.length && <p>No stock rows configured.</p>}
-    <div className={styles.list}>{rows.filter(row => row.color !== 'grey' && row.color !== 'white').map(row => <StockRow key={row.id} item={row} />)}
-      {rows.some(row => row.color === 'grey' || row.color === 'white') && <><h2>No longer sold</h2>{rows.filter(row => row.color === 'grey' || row.color === 'white').map(row => <StockRow key={row.id} item={row} />)}</>}
+    <div className={styles.list}>{colorCards(false)}
+      {rows.filter(row => row.kind === 'finished').map(row => <article key={row.id} className={styles.stockCard} aria-label="Finished ornaments"><h2>Finished ornaments</h2><StockRow item={row} /></article>)}
+      {colors.some(legacy) && <><h2>No longer sold</h2>{colorCards(true)}</>}
     </div>
   </section>
 }
@@ -56,9 +64,9 @@ function StockRow({ item }: { item: InventoryItem }) {
     } finally { setBusy(false) }
   }
   const dirty = valid && value !== saved
-  return <article className={styles.stockRow}>
+  return <div className={styles.stockRow} role="group" aria-label={name}>
     <div className={styles.name}>
-      <h2>{item.kind === 'custom' ? <span className={styles.swatch} style={{ background: `var(--ornament-${item.color})` }} aria-hidden="true" /> : null}{name}</h2>
+      <h3>{item.kind === 'finished' ? 'Available' : item.finish === 'matte' ? 'Matte' : 'Shiny'}</h3>
       {dirty && <p>Unsaved changes</p>}{notice && !dirty && <p role="status">{notice}</p>}{saved <= 1 && <InsetNote><p>{saved === 0 ? 'Sold out' : 'Low stock: last one'}</p></InsetNote>}
     </div>
     <NumberStepper label={`${name} quantity`} value={quantity} onChange={next => { setQuantity(next); setNotice('') }} max={10000} disabled={busy} />
@@ -69,5 +77,5 @@ function StockRow({ item }: { item: InventoryItem }) {
       <Button tone="staff" disabled={busy} onClick={() => { setQuantity(String(conflict)); setConflict(null); setError('') }}>Keep {conflict}</Button>
       <Button tone="staff" variant="secondary" disabled={busy} onClick={() => void save()}>Save {quantity}</Button>
     </div>}
-  </article>
+  </div>
 }

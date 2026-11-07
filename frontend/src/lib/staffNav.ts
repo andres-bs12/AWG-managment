@@ -8,6 +8,7 @@ const HUBS: Record<string, string> = {
   '/staff/inventory': 'Stock',
   '/staff/painting-days': 'Painting days',
   '/staff/sales/new': 'New sale',
+  '/staff/sales': 'Sales',
 }
 
 function hubFor(path: string) {

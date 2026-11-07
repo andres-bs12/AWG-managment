@@ -1,7 +1,7 @@
 .block { min-width: 0; }
 .label { margin: 0; font-size: var(--type-label-size); line-height: var(--type-label-line); font-weight: var(--type-label-weight); }
 .hint, .count { margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
-.tiles { display: flex; flex-wrap: wrap; gap: var(--space-5); margin-top: var(--space-5); }
+.tiles { display: flex; flex-wrap: wrap; gap: var(--space-5); margin-top: var(--space-2); }
 .tile, .add { position: relative; flex: 0 0 var(--size-photo); width: var(--size-photo); height: var(--size-photo); border-radius: var(--radius-control); }
 .tile img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .remove { position: absolute; top: var(--remove-offset); right: var(--remove-offset); z-index: 1; display: grid; place-items: center; width: var(--touch); height: var(--touch); padding: 0; border: 0; border-radius: var(--radius-circle); background: transparent; color: var(--color-text); cursor: pointer; }

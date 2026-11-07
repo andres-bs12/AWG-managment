@@ -1,3 +1,4 @@
+import { StaffText } from './StaffText'
 import { formatEur } from '../../lib/money'
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
@@ -43,19 +44,20 @@ export function DeliveryRow({ row, from }: Props) {
     <button
       type="button"
       className={styles.dlv}
+      data-thumbnail={Boolean((row.photoUrl && !photoFailed) || row.color)}
       onClick={() => navigate(`/staff/orders/${row.orderId}`, { state: { from } })}
     >
       {row.photoUrl && !photoFailed ? (
         <img src={row.photoUrl} alt="" width={48} height={48} onError={() => setPhotoFailed(true)} />
-      ) : (
-        <span className={styles.thumb} />
-      )}
+      ) : row.color ? (
+        <span className={styles.thumb} style={{ background: `var(--ornament-${row.color})` }} role="img" aria-label={`${row.color} ornament`} />
+      ) : null}
       <span className={styles.dlvBody}>
         <strong>
           {row.source === 'web' ? <span className={styles.webTag}>Web</span> : null}
-          {row.orderCode} · {row.title}
+          <StaffText>{`${row.orderCode} · ${row.title}`}</StaffText>
         </strong>
-        <span>{[row.customerName, row.color, row.finish, deliveryStatusLabel(row)].filter(Boolean).join(' · ')}</span>
+        <span><StaffText>{[row.customerName, row.finish, deliveryStatusLabel(row)].filter(Boolean).join(' · ')}</StaffText></span>
       </span>
       <span className={styles.dlvAside}>
 <span>{row.methodLabel}</span>

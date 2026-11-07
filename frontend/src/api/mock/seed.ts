@@ -34,7 +34,7 @@ export const STAFF_ACCOUNTS: Array<StaffUser & { password: string }> = [
 export type MockState = {
   pendingCheckouts?: Record<string, string>
   inventory?: import('../../domain/types').InventoryItem[]
-  paintingDays?: Record<string, { open: boolean; maxPaintings: number }>
+  paintingDays?: Record<string, { open: boolean; maxPaintings: number; openHour?: number; closeHour?: number }>
   waitlist?: string[]
   waitlistTokens?: Record<string, { email: string; confirmed: boolean }>
   seedRevision: number

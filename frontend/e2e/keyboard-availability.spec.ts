@@ -123,7 +123,8 @@ test.describe('desktop keyboard checkout', () => {
     await tab(page)
     await expect(backName).toBeFocused()
     await expect(backName).toHaveValue('LUNA')
-    await typeInto(page, page.locator('input[id^="pet-"]'), 'Luna')
+    await typeInto(page, backName, 'Luna')
+    await expect(page.locator('input[id^="pet-"]')).toHaveCount(0)
     await tabTo(page, page.getByRole('button', { name: 'Foto hinzufügen, 0 von 6', exact: true }))
     const chooser = page.waitForEvent('filechooser')
     await page.keyboard.press('Enter')
@@ -150,6 +151,8 @@ test.describe('desktop keyboard checkout', () => {
     await expect(days.nth(1)).toBeChecked()
     await expect(days.nth(1)).toBeFocused()
     await expect(page.locator('#buy-date-error')).toHaveCount(0)
+    await continueByKeyboard(page, 'Enter')
+    await expect(page.locator('#buy-heading')).toHaveText('Deine Daten')
     for (const [id, value] of Object.entries({
       'buy-name': 'Alex Example', 'buy-email': 'alex@example.com', 'buy-phone': '+43 123456789',
       'buy-line1': 'Hauptstraße 1', 'buy-line2': 'Stiege 2, Tür 3', 'buy-postal': '1010',
@@ -269,9 +272,9 @@ for (const locale of ['de', 'en'] as const) {
     await choose(page)
     if (mobile(page)) await next(page).click()
     await page.getByRole('checkbox', { name: /name (auf|on)/i }).check()
-    await page.locator('input[id^="back-"]').fill('LUNA')
+    await page.locator('input[id^="back-"]').fill('Luna')
     if (mobile(page)) await next(page).click()
-    await page.locator('input[id^="pet-"]').fill('Luna')
+    await expect(page.locator('input[id^="pet-"]')).toHaveCount(0)
     await page.locator('input[type=file]').setInputFiles(photo)
     await expect(page.getByRole('img', { name: /^(Foto|Photo) 1 (von|of) Luna$/ })).toBeVisible()
     await page.locator('summary').click()
@@ -295,10 +298,7 @@ for (const locale of ['de', 'en'] as const) {
     await expect(page.locator('input[name="delivery-date"]')).toHaveCount(2)
     await expect(page.getByRole('radio', { name: /^(Mittwoch|Wednesday),? 2[. ]/ })).toHaveCount(0)
     await expect(page.locator('input[name="delivery-date"]:checked')).toHaveCount(0)
-    await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('awg-buy-draft')!))).toEqual({ ...before, deliveryDate: '' })
-    for (const [id, value] of Object.entries({ 'buy-name': 'Alex Example', 'buy-email': 'alex@example.com', 'buy-phone': '123456789', 'buy-line1': 'Hauptstraße 1', 'buy-line2': 'Stiege 2, Tür 3', 'buy-postal': '1010' })) {
-      await expect(page.locator(`#${id}`)).toHaveValue(value)
-    }
+    await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('awg-buy-draft')!))).toEqual({ ...before, deliveryDate: '', pickupTime: '' })
     expect(checkouts).toBe(0)
     const replacement = page.locator('input[name="delivery-date"]').first()
     await tabTo(page, replacement)
@@ -306,13 +306,17 @@ for (const locale of ['de', 'en'] as const) {
     await expect(replacement).toBeChecked()
     await expect(page.locator('#buy-date-error')).toHaveCount(0)
     await next(page).click()
+    for (const [id, value] of Object.entries({ 'buy-name': 'Alex Example', 'buy-email': 'alex@example.com', 'buy-phone': '123456789', 'buy-line1': 'Hauptstraße 1', 'buy-line2': 'Stiege 2, Tür 3', 'buy-postal': '1010' })) {
+      await expect(page.locator(`#${id}`)).toHaveValue(value)
+    }
+    await next(page).click()
     await expect(page.locator('#buy-terms')).toBeChecked()
     await expect(page.locator('form')).toContainText('Luna')
-    await expect(page.locator('form')).toContainText('LUNA')
+    await expect(page.locator('form')).toContainText('Luna')
     // Inspect the in-memory photo and note by reopening their exact editor.
     await page.getByRole('button', { name: locale === 'de' ? 'Kugel Luna ändern' : 'Change ornament Luna', exact: true }).click()
     if (mobile(page)) { await next(page).click(); await next(page).click() }
-    await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
+    await expect(page.locator('[data-pet-name] strong')).toHaveText('Luna')
     await expect(page.getByRole('img', { name: /^(Foto|Photo) 1 (von|of) Luna$/ })).toBeVisible()
     await page.locator('summary').click()
     await expect(page.locator('textarea[id^="note-"]')).toHaveValue('Keep the white whiskers')

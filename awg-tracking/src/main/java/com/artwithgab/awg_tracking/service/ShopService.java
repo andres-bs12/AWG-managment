@@ -336,6 +336,12 @@ public class ShopService {
             if (item.color() == null || !item.color().isOffered()) {
                 throw new BadRequestException("Choose a color for each ornament.").code("VALIDATION").field("items[" + n + "].color");
             }
+            if (item.withName()) {
+                String back = item.backName() == null ? "" : item.backName().trim().toUpperCase(Locale.ROOT);
+                if (back.isEmpty() || back.codePointCount(0, back.length()) > 6) {
+                    throw new BadRequestException("Use 1–6 letters for the painted name.").code("VALIDATION").field("items[" + n + "].backName");
+                }
+            }
             if (item.finish() == null) {
                 throw new BadRequestException("Choose shiny or matte for each ornament.").code("VALIDATION").field("items[" + n + "].finish");
             }
@@ -398,7 +404,7 @@ public class ShopService {
             item.setNote(row.note() == null ? "" : row.note().trim());
             if (withName && row.backName() != null) {
                 String back = row.backName().trim().toUpperCase(Locale.ROOT);
-                item.setNameInOrnament(back.length() > 6 ? back.substring(0, 6) : back);
+                item.setNameInOrnament(back);
             }
             if (custom) {
                 HourSpanDto slot = slots.get(slotIndex++);

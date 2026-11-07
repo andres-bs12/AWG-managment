@@ -1,6 +1,6 @@
 # Sustituir mocks por Spring
 
-On-demand: no forma parte de la fase UX staff. La UI llama solo a `api` (`frontend/src/api/client.ts`). Hoy `VITE_DATA_SOURCE=mock`. El cliente HTTP vive en `frontend/src/api/http/services.ts` y lanza un error claro hasta que implementes `fetch`.
+El swap está implementado. La UI llama solo a `api` (`frontend/src/api/client.ts`); `VITE_DATA_SOURCE=mock` queda como valor predeterminado de desarrollo/demo y producción exige `http`. El cliente HTTP completo vive en `frontend/src/api/http/services.ts`.
 
 ## 1. Encender HTTP
 
@@ -11,19 +11,19 @@ VITE_DATA_SOURCE=http
 VITE_API_BASE_URL=http://localhost:8080
 ```
 
-No hace falta tocar páginas. Si un método sigue en stub, fallará con el mensaje de `http/services.ts`.
+No hace falta tocar páginas. Vite usa el proxy `/api` local si no se especifica una base externa.
 
 ## 2. Contrato
 
 Tipos en `frontend/src/domain/types.ts` (nombres alineados a FigJam Entities: `Customer`, `Order`, `OrderItem`, `Market`, `MarketDay`, `TimeBlock`, `StaffUser`).
 
-Interfaces en `frontend/src/api/contracts.ts`. Implementa cada método en `http/services.ts` con `fetch(`${import.meta.env.VITE_API_BASE_URL}/...`)`.
+Interfaces en `frontend/src/api/contracts.ts`; sus implementaciones mock y HTTP comparten ese contrato.
 
 Auth: el staff ya guarda un token en `localStorage` (`awg-staff-token`) y `AuthContext` lo revalida con `api.auth.me`. En HTTP, manda `Authorization: Bearer <token>` en el helper de `fetch`.
 
 ## 3. Mapa implementado
 
-Todos los cuerpos y respuestas tienen la forma exacta de `frontend/src/domain/types.ts`. Errores: `{ status, message }`.
+Todos los cuerpos y respuestas tienen la forma de `frontend/src/domain/types.ts`. Errores: `{ status, message, code, field }` (código/campo según el error); `lib/apiError.ts` los traduce para la UI.
 
 | Servicio UI | Endpoint | Auth |
 |-------------|----------|------|
@@ -64,4 +64,25 @@ Hecho (2026-11-04): todos los métodos implementados, proxy `/api` en Vite, Entr
 - Staff HTTP mutations dispatch a data-change event after a successful response; readers also refetch on focus/visibility and every minute. HTTP 401 emits a session event; the router keeps `next` and the draft, without a full reload. Offline bootstrap retains the token.
 - New stall dates with Vienna deliveries retain 400 `DAY_HAS_DELIVERIES`, field `days`; the mock follows the same rejection. Painted custom bases are not returned to stock on cancellation.
 
-These are additive DTO changes with no entity/schema change. Deploy the matching backend before the staff frontend; the old config does not contain finishedPrice. The handover/payment pair consists of two absolute server operations; if collection succeeds and handover fails, the balance is already paid and retry completes handover. Order-level handover and hard cancellation remain pending owner decisions.
+These Task 11 DTO changes were additive. Deploy the matching backend before the staff frontend; the old config does not contain finishedPrice. The handover/payment pair consists of two absolute server operations; if collection succeeds and handover fails, the balance is already paid and retry completes handover. The v1.1 item handover/cancellation contract below supersedes the earlier pending decisions.
+
+## Staff sales list (2026-11-06)
+
+- `orders.listSales(filters)` → staff-authenticated `GET /api/orders` without the `code` parameter. Optional filters: `state=unpaid|deposit|paid|pending|review`, `source=stall|web`, `from`/`to` calendar dates, `query` (code, customer name or at least three phone digits), zero-based `page` and `size` (default 20, maximum 50).
+- The response is `{ orders: OrderSummary[], page, size, totalElements, totalPages }`, ordered by creation time and id descending. `from` and `to` include the whole selected calendar days in Europe/Vienna. Filters apply before pagination. A pending/review checkout has that displayed state and is excluded from `state=unpaid`.
+- Summaries also include `source` (`stall` for legacy null sources) and `status` (`ACTIVE`/`CANCELLED`). Cancelled sales remain visible; erased orders are omitted, as in staff search. Form/track tokens, addresses and photos are excluded from the summary.
+- `/staff/sales` provides quick periods Today / 7 days / All, payment/source filters, the existing code/name/phone search semantics, and a link to each order. Filter and page parameters survive the return from the order detail. No database migration is needed for this endpoint.
+
+
+### Per-day painting hours (v1.1)
+
+`GET /api/painting-days?from=&to=` returns effective numeric `openHour` / `closeHour` with the existing date/open/maxPaintings/booked fields. Staff PATCH accepts both optional hour values together, in quarter-hour steps from 00:00 through 23:45, end after start. Omitting both preserves any override. V11 stores nullable overrides; unset dates inherit the preferred market/home painting window. These values never modify market pickup times. Existing bookings remain when the owner narrows a window or capacity. Automatic suggestions, manual sales and moves use the painting hours; manual bookings retain the existing ability to exceed the daily count/closed suggestion limit. Agenda derives its board extent from the effective window plus all existing slots.
+
+### Item handover, cancellation and QR receipt (v1.1)
+
+- `PATCH /api/orders/{id}/handed-over` accepts `{ handedOver, itemIds? }`; omitted IDs retain the whole-order operation. V8 adds per-item handover; the order completes when the last item is handed over. Deliveries keeps one complete cart across dates, destinations and partial handovers. Date, destination and production filters select matching items for enabled controls and default batch selection; other cart items stay visible. Balance collection remains order-wide.
+- `POST /api/orders/{id}/cancel` retains the order and optional reason (V9), returns eligible stock and excludes its reservations. V10 adds bounded pending checkout reservations and the application expiry. These schema changes and V11 still require PostgreSQL validation.
+- The waiting QR sale reads the existing `GET /api/orders/{id}/bundle` serially, at 5-second intervals; failures back off to 10/20/30 seconds. It stops once all custom items have `formComplete`, shows **Form received**, and provides order details. Focus/visibility can refresh. No new receipt endpoint or sent-notification claim is involved.
+- A successful public form submit goes directly to Track with a focused saved notice and bypasses the decorative wipe. The Track reading card stays opaque throughout its entrance.
+
+Current verification: HTTP build, lint and 50 Node tests pass; Java was not changed in the E2E repair pass. Claude's 681-case baseline had 40 failures. Re-run and snapshot work: [E2E repair report](../tasks/audit-results/e2e-repair-2026-11-06.md).

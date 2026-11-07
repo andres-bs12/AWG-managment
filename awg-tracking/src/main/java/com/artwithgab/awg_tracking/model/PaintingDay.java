@@ -11,7 +11,8 @@ import java.time.LocalDate;
 
 /**
  * Gaby's choice for one painting date. Missing row = open with the default limit
- * (awg.calendar.default-max-paintings). Only automatic planning respects it.
+ * (awg.calendar.default-max-paintings), with hours inherited from the calendar.
+ * Only automatic planning enforces the switch/limit; hours also constrain manual moves.
  */
 @Entity
 @Getter
@@ -26,4 +27,9 @@ public class PaintingDay {
 
     @Column(nullable = false)
     private int maxPaintings;
+
+    /** Nullable overrides keep the market's pickup hours independent of painting. */
+    private Double openHour;
+
+    private Double closeHour;
 }

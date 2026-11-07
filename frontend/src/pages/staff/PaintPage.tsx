@@ -1,3 +1,4 @@
+import { StaffText } from '../../components/staff/StaffText'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
@@ -93,7 +94,7 @@ export function PaintPage() {
         <div className={styles.who}>
           <h1 title={title}>{title}</h1>
           <p className={styles.handoff}>{handoff}</p>
-          <p className={styles.meta}>{order.code} · {customer.name || 'Customer pending'}</p>
+          <p className={styles.meta}><StaffText>{`${order.code} · ${customer.name || 'Customer pending'}`}</StaffText></p>
           <p className={styles.meta}>{slot}</p>
           <p className={styles.paintFacts}>{item.withName && item.backName ? <strong>Name on back: {item.backName}</strong> : null}<span>Colour: {item.color ? `${item.color} · ${item.finish ?? 'shiny'}` : 'not set'}</span></p>
           {item.note ? <p className={styles.paintNote}>{item.note}</p> : null}

@@ -1,3 +1,4 @@
+import { paintedName, paintedNameValid, reconcilePetName } from '../../lib/paintedName'
 import { keepFormFocusVisible } from '../../lib/publicFormFocus'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -77,6 +78,10 @@ function CustomerForm({ token }: { token: string }) {
       const source = fromView(data)
       let restored = source
       try { const raw = sessionStorage.getItem(formDraftKey(token)); if (raw) restored = restoreFormDraft(raw, source) } catch { setStorageError(true) }
+      restored = { ...restored, items: restored.items.map(item => {
+        const named = targets(data).find(source => source.id === item.orderItemId)?.withName
+        return named ? reconcilePetName({ ...item, withName: true }) : item
+      }) }
       setDraft(restored); setView(data); setTerminal(data.editable ? null : 'locked')
     }).catch(error => { if (active) { setIssue(error); setTerminal(terminalFor(error)) } }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
@@ -108,7 +113,7 @@ function CustomerForm({ token }: { token: string }) {
   const displayedErrors = { ...Object.fromEntries(Object.entries(errors).map(([id, key]) => [id, t(key)])), ...(serverField ? { [serverField.id]: apiError(serverField.issue, locale, t('shopFixErrors')).text } : {}) }
   const labels: Record<string, string> = { 'form-name': t('yourName'), 'form-phone': t('phone'), 'form-email': t('email'), 'form-line1': t('shopStreet'), 'form-line2': t('shopLine2'), 'form-postal': t('shopPostal'), 'form-city': t('shopCity') }
   draft.items.forEach((item, index) => {
-    for (const [prefix, key] of [['pet', 'petName'], ['back', 'backName'], ['photos', 'formPhotos'], ['note', 'noteLabel']]) labels[`${prefix}-${item.orderItemId}`] = `${t(key)} · ${t('ornamentN', { n: index + 1 })}`
+    for (const [prefix, key] of [['pet', 'petName'], ['photos', 'formPhotos'], ['note', 'noteLabel']]) labels[`${prefix}-${item.orderItemId}`] = `${t(key)} · ${t('ornamentN', { n: index + 1 })}`
   })
   const handoffs = [...new Set((view?.handoffs ?? []).map(handoff => handoff.kind === 'vienna'
     ? [t('whenVienna'), handoff.date ? formatDateLabel(handoff.date, locale === 'de' ? 'de-AT' : 'en-GB') : ''].filter(Boolean).join(' · ')
@@ -122,8 +127,10 @@ function CustomerForm({ token }: { token: string }) {
     setIssue(null)
   }
   function patchItem(id: string, partial: Partial<FormItemDraft>) {
+    const named = formItems.find(item => item.id === id)?.withName
+    if (named && partial.petName !== undefined) partial = { ...partial, backName: paintedName(partial.petName) }
     setDraft(current => ({ ...current, items: current.items.map(item => item.orderItemId === id ? { ...item, ...partial } : item) }))
-    clear(Object.keys(partial).map(key => `${({ petName: 'pet', backName: 'back' } as Record<string, string>)[key] ?? key}-${id}`))
+    clear(Object.keys(partial).map(key => `${({ petName: 'pet', backName: 'pet' } as Record<string, string>)[key] ?? key}-${id}`))
   }
   function patchContact(partial: Partial<ContactValues>) {
     const ids: Record<string, string> = { customerName: 'name', postalCode: 'postal' }
@@ -135,7 +142,7 @@ function CustomerForm({ token }: { token: string }) {
     const found: Record<string, string> = {}
     for (const item of draft.items) {
       if (!item.petName.trim()) found[`pet-${item.orderItemId}`] = 'formNeedPet'
-      if (formItems.find(source => source.id === item.orderItemId)?.withName && !item.backName.trim()) found[`back-${item.orderItemId}`] = 'formNeedBackName'
+      if (formItems.find(source => source.id === item.orderItemId)?.withName && !paintedNameValid(item.backName)) found[`pet-${item.orderItemId}`] = item.backName ? 'formPaintedNameTooLong' : 'formNeedBackName'
       if (!item.photos.length) found[`photos-${item.orderItemId}`] = 'needPhoto'
     }
     if (!draft.customerName.trim()) found['form-name'] = 'formNeedName'
@@ -182,15 +189,15 @@ function CustomerForm({ token }: { token: string }) {
       }, { rememberToken: !staffHandoff })
       try { sessionStorage.removeItem(formDraftKey(token)) } catch { setStorageError(true) }
       // The Track page already shows the order state: go there and confirm the save once.
-      void navigate(`/track/${encodeURIComponent(result.orderCode)}`, { state: { formSaved: true } })
+      void navigate(`/track/${encodeURIComponent(result.orderCode)}`, { replace: true, state: { formSaved: true } })
     } catch (error) {
       const terminal = terminalFor(error)
       if (terminal) { setTerminal(terminal); setIssue(error); return }
       const field = apiError(error, locale, t('formSaveError')).field ?? ''
       const match = field.match(/^items\[(\d+)\]\.(\w+)/)
-      const item = match ? draft.items[Number(match[1])] : field === 'photos' ? draft.items[0] : undefined
-      const name = match?.[2] ?? 'photos'
-      const itemIds: Record<string, string> = { petName: 'pet', backName: 'back', note: 'note', photos: 'photos' }
+      const item = match ? draft.items[Number(match[1])] : ['photos', 'petName', 'backName'].includes(field) ? draft.items[0] : undefined
+      const name = match?.[2] ?? field
+      const itemIds: Record<string, string> = { petName: 'pet', backName: 'pet', note: 'note', photos: 'photos' }
       const contactIds: Record<string, string> = { customerName: 'form-name', phone: 'form-phone', email: 'form-email', address: 'form-line1', 'address.line1': 'form-line1', 'address.line2': 'form-line2', 'address.postalCode': 'form-postal', 'address.city': 'form-city' }
       const id = item && itemIds[name] ? `${itemIds[name]}-${item.orderItemId}` : contactIds[field]
       if (id) { focusRequest.current = id; setErrors({}); setServerField({ id, issue: error }); setStep('details') } else setIssue(error)
@@ -215,8 +222,10 @@ function CustomerForm({ token }: { token: string }) {
       <ErrorSummary errors={displayedErrors} labels={labels} onFocus={id => { const control = document.getElementById(id) ?? document.getElementById(id.replace('photos-', 'photos-block-')); const details = control?.closest('details'); if (details) details.open = true; control?.focus() }} />
       {step === 'details' ? <>
         <p className={styles.muted}>{t('formCanEdit')}</p>
-        <FormItems items={view.items ?? [view.item]} draft={draft.items} errors={displayedErrors} photoErrors={Object.fromEntries(Object.entries(photoErrors).map(([id, key]) => [id, key ? t(key) : '']))} patch={patchItem} addFiles={addFiles} validate={validateField} />
-        <ContactFields prefix="form" values={{ ...draft, ...draft.address, line2: draft.address.line2 ?? '' }} onChange={patchContact} error={id => displayedErrors[id]} onBlur={validateField} withAddress={view.needsAddress} announceErrors={false} validFields={validFields} deliveryPhone={view.needsAddress} />
+        <div className={styles.sections}>
+          <div className={styles.items}><FormItems items={view.items ?? [view.item]} draft={draft.items} errors={displayedErrors} photoErrors={Object.fromEntries(Object.entries(photoErrors).map(([id, key]) => [id, key ? t(key) : '']))} patch={patchItem} addFiles={addFiles} validate={validateField} /></div>
+          <div className={styles.contact}><ContactFields prefix="form" values={{ ...draft, ...draft.address, line2: draft.address.line2 ?? '' }} onChange={patchContact} error={id => displayedErrors[id]} onBlur={validateField} withAddress={view.needsAddress} announceErrors={false} validFields={validFields} deliveryPhone={view.needsAddress} /></div>
+        </div>
       </> : <FormReview view={view} draft={draft} handoffs={handoffs} edit={edit} />}
     </section>
     <StickyActions>{step === 'review' && <Button variant="secondary" disabled={sending} onClick={() => { setErrors({}); focusRequest.current = 'form-heading'; setStep('details') }}>{t('back')}</Button>}

@@ -165,19 +165,19 @@ test('cancelled checkout says nothing was charged and restores the saved design'
   await choose(page)
   if (mobile(page)) await next(page).click()
   await page.locator('input[type=checkbox]').first().check()
-  await page.locator('input[id^="back-"]').fill('LUNA')
+  await page.locator('input[id^="back-"]').fill('Luna')
   if (mobile(page)) await next(page).click()
-  await page.locator('input[id^="pet-"]').fill('Luna')
+  await expect(page.locator('input[id^="pet-"]')).toHaveCount(0)
   await page.locator('input[type=file]').setInputFiles(photo)
   await expect(page.getByRole('img', { name: 'Foto 1 von Luna', exact: true })).toBeVisible()
   await page.locator('summary').filter({ hasText: 'Notiz für Gaby' }).click()
   await page.locator('textarea[id^="note-"]').fill('Keep the white whiskers')
   await delivery(page)
-  const selectedDate = await page.locator('input[name="delivery-date"]:checked').getAttribute('aria-label')
+  const selectedDate = await page.evaluate(() => JSON.parse(sessionStorage.getItem('awg-buy-draft')!).deliveryDate)
   expect(selectedDate).not.toBeNull()
   await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('awg-buy-draft') ?? '{}'))).toMatchObject({
     customerName: 'Alex Example', email: 'alex@example.com', deliveryDate: expect.stringMatching(/^2026-/),
-    items: [{ color: 'red', finish: 'shiny', withName: true, backName: 'LUNA', petName: 'Luna', note: 'Keep the white whiskers' }],
+    items: [{ color: 'red', finish: 'shiny', withName: true, backName: 'Luna', petName: 'Luna', note: 'Keep the white whiskers' }],
   })
 
   await page.goto(`/buy?cancelled=${code}`)
@@ -186,9 +186,9 @@ test('cancelled checkout says nothing was charged and restores the saved design'
   await expect(page.getByRole('radio', { name: 'Glänzend', exact: true })).toBeChecked()
   if (mobile(page)) await next(page).click()
   await expect(page.locator('input[type=checkbox]').first()).toBeChecked()
-  await expect(page.locator('input[id^="back-"]')).toHaveValue('LUNA')
+  await expect(page.locator('input[id^="back-"]')).toHaveValue('Luna')
   if (mobile(page)) await next(page).click()
-  await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
+  await expect(page.locator('[data-pet-name] strong')).toHaveText('Luna')
   await page.locator('summary').filter({ hasText: 'Notiz für Gaby' }).click()
   await expect(page.locator('textarea[id^="note-"]')).toHaveValue('Keep the white whiskers')
   await expect(page.getByRole('status').filter({ hasText: 'Fotos können nach dem Neuladen' })).toBeVisible()
@@ -196,10 +196,12 @@ test('cancelled checkout says nothing was charged and restores the saved design'
   await page.locator('input[type=file]').setInputFiles(photo)
   await expect(page.getByRole('img', { name: 'Foto 1 von Luna', exact: true })).toBeVisible()
   await next(page).click()
+  await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('awg-buy-draft')!).deliveryDate)).toBe(selectedDate)
+  await next(page).click()
   await expect(page.locator('#buy-name')).toHaveValue('Alex Example')
   await expect(page.locator('#buy-email')).toHaveValue('alex@example.com')
   await expect(page.locator('#buy-line1')).toHaveValue('Hauptstraße 1')
-  await expect(page.locator('input[name="delivery-date"]:checked')).toHaveAttribute('aria-label', selectedDate!)
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('awg-buy-draft')!).deliveryDate)).toBe(selectedDate)
 })
 
 for (const transport of ['http', 'mock'] as const) {

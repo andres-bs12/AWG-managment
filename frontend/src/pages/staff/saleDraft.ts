@@ -175,7 +175,7 @@ export function deliveryLabel(item: DraftItem, markets: Market[], days: MarketDa
   if (item.kind === 'finished' && item.delivery.mode === 'now') return 'Deliver now'
   if (item.delivery.mode === 'vienna') {
     const date = item.delivery.pickupDate ? formatDateLabel(item.delivery.pickupDate) : null
-    return ['Vienna delivery · Wed/Fri · no exact time', date].filter(Boolean).join(' · ')
+    return ['Vienna', date].filter(Boolean).join(' · ')
   }
   const day = days.find((d) => d.id === item.delivery.marketDayId) ?? days.find((d) => d.date === item.delivery.pickupDate)
   const market = markets.find((m) => m.id === (item.delivery.marketId ?? day?.marketId))

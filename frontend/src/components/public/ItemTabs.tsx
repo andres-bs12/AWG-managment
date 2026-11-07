@@ -18,9 +18,9 @@ export function ItemTabs({ items, activeUid, maxItems, onSelect, onAdd }: { item
         setFocusedUid(item.uid)
         document.getElementById(`tab-${item.uid}`)?.focus()
       }}>
-        {items.map((item, index) => <button type="button" role="tab" key={item.uid} id={`tab-${item.uid}`} aria-selected={activeUid === item.uid} aria-controls={`panel-${item.uid}`} tabIndex={focusUid === item.uid ? 0 : -1} onFocus={() => setFocusedUid(item.uid)} onClick={() => onSelect(item.uid)}>{item.petName?.trim() || t('ornamentN', { n: index + 1 })}</button>)}
+        {items.map((item, index) => <button type="button" role="tab" key={item.uid} id={`tab-${item.uid}`} aria-selected={activeUid === item.uid} aria-controls={`panel-${item.uid}`} tabIndex={focusUid === item.uid ? 0 : -1} onFocus={() => setFocusedUid(item.uid)} onClick={() => onSelect(item.uid)}>{[t('ornamentN', { n: index + 1 }), item.petName?.trim()].filter(Boolean).join(' · ')}</button>)}
       </div>
-      <button type="button" id="buy-add" className={styles.addItem} aria-label={t('shopAddAnother')} disabled={items.length >= maxItems} onClick={onAdd}><span aria-hidden="true">+</span><span className={styles.addLabel}>{t('shopAddShort')}</span></button>
+      <button type="button" id="buy-add" className={styles.addItem} aria-label={t('shopAddAnother')} disabled={items.length >= maxItems} onClick={onAdd}><span aria-hidden="true">+</span><span className={styles.addLabel}>{t('shopAddAnother')}</span></button>
     </div>
     {items.length >= maxItems && <p className={styles.limit}>{t('itemLimit', { n: maxItems })}</p>}
   </>

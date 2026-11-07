@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test'
-import { open, choose, pet, next, axe, expectActionClearance } from './helpers'
+import { open, choose, pet, next, chooseFirstDate, axe, expectActionClearance } from './helpers'
 
 test('contact fields have labels, single-column spacing and aligned postcode and city', async ({ page }) => {
-  await open(page); await choose(page); await pet(page); await next(page).click()
+  await open(page); await choose(page); await pet(page); await next(page).click(); await chooseFirstDate(page); await next(page).click()
   for (const id of ['buy-name', 'buy-email', 'buy-phone', 'buy-line1', 'buy-line2', 'buy-postal']) {
     const input = page.locator(`#${id}`)
     const label = page.locator(`label[for="${id}"]`)
@@ -36,12 +36,13 @@ test('bottom actions reserve scroll space across resize, short viewports and QR 
   const shell = page.locator('[data-public-scroll]')
   // Scroll through the calendar without focusing a control: clearance must not depend on focus repair.
   for (const fraction of [0, 0.3, 0.6, 1]) {
-    await shell.evaluate((node, value) => { node.scrollTop = value * (node.scrollHeight - node.clientHeight) }, fraction)
+    await page.evaluate(value => { const card = document.querySelector('[data-public-page]')!; window.scrollTo(0, Math.max(0, card.getBoundingClientRect().top + scrollY + card.clientHeight * value - innerHeight)) }, fraction)
     await expectActionClearance(page)
     await axe(page)
   }
   await page.setViewportSize({ width: 360, height: 240 })
-  await expectActionClearance(page, 'flow')
+  await expectActionClearance(page)
+  await page.evaluate(() => window.scrollTo(0, 0))
   await page.setViewportSize({ width: 768, height: 1024 })
   await expectActionClearance(page)
   await page.setViewportSize({ width: 1280, height: 900 })
@@ -59,7 +60,7 @@ test('bottom actions reserve scroll space across resize, short viewports and QR 
 })
 
 test('ordinary contact fields follow the spacing scale', async ({ page }) => {
-  await open(page); await choose(page); await pet(page); await next(page).click()
+  await open(page); await choose(page); await pet(page); await next(page).click(); await chooseFirstDate(page); await next(page).click()
   for (const id of ['buy-name', 'buy-email', 'buy-line1', 'buy-line2', 'buy-postal']) {
     const label = await page.locator(`label[for="${id}"]`).boundingBox()
     const input = await page.locator(`#${id}`).boundingBox()
@@ -76,4 +77,28 @@ test('ordinary contact fields follow the spacing scale', async ({ page }) => {
     expect(emailLabel!.y - name!.y - name!.height).toBeGreaterThanOrEqual(20)
     expect(emailLabel!.y - name!.y - name!.height).toBeLessThanOrEqual(28)
   }
+})
+
+test('details ends with exactly one field gap before the sticky bar at 390×844', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'One fixed phone geometry regression.')
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await open(page); await choose(page); await pet(page); await next(page).click(); await chooseFirstDate(page); await next(page).click()
+  await expect(page.getByRole('heading', { name: 'Kontakt', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Lieferadresse', exact: true })).toBeVisible()
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    ;(document.activeElement as HTMLElement)?.blur()
+    // Measure the bar at the card's end, after ordinary scrolling releases its sticky offset.
+    window.scrollTo(0, document.documentElement.scrollHeight)
+  })
+  await expect(page.locator('[data-sticky-actions]')).toHaveCSS('position', 'sticky')
+  await expect.poll(() => page.evaluate(() => {
+    const bar = document.querySelector('[data-sticky-actions]')!
+    const lastBottom = Math.max(...['buy-postal', 'buy-city'].map(id => document.getElementById(id)!.getBoundingClientRect().bottom))
+    const fieldGap = parseFloat(getComputedStyle(bar).getPropertyValue('--space-5'))
+    return Math.abs(bar.getBoundingClientRect().top - lastBottom - fieldGap)
+  })).toBeLessThanOrEqual(2)
+  const fieldGap = await page.evaluate(() => document.querySelector('label[for="buy-email"]')!.getBoundingClientRect().top - document.getElementById('buy-name')!.getBoundingClientRect().bottom)
+  expect(Math.abs(fieldGap - 24)).toBeLessThanOrEqual(2)
 })

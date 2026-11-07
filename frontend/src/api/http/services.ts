@@ -1,3 +1,4 @@
+import { buyMetricForHttp } from '../../lib/buyMetrics'
 import { validatePhoto } from '../../lib/photoValidation'
 import type { Api } from '../contracts'
 import { forgetFormToken, readFormToken, rememberFormToken } from '../formTokens'
@@ -196,7 +197,7 @@ const enc = encodeURIComponent
 
 export const httpApi: Api = {
   inventory: { list: () => request('/api/inventory', {}, staff), update: (id, quantity, expectedQuantity) => request(`/api/inventory/${enc(id)}`, jsonInit('PATCH', { quantity, expectedQuantity }), staff) },
-  paintingDays: { list: (from, to) => request(`/api/painting-days?from=${enc(from)}&to=${enc(to)}`, {}, staff), update: (date, open, maxPaintings) => request(`/api/painting-days/${enc(date)}`, jsonInit('PATCH', { open, maxPaintings }), staff) },
+  paintingDays: { list: (from, to) => request(`/api/painting-days?from=${enc(from)}&to=${enc(to)}`, {}, staff), update: (date, open, maxPaintings, hours) => request(`/api/painting-days/${enc(date)}`, jsonInit('PATCH', { open, maxPaintings, ...hours }), staff) },
   auth: {
     login: (email, password) =>
       request('/api/staff/login', jsonInit('POST', { email, password })),
@@ -222,6 +223,11 @@ export const httpApi: Api = {
       (await request('/api/agenda/move-suggestion', jsonInit('POST', input), staff)) ?? null,
   },
   orders: {
+    listSales: (filters) => {
+      const params = new URLSearchParams()
+      for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== '') params.set(key, String(value))
+      return request(`/api/orders?${params}`, {}, staff)
+    },
     search: (query) => request(`/api/orders/search?q=${enc(query)}`, {}, staff),
     attention: () => request('/api/orders/attention', {}, staff),
     getOrder: (id) => request(`/api/orders/${enc(id)}`, {}, staff),
@@ -286,7 +292,7 @@ export const httpApi: Api = {
   uploads: {
     toPhoto: (file) => fileToPhoto(file),
   },
-  metrics: { track: (metric) => request('/api/metrics/buy', jsonInit('POST', metric)) },
+  metrics: { track: (metric) => request('/api/metrics/buy', jsonInit('POST', buyMetricForHttp(metric))) },
   shop: {
     abandonCheckout: async (code) => { await request(`/api/shop/checkout/${enc(code)}/abandon`, { method: 'POST', headers: formTokenHeader(code) }); forgetFormToken(code) },
     confirmWaitlist: (token) => request('/api/shop/waitlist/confirm', jsonInit('POST', { token })),

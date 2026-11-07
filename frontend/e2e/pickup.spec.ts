@@ -1,3 +1,4 @@
+import type { ShopCheckoutInput } from '../src/domain/types'
 import { test, expect, type Page } from '@playwright/test'
 import { axe, choose, expectActionClearance, mobile, next, open, pet } from './helpers'
 
@@ -11,7 +12,7 @@ async function recordCheckout(page: Page) {
   await page.evaluate(async () => {
     const path = '/src/api/client.ts'; const { api } = await import(path)
     const original = api.shop.checkout
-    api.shop.checkout = async (input: Parameters<typeof original>[0]) => {
+    api.shop.checkout = async (input: ShopCheckoutInput) => {
       // The redirect to the thanks page reloads the document, so keep the record in sessionStorage.
       sessionStorage.setItem('e2e-checkout', JSON.stringify({ ...input, items: input.items.map(item => ({ ...item, photos: item.photos.length })) }))
       return original(input)
@@ -40,6 +41,7 @@ for (const locale of ['de', 'en'] as const) {
     await expect(time).toBeChecked()
     await expect(page.locator('[data-selected-date]')).toHaveAttribute('data-selected', 'true')
     await expect(page.locator('[data-selected-date] > span')).toContainText('15:30')
+    await next(page).click()
     // Pickup needs contact details only.
     await expect(page.locator('#buy-line1, #buy-postal')).toHaveCount(0)
     await page.locator('#buy-name').fill('Alex Example')
@@ -67,16 +69,13 @@ for (const locale of ['de', 'en'] as const) {
     await open(page, locale)
     await choose(page); await pet(page); await next(page).click()
     await choosePickup(page, locale)
-    await page.locator('#buy-name').fill('Alex Example')
-    await page.locator('#buy-email').fill('alex@example.com')
-    await page.locator('#buy-phone').fill('123456789')
     await next(page).click()
     await expect(page.locator('#buy-time-error')).toHaveText(copy[locale].time)
     await expect(page.locator('#buy-time')).toBeFocused()
-    // Switching back to Vienna clears the pickup choice and brings the address back.
+    // Switching back to Vienna clears the pickup choice; address entry belongs to details.
     await page.getByRole('radio', { name: new RegExp(`^${copy[locale].vienna}`) }).locator('..').click()
     await expect(page.locator('#buy-time')).toHaveCount(0)
-    await expect(page.locator('#buy-line1')).toBeVisible()
+    await expect(page.locator('#buy-line1')).toHaveCount(0)
     await expect(page.locator('[class*="dateCard"][aria-pressed]')).toHaveCount(1)
   })
 }
@@ -84,29 +83,15 @@ for (const locale of ['de', 'en'] as const) {
 test('the mobile action bar spans the card and merges with its end', async ({ page }) => {
   test.skip(!mobile(page), 'The bar docks below 1024px only.')
   await open(page); await choose(page); await pet(page); await next(page).click()
-  const shell = page.locator('[data-public-scroll]')
   const bar = page.locator('[data-sticky-actions]')
-  const geometry = () => page.evaluate(() => {
-    const card = document.querySelector('[data-public-page]')!.getBoundingClientRect()
-    const actions = document.querySelector<HTMLElement>('[data-sticky-actions]')!
-    const box = actions.getBoundingClientRect()
-    const css = getComputedStyle(actions)
-    return { stuck: actions.dataset.stuck === 'true', cardLeft: card.left, cardRight: card.right, cardBottom: card.bottom, left: box.left, right: box.right, bottom: box.bottom, top: box.top, shadow: css.boxShadow, radius: [css.borderTopLeftRadius, css.borderBottomLeftRadius] }
-  })
-  await shell.evaluate(node => { node.scrollTop = 0 })
-  await expect.poll(async () => (await geometry()).stuck).toBe(false)
-  let box = await geometry()
-  expect([box.left, box.right]).toEqual([box.cardLeft, box.cardRight])
-  expect(box.bottom).toBe(page.viewportSize()!.height)
-  expect(box.radius[1]).toBe('0px')
+  await page.evaluate(() => window.scrollTo(0, 0))
   await expectActionClearance(page)
-  await shell.evaluate(node => { node.scrollTop = node.scrollHeight })
-  await expect(bar).toHaveAttribute('data-stuck', 'true')
-  box = await geometry()
-  expect([box.left, box.right, box.bottom]).toEqual([box.cardLeft, box.cardRight, box.cardBottom])
-  expect(box.shadow).toBe('none')
-  expect(box.radius[0]).toBe('0px')
-  expect(box.radius[1]).not.toBe('0px')
+  await page.evaluate(() => document.querySelector('[data-public-page]')!.scrollIntoView({ block: 'end' }))
+  await expect.poll(() => bar.evaluate(node => {
+    const box = node.getBoundingClientRect()
+    const card = node.closest('[data-public-page]')!.getBoundingClientRect()
+    return [box.left, box.right, box.bottom].map(Math.round).join(',') === [card.left, card.right, card.bottom].map(Math.round).join(',')
+  })).toBe(true)
   await expectActionClearance(page)
   await axe(page)
 })

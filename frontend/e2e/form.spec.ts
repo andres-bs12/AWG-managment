@@ -15,7 +15,6 @@ async function openForm(page: Page, locale: 'de' | 'en' = 'de', formToken = toke
 }
 async function fillForm(page: Page) {
   await page.locator('input[id^="pet-"]').fill('Luna')
-  await page.locator('input[id^="back-"]').fill('Luna')
   await page.locator('input[type="file"]').setInputFiles(photo)
   await expect(page.getByRole('img', { name: /(?:Foto|Photo) 1 (?:von|of) Luna/ })).toBeVisible()
   await page.locator('#form-name').fill('Alex Example')
@@ -67,7 +66,7 @@ for (const locale of ['de', 'en'] as const) {
     await axe(page); await noOverflow(page)
     await page.getByRole('button', { name: locale === 'de' ? 'Kugel Luna ändern' : 'Change ornament Luna', exact: true }).click()
     await expect(page.locator('input[id^="pet-"]')).toBeFocused()
-    await expect(page.locator('input[id^="back-"]')).toHaveValue('Luna')
+    await expect(page.locator('input[id^="back-"]')).toHaveCount(0)
     await expect(page.locator('textarea')).toHaveValue('Please keep the white patch.')
     await next(page).click(); await next(page).click()
     // A successful send goes straight to Track, which confirms the save once.
@@ -94,7 +93,7 @@ for (const locale of ['de', 'en'] as const) {
     await next(page).click()
     await expect(page.locator('input[id^="pet-"]')).toBeFocused()
     await expect(page.getByRole('alert')).toContainText(locale === 'de' ? 'Bitte prüfe die markierten Felder.' : 'Please check the highlighted fields.')
-    await expect(page.getByRole('alert').getByRole('link')).toHaveCount(6)
+    await expect(page.getByRole('alert').getByRole('link')).toHaveCount(5)
     await axe(page); await noOverflow(page)
     await page.getByRole('alert').getByRole('link').filter({ hasText: /E-Mail|E-mail|Email/ }).click()
     await expect(page.locator('#form-email')).toBeFocused()
@@ -112,7 +111,7 @@ test('reload restores text, omits local bytes, and requests photos again', async
   await next(page).click(); await page.reload()
   await expect(page.locator('#form-heading')).toHaveText('Deine Kugel(n)')
   await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
-  await expect(page.locator('input[id^="back-"]')).toHaveValue('Luna')
+  await expect(page.locator('input[id^="back-"]')).toHaveCount(0)
   await expect(page.locator('#form-email')).toHaveValue('alex@example.com')
   await expect(page.getByRole('status').filter({ hasText: /Fotos können nach dem Neuladen/ })).toBeVisible()
   expect(await page.evaluate(formToken => sessionStorage.getItem(`awg-form-draft:${formToken}`)?.includes('data:image'), token)).toBe(false)
@@ -252,7 +251,6 @@ test('completes the QR form by keyboard with visible, unobscured focus', async (
   await openForm(page)
   const pet = page.locator('input[id^="pet-"]')
   await tabTo(page, pet); await page.keyboard.type('Luna')
-  await tabTo(page, page.locator('input[id^="back-"]')); await page.keyboard.type('Luna')
   const add = page.getByRole('button', { name: 'Foto hinzufügen, 0 von 6', exact: true })
   await tabTo(page, add)
   const chooser = page.waitForEvent('filechooser'); await page.keyboard.press('Enter'); await (await chooser).setFiles(photo)
@@ -310,14 +308,13 @@ test('two ornaments keep fixed variants, independent details and the bought name
   await page.goto(`/form/${prepared.token}`)
   await expect(page.locator('#form-heading')).toBeVisible()
   await expect(page.locator('[data-preview="live"]')).toHaveCount(2)
-  await expect(page.locator('input[id^="back-"]')).toHaveCount(1)
+  await expect(page.locator('input[id^="pet-"]')).toHaveCount(2)
   await expect(page.locator('input[type="checkbox"]')).toHaveCount(0)
   await expect(page.locator('input[value="red"], input[value="green"], input[value="shiny"], input[value="matte"]')).toHaveCount(0)
   const first = prepared.view.items![0], second = prepared.view.items![1]
   await page.locator(`#pet-${first.id}`).fill('Milo')
   await expect(page.locator(`#pet-${second.id}`)).toHaveValue('Otto')
-  await page.locator(`#back-${first.id}`).fill('milo')
-  await expect(page.locator(`#back-${first.id}`)).toHaveValue('milo')
+  await expect(page.locator(`#pet-${first.id}`)).toHaveValue('Milo')
   await expect(page.locator('[data-preview="live"]').first().locator('text')).toHaveText('Milo')
   await axe(page); await noOverflow(page)
   await next(page).click()
@@ -365,9 +362,13 @@ test('review cards are compact: one Ändern per card, colour and finish on one l
   // Each review card has at most one button: its single Ändern next to the title.
   for (const card of await page.locator('section[class*="card"]').all()) expect(await card.getByRole('button').count()).toBeLessThanOrEqual(1)
   await expect(page.getByRole('button', { name: /ändern/ })).toHaveCount(2)
-  // Colour and finish share one row ("Rot · Glänzend"), never two rows.
-  await expect(page.getByText('Farbe & Oberfläche', { exact: true })).toHaveCount(1)
-  await expect(page.locator('dt').filter({ hasText: /^(Farbe|Oberfläche)$/ })).toHaveCount(0)
+  // The picture shows the colour: only the finish is written, in one row, and no colour word appears.
+  await expect(page.locator('dt').filter({ hasText: /^Oberfläche$/ })).toHaveCount(1)
+  const product = page.locator('[data-review-product]').first()
+  await expect(product.locator(':scope > div:nth-child(2) dt')).toHaveText('Oberfläche')
+  await expect(product.locator(':scope > div:nth-child(2) img')).toHaveCount(1)
+  await expect(page.locator('dt').filter({ hasText: /^(Farbe|Farbe & Oberfläche)$/ })).toHaveCount(0)
+  await expect(page.locator('dd').filter({ hasText: /\b(Rot|Grün|Beige)\b/ })).toHaveCount(0)
   await expect(page.getByText(/Fotos deines Tiers/)).toHaveCount(0)
   await axe(page); await noOverflow(page)
 })
@@ -418,4 +419,45 @@ test('works at 200% text size without horizontal scroll or overlapping controls'
   await next(page).click()
   await expect(page.locator('#form-heading')).toHaveText('Prüfen & absenden')
   await noOverflow(page)
+})
+
+test('legacy full pet name and shorter painted name survive form loading, review and submit', async ({ page }) => {
+  await openForm(page, 'en', 'frm-abs103')
+  const view = await page.evaluate(async () => {
+    const path = '/src/api/client.ts'; const { api } = await import(path)
+    return api.forms.getForm('frm-abs103')
+  })
+  const item = { ...view.item, withName: true, petName: 'Luna Belle', backName: 'LUNA' }
+  const legacy = { ...view, item, items: [item] }
+  await page.route('**/api/forms/*', route => route.request().method() === 'GET'
+    ? route.fulfill({ json: legacy })
+    : route.fulfill({ status: 400, json: { code: 'VALIDATION', field: 'items[0].backName' } }))
+  await page.evaluate(async () => {
+    const clientPath = '/src/api/client.ts', httpPath = '/src/api/http/services.ts'
+    const { api } = await import(clientPath); const { httpApi } = await import(httpPath)
+    api.forms.getForm = httpApi.forms.getForm; api.forms.submitForm = httpApi.forms.submitForm
+  })
+  // Keep the HTTP method substitution in this document across the route change.
+  await page.evaluate(() => { history.pushState({}, '', '/form/legacy-review-token'); dispatchEvent(new PopStateEvent('popstate')) })
+  const name = page.locator('input[id^="pet-"]')
+  await expect(name).toHaveValue('LUNA')
+  await expect(page.locator('input[id^="back-"]')).toHaveCount(0)
+  await next(page).click()
+  await expect(page.locator('#form-heading')).toHaveText('Review & send')
+  await expect(page.locator('form')).toContainText('Luna Belle')
+  await expect(page.locator('form')).toContainText('LUNA')
+  const request = page.waitForRequest(req => req.method() === 'POST' && req.url().includes('/api/forms/'))
+  await next(page).click()
+  const submitted = await request
+  const data = await new Response(new Uint8Array(submitted.postDataBuffer()!), { headers: { 'Content-Type': submitted.headers()['content-type'] } }).formData()
+  const payload = JSON.parse(await (data.get('payload') as Blob).text())
+  expect(payload.items[0]).toMatchObject({ petName: 'Luna Belle', backName: 'LUNA' })
+  await expect(name).toBeFocused()
+  await expect(page.locator('[id^="pet-"][id$="-error"]')).toBeVisible()
+  await name.fill('Straße'); await next(page).click()
+  await expect(name).toBeFocused()
+  await expect(page.locator('[id^="pet-"][id$="-error"]')).toContainText('1–6')
+  await name.fill(''); await next(page).click()
+  await expect(name).toHaveValue('')
+  await expect(page.locator('[id^="pet-"][id$="-error"]')).toBeVisible()
 })

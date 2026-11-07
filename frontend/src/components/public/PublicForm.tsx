@@ -1,7 +1,6 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 import { useLocale } from '../../i18n/LocaleContext'
 import styles from './PublicForm.module.css'
-import { usePublicActions } from './usePublicActions'
 
 export function PublicPage({ className = '', variant = 'form', ...props }: HTMLAttributes<HTMLDivElement> & { variant?: 'form' | 'status' }) {
   return <div {...props} data-public-page className={`${styles.page} ${variant === 'status' ? styles.state : ''} ${className}`} />
@@ -11,8 +10,7 @@ export function PageHeader({ title, children }: { title: string; children?: Reac
 }
 export function InsetNote({ children, tone }: { children: ReactNode; tone?: 'warning' }) { return <div className={styles.inset} data-tone={tone}>{children}</div> }
 export function StickyActions({ children, className = '' }: { children: ReactNode; className?: string }) {
-  const ref = usePublicActions()
-  return <div ref={ref} data-sticky-actions className={`${styles.actions} ${className}`}>{children}</div>
+  return <div data-sticky-actions className={`${styles.actions} ${className}`}>{children}</div>
 }
 export function Card({ children }: { children: ReactNode }) { return <section className={styles.card}>{children}</section> }
 export function PublicState({ title, children, error = false }: { title: string; children: ReactNode; error?: boolean }) {

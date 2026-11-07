@@ -25,15 +25,23 @@ export async function chooseFirstDate(page: Page) {
   await expect(radio).toBeChecked()
 }
 export async function pet(page: Page, name = 'Luna') {
-  if (mobile(page)) { await next(page).click(); await next(page).click() }
-  await page.locator('input[id^="pet-"]').fill(name)
+  if (mobile(page)) await next(page).click()
+  // A named ornament has one editable control on the name card, then a summary by its photos.
+  const paintedName = page.locator('input[id^="back-"]')
+  if (await paintedName.count()) await paintedName.fill(name)
+  if (mobile(page)) await next(page).click()
+  const petName = page.locator('input[id^="pet-"]')
+  if (await petName.count()) await petName.fill(name)
+  else await expect(page.locator('[data-pet-name] strong')).toHaveText(name)
   await page.locator('input[type=file]').setInputFiles(photo)
-  await expect(page.locator('img[alt*="Luna"], img[alt*="Max"]')).toBeVisible()
+  await expect(page.getByRole('img', { name: `Photo 1 of ${name}`, exact: true })
+    .or(page.getByRole('img', { name: `Foto 1 von ${name}`, exact: true }))).toBeVisible()
 }
 export async function delivery(page: Page) {
   await next(page).click()
   await expect(page.locator('#buy-date')).toBeVisible()
   await chooseFirstDate(page)
+  await next(page).click()
   await page.locator('#buy-name').fill('Alex Example')
   await page.locator('#buy-email').fill('alex@example.com')
   await page.locator('#buy-phone').fill('123456789')
@@ -46,18 +54,11 @@ export async function axe(page: Page) {
   expect(results.violations).toEqual([])
 }
 
-export async function expectActionClearance(page: Page, mode = mobile(page) ? 'docked' : 'flow') {
+export async function expectActionClearance(page: Page, mode = mobile(page) && (page.viewportSize()?.height ?? 900) > 640 ? 'sticky' : 'flow') {
   await expect.poll(() => page.locator('[data-sticky-actions]').evaluate((bar, expected) => {
-    const shell = bar.closest('[data-public-scroll]')!
-    const viewport = shell.getBoundingClientRect()
     const actions = bar.getBoundingClientRect()
     if (expected === 'flow') return getComputedStyle(bar).position === 'static'
-      && !shell.hasAttribute('data-docked-actions') && !(bar as HTMLElement).dataset.docked
-    const inside = actions.left >= 0 && actions.right <= innerWidth && actions.bottom <= innerHeight + 0.5
-    // At the end of the card the bar returns to the flow as the card's last row.
-    if ((bar as HTMLElement).dataset.stuck === 'true') return getComputedStyle(bar).position === 'static' && inside
-    // Docked: the scrollport ends exactly where the bar starts, so nothing can sit underneath it.
-    return getComputedStyle(bar).position === 'fixed' && viewport.bottom <= actions.top + 0.5 && inside
+    return getComputedStyle(bar).position === 'sticky'
+      && actions.left >= 0 && actions.right <= innerWidth && actions.top >= 0 && actions.bottom <= innerHeight
   }, mode)).toBe(true)
 }
-

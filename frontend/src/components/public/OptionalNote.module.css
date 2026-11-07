@@ -1,4 +1,4 @@
-.note summary { display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--touch); color: var(--color-text); font-weight: var(--type-label-weight); list-style: none; cursor: pointer; }
+.note summary { display: flex; width: fit-content; align-items: center; gap: var(--space-2); min-height: var(--touch); color: var(--color-text); font-weight: var(--type-label-weight); list-style: none; cursor: pointer; }
 .note summary::-webkit-details-marker { display: none; }
 .note summary::after { content: ''; width: var(--space-2); height: var(--space-2); border-right: var(--border-control) solid currentColor; border-bottom: var(--border-control) solid currentColor; transform: rotate(45deg); transition: transform var(--dur-change) var(--ease-enter); }
 .note[open] summary::after { transform: rotate(-135deg); }

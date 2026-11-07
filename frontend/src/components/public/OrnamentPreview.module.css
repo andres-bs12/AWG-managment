@@ -47,7 +47,7 @@
   .front, .back, .ball { transition: opacity var(--dur-reduced-fade) linear; }
 }
 
-.pause { position: absolute; inset-inline-end: 0; top: 0; display: grid; place-items: center; width: var(--touch); height: var(--touch); padding: 0; border: 0; border-radius: var(--radius-small); background: var(--color-surface); color: var(--color-text-muted); cursor: pointer; }
+.pause { position: absolute; inset-inline-end: 0; top: 0; display: grid; place-items: center; width: var(--touch); height: var(--touch); padding: 0; border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-circle); background: var(--color-surface-raised); color: var(--color-text); cursor: pointer; }
 .pause svg { width: var(--size-icon); height: var(--size-icon); }
 .pause:focus-visible { outline: none; box-shadow: var(--focus); }
 .preview[data-paused='true'] .dog { animation-play-state: paused; }
@@ -55,3 +55,5 @@
 .preview[data-preview='static'] * { animation: none; transition: none; }
 .preview[data-preview='static'] .dog { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .pause { display: none; } }
+
+.pause:hover { background: var(--color-selection-hover); }

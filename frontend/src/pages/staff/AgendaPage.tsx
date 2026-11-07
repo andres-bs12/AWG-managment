@@ -1,3 +1,4 @@
+import { StaffText } from '../../components/staff/StaffText'
 import { DayRow, LostSaves } from './PaintingDaysPage'
 import { AgendaSessionList } from '../../components/staff/AgendaSessionList'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
@@ -5,7 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useStaffRefresh } from '../../lib/useStaffRefresh'
 import { useStaffClock } from '../../lib/staffClock'
-import { layoutAgendaSlots } from '../../lib/agendaLayout'
+import { agendaBounds, layoutAgendaSlots } from '../../lib/agendaLayout'
 import { StaffDialog } from '../../components/staff/StaffDialog'
 import { Field } from '../../components/ui/Field'
 import { dayChipLabel, DeliveryRow } from '../../components/staff/DeliveryRow'
@@ -54,6 +55,7 @@ export function AgendaPage() {
     const rem = Number.parseFloat(css.fontSize) || 16
     return { HOUR_H: Math.max(Number.parseFloat(css.getPropertyValue('--size-agenda-hour')), 5 * rem), REM: rem }
   })
+  const [paintingEditor, setPaintingEditor] = useState(false)
   const [paintingRule, setPaintingRule] = useState<PaintingDay | null>(null)
   const [paintingError, setPaintingError] = useState('')
   const navigate = useNavigate()
@@ -90,7 +92,7 @@ export function AgendaPage() {
       if (!active) return
       setDays(list)
       const today = list.find((d) => d.marketDay.isToday) ?? list[0]
-      setDate((current) => dateParam || current || today?.marketDay.date || '')
+      setDate(current => [dateParam, current, today?.marketDay.date].find(candidate => list.some(day => day.marketDay.date === candidate)) || '')
       setLoadError('')
     }).catch((err: Error) => { if (active) setLoadError(err.message) })
     return () => { active = false }
@@ -102,6 +104,7 @@ export function AgendaPage() {
 
   function setAgendaDate(next: string) {
     setDate(next)
+    setPaintingEditor(false)
     setSelectedBlockId(null)
     setMoveProposal(null)
     setNewProposal(null)
@@ -120,16 +123,17 @@ export function AgendaPage() {
   }, [date, version, retry])
 
   const day = days.find((d) => d.marketDay.date === date) ?? days[0]
-  const hours = useMemo(() => {
-    if (!day) return []
-    const out: number[] = []
-    for (let h = Math.floor(day.marketDay.openHour); h < day.marketDay.closeHour; h += 1) out.push(h)
-    return out
-  }, [day])
-
+  const rule = paintingRule?.date === date ? paintingRule : null
+  const paintOpen = rule?.openHour ?? day?.marketDay.openHour ?? 0
+  const paintClose = rule?.closeHour ?? day?.marketDay.closeHour ?? 0
   const boardSlots = useMemo(() => day?.slots ?? [], [day])
   const slotLayout = layoutAgendaSlots(boardSlots)
-  const boardStart = day ? Math.floor(day.marketDay.openHour) : 0
+  const { start: boardStart, end: boardEnd } = agendaBounds(boardSlots, paintOpen, paintClose)
+  const hours = useMemo(() => {
+    const out: number[] = []
+    for (let h = boardStart; h < boardEnd; h += 1) out.push(h)
+    return out
+  }, [boardStart, boardEnd])
 
   const paintRanges = useMemo(() => boardSlots.map(slotRange), [boardSlots])
   const marketDays = useMemo(() => days.map((row) => row.marketDay), [days])
@@ -150,7 +154,7 @@ export function AgendaPage() {
 
   function clampHour(h: number) {
     if (!day) return h
-    return Math.min(day.marketDay.closeHour, Math.max(day.marketDay.openHour, h))
+    return Math.min(paintClose, Math.max(paintOpen, h))
   }
 
   function hourFromEvent(e: ReactPointerEvent) {
@@ -181,8 +185,8 @@ export function AgendaPage() {
       : 0.5
     const start = Math.min(startHour, endHour)
     const end = Math.max(start + minimumDuration, Math.max(startHour, endHour))
-    const clampedStart = Math.max(start, day.marketDay.openHour)
-    const clampedEnd = Math.min(end, day.marketDay.closeHour)
+    const clampedStart = Math.max(start, paintOpen)
+    const clampedEnd = Math.min(end, paintClose)
     return {
       start: clampedStart,
       end: clampedEnd,
@@ -196,6 +200,7 @@ export function AgendaPage() {
 
   function newSlotProblem(start: number, end: number): string | null {
     if (!day) return 'No market day'
+    if (start < paintOpen || end > paintClose) return 'Choose a time within painting hours.'
     if (day.marketDay.isToday && start < nowHour - 0.01) return 'That time has already passed.'
     if (hasPaintOverlap(paintRanges, start, end)) return 'That time overlaps another session.'
     return null
@@ -209,7 +214,7 @@ export function AgendaPage() {
   function startNewDrag(pointerId: number, startHour: number) {
     if (!day) return
     drag.current = { kind: 'new', pointerId, startHour }
-    setPreview(previewFrom(startHour, Math.min(startHour + 1, day.marketDay.closeHour)))
+    setPreview(previewFrom(startHour, Math.min(startHour + 1, paintClose)))
   }
 
   function proposeNew(start: number, end: number) {
@@ -232,7 +237,7 @@ export function AgendaPage() {
       ? boardSlots.find((slot) => slot.block.id === slotElement.dataset.slotId)
       : undefined
     if (slotElement) {
-      if (!editing || !movingSlot || movingSlot.held || movingSlot.order?.handedOver || movingSlot.block.status !== 'not_started') return
+      if (!editing || !movingSlot || movingSlot.held || (movingSlot.item?.handedOver ?? movingSlot.order?.handedOver) || movingSlot.block.status !== 'not_started') return
       e.preventDefault()
       const pointerHour = hourFromEvent(e)
       const duration = movingSlot.block.endHour - movingSlot.block.startHour
@@ -290,7 +295,7 @@ export function AgendaPage() {
     const slot = boardSlots.find((row) => row.block.id === currentDrag.blockId)
     if (!slot) return
     const unclampedStart = hourFromEvent(e) - currentDrag.grabOffset
-    const start = Math.min(day.marketDay.closeHour - currentDrag.duration, Math.max(day.marketDay.openHour, unclampedStart))
+    const start = Math.min(paintClose - currentDrag.duration, Math.max(paintOpen, unclampedStart))
     setPreview(previewFrom(start, start + currentDrag.duration, slot))
   }
 
@@ -303,7 +308,7 @@ export function AgendaPage() {
     }
     const currentDrag = drag.current
     let { start, end } = preview
-    if (end - start < 0.4) end = Math.min(start + 1, day.marketDay.closeHour)
+    if (end - start < 0.4) end = Math.min(start + 1, paintClose)
     drag.current = null
     setPreview(null)
     if (currentDrag.kind === 'move') {
@@ -330,7 +335,7 @@ export function AgendaPage() {
   function startSaleFromProposal() {
     if (!newProposal || !day) return
     const problem = newSlotProblem(newProposal.start, newProposal.end)
-    if (problem || newProposal.end <= newProposal.start || newProposal.end > day.marketDay.closeHour || newProposal.start < day.marketDay.openHour) { setMoveError(problem ?? 'Choose a valid time within opening hours.'); return }
+    if (problem || newProposal.end <= newProposal.start || newProposal.end > paintClose || newProposal.start < paintOpen) { setMoveError(problem ?? 'Choose a valid time within opening hours.'); return }
     const q = new URLSearchParams({
       kind: 'custom',
       date: day.marketDay.date,
@@ -393,7 +398,7 @@ export function AgendaPage() {
   if (loadError) return <section><h1>Agenda</h1><ButtonLink to="/staff/painting-days" tone="staff" variant="secondary">Painting days</ButtonLink><p role="alert">{loadError}</p><Button tone="staff" onClick={() => setRetry(value => value + 1)}>Try again</Button></section>
   if (!day) return <p role="status">{date ? 'No days scheduled.' : 'Loading agenda…'}</p>
 
-  const height = (day.marketDay.closeHour - boardStart) * HOUR_H
+  const height = (boardEnd - boardStart) * HOUR_H
   const shownPreview = preview ?? (newProposal ? { ...newProposal, invalid: false } : null)
   const proposalMinutes = newProposal ? Math.round((newProposal.end - newProposal.start) * 60) : 0
   const deliveries = day.deliveries ?? []
@@ -407,10 +412,8 @@ export function AgendaPage() {
   return (
     <section style={{ '--hour-h': `${HOUR_H}px` } as CSSProperties}>
       <div className={styles.head}>
-        <h1>Agenda</h1><ButtonLink to="/staff/painting-days" tone="staff" variant="secondary">Painting days</ButtonLink>
-        <p className={styles.context}>
-          {day.market.name} · {formatDateLabel(day.marketDay.date)}
-        </p>
+        <h1>Agenda</h1>
+        {day.market.kind === 'market' && <p className={styles.context}>{day.market.name}</p>}
       </div>
 
       <DayStrip
@@ -418,16 +421,23 @@ export function AgendaPage() {
         today={days.find(row => row.marketDay.isToday)?.marketDay.date}
         value={date}
         onChange={setAgendaDate}
+        tools={<Button tone="staff" variant="secondary" className={styles.settings} aria-label={`Painting hours for ${formatDateLabel(day.marketDay.date)}`} onClick={() => setPaintingEditor(true)}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m9 3-1 3-3 1-2 5 2 5 3 1 1 3h6l1-3 3-1 2-5-2-5-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </Button>}
       />
 
       {paintingError && <div role="alert"><p>{paintingError}</p><Button tone="staff" variant="secondary" onClick={() => setRetry(value => value + 1)}>Retry</Button></div>}
       <LostSaves onSaved={() => setRetry(value => value + 1)} />
-      {paintingRule && paintingRule.date === date && <DayRow key={`${paintingRule.date}|${paintingRule.open}|${paintingRule.maxPaintings}|${paintingRule.booked}`} day={paintingRule} />}
+      {paintingRule && paintingRule.date === date && paintingRule.booked > (paintingRule.open ? paintingRule.maxPaintings : 0) && <p className={styles.capacityWarning} role="status"><StaffText>{`Over painting limit · ${paintingRule.booked} booked. Review painting hours.`}</StaffText></p>}
+      {paintingEditor && <StaffDialog title={`Painting hours · ${formatDateLabel(day.marketDay.date)}`} onClose={() => { setPaintingEditor(false); setRetry(value => value + 1) }}>
+        {paintingRule && paintingRule.date === date ? <DayRow key={paintingRule.date} day={paintingRule} showDate={false} onSaved={saved => { setPaintingRule(saved); setRetry(value => value + 1) }} /> : paintingError ? <div role="alert"><p>{paintingError}</p><Button tone="staff" onClick={() => setRetry(value => value + 1)}>Retry</Button></div> : <p role="status">Loading painting hours…</p>}
+        <Button tone="staff" variant="secondary" onClick={() => { setPaintingEditor(false); setRetry(value => value + 1) }}>Not yet</Button>
+      </StaffDialog>}
 
       <div className={styles.toolbar}>
         {view === 'calendar' && <Button tone="staff" variant="secondary" onClick={() => {
-          const earliest = day.marketDay.isToday ? Math.max(nowHour, day.marketDay.openHour) : day.marketDay.openHour
-          for (let start = Math.ceil(earliest * 4) / 4; start + 1 <= day.marketDay.closeHour; start += .25) {
+          const earliest = day.marketDay.isToday ? Math.max(nowHour, paintOpen) : paintOpen
+          for (let start = Math.ceil(earliest * 4) / 4; start + 1 <= paintClose; start += .25) {
             if (!newSlotProblem(start, start + 1)) { proposeNew(start, start + 1); return }
           }
           setMoveError('No free hour on this day. Choose another day or move a session.')
@@ -473,7 +483,7 @@ export function AgendaPage() {
           {moveError ? <p role="alert">{moveError}</p> : null}
           <div className={styles.moveActions}>
             <Button tone="staff" variant="ghost" onClick={() => { setMoveProposal(null); setMoveError('') }} disabled={moving}>
-              Cancel
+              Not yet
             </Button>
             <Button tone="staff" onClick={confirmMove} disabled={moving}>
               {moving ? 'Saving…' : 'Save move'}
@@ -484,7 +494,7 @@ export function AgendaPage() {
 
       {[...slotLayout.values()].some(layout => layout.lanes > 1) && <p className={styles.moveError} role="status">Overlapping sessions are shown side by side. Review the schedule.</p>}
       <div className={styles.workspace}>
-        {view === 'list' ? <AgendaSessionList slots={day.slots} days={marketDays} selectedId={selectedBlockId} onOpen={openOrder} /> : <div>
+        {view === 'list' ? <AgendaSessionList slots={day.slots} selectedId={selectedBlockId} onOpen={openOrder} /> : <div>
           <div className={styles.board}>
             <div className={styles.hours}>
               {hours.map((h) => (
@@ -507,7 +517,7 @@ export function AgendaPage() {
               {hours.map((h) => (
                 <div key={h} className={styles.gridline} />
               ))}
-              {day.marketDay.isToday && nowHour >= day.marketDay.openHour && nowHour <= day.marketDay.closeHour ? (
+              {day.marketDay.isToday && nowHour >= paintOpen && nowHour <= paintClose ? (
                 <div
                   className={styles.now}
                   role="img"
@@ -528,11 +538,11 @@ export function AgendaPage() {
                 </div>
               ) : null}
               {boardSlots.map((slot) => {
-                const name = slot.held ? 'Held by web checkout' : slot.item?.petName || slot.customer?.name || 'Block'
+                const name = slot.held ? 'Held by web checkout' : slot.item?.petName || (slot.item?.kind === 'custom' ? 'Custom ornament' : 'Paint session')
                 const range = `${formatHour(slot.block.startHour)}–${formatHour(slot.block.endHour)}`
                 const code = slot.order?.code
                 const handoff = slot.item ? handoffLabel(slot.item, marketDays) : null
-                const tone = slot.held ? 'held' : slot.order?.handedOver ? 'delivered' : slot.block.status
+                const tone = slot.held ? 'held' : (slot.item?.handedOver ?? slot.order?.handedOver) ? 'delivered' : slot.block.status
                 const slotHeight = (slot.block.endHour - slot.block.startHour) * HOUR_H - 4
                 // Three lines need about 4.75rem (76px at 16px); shorter blocks get one line instead of overlapping text.
                 const compact = slotHeight < 4.75 * REM
@@ -546,7 +556,7 @@ export function AgendaPage() {
                     data-held={slot.held || undefined}
                     disabled={slot.held}
                     data-slot-id={slot.block.id}
-                    data-movable={!slot.held && slot.block.status === 'not_started' && !slot.order?.handedOver ? 'true' : 'false'}
+                    data-movable={!slot.held && slot.block.status === 'not_started' && !(slot.item?.handedOver ?? slot.order?.handedOver) ? 'true' : 'false'}
                     data-status={tone}
                     data-selected={selectedBlockId === slot.block.id ? 'true' : 'false'}
                     aria-pressed={selectedBlockId === slot.block.id}
@@ -560,11 +570,10 @@ export function AgendaPage() {
                     data-compact={compact || undefined}
                     onClick={() => openOrder(slot)}
                   >
-                    {compact ? <span className={styles.slotLine}><strong>{name}</strong> · {range} · {statusLabel}</span> : <>
+                    {compact ? <><strong>{name}</strong><span className={styles.slotRange}><StaffText>{`${code} · ${statusLabel}`}</StaffText></span></> : <>
                       <strong>{name}</strong>
                       <span className={styles.slotRange}>
-                        {range}
-                        {code ? ` · ${code}` : ''}
+                        <StaffText>{`${range}${code ? ` · ${code}` : ''}`}</StaffText>
                       </span>
                       <span className={styles.slotHandoff}>{statusLabel}</span>
                     </>}
@@ -587,7 +596,7 @@ export function AgendaPage() {
               {moveError && <p role="alert">{moveError}</p>}
               <div className={styles.moveActions}>
                 <Button tone="staff" variant="ghost" onClick={() => setNewProposal(null)}>
-                  Cancel
+                  Not yet
                 </Button>
                 <Button tone="staff" onClick={startSaleFromProposal}>
                   {placeItem ? 'Use this time' : 'Start sale'}
@@ -604,9 +613,6 @@ export function AgendaPage() {
               All deliveries
             </ButtonLink>
           </div>
-          <p className={styles.sideMeta}>
-            {marketDeliveries.length} {marketDeliveries.length === 1 ? 'pickup' : 'pickups'} · {viennaDeliveries.length} home {viennaDeliveries.length === 1 ? 'delivery' : 'deliveries'}
-          </p>
           {marketDeliveries.length === 0 && viennaDeliveries.length === 0 ? (
             <p className={styles.sideMeta}>No deliveries for this day.</p>
           ) : null}

@@ -88,33 +88,6 @@
 
 .buyBtn { border-color: var(--snow-2); }
 
-/**
- * Short portrait phones: trade title size, gaps and stall height so the copy, both CTAs *and* the
- * footer line all stay on screen without a scroll.
- */
-@media (max-height: 700px) and (max-width: 559px) {
-  .hero {
-    gap: 4px;
-    padding: 2px 14px 4px;
-  }
-
-  .title {
-    font-size: 2.1rem;
-  }
-
-  .subtitle {
-    font-size: 1rem;
-  }
-
-  .clock {
-    margin-top: 4px;
-  }
-
-  .hero {
-    --stall-w: min(520px, 88vw, calc((100svh - 380px) * 1.08));
-  }
-}
-
 @media (min-width: 720px) {
   .ctas {
     flex-direction: row;
@@ -197,6 +170,25 @@
     max-width: 440px;
     align-self: start;
   }
+}
+
+/* One height budget for every portrait phone, including wide phones with Safari chrome. */
+@media (max-width: 767px) {
+  .hero {
+    --stall-w: max(var(--size-home-stall-min), min(var(--size-home-stall-max), 88vw, calc((100svh - var(--layout-home-reserve)) * 1.08)));
+    display: flex;
+    flex: none;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-4) var(--space-3);
+  }
+  .copyTop { align-items: center; align-self: auto; }
+  .stage { width: 100%; align-self: auto; }
+  .stage > :last-child { display: block; }
+  .title { font-size: clamp(var(--type-home-title-min), 10vw, var(--type-home-title-max)); }
+  .subtitle { font-size: var(--type-body-size); }
+  .clock { margin-top: var(--space-2); }
+  .ctas { flex-direction: column; width: min(var(--size-home-ctas), 100%); gap: var(--space-3); align-self: auto; }
+  .ctas > * { min-width: 0; white-space: normal; }
 }
 
 @keyframes dropIn {

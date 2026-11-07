@@ -1,4 +1,5 @@
 import { paymentSummary } from '../../lib/paymentSummary'
+import { filterSales } from '../../lib/sales'
 import { readFormToken, rememberFormToken } from '../formTokens'
 import type {
   InventoryItem, PaintingDay, ShopCheckoutInput,
@@ -111,6 +112,16 @@ export function getStoreVersion(): number {
 
 ensureDemoSeed()
 
+// The customer can submit the QR form in another tab while the staff screen stays open.
+if (typeof window !== 'undefined') window.addEventListener('storage', event => {
+  if (event.key !== STORAGE_KEY) return
+  const stored = readStored()
+  if (!stored) return
+  state = stored
+  version += 1
+  listeners.forEach(listener => listener())
+})
+
 export function resetStore() {
   try {
     for (const key of Object.keys(localStorage)) {
@@ -142,11 +153,17 @@ function dayByDate(date: string, marketId?: string): MarketDay | undefined {
   if (!rows.length) {
     const home = state.markets.find(m => m.kind === 'home')
     if (!home || (marketId && marketId !== home.id)) return undefined
-    return { id: `home-${date}`, marketId: home.id, date, openHour: 10, closeHour: 13, isToday: false }
+    return { id: `home-${date}`, marketId: home.id, date, openHour: 10, closeHour: [3, 5].includes(utcWeekday(date)) ? 12 : 13, isToday: false }
   }
   if (marketId) return rows[0]
   const rank = (day: MarketDay) => (state.markets.find((m) => m.id === day.marketId)?.kind === 'market' ? 0 : 1)
   return rows.slice().sort((a, b) => rank(a) - rank(b))[0]
+}
+
+function blocksForDate(date: string): TimeBlock[] {
+  const ids = new Set(state.marketDays.filter(day => day.date === date).map(day => day.id))
+  ids.add(`home-${date}`)
+  return state.blocks.filter(block => ids.has(block.marketDayId)).sort((a, b) => a.startHour - b.startHour)
 }
 
 function blocksForDay(dayId: string): TimeBlock[] {
@@ -180,11 +197,13 @@ export function paintingDay(date: string): PaintingDay {
   const settings = state.paintingDays?.[date] ?? { open: true, maxPaintings: 2 }
   const ids = new Set(state.marketDays.filter(day => day.date === date).map(day => day.id))
   const booked = state.blocks.filter(block => ids.has(block.marketDayId) && state.items.some(item => item.id === block.orderItemId && item.kind === 'custom')).length
-  return { date, ...settings, booked }
+  const day = dayByDate(date)
+  return { date, ...settings, booked, openHour: settings.openHour ?? day?.openHour ?? 10, closeHour: settings.closeHour ?? day?.closeHour ?? ([3, 5].includes(utcWeekday(date)) ? 12 : 13) }
 }
-export function updatePaintingDay(date: string, open: boolean, maxPaintings: number): PaintingDay {
+export function updatePaintingDay(date: string, open: boolean, maxPaintings: number, hours?: { openHour: number; closeHour: number }): PaintingDay {
   if (!Number.isInteger(maxPaintings) || maxPaintings < 0 || maxPaintings > 10) throw new Error('Maximum must be between 0 and 10.')
-  state.paintingDays ??= {}; state.paintingDays[date] = { open, maxPaintings }; emit(); return paintingDay(date)
+  if (hours && (!Number.isFinite(hours.openHour) || !Number.isFinite(hours.closeHour) || hours.openHour < 0 || hours.closeHour >= 24 || hours.openHour >= hours.closeHour || !Number.isInteger(hours.openHour * 4) || !Number.isInteger(hours.closeHour * 4))) throw new Error('Choose painting hours from 00:00 to 23:45 in 15-minute steps, with end after start.')
+  state.paintingDays ??= {}; state.paintingDays[date] = { ...state.paintingDays[date], open, maxPaintings, ...hours }; emit(); return paintingDay(date)
 }
 export function joinWaitlist(email: string) { const token = crypto.randomUUID(); (state.waitlistTokens ??= {})[token] = { email: email.toLowerCase(), confirmed: false }; emit() }
 export function confirmWaitlist(token: string) { const entry = state.waitlistTokens?.[token]; if (!entry) throw Object.assign(new Error('Unknown token'), { status: 404 }); entry.confirmed = true; state.waitlist ??= []; if (!state.waitlist.includes(entry.email)) state.waitlist.push(entry.email); emit() }
@@ -213,10 +232,10 @@ export function findFreeSlot(
   }
   const floor =
     day.isToday && afterHour == null
-      ? Math.max(day.openHour, DEMO_NOW_HOUR)
-      : Math.max(day.openHour, afterHour ?? day.openHour)
+      ? Math.max(setting.openHour, DEMO_NOW_HOUR)
+      : Math.max(setting.openHour, afterHour ?? setting.openHour)
   const busy = [
-    ...blocksForDay(day.id).filter((block) => block.id !== ignoreBlockId),
+    ...blocksForDate(date).filter((block) => block.id !== ignoreBlockId),
     ...extraBusy.map((b, i) => ({
       id: `draft-${i}`,
       marketDayId: day.id,
@@ -226,7 +245,7 @@ export function findFreeSlot(
       status: 'not_started' as const,
     })),
   ].sort((a, b) => a.startHour - b.startHour)
-  const ceiling = Math.min(day.closeHour, beforeHour ?? day.closeHour)
+  const ceiling = Math.min(setting.closeHour, beforeHour ?? setting.closeHour)
   let cursor = floor
   const tryPlace = (start: number): CapacityResult | null => {
     const end = start + durationHours
@@ -654,7 +673,7 @@ export function getAgendaDay(date: string): AgendaDay {
   return {
     marketDay,
     market,
-    slots: blocksForDay(marketDay.id).map(slotView).map(slot => slot.order?.checkoutStatus === 'pending' || slot.order?.checkoutStatus === 'review' || slot.order?.paymentReview ? { block: slot.block, held: true, order: null, item: null, customer: null } : slot),
+    slots: blocksForDate(marketDay.date).map(slotView).map(slot => slot.order?.checkoutStatus === 'pending' || slot.order?.checkoutStatus === 'review' || slot.order?.paymentReview ? { block: slot.block, held: true, order: null, item: null, customer: null } : slot),
     deliveries: deliveriesForDate(marketDay.date),
   }
 }
@@ -675,10 +694,11 @@ export function moveBlock(blockId: string, date: string, startHour: number) {
   const day = dayByDate(date)
   if (!day) throw new Error('No market day')
   const end = startHour + duration
-  if (startHour < day.openHour || end > day.closeHour) {
-    throw new Error('Outside market hours')
+  const hours = paintingDay(date)
+  if (startHour < hours.openHour || end > hours.closeHour) {
+    throw new Error('Outside painting hours')
   }
-  if (hasPaintOverlap(blocksForDay(day.id), startHour, end, blockId)) {
+  if (hasPaintOverlap(blocksForDate(date), startHour, end, blockId)) {
     throw new Error('That time overlaps another block')
   }
   if (day.isToday && startHour < DEMO_NOW_HOUR) {
@@ -797,11 +817,12 @@ export function createSale(input: CreateSaleInput): Order {
       }
       const md = dayByDate(row.paintDate, row.marketId) ?? dayByDate(row.paintDate)
       if (!md) throw new Error('Cannot place paint block: no market day')
-      const clashExisting = blocksForDay(md.id).some((b) =>
+      const clashExisting = blocksForDate(md.date).some((b) =>
         b.id !== moving?.id && hoursOverlap(row.paintStart!, row.paintEnd!, b.startHour, b.endHour),
       )
       const deliveryDay = state.marketDays.find((day) => day.id === row.marketDayId)
-      if (row.paintEnd <= row.paintStart || row.paintStart < md.openHour || row.paintEnd > md.closeHour ||
+      const hours = paintingDay(md.date)
+      if (row.paintEnd <= row.paintStart || row.paintStart < hours.openHour || row.paintEnd > hours.closeHour ||
         (md.isToday && row.paintStart < DEMO_NOW_HOUR) ||
         !deliveryDay || row.paintDate > deliveryDay.date ||
         (row.paintDate === deliveryDay.date && row.deliveryKind === 'market' && row.pickupHour != null && row.paintEnd > row.pickupHour) ||
@@ -1155,7 +1176,10 @@ export function searchOrders(query: string): import('../../domain/types').OrderS
 function orderSummary(order: Order): import('../../domain/types').OrderSummary {
   const bundle = getOrderBundle(order.id)
   const dates = bundle.items.map(item => item.delivery.deliveryDate ?? state.marketDays.find(day => day.id === item.delivery.marketDayId)?.date).filter((date): date is string => Boolean(date)).sort()
-  return { id: order.id, code: order.code, customerName: bundle.customer.name, phone: bundle.customer.phone, createdAt: order.createdAt, paymentState: order.paymentState, checkoutStatus: order.checkoutStatus ?? (order.paymentReview ? 'review' : null), total: order.total, items: bundle.items.length, nextHandoffDate: dates[0] ?? null, handedOver: order.handedOver }
+  return { id: order.id, code: order.code, customerName: bundle.customer.name, phone: bundle.customer.phone, createdAt: order.createdAt, paymentState: order.paymentState, checkoutStatus: order.checkoutStatus ?? (order.paymentReview ? 'review' : null), total: order.total, items: bundle.items.length, nextHandoffDate: dates[0] ?? null, handedOver: order.handedOver, source: order.source ?? 'stall', status: order.status ?? 'ACTIVE' }
+}
+export function listSales(filters: import('../../domain/types').SalesFilters): import('../../domain/types').SalesPage {
+  return filterSales(state.orders.map(orderSummary), filters)
 }
 export function attentionOrders() {
   return state.orders.filter(order => order.status !== 'CANCELLED' && (order.paymentReview || order.checkoutStatus === 'pending' || order.checkoutStatus === 'review')).map(orderSummary)

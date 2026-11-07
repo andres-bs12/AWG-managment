@@ -1,3 +1,4 @@
+import { StaffText } from '../../components/staff/StaffText'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { api } from '../../api/client'
 import type { PaintingDay } from '../../domain/types'
@@ -5,7 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { NumberStepper } from '../../components/staff/NumberStepper'
 import { StaffBackLink } from '../../components/staff/StaffBackLink'
 import { InsetNote } from '../../components/public/PublicForm'
-import { addUtcDays, formatDateLabel, utcWeekday } from '../../lib/time'
+import { addUtcDays, formatDateLabel, formatHour, parseHour, utcWeekday } from '../../lib/time'
 import { useStaffClock } from '../../lib/staffClock'
 import styles from './SettingsRows.module.css'
 
@@ -13,7 +14,7 @@ import styles from './SettingsRows.module.css'
  * Saves that failed after their row was gone (range change or leaving the page). They stay here for this
  * browser session, so the page can show them and retry instead of losing the edit silently.
  */
-type LostSave = { date: string; open: boolean; max: number; message: string }
+type LostSave = { date: string; open: boolean; max: number; openHour: number; closeHour: number; message: string }
 let lostSaves: LostSave[] = []
 const lostListeners = new Set<() => void>()
 function setLostSaves(next: LostSave[]) { lostSaves = next; lostListeners.forEach(listener => listener()) }
@@ -30,7 +31,7 @@ export function LostSaves({ onSaved }: { onSaved: () => void }) {
     for (const row of rows) {
       // A newer edit in the visible row replaces (and clears) this entry; never send the older value then.
       if (!lostSaves.includes(row)) continue
-      try { await api.paintingDays.update(row.date, row.open, row.max); if (lostSaves.includes(row)) clearLostSave(row.date) }
+      try { await api.paintingDays.update(row.date, row.open, row.max, { openHour: row.openHour, closeHour: row.closeHour }); if (lostSaves.includes(row)) clearLostSave(row.date) }
       catch (err) { if (lostSaves.includes(row)) recordLostSave({ ...row, message: err instanceof Error ? err.message : row.message }) }
     }
     setBusy(false)
@@ -72,7 +73,7 @@ export function PaintingDaysPage() {
   const weeks = Array.from({ length: Math.ceil(upcoming.length / 7) }, (_, index) => upcoming.slice(index * 7, index * 7 + 7))
   return <section className={styles.page}>
     <StaffBackLink to="/staff/agenda" label="Agenda" /><h1>Painting days</h1>
-    <InsetNote><p>These limits apply to automatic suggestions, including stall days. Manual moves and sales may exceed them. Changes save automatically. Weekday and stall defaults are awaiting the owner's decision.</p></InsetNote>
+    <InsetNote><p>Hours and limits apply to automatic suggestions. Manual bookings stay in the agenda. Changes save automatically.</p></InsetNote>
     <nav className={styles.range} aria-label="Painting day ranges"><Button tone="staff" variant="secondary" disabled={offset === 0 || loading} onClick={() => { setLoading(true); setOffset(n => n - 1) }}>Previous 4 weeks</Button><Button tone="staff" variant="secondary" disabled={!seasonEnd || to >= seasonEnd || loading} onClick={() => { setLoading(true); setOffset(n => n + 1) }}>Next 4 weeks</Button></nav>
     <LostSaves onSaved={() => setRetry(n => n + 1)} />
     {loading && <p role="status">Loading painting days…</p>}
@@ -82,17 +83,19 @@ export function PaintingDaysPage() {
   </section>
 }
 /** One compact row per day. Every change saves on its own (toggles at once, typed numbers after a pause), in order. */
-export function DayRow({ day }: { day: PaintingDay }) {
+export function DayRow({ day, showDate = true, onSaved }: { day: PaintingDay; showDate?: boolean; onSaved?: (day: PaintingDay) => void }) {
+  const [start, setStart] = useState(formatHour(day.openHour))
+  const [end, setEnd] = useState(formatHour(day.closeHour))
   const [open, setOpen] = useState(day.open)
   const [max, setMax] = useState(String(day.maxPaintings))
   const [booked, setBooked] = useState(day.booked)
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [error, setError] = useState('')
   // `latest` is what the screen shows; `queue` waits to be sent; `running` guards one request at a time.
-  const latest = useRef({ open: day.open, max: day.maxPaintings })
+  const latest = useRef({ open: day.open, max: day.maxPaintings, openHour: day.openHour, closeHour: day.closeHour })
   // Every edit, valid or not, bumps the revision; a response only applies to the revision it was sent for.
   const revision = useRef(0)
-  const queue = useRef<{ open: boolean; max: number; revision: number } | null>(null)
+  const queue = useRef<{ open: boolean; max: number; openHour: number; closeHour: number; revision: number } | null>(null)
   const running = useRef(false)
   const timer = useRef<number | undefined>(undefined)
   const flushRef = useRef<() => void>(() => {})
@@ -107,16 +110,17 @@ export function DayRow({ day }: { day: PaintingDay }) {
         queue.current = null
         setState('saving'); setError('')
         try {
-          const result = await api.paintingDays.update(day.date, next.open, next.max)
+          const result = await api.paintingDays.update(day.date, next.open, next.max, { openHour: next.openHour, closeHour: next.closeHour })
           clearLostSave(day.date)
+          onSaved?.(result)
           setBooked(result.booked)
           // Only reflect the server when nothing newer was typed meanwhile.
           if (next.revision !== revision.current) continue
-          setOpen(result.open); setMax(String(result.maxPaintings)); latest.current = { open: result.open, max: result.maxPaintings }
+          setOpen(result.open); setMax(String(result.maxPaintings)); setStart(formatHour(result.openHour)); setEnd(formatHour(result.closeHour)); latest.current = { open: result.open, max: result.maxPaintings, openHour: result.openHour, closeHour: result.closeHour }
           setState(queue.current || timer.current !== undefined ? 'saving' : 'saved')
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Could not save day.'
-          if (!mounted.current) { recordLostSave({ date: day.date, open: next.open, max: next.max, message }); continue }
+          if (!mounted.current) { recordLostSave({ date: day.date, open: next.open, max: next.max, openHour: next.openHour, closeHour: next.closeHour, message }); continue }
           if (next.revision !== revision.current) continue
           setError(message); setState('error')
         }
@@ -132,14 +136,17 @@ export function DayRow({ day }: { day: PaintingDay }) {
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => { timer.current = undefined; queue.current = { ...latest.current, revision: revision.current }; void flush() }, wait)
   }
-  function change(nextOpen: boolean, nextMax: string, wait: number) {
-    setOpen(nextOpen); setMax(nextMax)
+  function change(nextOpen: boolean, nextMax: string, wait: number, nextStart = start, nextEnd = end) {
+    setOpen(nextOpen); setMax(nextMax); setStart(nextStart); setEnd(nextEnd)
     revision.current += 1
+    queue.current = null
     clearLostSave(day.date)
     window.clearTimeout(timer.current); timer.current = undefined
     const number = Number(nextMax)
     if (nextMax.trim() === '' || !Number.isInteger(number) || number < 0 || number > 10) { setError('Enter a whole number from 0 to 10.'); setState('error'); return }
-    latest.current = { open: nextOpen, max: number }
+    const openHour = parseHour(nextStart), closeHour = parseHour(nextEnd)
+    if (!nextStart || !nextEnd || !Number.isFinite(openHour) || !Number.isFinite(closeHour) || openHour < 0 || closeHour >= 24 || openHour >= closeHour || !Number.isInteger(openHour * 4) || !Number.isInteger(closeHour * 4)) { setError('Choose painting hours from 00:00 to 23:45 in 15-minute steps, with end after start.'); setState('error'); return }
+    latest.current = { open: nextOpen, max: number, openHour, closeHour }
     setError(''); setState('saving')
     send(wait)
   }
@@ -147,10 +154,14 @@ export function DayRow({ day }: { day: PaintingDay }) {
   const limit = Number(max)
   const over = Number.isFinite(limit) && booked > (open ? limit : 0)
   return <article className={styles.dayRow}>
-    <div className={styles.name}><h3>{label}</h3><p data-over={over || undefined}>{booked}/{open ? max : 0} booked{over ? ' · Over limit; existing bookings remain' : ''}{!open ? ' · Closed' : ''}</p></div>
+    <div className={styles.name}>{showDate && <h3>{label}</h3>}<p data-over={over || undefined}><StaffText>{`${booked}/${open ? max : 0} booked${over ? ' · Over limit; existing bookings remain' : ''}${!open ? ' · Closed' : ''}`}</StaffText></p></div>
     <label className={styles.toggle}><input type="checkbox" role="switch" checked={open} onChange={event => change(event.target.checked, max, 0)} /> Open<span className="visually-hidden">, {label}</span></label>
     <NumberStepper label={`Max paintings for ${label}`} value={max} onChange={value => change(open, value, 400)} max={10} disabled={!open} />
+    <div className={styles.hours}>
+      <label htmlFor={`paint-start-${day.date}`}>Start<input id={`paint-start-${day.date}`} type="time" step="900" value={start} disabled={!open} aria-label={`Painting starts ${label}`} onChange={event => change(open, max, 400, event.target.value, end)} /></label>
+      <label htmlFor={`paint-end-${day.date}`}>End<input id={`paint-end-${day.date}`} type="time" step="900" value={end} disabled={!open} aria-label={`Painting ends ${label}`} onChange={event => change(open, max, 400, start, event.target.value)} /></label>
+    </div>
     <p className={styles.saveState} role="status">{state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : ''}</p>
-    {error && <p className={styles.error} role="alert">{error}{state === 'error' && error !== 'Enter a whole number from 0 to 10.' ? <> <Button tone="staff" variant="secondary" onClick={() => send(0)}>Retry</Button></> : null}</p>}
+    {error && <p className={styles.error} role="alert">{error}{state === 'error' && error !== 'Enter a whole number from 0 to 10.' && !error.startsWith('Choose painting hours') ? <> <Button tone="staff" variant="secondary" onClick={() => send(0)}>Retry</Button></> : null}</p>}
   </article>
 }

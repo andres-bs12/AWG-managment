@@ -22,3 +22,12 @@ export function ReviewThumbs({ photos, alt }: { photos: { id: string; dataUrl: s
   if (!photos.length) return null
   return <div className={styles.thumbs}>{photos.map((photo, index) => <img key={photo.id} src={photo.dataUrl} alt={alt(index)} />)}</div>
 }
+
+/** Shared product row: ornament, stacked details/reference photos, then the top-aligned price. */
+export function ReviewProduct({ preview, price, children }: { preview: ReactNode; price: ReactNode; children: ReactNode }) {
+  return <div className={styles.product} data-review-product>
+    <div className={styles.preview}>{preview}</div>
+    <div className={styles.details}>{children}</div>
+    <strong className={styles.price}>{price}</strong>
+  </div>
+}

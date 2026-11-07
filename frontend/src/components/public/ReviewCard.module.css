@@ -1,4 +1,4 @@
-.card { display: grid; gap: var(--space-4); margin-bottom: var(--space-4); padding: var(--space-4); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-raised); color: var(--color-text); }
+.card { display: grid; gap: var(--space-4); margin: 0; padding: var(--space-4); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-raised); color: var(--color-text); }
 /* Title and its single Edit share one row; the button keeps a 44px target without growing the card
    (negative margins equal to its own padding keep the text aligned to the card's inner edge). */
 .header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: var(--touch); margin-block: calc((var(--type-h3-line) * var(--type-h3-size) - var(--touch)) / 2); }
@@ -17,6 +17,12 @@
   .row { grid-template-columns: subgrid; grid-column: 1 / -1; align-items: baseline; gap: 0; }
   .row dt { font-size: var(--type-body-size); line-height: var(--type-body-line); }
 }
-.thumbs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.thumbs img { width: var(--size-review-art); height: var(--size-review-art); border-radius: var(--radius-small); object-fit: cover; }
+.thumbs { display: flex; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.thumbs img { width: var(--size-review-art); max-width: 100%; height: auto; aspect-ratio: 1; border-radius: var(--radius-small); object-fit: cover; }
+.product { display: grid; grid-template-columns: var(--size-review-art) minmax(0, 1fr) max-content; gap: var(--space-3); align-items: start; min-width: 0; }
+.preview { width: var(--size-review-art); }
+.details { display: grid; gap: var(--space-3); min-width: 0; }
+.details p, .details dl, .details dd { margin: 0; overflow-wrap: anywhere; }
+.details dt { color: var(--color-text-muted); font-size: var(--type-hint-size); }
+.price { white-space: nowrap; font-variant-numeric: tabular-nums lining-nums; font-weight: var(--type-label-weight); }
 @media (min-width: 768px) { .card { padding: var(--space-5); } }

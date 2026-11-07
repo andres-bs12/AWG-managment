@@ -59,6 +59,20 @@ public class AgendaService {
             return rule == null ? defaultMaxPaintings : rule.getMaxPaintings();
         }
 
+        double paintingOpenHour(LocalDate date) {
+            var rule = paintingDays.get(date);
+            if (rule != null && rule.getOpenHour() != null) return rule.getOpenHour();
+            return index.dayByDate(date).map(day -> Hours.of(day.getOpenTime()))
+                    .orElseGet(() -> Hours.of(CalendarRules.homePaintHours(date)[0]));
+        }
+
+        double paintingCloseHour(LocalDate date) {
+            var rule = paintingDays.get(date);
+            if (rule != null && rule.getCloseHour() != null) return rule.getCloseHour();
+            return index.dayByDate(date).map(day -> Hours.of(day.getCloseTime()))
+                    .orElseGet(() -> Hours.of(CalendarRules.homePaintHours(date)[1]));
+        }
+
         List<Busy> busyOn(LocalDate date, String ignoreId) {
             return items.stream()
                     .filter(i -> i.getPaintStart() != null && i.getPaintStart().toLocalDate().equals(date))
@@ -172,8 +186,8 @@ public class AgendaService {
         Optional<MarketDay> found = index.dayByDate(date, marketId).or(() -> index.dayByDate(date));
         if (found.isEmpty()) return new CapacityResultDto(false, null, 0, "No market day on that date.");
         MarketDay day = found.get();
-        double open = Hours.of(day.getOpenTime());
-        double close = Hours.of(day.getCloseTime());
+        double open = s.paintingOpenHour(date);
+        double close = s.paintingCloseHour(date);
         double floor = index.isToday(day) && afterHour == null
                 ? Math.max(open, index.nowHour())
                 : Math.max(open, afterHour == null ? open : afterHour);
@@ -221,6 +235,7 @@ public class AgendaService {
         Optional<MarketDay> target = index.dayByDate(date);
         LocalDate todayDate = index.todayDay().map(MarketDay::getDate).orElse(index.today());
         if (target.isEmpty() || date.isAfter(handoffDate) || date.isBefore(todayDate) || duration <= 0) return null;
+        if (!s.paintingOpen(date) || s.paintingsOn(date, null) > s.maxPaintings(date)) return null;
         MarketDay targetDay = target.get();
 
         List<OrderItem> onDay = s.items().stream()
@@ -232,6 +247,7 @@ public class AgendaService {
             double end = Hours.of(item.getPaintEnd().toLocalTime());
             double blockDuration = end - start;
             if (blockDuration + Hours.EPS < duration) continue;
+            if (start < s.paintingOpenHour(date) - Hours.EPS || start + duration > s.paintingCloseHour(date) + Hours.EPS) continue;
             if (beforeHour != null && start + duration > beforeHour + Hours.EPS) continue;
             if (item.getProductionStatus() != ProductionStatus.NOT_STARTED || item.getOrder().isUnconfirmedWeb()) continue;
             if (index.isToday(targetDay) && start < index.nowHour()) continue;
@@ -271,8 +287,8 @@ public class AgendaService {
         MarketDay day = index.dayByDate(date).orElseThrow(() -> new BadRequestException("No market day"));
         double start = Hours.snap(startHour);
         double end = start + duration;
-        if (start < Hours.of(day.getOpenTime()) - Hours.EPS || end > Hours.of(day.getCloseTime()) + Hours.EPS) {
-            throw new BadRequestException("Outside market hours");
+        if (start < s.paintingOpenHour(date) - Hours.EPS || end > s.paintingCloseHour(date) + Hours.EPS) {
+            throw new BadRequestException("Outside painting hours");
         }
         if (s.busyOn(date, blockId.toString()).stream().anyMatch(b -> Hours.overlap(start, end, b.start(), b.end()))) {
             throw new ConflictException("That time overlaps another block");

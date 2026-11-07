@@ -1,3 +1,4 @@
+import { reconcilePetName } from './paintedName.ts'
 import type { OrnamentColor, CustomFinish, DeliveryKind, Photo } from '../domain/types'
 
 export const BUY_DRAFT_KEY = 'awg-buy-draft'
@@ -42,11 +43,13 @@ export function loadBuyDraft(): BuyDraft {
     const raw = sessionStorage.getItem(BUY_DRAFT_KEY)
     if (!raw) return emptyDraft()
     const parsed = JSON.parse(raw) as Partial<BuyDraft>
-    const items = Array.isArray(parsed.items) ? parsed.items.filter((item) => item && typeof item.uid === 'string' && (!('kind' in item) || item.kind === 'custom')).map((item) => ({
+    // Older drafts carried a screen index that was never restored.
+    const { buyStep: _obsoleteStep, ...values } = parsed as Partial<BuyDraft> & { buyStep?: number }
+    const items = Array.isArray(parsed.items) ? parsed.items.filter((item) => item && typeof item.uid === 'string' && (!('kind' in item) || item.kind === 'custom')).map((item) => reconcilePetName({
         ...newItem(), ...item, color: ['red', 'green', 'beige'].includes(item.color) && item.finish ? item.color : '', finish: ['red', 'green', 'beige'].includes(item.color) && (item.finish === 'shiny' || item.finish === 'matte') ? item.finish : '' as const, photos: [], photosNeedReload: !!item.photosNeedReload || (Array.isArray(item.photos) && item.photos.length > 0),
       })) : []
     return {
-      ...emptyDraft(), ...parsed,
+      ...emptyDraft(), ...values,
       items: items.length ? items : [newItem()],
       deliveryKind: parsed.deliveryKind === 'market' ? 'market' : 'vienna',
       pickupTime: typeof parsed.pickupTime === 'string' && /^\d{2}:\d{2}$/.test(parsed.pickupTime) ? parsed.pickupTime : '',
@@ -59,8 +62,9 @@ export function loadBuyDraft(): BuyDraft {
 
 export function saveBuyDraft(draft: BuyDraft): boolean {
   try {
+    const { buyStep: _obsoleteStep, ...values } = draft as BuyDraft & { buyStep?: number }
     sessionStorage.setItem(BUY_DRAFT_KEY, JSON.stringify({
-      ...draft, acceptTerms: false,
+      ...values, acceptTerms: false,
       items: draft.items.map((item) => ({ ...item, photos: [], photosNeedReload: item.photosNeedReload || item.photos.length > 0 })),
     }))
     return true

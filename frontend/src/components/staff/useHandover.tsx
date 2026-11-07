@@ -9,7 +9,7 @@ import { StaffDialog } from './StaffDialog'
 
 type Bundle = Awaited<ReturnType<typeof api.orders.getOrderBundle>>
 type Pending = { bundle: Bundle; target: boolean; itemId?: string }
-export function useHandover(onChanged: () => Promise<unknown> | void, onError: (message: string) => void) {
+export function useHandover(onChanged: (change: { orderId: string; code: string; target: boolean; itemIds: string[] }) => Promise<unknown> | void, onError: (message: string) => void) {
   const lock = useRef(false)
   const [busy, setBusy] = useState(false)
   const [pending, setPending] = useState<Pending | null>(null)
@@ -29,11 +29,11 @@ export function useHandover(onChanged: () => Promise<unknown> | void, onError: (
       if (collect) await api.payments.setPaymentState(pending.bundle.order.id, 'paid', method)
       await api.orders.setHandedOver(pending.bundle.order.id, pending.target, ids)
       setPending(null)
-      await onChanged()
+      await onChanged({ orderId: pending.bundle.order.id, code: pending.bundle.order.code, target: pending.target, itemIds: ids })
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not update handover.') }
     finally { lock.current = false; setBusy(false) }
   }
-  async function request(id: string, target: boolean, itemId?: string) {
+  async function request(id: string, target: boolean, itemId?: string, initialIds?: string[]) {
     if (lock.current) return
     trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     lock.current = true; setBusy(true); onError('')
@@ -43,7 +43,9 @@ export function useHandover(onChanged: () => Promise<unknown> | void, onError: (
       const eligible = bundle.items.filter(item => (item.handedOver ?? bundle.order.handedOver) !== target && (!target || item.productionStatus === 'finished'))
       if (itemId && !eligible.some(item => item.id === itemId)) throw new Error('This ornament cannot be updated.')
       if (!eligible.length) throw new Error('There are no eligible ornaments to update.')
-      setSelected(itemId ? [itemId] : eligible.map(item => item.id))
+      const initial = itemId ? [itemId] : eligible.filter(item => !initialIds || initialIds.includes(item.id)).map(item => item.id)
+      if (!initial.length) throw new Error('There are no eligible ornaments in these filters.')
+      setSelected(initial)
       setPending({ bundle, target, itemId }); setMethod(bundle.order.paymentMethod ?? null); setError('')
     } catch (err) { onError(err instanceof Error ? err.message : 'Could not check order.') }
     finally { lock.current = false; setBusy(false) }

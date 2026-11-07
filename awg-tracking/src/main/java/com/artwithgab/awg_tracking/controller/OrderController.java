@@ -16,6 +16,17 @@ import java.util.UUID;
 public class OrderController {
     private final OrderService orderService;
 
+    @GetMapping(params = "!code")
+    public SalesPageDto list(@RequestParam(required = false) String state,
+                             @RequestParam(required = false) String source,
+                             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+                             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+                             @RequestParam(defaultValue = "0") int page,
+                             @RequestParam(defaultValue = "20") int size,
+                             @RequestParam(required = false) String query) {
+        return orderService.listSales(state, source, from, to, page, size, query);
+    }
+
     @GetMapping(params = "code")
     public OrderDto byCode(@RequestParam String code) {
         return orderService.getOrderByCode(code);

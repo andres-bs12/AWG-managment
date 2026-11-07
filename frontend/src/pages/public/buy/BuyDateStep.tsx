@@ -1,3 +1,4 @@
+import { DeliveryIcon } from '../../../components/public/DeliveryIcon'
 import { useLayoutEffect, useRef, useState } from 'react'
 import styles from '../BuyPage.module.css'
 import { pickupTimes, type BuyStepProps } from './shared'
@@ -28,15 +29,17 @@ export function BuyDateStep(props: Props) {
     { kind: 'vienna', title: t('methodVienna'), detail: t('methodViennaDetail', { fee: config.deliveryFee ? formatEur(config.deliveryFee, locale) : t('shopFree') }) },
     { kind: 'market', title: t('methodMarket'), detail: t('methodMarketDetail') },
   ]
-  return <>
+  return <div className={styles.deliverySections}>
     <fieldset className={styles.methodGroup}><legend className={styles.groupLegend}>{t('deliveryMethod')}</legend>
       <div className={styles.choiceCards}>{methods.map(method => <label key={method.kind} className={styles.choiceCard} data-selected={draft.deliveryKind === method.kind}>
         <input className={styles.choiceInput} type="radio" name="delivery-kind" value={method.kind} checked={draft.deliveryKind === method.kind} onChange={() => choose(method.kind)} />
-        <strong>{method.title}</strong><span>{method.detail}</span>
+        <span className={styles.identifiedCard}><DeliveryIcon kind={method.kind} /><span><strong>{method.title}</strong><span>{method.detail}</span>{method.kind === 'vienna' && <span>{t('shopDateLead')}</span>}</span></span>
       </label>)}</div>
     </fieldset>
-    {draft.deliveryKind === 'market' ? <PickupSection {...props} /> : <ViennaSection {...props} />}
-  </>
+    <section className={styles.dateSection} aria-labelledby="delivery-when"><h3 id="delivery-when">{t('deliveryWhen')}</h3>
+    <div className={styles.dateBody}>{draft.deliveryKind === 'market' ? <PickupSection {...props} /> : <ViennaSection {...props} />}</div>
+    </section>
+  </div>
 }
 
 function SelectedDate({ label, value, placeholder }: { label: string; value: string; placeholder: string }) {
@@ -64,11 +67,10 @@ function ViennaSection({ t, draft, dates, datesState, setDatesRetry, patch, form
   const earliest = sorted[0]
   const months = [...new Set(sorted.map(d => d.date.slice(0, 7)))]
   return <>
-    <p className={styles.sectionLead}>{t('shopDateLead')}</p>
     <p className={styles.muted} role="status" hidden={datesState === 'ready' && dates.length > 0}>{datesState === 'loading' ? t('shopDatesLoading') : datesState === 'error' ? t('shopDatesError') : datesState === 'ready' && !dates.length ? t('shopDatesNone') : ''}</p>
     {datesState === 'error' && <Button variant="secondary" onClick={() => setDatesRetry(value => value + 1)}>{t('shopRetry')}</Button>}
     {(datesState === 'loading' || datesState === 'idle') && <div className={styles.dateCards} aria-hidden="true"><div className={styles.dateSkeleton} /></div>}
-    {datesState === 'ready' && earliest && <div className={styles.dateCards}><button type="button" className={styles.dateCard} data-selected={draft.deliveryDate === earliest.date} data-earliest aria-pressed={draft.deliveryDate === earliest.date} onClick={() => patch({ deliveryDate: earliest.date })}><small>{t('earliestDate')}</small><span>{compactDate(earliest.date)} · {t('eveningShort')}</span></button></div>}
+    {datesState === 'ready' && earliest && <div className={styles.dateCards}><button type="button" className={styles.dateCard} data-selected={draft.deliveryDate === earliest.date} data-earliest aria-pressed={draft.deliveryDate === earliest.date} onClick={() => patch({ deliveryDate: earliest.date })}><span className={styles.identifiedCard}><DeliveryIcon kind="date" /><span><small>{t('earliestDate')}</small><span>{compactDate(earliest.date)} · {t('eveningShort')}</span></span></span></button></div>}
     <fieldset ref={calendar} id="buy-date" tabIndex={-1} className={styles.calendarField} aria-busy={datesState === 'loading'} aria-describedby={described('buy-date')}><legend className="visually-hidden">{t('shopStepDate')}</legend>
       {datesState === 'ready' && months.map(month => { const first = new Date(`${month}-01T12:00:00`); const offset = (first.getDay() + 6) % 7; const count = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate(); return <div key={month}><h3>{new Intl.DateTimeFormat(lang, { month: 'long', year: 'numeric' }).format(first)}</h3><div className={styles.calendar} data-list={list}>{Array.from({ length: 7 }, (_, i) => <span key={`w${i}`} className={styles.weekday}>{new Intl.DateTimeFormat(lang, { weekday: 'short' }).format(new Date(2026, 10, 2 + i))}</span>)}{Array.from({ length: offset }, (_, i) => <span key={`blank${i}`} />)}{Array.from({ length: count }, (_, i) => { const date = `${month}-${String(i + 1).padStart(2, '0')}`; const available = dates.some(d => d.date === date); return available ? <label key={date} className={styles.day} data-selected={draft.deliveryDate === date}><input className={styles.choiceInput} type="radio" name="delivery-date" aria-label={formatDate(date)} checked={draft.deliveryDate === date} onChange={() => patch({ deliveryDate: date })} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); patch({ deliveryDate: date }) } }} /><span className={styles.dayNumber}>{i + 1}</span><span className={styles.dayFull}>{formatDate(date)}</span></label> : <span key={date} className={styles.unavailable}>{i + 1}</span> })}</div></div> })}
     </fieldset>

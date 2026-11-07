@@ -6,31 +6,37 @@ import styles from './ContactFields.module.css'
 export type ContactValues = { customerName: string; email: string; phone: string; line1: string; line2: string; postalCode: string; city?: string }
 
 /** Shared contact/address composition; QR forms retain the server's address city. */
-export function ContactFields({ prefix, values, onChange, error, onBlur, validFields = [], withAddress = true, announceErrors = true, deliveryPhone = true }: {
+export function ContactFields({ prefix, values, onChange, error, onBlur, validFields = [], withAddress = true, announceErrors = true, deliveryPhone = true, showContactHeading = true }: {
   prefix: string; values: ContactValues; onChange: (partial: Partial<ContactValues>) => void;
   error: (id: string) => string | undefined; onBlur?: (id: string) => void; validFields?: string[];
-  withAddress?: boolean; announceErrors?: boolean; deliveryPhone?: boolean;
+  withAddress?: boolean; announceErrors?: boolean; deliveryPhone?: boolean; showContactHeading?: boolean;
 }) {
   const { t } = useLocale()
   const fields = [
     { key: 'customerName', suffix: 'name', label: t('yourName'), autoComplete: 'name', maxLength: 120 },
     { key: 'email', suffix: 'email', label: t('email'), autoComplete: 'email', maxLength: 200, type: 'email' },
-    { key: 'phone', suffix: 'phone', label: t('phone'), autoComplete: 'tel', maxLength: 40, type: 'tel', hint: t(deliveryPhone ? 'phoneHint' : 'formPhoneHint') },
   ] as const
-  return <>
-    <fieldset className={styles.section}><legend className={styles.title}>{t('contactHeading')}</legend><div className={styles.grid} data-field-grid>
+  return <div className={styles.sections}>
+    <section className={styles.section} aria-label={t('contactHeading')}>
+      {showContactHeading && <h3 className={styles.title}>{t('contactHeading')}</h3>}
+      <div className={styles.fields}><div className={styles.grid} data-field-grid>
       {fields.map(field => {
         const id = `${prefix}-${field.suffix}`
-        return <Field key={id} className={styles.half} label={field.label} htmlFor={id} hint={'hint' in field ? field.hint : undefined} error={error(id)} announceError={announceErrors}>
+        return <Field key={id} className={styles.half} label={field.label} htmlFor={id} error={error(id)} announceError={announceErrors}>
           <input id={id} type={'type' in field ? field.type : 'text'} autoComplete={field.autoComplete} maxLength={field.maxLength} value={values[field.key]} onBlur={() => onBlur?.(id)} data-valid={validFields.includes(id) || undefined} onChange={event => onChange({ [field.key]: event.target.value })} />
         </Field>
       })}
-    </div></fieldset>
-    {withAddress && <fieldset className={styles.section}><legend className={styles.title}>{t('addressHeading')}</legend><div className={styles.grid} data-field-grid>
+    </div><div className={styles.grid} data-field-grid>
+      <Field className={styles.half} label={t('phone')} htmlFor={`${prefix}-phone`} hint={t(deliveryPhone ? 'phoneHint' : 'formPhoneHint')} error={error(`${prefix}-phone`)} announceError={announceErrors}>
+        <input id={`${prefix}-phone`} type="tel" autoComplete="tel" maxLength={40} value={values.phone} onBlur={() => onBlur?.(`${prefix}-phone`)} data-valid={validFields.includes(`${prefix}-phone`) || undefined} onChange={event => onChange({ phone: event.target.value })} />
+      </Field>
+    </div></div></section>
+    {withAddress && <section className={`${styles.section} ${styles.address}`} aria-label={t('addressHeading')}><h3 className={styles.title}>{t('addressHeading')}</h3><div className={styles.fields}><div className={styles.grid} data-field-grid>
       <Field className={styles.wide} label={t('shopStreet')} htmlFor={`${prefix}-line1`} error={error(`${prefix}-line1`)} announceError={announceErrors}><input id={`${prefix}-line1`} maxLength={200} autoComplete="address-line1" value={values.line1} onBlur={() => onBlur?.(`${prefix}-line1`)} data-valid={validFields.includes(`${prefix}-line1`) || undefined} onChange={event => onChange({ line1: event.target.value })} /></Field>
       <Field className={styles.narrow} label={t('shopLine2')} htmlFor={`${prefix}-line2`} error={error(`${prefix}-line2`)} announceError={announceErrors}><input id={`${prefix}-line2`} maxLength={200} autoComplete="address-line2" value={values.line2} onBlur={() => onBlur?.(`${prefix}-line2`)} onChange={event => onChange({ line2: event.target.value })} /></Field>
+    </div><div className={`${styles.grid} ${styles.postalRow}`} data-field-grid>
       <Field className={styles.postal} label={t('shopPostal')} htmlFor={`${prefix}-postal`} error={error(`${prefix}-postal`)} announceError={announceErrors}><input id={`${prefix}-postal`} maxLength={4} inputMode="numeric" autoComplete="postal-code" value={values.postalCode} onBlur={() => onBlur?.(`${prefix}-postal`)} data-valid={validFields.includes(`${prefix}-postal`) || undefined} onChange={event => onChange({ postalCode: event.target.value.replace(/\D/g, '') })} /></Field>
       <div className={styles.city}><div className={styles.cityLabel}><strong id={`${prefix}-city-label`}>{t('shopCity')}</strong><HelpTip label={t('explainVienna')}>{t('viennaHelp')}</HelpTip></div><span className={styles.cityValue} id={`${prefix}-city`} tabIndex={-1} aria-labelledby={`${prefix}-city-label`}>Wien</span>{error(`${prefix}-city`) && <p className={styles.error}>{error(`${prefix}-city`)}</p>}</div>
-    </div></fieldset>}
-  </>
+    </div></div></section>}
+  </div>
 }

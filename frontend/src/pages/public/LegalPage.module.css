@@ -1,4 +1,4 @@
-.page { width: min(680px, calc(100% - 32px)); margin: 32px auto; padding: 24px; background: rgba(255, 255, 255, 0.94); color: var(--public-ink); border-radius: var(--radius); overflow-wrap: anywhere; line-height: 1.6; }
+.page { width: min(var(--layout-reading-max), calc(100% - 2 * var(--layout-gutter))); margin: 32px auto; padding: var(--space-4); background: var(--color-surface); color: var(--public-ink); border-radius: var(--radius); overflow-wrap: anywhere; line-height: 1.6; }
 .page h1 { line-height: 1.2; }
 .page h2 { margin-top: var(--space-6); font-size: var(--fs-h2); line-height: 1.3; }
 .page ul { padding-left: var(--space-5); }

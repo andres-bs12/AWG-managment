@@ -1,3 +1,4 @@
+import { paintedName } from '../../../lib/paintedName'
 import { OptionalNote } from '../../../components/public/OptionalNote'
 import type { OrderItem } from '../../../domain/types'
 import type { FormItemDraft } from '../../../lib/formDraft'
@@ -30,8 +31,7 @@ export function FormItems({ items, draft, errors, photoErrors, patch, addFiles, 
       <div className={styles.editor}>
         <div className={styles.preview}><OrnamentPreview readOnly item={previewItem(source, item)} /></div>
         <div className={styles.fields}>
-          <Field label={t('petName')} htmlFor={`pet-${id}`} error={errors[`pet-${id}`]} announceError={false}><input id={`pet-${id}`} maxLength={60} value={item.petName} onBlur={() => validate(`pet-${id}`)} onChange={event => patch(id, { petName: event.target.value })} /></Field>
-          {source.withName && <Field label={t('backName')} htmlFor={`back-${id}`} hint={t('formBackNameHint')} error={errors[`back-${id}`]} announceError={false}><input id={`back-${id}`} maxLength={6} value={item.backName} onBlur={() => validate(`back-${id}`)} onChange={event => patch(id, { backName: event.target.value })} /></Field>}
+          <Field label={t(source.withName ? 'paintedPetName' : 'petName')} hint={source.withName ? t('formBackNameHint') : undefined} htmlFor={`pet-${id}`} error={errors[`pet-${id}`]} announceError={false}><input id={`pet-${id}`} maxLength={60} value={source.withName ? item.backName : item.petName} onBlur={() => validate(`pet-${id}`)} onChange={event => patch(id, { petName: source.withName ? paintedName(event.target.value) : event.target.value })} /></Field>
           <PhotoTiles uid={id} petName={item.petName} photos={item.photos} needsReload={item.photosNeedReload} error={errors[`photos-${id}`]} fileError={photoErrors[id]} announceErrors={false} onAdd={files => addFiles(id, files)} onRemove={photoId => patch(id, { photos: item.photos.filter(photo => photo.id !== photoId) })} />
           <OptionalNote id={`note-${id}`} value={item.note} onChange={note => patch(id, { note })} error={errors[`note-${id}`]} announceError={false} />
         </div>

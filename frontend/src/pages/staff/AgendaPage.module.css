@@ -390,3 +390,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.settings { min-width: var(--touch-lg); padding: var(--space-3); }
+.settings svg { width: var(--size-icon); height: var(--size-icon); }
+.capacityWarning { padding: var(--space-3); margin-bottom: var(--space-4); background: var(--color-warning-surface); color: var(--staff-warn); border-radius: var(--radius-control); }
+
+.slot[data-compact] { padding: var(--space-1) var(--space-2); gap: 0; }

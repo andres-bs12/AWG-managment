@@ -3,6 +3,7 @@ package com.artwithgab.awg_tracking.payment;
 import com.artwithgab.awg_tracking.config.AwgProperties;
 import com.artwithgab.awg_tracking.exception.ApiException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -30,6 +31,7 @@ import java.util.List;
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class StripeClient {
     private static final long SIGNATURE_TOLERANCE_SECONDS = 300;
 
@@ -65,8 +67,8 @@ public class StripeClient {
         var shop = props.shop();
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("mode", "payment");
-        // Cards only: payment is known at once, so a completed session is always a paid one.
-        form.add("payment_method_types[]", "card");
+        // Payment methods come from the Dashboard (Stripe no longer accepts payment_method_types).
+        // Delayed methods are safe: the webhook only confirms sessions whose payment_status is "paid".
         form.add("client_reference_id", orderId);
         form.add("metadata[orderId]", orderId);
         form.add("metadata[orderCode]", orderCode);
@@ -95,8 +97,23 @@ public class StripeClient {
             JsonNode json = objectMapper.readTree(body);
             return new Session(json.path("id").asString(), json.path("url").asString());
         } catch (RestClientException | IllegalArgumentException e) {
+            log.warn("Stripe checkout session failed: {}", describe(e));
             throw new PaymentProviderException();
         }
+    }
+
+    /** Stripe's error type, code, param and message (never the request, which carries the key). */
+    private String describe(Exception e) {
+        if (e instanceof org.springframework.web.client.RestClientResponseException r) {
+            try {
+                JsonNode error = objectMapper.readTree(r.getResponseBodyAsString()).path("error");
+                return r.getStatusCode().value() + " " + error.path("type").asString("") + " " + error.path("code").asString("")
+                        + " param=" + error.path("param").asString("") + " " + error.path("message").asString("");
+            } catch (RuntimeException ignored) {
+                return String.valueOf(r.getStatusCode().value());
+            }
+        }
+        return e.getClass().getSimpleName();
     }
 
     /**

@@ -1,189 +1,6 @@
-import { test, expect, type Page, type Route } from '@playwright/test'
-import type { AgendaDay, CreateSaleInput, Market, Order, OrderItem, TimeBlock } from '../src/domain/types'
+import { test, expect, type Page } from '@playwright/test'
 import { axe } from './helpers'
-
-const staffUser = { id: 'staff-gaby', name: 'Gaby', email: 'gaby@artwithgab.com' }
-const today = '2026-11-06'
-const token = 'staff-review-session'
-const market: Market = { id: 'market-review', name: 'Review Christmas Market', kind: 'market', totalCost: 1250, startDate: today, finishDate: '2026-11-08', stall: 4 }
-const marketDay = { id: 'day-review', marketId: market.id, date: today, openHour: 10, closeHour: 20, isToday: true }
-const spareMarket: Market = { ...market, id: 'market-spare', name: 'Unused market', startDate: '2026-12-04', finishDate: '2026-12-06' }
-const spareDays = ['2026-12-04', '2026-12-05', '2026-12-06'].map((date, index) => ({ ...marketDay, id: `spare-${index}`, marketId: spareMarket.id, date, isToday: false }))
-const config = { enabled: true, seasonOver: false, seasonEnd: '2026-12-24', deliveriesFrom: '2026-11-30', customPrice: 57, finishedPrice: 41, nameExtra: 14, deliveryFee: 0, maxItems: 8, colors: ['red', 'green', 'beige'].flatMap(color => ['shiny', 'matte'].map(finish => ({ color, finish, inStock: true }))) }
-
-function order(id = 'order-review', overrides: Partial<Order> = {}): Order {
-  return { id, customerId: `customer-${id}`, code: id === 'order-review' ? 'AWGREVIEW' : `AWG${id.toUpperCase()}`, trackToken: `track-${id}`, formToken: `form-${id}`, paymentState: 'deposit', paymentMethod: 'cash', total: 57, amountPaid: 20, createdAt: `${today}T08:00:00`, itemIds: [`item-${id}`], handedOver: false, ...overrides }
-}
-function item(parent: Order, overrides: Partial<OrderItem> = {}): OrderItem {
-  return { id: parent.itemIds[0], orderId: parent.id, kind: 'custom', petName: 'Luna', withName: false, color: 'red', finish: 'matte', backName: '', note: '', cost: parent.total, productionStatus: 'not_started', photos: [], formComplete: true, delivery: { kind: 'market', marketId: market.id, marketDayId: marketDay.id, pickupHour: 17 }, ...overrides }
-}
-function summary(parent: Order, checkoutStatus: string | null = null) {
-  return { id: parent.id, code: parent.code, customerName: 'Alex Review', phone: '+43 660 1234567', createdAt: parent.createdAt, paymentState: parent.paymentState, checkoutStatus, total: parent.total, items: parent.itemIds.length, nextHandoffDate: today, handedOver: parent.handedOver }
-}
-
-type FixtureOptions = { multi?: boolean; finished?: boolean; handedOver?: boolean; held?: boolean; attention?: boolean; missingForm?: boolean; controlledClock?: boolean; checkoutStatus?: 'pending' | 'review' }
-
-/**
- * Serve the actual HTTP entry in the existing Vite test server. Only the selected
- * API module and backend responses are substituted: components, HTTP error/auth
- * handling and request serialisation are the production implementations. The
- * HTTP demo entry keeps its store version constant, so mock notifications cannot
- * accidentally hide a missing HTTP re-fetch.
- */
-async function httpFixture(page: Page, options: FixtureOptions = {}) {
-  const instant = new Date(`${today}T09:00:00Z`) // 10:00 in Vienna, independently of device timezone.
-  if (options.controlledClock) await page.clock.install({ time: instant })
-  else await page.clock.setFixedTime(instant)
-  await page.addInitScript(value => {
-    if (!sessionStorage.getItem('staff-fixture-initialized')) {
-      localStorage.setItem('awg-staff-token', value)
-      sessionStorage.setItem('staff-fixture-initialized', 'true')
-    }
-  }, token)
-  await page.route('**/src/api/mock/entry.ts', route => route.fulfill({ contentType: 'application/javascript', body: "export { httpApi as selectedApi } from '/src/api/http/services.ts'" }))
-  await page.route('**/src/api/mock/demo.ts', route => route.fulfill({ contentType: 'application/javascript', body: "export * from '/src/api/http/demo.ts'" }))
-  const original = order('order-review', { handedOver: options.handedOver ?? false, ...(options.checkoutStatus ? { source: 'web', checkoutStatus: options.checkoutStatus, paymentState: 'unpaid', paymentMethod: null, amountPaid: 0 } : {}) })
-  if (options.multi) original.itemIds.push('item-second')
-  const records = new Map([[original.id, original]])
-  const items = new Map([[original.id, item(original, { productionStatus: options.finished ? 'finished' : 'not_started', formComplete: !options.missingForm })]])
-  const extraItem = options.multi ? item(original, { id: 'item-second', petName: 'Milo', productionStatus: 'finished', handedOver: options.handedOver ?? false }) : null
-  const blocks = new Map<string, TimeBlock>([[original.id, { id: 'block-review', marketDayId: marketDay.id, orderItemId: original.itemIds[0], startHour: 12, endHour: 13, status: options.finished ? 'finished' : 'not_started' }]])
-  const createdByKey = new Map<string, Order>()
-  const mutations: { path: string; body: unknown }[] = []
-  const saleRequests: { key: string; input: CreateSaleInput; id: string }[] = []
-  const searches: string[] = []
-  let dayReads = 0
-  let meStatus: number | 'offline' = 200
-  let logoutOffline = false
-  let agendaStatus = 200
-  let mutationError: { code: string; message: string } | null = null
-  const inventory = [...config.colors.map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, quantity: 3 })), { id: 'stock-finished', kind: 'finished', color: null, finish: null, quantity: 3 }]
-  let allMarkets = [market, spareMarket]
-  let allDays = [marketDay, ...spareDays]
-  let paintingDays = [{ date: '2026-11-05', open: true, maxPaintings: 2, booked: 0 }, { date: today, open: true, maxPaintings: 2, booked: 1 }, { date: '2026-11-07', open: true, maxPaintings: 2, booked: 3 }]
-
-  const bundle = (id: string) => {
-    const parent = records.get(id)!
-    return { order: parent, customer: { id: parent.customerId, name: 'Alex Review', phone: '+43 660 1234567', email: 'alex@example.com' }, items: [items.get(id)!, ...(id === original.id && extraItem ? [extraItem] : [])], blocks: blocks.has(id) ? [blocks.get(id)!] : [] }
-  }
-  const day = (): AgendaDay => {
-    const current = records.get(original.id)
-    const currentItem = items.get(original.id)
-    const slots = current && currentItem ? [{ block: blocks.get(current.id)!, order: current, item: currentItem, customer: bundle(current.id).customer }] : []
-    const held = options.held ? [{ block: { id: 'web-checkout-hold', marketDayId: marketDay.id, orderItemId: null, startHour: 15, endHour: 16, status: 'not_started' as const }, order: null, item: null, customer: null, held: true }] : []
-    return { marketDay, market, slots: [...slots, ...held], deliveries: current && currentItem ? [{ orderId: current.id, orderCode: current.code, itemId: currentItem.id, title: 'Luna', customerName: 'Alex Review', color: 'red', finish: 'matte', productionStatus: currentItem.productionStatus, handedOver: current.handedOver, deliveryKind: 'market', pickupHour: 17, methodLabel: market.name, timeLabel: '17:00', phone: '+43 660 1234567', addressLabel: null, remaining: current.total - (current.amountPaid ?? 0), paymentState: current.paymentState }] : [] }
-  }
-  async function json(route: Route, value: unknown, status = 200) { await route.fulfill({ status, json: value }) }
-  await page.route(url => url.pathname.startsWith('/api/'), async route => {
-    const request = route.request()
-    const url = new URL(request.url())
-    const path = url.pathname
-    const method = request.method()
-    if (path === '/api/staff/me') {
-      if (meStatus === 'offline') return route.abort('failed')
-      return json(route, meStatus === 200 ? staffUser : { code: 'UNAUTHORIZED', message: 'Session expired.' }, meStatus)
-    }
-    if (path === '/api/staff/login') return json(route, { user: staffUser, token })
-    if (path === '/api/staff/logout') {
-      if (logoutOffline) return route.abort('failed')
-      return route.fulfill({ status: 204 })
-    }
-    if (path === '/api/shop/config') return json(route, config)
-    if (path === '/api/inventory') return json(route, inventory)
-    if (path === '/api/markets' && method === 'GET') return json(route, allMarkets)
-    if (path === '/api/market-days') return json(route, allDays.filter(row => !url.searchParams.has('marketId') || row.marketId === url.searchParams.get('marketId')))
-    if (path === '/api/painting-days') return json(route, paintingDays)
-    if (path.startsWith('/api/painting-days/') && method === 'PATCH') {
-      const body = request.postDataJSON() as { open: boolean; maxPaintings: number }
-      mutations.push({ path, body })
-      const date = decodeURIComponent(path.split('/').pop()!)
-      paintingDays = paintingDays.map(row => row.date === date ? { ...row, ...body } : row)
-      return json(route, paintingDays.find(row => row.date === date))
-    }
-    if (path === '/api/agenda/days' || path.startsWith('/api/agenda/days/')) {
-      dayReads++
-      if (agendaStatus !== 200) return json(route, { code: 'UNAUTHORIZED', message: 'Session expired.' }, agendaStatus)
-      return json(route, path === '/api/agenda/days' ? [day()] : day())
-    }
-    if (path === '/api/agenda/capacity') return json(route, { ok: true, slot: { date: today, startHour: 13, endHour: 14 }, remainingHours: 4, message: 'Available' })
-    if (path === '/api/agenda/move-suggestion') return json(route, null)
-    if (path === '/api/orders/search') { searches.push(url.searchParams.get('q') ?? ''); return json(route, [...records.values()].map(row => summary(row))) }
-    if (path === '/api/orders/attention') return json(route, options.attention ? [summary(original, 'review')] : [])
-    const bundleMatch = /^\/api\/orders\/([^/]+)\/bundle$/.exec(path)
-    if (bundleMatch) return records.has(bundleMatch[1]) ? json(route, bundle(bundleMatch[1])) : json(route, { message: 'Order not found.' }, 404)
-    if (path === '/api/orders' && method === 'POST') {
-      const key = request.headers()['idempotency-key']
-      expect(key).toBeTruthy()
-      const input = request.postDataJSON() as CreateSaleInput
-      if (mutationError) return json(route, mutationError, 409)
-      const previous = createdByKey.get(key)
-      const created = previous ?? order(`sale-${createdByKey.size + 1}`, { total: input.items.reduce((sum, row) => sum + (row.kind === 'custom' ? config.customPrice + (row.withName ? config.nameExtra : 0) : config.finishedPrice), 0), paymentState: 'unpaid', paymentMethod: null, amountPaid: 0 })
-      if (!previous) {
-        records.set(created.id, created)
-        items.set(created.id, item(created, { kind: input.items[0].kind, productionStatus: input.items[0].kind === 'finished' ? 'finished' : 'not_started' }))
-        createdByKey.set(key, created)
-      }
-      saleRequests.push({ key, input, id: created.id })
-      return json(route, created)
-    }
-    if (method !== 'GET') {
-      const body = request.postData() ? request.postDataJSON() : null
-      mutations.push({ path, body })
-      if (mutationError) return json(route, mutationError, 409)
-      if (method === 'PATCH' && path.startsWith('/api/inventory/')) {
-        const row = inventory.find(entry => entry.id === path.split('/').at(-1))!
-        if (body.expectedQuantity !== row.quantity) return json(route, { code: 'STOCK_CHANGED', message: 'Stock changed.' }, 409)
-        row.quantity = body.quantity
-        return json(route, row)
-      }
-      if (path === '/api/agenda/blocks/block-review') {
-        const block = blocks.get(original.id)!
-        blocks.set(original.id, { ...block, startHour: body.startHour, endHour: body.startHour + block.endHour - block.startHour })
-        return route.fulfill({ status: 204 })
-      }
-      const payment = /^\/api\/orders\/([^/]+)\/payment-state$/.exec(path)
-      if (payment) {
-        const parent = records.get(payment[1])!
-        Object.assign(parent, { paymentState: body.state, paymentMethod: body.method, amountPaid: body.state === 'paid' ? parent.total : body.state === 'unpaid' ? 0 : body.amountPaid })
-        return json(route, parent)
-      }
-      const handed = /^\/api\/orders\/([^/]+)\/handed-over$/.exec(path)
-      if (handed) { const parent = records.get(handed[1])!; const list = [items.get(handed[1])!, ...(handed[1] === original.id && extraItem ? [extraItem] : [])]; for (const row of list) if (!body.itemIds || body.itemIds.includes(row.id)) row.handedOver = body.handedOver; parent.handedOver = list.every(row => row.handedOver); return route.fulfill({ status: 204 }) }
-      const cancelled = /^\/api\/orders\/([^/]+)\/cancel$/.exec(path)
-      if (cancelled) { Object.assign(records.get(cancelled[1])!, { status: 'CANCELLED', cancelledAt: new Date().toISOString(), cancellationReason: body.reason }); return route.fulfill({ status: 204 }) }
-      const status = /^\/api\/orders\/([^/]+)\/items\/[^/]+\/status$/.exec(path)
-      if (status) { items.get(status[1])!.productionStatus = body.status; return route.fulfill({ status: 204 }) }
-      if (method === 'DELETE' && path.startsWith('/api/markets/')) { allMarkets = allMarkets.filter(row => row.id !== path.split('/').at(-1)); return route.fulfill({ status: 204 }) }
-      if (method === 'DELETE' && path.startsWith('/api/market-days/')) { allDays = allDays.filter(row => row.id !== path.split('/').at(-1)); return route.fulfill({ status: 204 }) }
-      if (path === '/api/markets' && method === 'POST') {
-        const saved = { ...spareMarket, ...body }
-        allMarkets = allMarkets.map(row => row.id === saved.id ? saved : row)
-        const savedDays = body.days.map((row: { date: string; openHour: number; closeHour: number }, index: number) => ({ ...row, id: `saved-${index}`, marketId: saved.id, isToday: false }))
-        allDays = [...allDays.filter(row => row.marketId !== saved.id), ...savedDays]
-        return json(route, { market: saved, days: savedDays })
-      }
-    }
-    return json(route, { message: `Unstubbed staff request: ${method} ${path}` }, 501)
-  })
-  return { original, records, items, mutations, saleRequests, searches, get dayReads() { return dayReads }, setMeStatus(value: typeof meStatus) { meStatus = value }, setLogoutOffline() { logoutOffline = true }, expireAgenda() { agendaStatus = 401 }, rejectMutations(code: string, message: string) { mutationError = { code, message } } }
-}
-
-async function navigation(page: Page, to: string) {
-  // Use the router so the HTTP session and draft stay mounted.
-  await page.evaluate(path => { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate')) }, to)
-}
-async function signedIn(page: Page, to = '/staff/agenda') {
-  await page.goto(to)
-  await expect(page.locator('div[data-staff-page]')).toBeVisible()
-}
-async function newFinishedSale(page: Page) {
-  await page.getByRole('button', { name: /Add finished product/ }).click()
-  await page.getByRole('button', { name: 'Continue', exact: true }).click()
-  await page.getByRole('radio', { name: 'Paid', exact: true }).locator('..').click()
-  await page.getByRole('radio', { name: 'Cash', exact: true }).locator('..').click()
-  await page.getByRole('button', { name: 'Done', exact: true }).click()
-  await expect(page.getByRole('link', { name: 'Open order', exact: true })).toBeVisible()
-}
+import { staffUser, token, today, marketDay, spareMarket, httpFixture, navigation, signedIn, newFinishedSale } from './staff-fixture'
 
 test('login retains the requested route and rejects an incorrect password', async ({ page }) => {
   await httpFixture(page)
@@ -281,7 +98,7 @@ test('custom calendar sale reaches QR, and fresh starts a second custom order wi
   await signedIn(page, `/staff/sales/new?date=${today}&start=13&end=14`)
   await expect(page.getByRole('heading', { name: /Custom 1/ })).toBeVisible()
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
-  await expect(page.getByText(/Paint time selected/)).toBeVisible()
+  await expect(page.getByText(/^Fri,? 6 Nov · 13:00–14:00$/, { exact: true }).first()).toBeVisible()
   await page.getByRole('button', { name: 'Create order & show QR', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Enlarge customer QR code', exact: true })).toBeVisible()
   await expect.poll(() => fixture.saleRequests.length).toBe(1)
@@ -518,20 +335,17 @@ test('delivery rows show the amount to collect before handover', async ({ page }
   await httpFixture(page, { finished: true })
   await signedIn(page, `/staff/deliveries?day=${today}`)
   await expect(page.getByText(/Collect.*37[.,]00/)).toBeVisible()
-  // The action belongs to its own card: clearly closer to it than to anything below.
-  const gap = await page.locator('[class*="item"]').filter({ has: page.getByRole('button', { name: 'Mark picked up', exact: true }) }).first().evaluate(node => {
-    const card = node.firstElementChild!.getBoundingClientRect()
-    const action = node.lastElementChild!.getBoundingClientRect()
-    return { inside: action.top - card.bottom, after: parseFloat(getComputedStyle(node).marginBottom) }
-  })
-  expect(gap.inside).toBeLessThan(gap.after)
-  await page.getByRole('button', { name: /Mark picked up|Picked up/ }).click()
+  const cart = page.getByRole('article', { name: 'Order AWGREVIEW', exact: true })
+  const action = cart.getByRole('button', { name: 'Hand over Luna', exact: true })
+  await expect(action.locator('xpath=ancestor::li')).toContainText('Luna')
+  await expect(cart).toContainText(/Fri,? 6 Nov · 17:00/)
+  await action.click()
   const dialog = page.getByRole('dialog', { name: 'Confirm handover', exact: true })
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: /Mark paid.*hand over/i }).click()
   // The handed-over order keeps its place and the change is announced.
-  await expect(page.getByRole('status').filter({ hasText: 'AWGREVIEW handed over.' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Undo handover', exact: true })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: 'AWGREVIEW · 1 ornament handed over.' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Undo handover Luna', exact: true })).toBeVisible()
 })
 
 test('payment corrections are disclosed explicitly and retain a precise server error', async ({ page }) => {
@@ -639,7 +453,7 @@ test('deleting a market requires confirmation; day deletion is staged until Save
   await expect(marketDialog).toBeVisible()
   expect(fixture.mutations.some(entry => entry.path === `/api/markets/${spareMarket.id}`)).toBe(false)
   await axe(page)
-  await marketDialog.getByRole('button', { name: /Keep market|Cancel/ }).click()
+  await marketDialog.getByRole('button', { name: 'Not yet', exact: true }).click()
   await expect(page.getByRole('heading', { name: spareMarket.name, exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Delete market', exact: true }).click()
   await marketDialog.getByRole('button', { name: 'Delete market', exact: true }).click()
@@ -749,7 +563,7 @@ test('leaving a created sale is explicit, the QR stays reachable from payment, a
   const leave = page.getByRole('dialog', { name: 'Leave this sale?', exact: true })
   await expect(leave).toContainText(`${code} stays saved and unpaid`)
   await axe(page)
-  await leave.getByRole('button', { name: 'Keep working', exact: true }).click()
+  await leave.getByRole('button', { name: 'Not yet', exact: true }).click()
   await expect(leave).toHaveCount(0)
   const toPayment = page.getByRole('button', { name: 'Continue to payment', exact: true })
   expect((await toPayment.boundingBox())!.height).toBeGreaterThanOrEqual(56)
@@ -865,7 +679,7 @@ test('painting days hide past days, flag over-limit days and save each change wi
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible()
   await expect(page.getByText('1/3 booked', { exact: true })).toBeVisible()
   await toggle.uncheck()
-  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 3 }, { open: false, maxPaintings: 3 }])
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 3, openHour: 10, closeHour: 20 }, { open: false, maxPaintings: 3, openHour: 10, closeHour: 20 }])
   await axe(page)
 })
 
@@ -904,7 +718,7 @@ test('a market day conflict is shown next to Save with focus and marks its day r
 test('stock rows save only when changed and a conflict keeps the server value by default', async ({ page }) => {
   const fixture = await httpFixture(page)
   await signedIn(page, '/staff/inventory')
-  const row = page.locator('article').filter({ hasText: 'Custom · red · shiny' })
+  const row = page.getByRole('group', { name: 'Custom · red · shiny', exact: true })
   const save = row.getByRole('button', { name: 'Save', exact: true })
   await expect(save).toBeDisabled()
   await row.getByRole('button', { name: /^Increase/ }).click()
@@ -934,27 +748,35 @@ async function mockSignIn(page: Page, to: string) {
 
 test('mock: a multi-ornament order is grouped before production filters and rows keep their place', async ({ page }) => {
   await mockSignIn(page, '/staff/deliveries')
-  const group = page.locator('[class*="item"]').filter({ hasText: 'Pip, Dot · 2 ornaments' })
+  const group = page.getByRole('article', { name: 'Order AWG0107', exact: true })
   await expect(group).toBeVisible()
-  await expect(group).toContainText('1 of 2 ready')
-  // Under "Finished" the half-finished order is not shown as a finished single ornament.
+  await expect(group.locator('li')).toHaveCount(2)
+  await expect(group.getByRole('button', { name: 'Hand over Pip', exact: true })).toBeDisabled()
+  await expect(group.getByRole('button', { name: 'Hand over Dot', exact: true })).toBeEnabled()
+  // Under "Finished" the half-finished order stays one cart: its finished ornament can be handed
+  // over, the unfinished one stays visible but disabled.
+  const filters = page.getByRole('button', { name: /^Filters/ })
+  if (await filters.isVisible()) await filters.click()
   await page.getByRole('radio', { name: 'Finished', exact: true }).locator('..').click()
-  await expect(page.getByText(/Pip|Dot/)).toHaveCount(0)
-  await page.getByRole('radio', { name: 'All', exact: true }).first().locator('..').click()
-  const codes = () => page.locator('[class*="item"] strong').evaluateAll(nodes => nodes.map(node => node.textContent?.split(' · ')[0]))
+  await expect(group.locator('li')).toHaveCount(2)
+  await expect(group.getByRole('button', { name: 'Hand over Dot', exact: true })).toBeEnabled()
+  await expect(group.getByRole('button', { name: 'Hand over Pip', exact: true })).toBeDisabled()
+  await page.getByRole('group', { name: 'Production', exact: true }).getByRole('radio', { name: 'All', exact: true }).locator('..').click()
+  const carts = page.getByRole('article', { name: /^Order AWG/ })
+  const codes = () => carts.evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')))
   const before = await codes()
-  const ready = page.locator('[class*="item"]').filter({ has: page.getByRole('button', { name: 'Mark picked up', exact: true, disabled: false }) }).first()
-  const code = (await ready.locator('strong').first().textContent())!.split(' · ')[0]
-  await ready.getByRole('button', { name: 'Mark picked up', exact: true }).click()
+  const ready = carts.filter({ has: page.locator('li').getByRole('button', { name: /^Hand over /, disabled: false }) }).first()
+  const code = (await ready.getAttribute('aria-label'))!.replace('Order ', '')
+  await ready.locator('li').getByRole('button', { name: /^Hand over /, disabled: false }).first().click()
   const balance = page.getByRole('dialog', { name: 'Confirm handover', exact: true })
   await expect(balance).toBeVisible()
   if (await balance.getByRole('button', { name: /Mark paid.*hand over/i }).isVisible()) await balance.getByRole('button', { name: /Mark paid.*hand over/i }).click()
   else await balance.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(page.getByRole('status').filter({ hasText: `${code} handed over.` })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: `${code} · 1 ornament handed over.` })).toBeVisible()
   expect(await codes()).toEqual(before)
-  await page.locator('[class*="item"]').filter({ hasText: code }).getByRole('button', { name: 'Undo handover', exact: true }).click()
+  await page.getByRole('article', { name: `Order ${code}`, exact: true }).getByRole('button', { name: /^Undo handover / }).first().click()
   await page.getByRole('dialog', { name: 'Undo handover' }).getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(page.getByRole('status').filter({ hasText: `${code} handover undone.` })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: `${code} · 1 ornament handover undone.` })).toBeVisible()
   expect(await codes()).toEqual(before)
 })
 
@@ -981,7 +803,7 @@ test('painting-day edits typed quickly are all sent, even when leaving during th
   await expect(page.getByRole('spinbutton').first()).toHaveValue('5')
   // Leave before the 400ms pause ends: the last value is still saved.
   await navigation(page, '/staff/agenda')
-  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 5 }])
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 5, openHour: 10, closeHour: 20 }])
 })
 
 test('a painting-day save that fails after leaving is shown on return and can be retried', async ({ page }) => {
@@ -1001,19 +823,20 @@ test('a painting-day save that fails after leaving is shown on return and can be
   await expect(lost).toHaveCount(0)
   // The visible row shows the value that was finally saved.
   await expect(page.getByRole('spinbutton').first()).toHaveValue('3')
-  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 3 }])
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 3, openHour: 10, closeHour: 20 }])
 })
 
 
 test('agenda painting capacity saves changes and warns without removing bookings', async ({ page }) => {
   const fixture = await httpFixture(page)
   await signedIn(page, '/staff/agenda')
-  const row = page.locator('article').filter({ has: page.getByRole('spinbutton', { name: /Max paintings for/ }) })
+  await page.getByRole('button', { name: /^Painting hours for Fri,? 6 Nov$/, exact: true }).click()
+  const row = page.getByRole('dialog', { name: /^Painting hours · Fri,? 6 Nov$/, exact: true }).locator('article').filter({ has: page.getByRole('spinbutton', { name: /Max paintings for/ }) })
   await expect(row.getByText('1/2 booked')).toBeVisible()
   await row.getByRole('button', { name: /^Decrease Max paintings/ }).click()
   await row.getByRole('button', { name: /^Decrease Max paintings/ }).click()
   await expect(row.getByText('1/0 booked · Over limit; existing bookings remain')).toBeVisible()
-  await expect.poll(() => fixture.mutations.filter(entry => entry.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: true, maxPaintings: 0 })
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: true, maxPaintings: 0, openHour: 10, closeHour: 20 })
   await row.getByRole('switch').uncheck()
-  await expect.poll(() => fixture.mutations.filter(entry => entry.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: false, maxPaintings: 0 })
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: false, maxPaintings: 0, openHour: 10, closeHour: 20 })
 })

@@ -1,7 +1,8 @@
 .panel {
-  width: min(440px, 92vw);
+  width: min(var(--layout-status-max), calc(100% - 2 * var(--layout-gutter)));
+  overflow-wrap: anywhere;
   margin: 24px auto 48px;
-  padding: 24px 20px 28px;
+  padding: var(--space-4);
   background: var(--public-surface);
   color: var(--public-ink);
   border-radius: var(--public-card-radius);

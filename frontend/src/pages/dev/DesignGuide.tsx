@@ -1,3 +1,4 @@
+import { patchPetName } from '../../lib/paintedName'
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useLocale } from '../../i18n/LocaleContext'
@@ -108,7 +109,7 @@ function ShopFixture() {
   const [long, setLong] = useState(false)
   const active = draft.items.find(item => item.uid === activeUid) ?? draft.items[0]
   const patch: BuyStepProps['patch'] = partial => setDraft(current => ({ ...current, ...partial }))
-  const patchItem: BuyStepProps['patchItem'] = (uid, partial) => setDraft(current => ({ ...current, items: current.items.map(item => item.uid === uid ? { ...item, ...partial } : item) }))
+  const patchItem: BuyStepProps['patchItem'] = (uid, partial) => setDraft(current => ({ ...current, items: current.items.map(item => item.uid === uid ? patchPetName(item, partial) : item) }))
   const shared: BuyStepProps = {
     t, draft, config: state === 'sold-out' ? { ...guideConfig, colors: guideConfig.colors.map(option => ({ ...option, inStock: false })) } : guideConfig, itemPrice: item => guideConfig.customPrice + (item.withName ? guideConfig.nameExtra : 0), patch, patchItem,
     err: key => state === 'error' ? t(key.startsWith('photos') ? 'photoInvalid' : 'required') : undefined,
@@ -127,7 +128,7 @@ function ShopFixture() {
     <ItemTabs items={draft.items} activeUid={activeUid} maxItems={guideConfig.maxItems} onSelect={setActiveUid} onAdd={() => { const item = guideItem(`guide-${draft.items.length + 1}`); patch({ items: [...draft.items, item] }); setActiveUid(item.uid) }} />
     {draft.items.map(item => <div key={item.uid} role="tabpanel" id={`panel-${item.uid}`} aria-labelledby={`tab-${item.uid}`} hidden={active.uid !== item.uid}>{active.uid === item.uid && <>
       {screen === 'design' && <><OrnamentPreview key={item.uid} item={{ ...item, ...preview }} /><BuyItemsStep {...shared} activeUid={active.uid} preview={setPreview} onJoinWaitlist={noJoin} /></>}
-      {screen === 'pet' && <BuyPetStep {...shared} activeUid={active.uid} />}
+      {screen === 'pet' && <BuyPetStep {...shared} activeUid={active.uid} changeName={() => setScreen('design')} />}
       {screen === 'delivery' && <><BuyDateStep {...shared} /><BuyContactStep {...shared} validFields={[]} validateField={() => {}} /></>}
       {screen === 'review' && <BuyReviewStep {...shared} total={itemsTotal} deliveryFee={0} itemsTotal={itemsTotal} changed="" go={index => setScreen(index < 2 ? 'design' : 'delivery')} />}
     </>}</div>)}

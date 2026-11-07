@@ -1,7 +1,7 @@
 import type { CustomerFormView } from '../../../domain/types'
 import type { FormDraft } from '../../../lib/formDraft'
 import { useLocale } from '../../../i18n/LocaleContext'
-import { ReviewCard, ReviewThumbs } from '../../../components/public/ReviewCard'
+import { ReviewCard, ReviewProduct, ReviewThumbs } from '../../../components/public/ReviewCard'
 import { OrnamentPreview } from '../../../components/public/OrnamentPreview'
 import { InsetNote } from '../../../components/public/PublicForm'
 import { formatEur } from '../../../lib/money'
@@ -17,17 +17,21 @@ export function FormReview({ view, draft, handoffs, edit }: { view: CustomerForm
       const item = draft.items.find(row => row.orderItemId === source.id)
       const details = item ?? source
       const title = t('ornamentN', { n: index + 1 })
-      // Colour and finish on one line; an order without either says so once, not twice.
-      const look = [source.color && `${t(colorKeys[source.color])}${source.color === 'grey' || source.color === 'white' ? ` (${t('legacyColour')})` : ''}`, source.finish && t(source.finish === 'shiny' ? 'finishShiny' : 'finishMatte')].filter(Boolean).join(' · ') || t('formFinishUnknown')
+      // The picture shows the colour, so only the finish is written. A legacy colour (no longer
+      // offered) is the exception: it is named so the customer knows why it differs.
+      const legacy = source.color === 'grey' || source.color === 'white'
+      const look = [legacy && source.color && `${t(colorKeys[source.color])} (${t('legacyColour')})`, source.finish && t(source.finish === 'shiny' ? 'finishShiny' : 'finishMatte')].filter(Boolean).join(' · ') || t('formFinishUnknown')
       return <ReviewCard key={source.id} title={title}
         action={item ? { label: editLabel, ariaLabel: t('editOrnamentNamed', { name: details.petName?.trim() || title }), onClick: () => edit(`pet-${source.id}`) } : undefined}
         rows={[
-          { label: t('reviewLook'), value: look },
           ...(source.withName ? [{ label: t('backName'), value: details.backName }] : []),
           ...(details.note ? [{ label: t('noteLabel'), value: details.note }] : []),
         ]}>
-        <div className={styles.reviewProduct}><div className={styles.reviewPreview}><OrnamentPreview item={previewItem(source, item)} static /></div><p>{details.petName || t(source.kind === 'finished' ? 'finishedOrnament' : 'customOrnament')}</p><span className={styles.price}>{formatEur(source.cost, locale)}</span></div>
-        {item && <ReviewThumbs photos={details.photos} alt={i => t('photoAlt', { n: i + 1, name: details.petName || t('yourPet') })} />}
+        <ReviewProduct preview={<OrnamentPreview item={previewItem(source, item)} static />} price={formatEur(source.cost, locale)}>
+          <p>{details.petName || t(source.kind === 'finished' ? 'finishedOrnament' : 'customOrnament')}</p>
+          <dl><dt>{legacy ? t('reviewLook') : t('shopFinish')}</dt><dd>{look}</dd></dl>
+          {item && <ReviewThumbs photos={details.photos} alt={i => t('photoAlt', { n: i + 1, name: details.petName || t('yourPet') })} />}
+        </ReviewProduct>
       </ReviewCard>
     })}
     <ReviewCard title={t('reviewDetails')} action={{ label: editLabel, ariaLabel: t('editContactShort'), onClick: () => edit('form-name') }} rows={[

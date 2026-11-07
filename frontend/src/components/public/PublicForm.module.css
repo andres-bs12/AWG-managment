@@ -1,4 +1,4 @@
-.page { width: min(var(--layout-form-max), calc(100% - 2 * var(--layout-gutter))); margin: var(--space-5) auto var(--space-7); padding: var(--space-4); border-radius: var(--radius-panel); background: var(--color-surface); color: var(--color-text); box-shadow: var(--shadow-1); font: var(--type-body-weight) var(--type-body-size)/var(--type-body-line) var(--font-sans); }
+.page { width: min(var(--layout-form-max), calc(100% - 2 * max(var(--layout-gutter), env(safe-area-inset-left), env(safe-area-inset-right)))); margin: var(--space-5) auto var(--space-7); padding: var(--space-4); border-radius: var(--radius-panel); background: var(--color-surface); color: var(--color-text); overflow-wrap: anywhere; box-shadow: var(--shadow-1); font: var(--type-body-weight) var(--type-body-size)/var(--type-body-line) var(--font-sans); }
 .header { display: grid; gap: var(--space-2); }
 .header h1 { margin: 0; font-family: var(--font-display); font-size: var(--type-h1-size); line-height: var(--type-h1-line); font-weight: var(--type-h1-weight); letter-spacing: var(--type-h1-tracking); }
 .lead { color: var(--color-text-muted); max-width: var(--measure-prose); }
@@ -10,6 +10,9 @@
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-5); }
 .actions > button { flex: 1; min-width: 0; }
 .card { display: grid; gap: var(--space-4); min-width: 0; margin: 0; padding: var(--space-4); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-raised); }
+/* The parent owns the 32px section gap; the line occupies its centre without adding space. */
+.dividedSection { position: relative; }
+.dividedSection::before { content: ''; position: absolute; inset-inline: 0; top: calc((var(--space-6) + var(--border-thin)) / -2); height: var(--border-thin); background: var(--color-border); pointer-events: none; }
 .state { max-width: var(--layout-status-max); }
 .stateBody { display: grid; gap: var(--space-5); margin-top: var(--space-5); }
 .stateBody p { margin: 0; }
@@ -20,17 +23,28 @@
 .errorSummary a:focus-visible { outline: none; box-shadow: var(--focus); }
 @media (min-width: 768px) { .page, .card { padding: var(--space-5); } }
 @media (max-width: 1023px) {
-  /* Docked: the card's own bottom row, full card width, flush with the screen bottom; inner
-     padding equals the card padding so the buttons line up with the content above.
-     Stuck (end of the card in view): back in the flow, merged with the card's bottom edge. */
-  .actions { padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom)); border-top: var(--border-thin) solid transparent; background: var(--color-surface); }
-  .actions[data-docked='true'] { position: fixed; bottom: 0; left: var(--public-actions-left); width: var(--public-actions-width); z-index: var(--z-sticky); margin-top: 0; border-radius: var(--radius-panel) var(--radius-panel) 0 0; box-shadow: var(--shadow-up); }
-  .actions[data-docked='true'][data-stuck='true'] { position: static; width: auto; margin: var(--space-5) calc(-1 * var(--space-4)) calc(-1 * var(--space-4)); border-top-color: var(--color-border); border-radius: 0 0 var(--radius-panel) var(--radius-panel); box-shadow: none; }
-  .page[data-relaxed-preview='true'] [data-public-preview] { position: static; }
+  /* A sticky last row stays inside its card and naturally stops at the card's end. */
+  .actions {
+    position: sticky;
+    bottom: 0;
+    z-index: var(--z-sticky);
+    margin: var(--space-5) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
+    padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom));
+    border-top: var(--border-thin) solid var(--color-border);
+    border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+    background: var(--color-surface);
+  }
 }
 @media (min-width: 768px) and (max-width: 1023px) {
-  .actions { padding: var(--space-4) var(--space-5) max(var(--space-4), env(safe-area-inset-bottom)); }
-  .actions[data-docked='true'][data-stuck='true'] { margin: var(--space-5) calc(-1 * var(--space-5)) calc(-1 * var(--space-5)); }
+  .actions {
+    margin-inline: calc(-1 * var(--space-5));
+    margin-bottom: calc(-1 * var(--space-5));
+    padding: var(--space-4) var(--space-5) max(var(--space-4), env(safe-area-inset-bottom));
+  }
+}
+/* Short windows need reading room; actions remain reachable at the card end. */
+@media (max-height: 640px) {
+  .actions { position: static; }
 }
 .page :is(button, a[data-selected]) { transition: transform var(--dur-press) var(--ease-press); }
 .page :is(button, a[data-selected]):active:not(:disabled):not([aria-disabled='true']) { transform: scale(var(--motion-press-scale)); }

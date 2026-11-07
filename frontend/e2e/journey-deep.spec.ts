@@ -49,7 +49,7 @@ async function namedDesign(page: Page, color = /^(Rot|Red)$/, finish = /^(Glänz
   await page.locator('input[id^="back-"]').fill(name)
   await expect(page.locator('input[id^="back-"]')).toHaveValue(name)
   if (mobile(page)) await next(page).click()
-  await page.locator('input[id^="pet-"]').fill(name)
+  await expect(page.locator('input[id^="pet-"]')).toHaveCount(0)
   await page.locator('input[type=file]').setInputFiles(photo)
   await expect(page.getByRole('img', { name: new RegExp(`^(Foto|Photo) 1 (von|of) ${name}$`) })).toBeVisible()
 }
@@ -61,7 +61,7 @@ async function addNote(page: Page) {
 
 async function fillDelivery(page: Page) {
   await delivery(page)
-  await expect(page.locator('input[name="delivery-date"]').first()).toBeChecked()
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('awg-buy-draft')!).deliveryDate)).toBe('2026-12-02')
   await page.locator('#buy-line2').fill(address.line2)
 }
 
@@ -70,8 +70,7 @@ async function expectContact(page: Page) {
     'buy-name': contact.customerName, 'buy-email': contact.email, 'buy-phone': contact.phone,
     'buy-line1': address.line1, 'buy-line2': address.line2, 'buy-postal': address.postalCode,
   })) await expect(page.locator(`#${id}`)).toHaveValue(value)
-  await expect(page.locator('input[name="delivery-date"]').first()).toBeChecked()
-  await expect(page.locator('input[name="delivery-date"]').first()).toHaveAttribute('aria-label', 'Mittwoch, 2. Dezember 2026')
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('awg-buy-draft')!).deliveryDate)).toBe('2026-12-02')
 }
 
 async function expectReview(page: Page, total: number, locale: Locale = 'de') {
@@ -92,7 +91,7 @@ for (const locale of ['de', 'en'] as const) {
       // starting with an English localStorage value.
       await page.getByRole('button', { name: 'EN', exact: true }).click()
       await expect(page.locator('#buy-heading')).toHaveText('Your ornament')
-      await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
+      await expect(page.locator('[data-pet-name] strong')).toHaveText('Luna')
       await expect(page.getByRole('img', { name: 'Photo 1 of Luna', exact: true })).toBeVisible()
     }
     await expect(preview(page)).toHaveAttribute('aria-label', locale === 'de' ? 'Rot, Glänzend, Name: Luna · Hinten' : 'Red, Shiny, name: Luna · Back')
@@ -162,26 +161,26 @@ test('two ornaments keep independent colour, finish, names, previews and totals 
   for (const [color, finish, name, label] of [
     ['Rot', 'Glänzend', 'Luna', firstLabel], ['Grün', 'Matt', 'Max', secondLabel],
   ] as const) {
-    await page.getByRole('tab', { name, exact: true }).click()
-    await expect(page.getByRole('tab', { name, exact: true })).toHaveAttribute('aria-selected', 'true')
+    await page.getByRole('tab', { name: new RegExp(`${name}$`) }).click()
+    await expect(page.getByRole('tab', { name: new RegExp(`${name}$`) })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('radio', { name: color, exact: true })).toBeChecked()
     await expect(page.getByRole('radio', { name: finish, exact: true })).toBeChecked()
     await expect(preview(page)).toHaveAttribute('aria-label', label)
     if (mobile(page)) await next(page).click()
     await expect(page.locator('input[id^="back-"]')).toHaveValue(name)
     if (mobile(page)) await next(page).click()
-    await expect(page.locator('input[id^="pet-"]')).toHaveValue(name)
+    await expect(page.locator('[data-pet-name] strong')).toHaveText(name)
     await expect(page.getByRole('img', { name: `Foto 1 von ${name}`, exact: true })).toBeVisible()
   }
   // Removal lives in the options card, visible in substep 0 on mobile.
-  await page.getByRole('tab', { name: 'Max', exact: true }).click()
+  await page.getByRole('tab', { name: /Max$/, exact: true }).click()
   await page.getByRole('button', { name: 'Diese Kugel entfernen', exact: true }).click()
-  await expect(page.getByRole('tab', { name: 'Max', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: /Max$/, exact: true })).toHaveCount(0)
   await expect(preview(page)).toHaveAttribute('aria-label', firstLabel)
   const remainingTotal = config.customPrice + config.nameExtra + config.deliveryFee
   await expect(price(page)).toHaveText(money(remainingTotal))
   if (mobile(page)) { await next(page).click(); await next(page).click() }
-  await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
+  await expect(page.locator('[data-pet-name] strong')).toHaveText('Luna')
   await expect(page.getByRole('img', { name: 'Foto 1 von Luna', exact: true })).toBeVisible()
   await fillDelivery(page)
   await next(page).click()
@@ -290,7 +289,7 @@ test('configuration reacts in under 100ms (median of five colour clicks and five
   expect(median(priceSamples), 'name click → preview label and first visible price change').toBeLessThan(100)
 })
 
-test('browser back/forward and in-app Back preserve all answers across the three screens', async ({ page }) => {
+test('browser back/forward and in-app Back preserve all answers across the four screens', async ({ page }) => {
   const config = await prepare(page)
   await namedDesign(page)
   await addNote(page)
@@ -300,19 +299,22 @@ test('browser back/forward and in-app Back preserve all answers across the three
   const total = config.customPrice + config.nameExtra + config.deliveryFee
   await expectReview(page, total)
   await page.goBack()
+  await expect(page.locator('#buy-heading')).toHaveText('Deine Daten')
+  await expectContact(page)
+  await page.goBack()
   await expect(page.locator('#buy-heading')).toHaveText('Lieferung')
   await expect(page).toHaveURL(/\/buy$/)
-  await expectContact(page)
   await page.goBack()
   await expect(page.locator('#buy-heading')).toHaveText('Deine Kugel')
   await expect(preview(page)).toHaveAttribute('aria-label', 'Rot, Glänzend, Name: Luna · Hinten')
   // Browser history restores the design screen with its current mobile substep.
-  await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
+  await expect(page.locator('[data-pet-name] strong')).toHaveText('Luna')
   await expect(page.getByRole('img', { name: 'Foto 1 von Luna', exact: true })).toBeVisible()
   if (!await page.locator('details').evaluate(node => node.hasAttribute('open'))) await page.locator('summary').click()
   await expect(page.locator('textarea[id^="note-"]')).toHaveValue(note)
   await page.goForward()
   await expect(page.locator('#buy-heading')).toHaveText('Lieferung')
+  await page.goForward()
   await expectContact(page)
   await page.goForward()
   await expectReview(page, total)
@@ -321,6 +323,7 @@ test('browser back/forward and in-app Back preserve all answers across the three
   await backButton(page).click()
   await expectContact(page)
   await backButton(page).click()
+  await backButton(page).click()
   if (mobile(page)) { await backButton(page).click(); await backButton(page).click() }
   await expect(page.getByRole('radio', { name: 'Rot', exact: true })).toBeChecked()
   await expect(page.getByRole('radio', { name: 'Glänzend', exact: true })).toBeChecked()
@@ -328,10 +331,11 @@ test('browser back/forward and in-app Back preserve all answers across the three
   await expect(nameOption(page)).toBeChecked()
   await expect(page.locator('input[id^="back-"]')).toHaveValue('Luna')
   if (mobile(page)) await next(page).click()
-  await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
+  await expect(page.locator('[data-pet-name] strong')).toHaveText('Luna')
   await expect(page.getByRole('img', { name: 'Foto 1 von Luna', exact: true })).toBeVisible()
   if (!await page.locator('details').evaluate(node => node.hasAttribute('open'))) await page.locator('summary').click()
   await expect(page.locator('textarea[id^="note-"]')).toHaveValue(note)
+  await next(page).click()
   await next(page).click()
   await expectContact(page)
   await next(page).click()
@@ -354,7 +358,7 @@ test('reload from delivery restores every text field and explicitly asks to re-a
   await expect(nameOption(page)).toBeChecked()
   await expect(page.locator('input[id^="back-"]')).toHaveValue('Luna')
   if (mobile(page)) await next(page).click()
-  await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
+  await expect(page.locator('[data-pet-name] strong')).toHaveText('Luna')
   await expect(page.getByRole('status').filter({ hasText: 'Fotos können nach dem Neuladen nicht gespeichert werden. Bitte füge sie erneut hinzu.' })).toBeVisible()
   await expect(page.locator('input[type=file]')).toHaveValue('')
   await expect(page.getByRole('img', { name: 'Foto 1 von Luna', exact: true })).toHaveCount(0)
@@ -368,6 +372,7 @@ test('reload from delivery restores every text field and explicitly asks to re-a
   await page.locator('input[type=file]').setInputFiles(photo)
   await expect(page.getByRole('img', { name: 'Foto 1 von Luna', exact: true })).toBeVisible()
   await expect(page.getByText('Fotos können nach dem Neuladen nicht gespeichert werden. Bitte füge sie erneut hinzu.', { exact: true })).toHaveCount(0)
+  await next(page).click()
   await next(page).click()
   await expectContact(page)
 })

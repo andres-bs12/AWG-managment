@@ -67,7 +67,19 @@ export type OrderSummary = {
   id: string; code: string; customerName: string; phone: string; createdAt: string
   paymentState: PaymentState; checkoutStatus: CheckoutStatus | null; total: number
   items: number; nextHandoffDate: string | null; handedOver: boolean
+  source?: 'stall' | 'web'; status?: 'ACTIVE' | 'CANCELLED'
 }
+
+export type SalesFilters = {
+  state?: PaymentState | 'pending' | 'review'
+  source?: 'stall' | 'web'
+  from?: string
+  to?: string
+  query?: string
+  page?: number
+  size?: number
+}
+export type SalesPage = { orders: OrderSummary[]; page: number; size: number; totalElements: number; totalPages: number }
 
 export type Order = {
   status?: 'ACTIVE' | 'CANCELLED'
@@ -300,7 +312,7 @@ export type MoveSuggestion = {
 }
 
 export type InventoryItem = { id: string; kind: ItemKind; color: OrnamentColor | null; finish?: CustomFinish | null; quantity: number }
-export type PaintingDay = { date: string; open: boolean; maxPaintings: number; booked: number }
+export type PaintingDay = { date: string; open: boolean; maxPaintings: number; booked: number; openHour: number; closeHour: number }
 
 export type ShopConfig = {
   seasonEnd: string

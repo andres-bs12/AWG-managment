@@ -30,6 +30,9 @@ export function TrackPage() {
   // Arriving from the QR form: confirm the save once, here where the order state is shown.
   const formSaved = !!(useLocation().state as { formSaved?: boolean } | null)?.formSaved
   const timers = useRef<number[]>([])
+  const savedNotice = useRef<HTMLParagraphElement>(null)
+
+  useEffect(() => { if (formSaved) savedNotice.current?.focus() }, [formSaved])
 
   const [fetchPhase, setPhase] = useState<Phase>(codeParam ? 'checking' : 'idle')
   const [reloadKey, setReloadKey] = useState(0)
@@ -61,6 +64,7 @@ export function TrackPage() {
         setLoaded(data)
         setError('')
         if (data.delivery.address) setAddr(data.delivery.address)
+        if (formSaved) { setPhase('done'); return }
         setPhase('loading')
         timers.current.push(
           window.setTimeout(() => {
@@ -87,7 +91,7 @@ export function TrackPage() {
       timers.current.forEach(window.clearTimeout)
       timers.current = []
     }
-  }, [codeParam, reloadKey, t, locale])
+  }, [codeParam, reloadKey, t, locale, formSaved])
 
   /** Without a code in the URL there is nothing to show, whatever a previous lookup left behind. */
   const phase: Phase = codeParam ? fetchPhase : 'idle'
@@ -148,7 +152,7 @@ export function TrackPage() {
     <div className={styles.page}>
       {showWipe ? <SleighWipe label={t('sleigh')} leaving={phase === 'leaving'} /> : null}
       {/* The form was saved even if loading the order below fails: confirm it regardless. */}
-      {formSaved && <p className={styles.savedBanner} role="status">{t('formSavedBanner')}</p>}
+      {formSaved && <p ref={savedNotice} tabIndex={-1} className={styles.savedBanner} role="status">{t('formSavedBanner')}</p>}
 
       {view && phase === 'done' ? (
         <section className={styles.card} aria-live="polite">

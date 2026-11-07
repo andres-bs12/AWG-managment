@@ -1,4 +1,4 @@
-.form { display: grid; gap: var(--space-5); }
+.form { display: flex; flex-direction: column; gap: var(--space-5); }
 .form > nav { margin: 0; }
 .step { display: grid; gap: var(--space-5); min-width: 0; }
 .step h2 { margin: 0; font-family: var(--font-display); font-size: var(--type-h2-size); line-height: var(--type-h2-line); font-weight: var(--type-h2-weight); letter-spacing: var(--type-h2-tracking); }
@@ -8,6 +8,9 @@
 .editor { display: grid; gap: var(--space-6); min-width: 0; }
 .fields { display: grid; gap: var(--space-5); min-width: 0; }
 .fields > * { margin: 0; }
+.sections { display: grid; gap: var(--space-6); min-width: 0; }
+.items { display: grid; gap: var(--space-4); min-width: 0; }
+.contact { composes: dividedSection from '../../components/public/PublicForm.module.css'; min-width: 0; }
 .preview { width: min(100%, var(--size-preview-desktop)); justify-self: center; }
 .facts { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0; }
 .facts > div { display: flex; gap: var(--space-2); }
@@ -16,9 +19,6 @@
 .muted { margin: 0; color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
 .review { display: grid; gap: var(--space-4); }
 .review > section { margin: 0; }
-.reviewProduct { display: grid; grid-template-columns: var(--size-review-art) minmax(0, 1fr) max-content; gap: var(--space-3); align-items: center; }
-.reviewProduct p { margin: 0; overflow-wrap: anywhere; }
-.reviewPreview { width: var(--size-review-art); }
 .price { white-space: nowrap; font-variant-numeric: tabular-nums lining-nums; font-weight: var(--type-label-weight); }
 .edit { min-width: var(--touch); min-height: var(--touch); padding: var(--space-1); border: 0; border-radius: var(--radius-small); background: transparent; color: var(--color-text); font: inherit; font-weight: var(--type-button-weight); text-decoration: underline; text-underline-offset: var(--space-1); cursor: pointer; }
 .edit:focus-visible { outline: none; box-shadow: var(--focus); }
@@ -30,3 +30,5 @@
 .form :is(input, textarea, button, summary, [tabindex]) { scroll-margin-block: var(--space-5) var(--space-10); }
 @media (min-width: 1024px) { .editor { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); } }
 
+
+.form > [data-sticky-actions] { margin-top: 0; }

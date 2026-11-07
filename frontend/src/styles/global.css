@@ -9,7 +9,6 @@
 html,
 body,
 #root {
-  height: 100%;
   min-height: 100%;
 }
 
@@ -102,3 +101,10 @@ p {
 [data-staff-page] :is(a, button, label, input, select) { scroll-margin-block: calc(var(--size-staff-tabs) + var(--staff-actions-height) + var(--space-4)); }
 
 html:has([data-staff-page]) { scroll-padding-bottom: calc(var(--size-staff-tabs) + var(--staff-actions-height) + var(--space-4)); }
+html:has([data-staff-page]), body:has([data-staff-page]) { background: var(--staff-bg); }
+
+/* Public routes use the document scrollport, including Safari's dynamic toolbar area. */
+html:has([data-public-scroll]), body:has([data-public-scroll]) {
+  background: var(--sky-top);
+}
+html:has([data-public-scroll]) { scroll-padding-block: var(--space-4); }

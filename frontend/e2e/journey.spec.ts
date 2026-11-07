@@ -12,9 +12,9 @@ for (const locale of ['de', 'en']) test(`checkout captures complete ${locale.toU
   await choose(page)
   if (mobile(page)) await next(page).click()
   await page.locator('input[type=checkbox]').first().check()
-  await page.locator('input[id^="back-"]').fill('LUNA')
+  await page.locator('input[id^="back-"]').fill('Luna')
   if (mobile(page)) await next(page).click()
-  await page.locator('input[id^="pet-"]').fill('Luna')
+  await expect(page.locator('input[id^="pet-"]')).toHaveCount(0)
   await page.locator('input[type=file]').setInputFiles(photo)
   await expect(page.locator('img[alt*="Luna"]')).toBeVisible()
   await review(page)
@@ -22,7 +22,7 @@ for (const locale of ['de', 'en']) test(`checkout captures complete ${locale.toU
   await page.locator('form button[type=submit]').click()
   await expect.poll(() => page.evaluate(() => (window as unknown as { checkout?: unknown }).checkout)).toMatchObject({
     customerName: 'Alex Example', email: 'alex@example.com', phone: '123456789', address: { line1: 'Hauptstraße 1', postalCode: '1010', city: 'Wien' }, acceptTerms: true,
-    items: [{ color: 'red', finish: 'shiny', withName: true, backName: 'LUNA', petName: 'Luna', photos: [expect.anything()] }], deliveryDate: expect.stringMatching(/^2026-/),
+    items: [{ color: 'red', finish: 'shiny', withName: true, backName: 'Luna', petName: 'Luna', photos: [expect.anything()] }], deliveryDate: expect.stringMatching(/^2026-/),
   })
 })
 
@@ -31,12 +31,12 @@ test('two ornaments retain independent choices', async ({ page }) => {
   await page.locator('#buy-add').click()
   await choose(page, /^(Rot|Red)$/, /^(Matt|Matte)$/)
   await pet(page, 'Max')
-  await page.getByRole('tab', { name: 'Luna' }).click()
+  await page.getByRole('tab', { name: /Luna$/ }).click()
   await expect(page.getByRole('radio', { name: /^(Rot|Red)$/ })).toBeChecked()
   await expect(page.getByRole('radio', { name: /^(Glänzend|Shiny)$/ })).toBeChecked()
   if (mobile(page)) { await next(page).click(); await next(page).click() }
   await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
-  await page.getByRole('tab', { name: 'Max' }).click()
+  await page.getByRole('tab', { name: /Max$/ }).click()
   await expect(page.getByRole('radio', { name: /^(Matt|Matte)$/ })).toBeChecked()
   if (mobile(page)) { await next(page).click(); await next(page).click() }
   await expect(page.locator('input[id^="pet-"]')).toHaveValue('Max')

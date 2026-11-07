@@ -20,7 +20,7 @@ Use **must**, **must not** and the values below as implementation requirements. 
 
 Precedence: owner decisions and product constraints in `AGENTS.md` → this document for public visual/content rules → the latest **Form design rules** in [sprint 6](sprint6-buy-ux.md#form-design-rules-public-forms-buy-form) and approved [premium plan](plan-buy-premium.md) → exploratory research. This document consolidates those decisions and supplies missing values. It does not authorize legal wording, new business rules or payment changes.
 
-Resolved conflicts: use three `/buy` screens (Design, Delivery, Review & pay); mobile design has three substeps (Colour/finish, Back name, Pet/photos). Owner decision (2026-11-05): from 768px related personal-data fields share a row on the six-column grid (Name | E-Mail, Telefon, Straße | Stiege/Tür, PLZ | Ort), aligned with subgrid; below 768px one column except PLZ + Ort. Show one “Frühester Termin” shortcut plus the calendar (owner decision 2026-11-05, superseding the earlier three cards). Never put a reference photo on the ornament. Earlier research proposing five shop screens, photo compositing, invented evening hours, alternate payment labels or automatic date selection is superseded.
+Resolved conflicts: owner decision (2026-11-06) uses four `/buy` screens (Design, Delivery, Your details, Review & pay); mobile design has three substeps (Colour/finish, Back name, Pet/photos). Owner decision (2026-11-05): from 768px related personal-data fields share a row on the six-column grid (Name | E-Mail, Telefon, Straße | Stiege/Tür, PLZ | Ort), aligned with subgrid; below 768px one column except PLZ + Ort. Show one “Frühester Termin” shortcut plus the calendar (owner decision 2026-11-05, superseding the earlier three cards). Never put a reference photo on the ornament. Earlier research proposing five shop screens, photo compositing, invented evening hours, alternate payment labels or automatic date selection is superseded.
 
 ## 2. Tokens and colour
 
@@ -200,7 +200,7 @@ All gaps are measured from the rendered edge of one element to the next. The tab
 | Control → error or count | `--space-2` = 8px | Field |
 | Field → next field | `--space-5` = 24px | FieldGroup parent; Field has no external margin |
 | Related field group → next field group | `--space-6` = 32px | Section body |
-| Section → unrelated section | 32px + `--border-thin` divider + 24px = 57px | SectionGroup parent; exceeds twice the 24px field gap |
+| Section → unrelated section | `--space-6` = 32px total; `--border-thin` divider centred inside this gap, adding no height | SectionGroup parent (owner decision, 2026-11-07) |
 | Page h1 → lead | 8px | PageHeader |
 | PageHeader block → progress/content | 24px | Page layout |
 | Step h2 → content | 24px; if an intro follows, 8px to intro then 24px to content | Step layout |
@@ -215,6 +215,7 @@ All gaps are measured from the rendered edge of one element to the next. The tab
 | Preview side control → disclaimer | 8px; complete preview → next unrelated block 24px | OrnamentPreview/parent |
 | List items / review detail rows | 12px gap; review rows have 12px block padding and 1px separator instead of another gap | List/ReviewCard |
 | Buttons in a group | 12px; 24px from preceding form content | ActionGroup |
+| Last step content → action bar | `--space-5` = 24px, including at the card end; no trailing field margin or extra dock reservation | Step/ActionGroup parent; card bottom padding is cancelled once by the bar |
 | Chips / choice cards / date cards / photo tiles / calendar rows | 12px / 12px / 12px / 12px / 4px | Control-specific layout |
 | Page gutter at 360px | 16px | PublicPage |
 | Page gutter at 768px | 24px | PublicPage |
@@ -269,7 +270,7 @@ Within every side-by-side pair, both fields use four shared `subgrid` rows: labe
 
 **L4 · Safe areas:** page inline padding is `max(var(--layout-gutter),env(safe-area-inset-left/right))`. Do not apply panel padding a second time to the calendar: seven 44px targets must fit a 360px viewport. At this width, place the calendar in the full 328px page content region, outside nested padded cards. At 320px or zoom, place the same date selection in a readable list if seven 44px columns do not fit. No horizontal page scrolling or overlapping targets.
 
-Below 1024px, allow a sticky bottom action bar only while it leaves the active field, error and keyboard usable. Measure actual header/preview/bar heights with layout observation; expose `--public-sticky-top` and `--public-sticky-bottom` as runtime dimensions and use them for scroll padding, scroll margins and reserved clearance (plus 16px). Do not hard-code `10rem`. If short viewport, keyboard or zoom leaves insufficient reading room, unstick the preview first, then actions. At ≥1024px actions are in normal flow. Never trap the user between two oversized sticky regions.
+Owner decision (2026-11-06): public pages scroll the document. Use CSS `position: sticky; bottom: 0` for actions inside the card below 1024px, with the specified bottom safe area. Do not resize an inner shell or measure a fixed dock, and do not infer keyboard state from the Safari toolbar height. The mobile preview stays in normal flow; at heights ≤640px actions stay in flow regardless of focus. Focus repair scrolls the window to keep the active control clear. At ≥1024px actions remain in normal flow. Never trap the user between two oversized sticky regions.
 
 ## 6. Shape, border and elevation
 
@@ -836,7 +837,7 @@ Staff-specific tokens in `tokens.css`:
 - `--staff-btn/selected/pressed/hover/ok/warn/danger` alias the shared primary, selected, pressed, hover, success, warning and error roles. Preserve `--staff-slot-*` for labelled operational statuses.
 - IBM Plex Sans (`--font-staff`) applies everywhere, including native dialogs. Four role tuples supply size, line-height and weight: `--type-staff-h1-*` = 1.375rem / 1.25 / 700; `h2` = 1.125rem / 1.35 / 600; `body` = 1rem / 1.5 / 400; `meta` = 0.875rem / 1.45 / 400. No smaller staff copy. Times, quantities and money use tabular lining numerals.
 - `--size-control-staff: 44px` is the minimum target. Card padding is 16px, row/group gaps 8–12px and larger section gaps 16–24px. Use the shared radius tokens, not page-specific radii.
-- `--layout-staff-max: 1280px`, `--layout-staff-side: 340px`; the two-pane workspace begins at 1024px. Below 1101px, the fixed bottom navigation contains Agenda, Deliveries, New sale, Search and More. More contains Stock, Markets, Painting days, Password and Log out. `--size-staff-tabs: 68px`, `--size-staff-header: 80px` and safe-area insets provide clearance. The staff-only navigation threshold is an explicit exception to the public layout thresholds.
+- `--layout-staff-max: 1280px`, `--layout-staff-side: 340px`; the two-pane workspace begins at 1024px. Below 1101px, the fixed bottom navigation contains Agenda, Deliveries, New sale, Search and More. More contains Sales, Stock, Markets, Painting days, Password and Log out. `--size-staff-tabs: 68px`, `--size-staff-header: 80px` and safe-area insets provide clearance. The staff-only navigation threshold is an explicit exception to the public layout thresholds.
 - `--size-agenda-hour: 80px` supplies both CSS and the board's numeric geometry. `--hour-h` remains the permitted local component alias. Whole-hour grid lines start at the floor of opening time; bookings retain their true offsets. Overlaps use separate lanes and a warning.
 - Central support sizes: `--size-staff-name: 180px`, `--size-staff-handoff: 132px`, `--size-staff-quantity: 80px`, `--layout-staff-dialog: 520px`, `--size-staff-qr: 220px`, `--size-staff-qr-large: 560px`, `--size-staff-qr-render: 720px`. QR render resolution is separate from its displayed size. Canvas-only colours `--staff-canvas`, `--staff-canvas-raised`, `--staff-canvas-text`, `--staff-canvas-muted` preserve the dark painting reference workspace; ordinary controls remain neutral.
 
@@ -847,3 +848,19 @@ All staff modules consume tokens. Media conditions use 639/767/1023px end thresh
 `npm run lint` enforces these contracts with `scripts/lint-staff-styles.mjs`, using the installed PostCSS parser. It checks raw colours/lengths, motion properties, invalid declarations and unknown tokens in staff modules and their shared controls. `.stylelintrc.json` also defines the raw-colour/pixel bans for Stylelint. Installing the Stylelint binary was blocked by registry DNS in this sandbox; the repository token check runs without downloading dependencies. Do not claim Stylelint itself ran.
 
 Required review sizes: iPad Air 11" 820×1180 and 1180×820, 390px phones and desktop. Verify keyboard focus, native radio arrows, modal focus/restore, safe-area/virtual-keyboard clearance, 44px targets, long names, stock and HTTP errors, plus axe on every staff page. Source migration and local checks do not certify visual/accessibility results: Claude runs Playwright and reviews the rendered UI externally. See [Task 11 handoff](task11-staff-handoff.md).
+
+
+### Staff mobile update (2026-11-06; browser verification pending)
+
+Show the selected day once in Agenda's chip strip; the gear at the strip's upper right edits that date's painting window and capacity. Painting windows are independent from pickup opening hours. Keep all existing paintings visible when the window shrinks. A delivery cart owns every item's date/time and handover controls; filters choose carts and limit actionable items while preserving the rest as context. Chosen paint times need only the slot and a Change action. Omit service schedules, repeated date subtitles and colour words beside visible swatches (retain accessible colour labels). AWG links to Agenda; Sales lives in More. Public footer and brand require opaque local contrast surfaces, and help uses a 24px info SVG within the existing 44px target.
+
+Reading surfaces must remain opaque throughout entrance animations, including Track after a QR save. Animate the Track card's transform without fading its text/background over the sky. Agenda pickup thumbnails show a photo or an accessible colour swatch; unknown colour with no photo leaves no placeholder or reserved thumbnail column. Production, date and destination filters match individual delivery items, preserve their whole order card and disable actions outside the active filters.
+
+Claude's first full v1.1 run: 639 passed, 40 failed, 2 skipped (681 total). Repairs and the required fresh snapshot review are tracked in [the E2E repair report](../tasks/audit-results/e2e-repair-2026-11-06.md). This is not a green-suite claim.
+
+
+### Staff phone polish (2026-11-06; browser verification pending)
+
+Below 768px, Deliveries and Sales keep one compact control row and a Filters button with an active-filter count; disclosure controls preserve their values when closed. Delivery day and sales search remain inline. At larger sizes the full filter controls remain expanded. Bottom navigation has five equal columns, at least 44px targets and inner label padding; compact Deliver/Sale labels retain accessible Deliveries/New sale names. Inventory groups Shiny/Matte controls under one colour swatch heading (accessible colour name, no visible colour word), with independent saves. Staff html/body backgrounds match the shell throughout scrolling. Bind separators to their preceding word so none starts a wrapped line. Keep one page title and at most one step label in New sale's initial screen.
+
+The owner reports a green 681-case E2E baseline before this polish; the earlier 639/40/2 checkpoint above is historical. This polish still requires Claude's browser run and fresh staff screenshot review.

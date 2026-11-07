@@ -1,3 +1,5 @@
+import { paintedNameValid, patchPetName } from '../../lib/paintedName'
+import { keepFormFocusVisible } from '../../lib/publicFormFocus'
 import { PageHeader, PublicPage, PublicState, StickyActions } from '../../components/public/PublicForm'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import publicForm from '../../components/public/PublicForm.module.css'
@@ -37,7 +39,7 @@ export function BuyPage() {
   const [configRetry, setConfigRetry] = useState(0)
   const [draft, setDraft] = useState<BuyDraft>(loadBuyDraft)
   const requestedStep = location.state?.buyStep
-  const step = requestedStep === 1 || requestedStep === 2 ? requestedStep : 0
+  const step = requestedStep === 1 || requestedStep === 2 || requestedStep === 3 ? requestedStep : 0
   const [previewChoice, setPreviewChoice] = useState<Partial<BuyItem> | null>(null)
   const [changedSection, setChangedSection] = useState('')
   const [returnReview, setReturnReview] = useState(false)
@@ -63,7 +65,7 @@ export function BuyPage() {
 
   useEffect(() => {
     // Reload returns to design so reference photos can be added again. During
-    // this visit, router history keeps all three screens on the mounted form.
+    // this visit, router history keeps all four screens on the mounted form.
     void navigate(entry.current, { replace: true, state: { buyStep: 0 } })
   }, [navigate])
   useEffect(() => { void api.metrics.track({ event: 'buy_view' }).catch(() => {}) }, [])
@@ -141,7 +143,7 @@ export function BuyPage() {
 
   const dateFmt = useMemo(() => new Intl.DateTimeFormat(locale === 'de' ? 'de-AT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), [locale])
   const formatDate = (date: string) => dateFmt.format(new Date(`${date}T12:00:00`))
-  const stepLabels = ['premiumDesign', 'stepShortDelivery', 'premiumReview'].map(key => t(key))
+  const stepLabels = ['premiumDesign', 'stepShortDelivery', 'shopStepContact', 'premiumReview'].map(key => t(key))
   if (configFailed) return <PublicState title={t('shopTitle')} error><p>{t('shopLoadError')}</p><Button onClick={() => { setConfigFailed(false); setConfigRetry(value => value + 1) }}>{t('shopRetry')}</Button></PublicState>
   if (!config) return <PublicPage><OrnamentLoader /></PublicPage>
   if (config.seasonOver) return <SeasonClosed />
@@ -159,8 +161,8 @@ export function BuyPage() {
     if (partial.withName !== undefined) setSides(current => ({ ...current, [uid]: partial.withName ? 'back' : 'front' }))
     for (const field of ['color', 'finish'] as const) if (partial[field]) void api.metrics.track({ event: 'buy_choice', field, value: partial[field] }).catch(() => {})
     if (partial.withName !== undefined) void api.metrics.track({ event: 'buy_choice', field: 'name', value: partial.withName ? 'on' : 'off' }).catch(() => {})
-    setDraft((current) => ({ ...current, items: current.items.map((item) => item.uid === uid ? { ...item, ...partial } : item) }))
-    const fields: Record<string, string> = { color: 'color', finish: 'finish', backName: 'back', petName: 'pet', note: 'note', photos: 'photos' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[`${fields[key]}-${uid}`]); return next }); setServerError('')
+    setDraft((current) => ({ ...current, items: current.items.map((item) => item.uid === uid ? patchPetName(item, partial) : item) }))
+    const fields: Record<string, string> = { color: 'color', finish: 'finish', backName: 'back', petName: 'pet', note: 'note', photos: 'photos' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[`${fields[key]}-${uid}`]); if (partial.petName !== undefined || partial.withName !== undefined) { delete next[`back-${uid}`]; delete next[`pet-${uid}`] }; return next }); setServerError('')
   }
   function validate(currentStep: number) {
     const found: Record<string, string> = {}
@@ -169,11 +171,11 @@ export function BuyPage() {
       for (const item of draft.items) {
         if (!shopConfig.colors.some((option) => option.color === item.color && option.inStock)) found[`color-${item.uid}`] = 'shopChooseColor'
         if (item.color && !shopConfig.colors.some(option => option.color === item.color && option.finish === item.finish && option.inStock)) found[`finish-${item.uid}`] = 'shopChooseFinish'
-        if (item.withName && !item.backName.trim()) found[`back-${item.uid}`] = 'shopBackNameRequired'
+        if (item.withName && !paintedNameValid(item.backName)) found[`back-${item.uid}`] = item.backName ? 'paintedNameTooLong' : 'shopBackNameRequired'
       }
     }
     if (currentStep === 1) for (const item of draft.items) {
-      if (!item.petName.trim()) found[`pet-${item.uid}`] = 'required'
+      if (!item.withName && !item.petName.trim()) found[`pet-${item.uid}`] = 'required'
       if (!item.photos.length) found[`photos-${item.uid}`] = 'shopNeedPhotoShop'
     }
     if (currentStep === 2 && draft.deliveryKind === 'vienna' && (datesState !== 'ready' || !dates.some((date) => date.date === draft.deliveryDate))) found['buy-date'] = 'shopNeedDate'
@@ -195,10 +197,12 @@ export function BuyPage() {
   }
   function validateField(id: string) {
     const error = validate(3)[id]
-    setErrors(current => { const next = { ...current }; if (error) next[id] = error; else delete next[id]; return next })
+    // A server rejection stays until the value is edited (patch clears it) or Continue revalidates:
+    // dropping it on blur would shift the actions under a finger that is tapping Continue.
+    setErrors(current => { const next = { ...current }; if (error) next[id] = error; else if (!current[id]?.startsWith('api:')) delete next[id]; return next })
     setValidFields(current => error ? current.filter(value => value !== id) : [...new Set([...current, id])])
     const field = ({ 'buy-name': 'customerName', 'buy-email': 'email', 'buy-phone': 'phone', 'buy-line1': 'line1', 'buy-postal': 'postalCode' } as Record<string, string>)[id]
-    if (error && field) void api.metrics.track({ event: 'buy_validation_error', step: 'delivery', field, code: error === 'required' ? 'required' : 'invalid' }).catch(() => {})
+    if (error && field) void api.metrics.track({ event: 'buy_validation_error', step: 'details', field, code: error === 'required' ? 'required' : 'invalid' }).catch(() => {})
   }
   function showErrors(found: Record<string, string>) {
     setErrors(found)
@@ -210,7 +214,7 @@ export function BuyPage() {
     }
     return Object.keys(found).length > 0
   }
-  function go(next: number) { void api.metrics.track({ event: 'buy_step', step: (['design', 'delivery', 'review'] as const)[next] }).catch(() => {}); didNavigate.current = true; setErrors({}); setServerError(''); setPreviewChoice(null); void navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { state: { buyStep: next } }) }
+  function go(next: number) { void api.metrics.track({ event: 'buy_step', step: (['design', 'delivery', 'details', 'review'] as const)[next] }).catch(() => {}); didNavigate.current = true; setErrors({}); setServerError(''); setPreviewChoice(null); void navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { state: { buyStep: next } }) }
   async function addFiles(uid: string, files: File[] | null) {
     if (!files) return
     const available = MAX_PHOTOS - (draft.items.find((item) => item.uid === uid)?.photos.length ?? MAX_PHOTOS)
@@ -227,7 +231,7 @@ export function BuyPage() {
     // Availability can change while a customer is on a later step.
     for (let index = 0; index < 4; index++) {
       const found = validate(index)
-      if (Object.keys(found).length) { go(index < 2 ? 0 : 1); showErrors(found); return }
+      if (Object.keys(found).length) { go(index < 2 ? 0 : index - 1); showErrors(found); return }
     }
     void api.metrics.track({ event: 'buy_pay_click' }).catch(() => {})
     busyRef.current = true; setBusy(true); setServerError('')
@@ -256,7 +260,7 @@ export function BuyPage() {
           ? { deliveryKind: 'market' as const, pickupTime: draft.pickupTime }
           : { address: { line1: draft.line1.trim(), line2: draft.line2.trim() || undefined, postalCode: draft.postalCode.trim(), city: 'Wien' } }),
         deliveryDate: draft.deliveryDate, acceptTerms: draft.acceptTerms,
-        items: draft.items.map((item) => ({ kind: 'custom', withName: item.withName, color: item.color || undefined, finish: item.finish || undefined, petName: item.petName.trim(), backName: item.withName ? item.backName.trim() : undefined, note: item.note.trim() || undefined, photos: item.photos })),
+        items: draft.items.map((item) => ({ kind: 'custom', withName: item.withName, color: item.color || undefined, finish: item.finish || undefined, petName: item.petName.trim(), backName: item.withName ? item.backName : undefined, note: item.note.trim() || undefined, photos: item.photos })),
       })
       // Only follow Stripe Checkout or a same-origin URL (the mock success page).
       const target = new URL(result.checkoutUrl, window.location.origin)
@@ -264,8 +268,8 @@ export function BuyPage() {
       try { sessionStorage.setItem('awg-checkout-pending', result.orderCode) } catch { /* storage unavailable */ }
       window.location.assign(target.href)
     } catch (error) {
-      const problem = apiError(error, locale, t('shopCheckoutError')); const field = problem.field ?? ''; const match = field.match(/^items\[(\d+)\]\.(\w+)/); const item = match ? draft.items[Number(match[1])] : undefined; const itemFields: Record<string, [number, string]> = { petName: [1, 'pet'], photos: [1, 'photos'], color: [0, 'color'], finish: [0, 'finish'], backName: [0, 'back'], note: [1, 'note'] }; const simple: Record<string, [number, string]> = { customerName: [3, 'buy-name'], email: [3, 'buy-email'], phone: [3, 'buy-phone'], 'address.line1': [3, 'buy-line1'], 'address.line2': [3, 'buy-line2'], 'address.city': [3, 'buy-city'], address: [3, 'buy-line1'], 'address.postalCode': [3, 'buy-postal'], deliveryDate: [2, 'buy-date'], pickupTime: [2, 'buy-time'] }; const target = field === 'photos' && draft.items[0] ? [1, `photos-${draft.items[0].uid}`] as const : match && item && itemFields[match[2]] ? [itemFields[match[2]][0], `${itemFields[match[2]][1]}-${item.uid}`] as const : simple[field];
-      if (target) { go(target[0] < 2 ? 0 : 1); showErrors({ [target[1]]: (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string') ? `api:${error.code}` : 'shopFixErrors' }) } else setServerError(problem.text)
+      const problem = apiError(error, locale, t('shopCheckoutError')); const field = problem.field ?? ''; const match = field.match(/^items\[(\d+)\]\.(\w+)/); const item = match ? draft.items[Number(match[1])] : ['petName', 'backName', 'photos'].includes(field) ? draft.items[0] : undefined; const itemFields: Record<string, [number, string]> = { petName: item?.withName ? [0, 'back'] : [1, 'pet'], photos: [1, 'photos'], color: [0, 'color'], finish: [0, 'finish'], backName: [0, 'back'], note: [1, 'note'] }; const simple: Record<string, [number, string]> = { customerName: [3, 'buy-name'], email: [3, 'buy-email'], phone: [3, 'buy-phone'], 'address.line1': [3, 'buy-line1'], 'address.line2': [3, 'buy-line2'], 'address.city': [3, 'buy-city'], address: [3, 'buy-line1'], 'address.postalCode': [3, 'buy-postal'], deliveryDate: [2, 'buy-date'], pickupTime: [2, 'buy-time'] }; const itemField = match?.[2] ?? field; const target = item && itemFields[itemField] ? [itemFields[itemField][0], `${itemFields[itemField][1]}-${item.uid}`] as const : simple[field];
+      if (target) { go(target[0] < 2 ? 0 : target[0] - 1); showErrors({ [target[1]]: (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string') ? `api:${error.code}` : 'shopFixErrors' }) } else setServerError(problem.text)
       busyRef.current = false; setBusy(false)
     }
   }
@@ -274,8 +278,15 @@ export function BuyPage() {
 
   const activeItem = draft.items.find(item => item.uid === activeUid) ?? draft.items[0]
   function next() {
-    if (step === 2) { void pay(); return }
-    if (step === 1) { const found = { ...validate(2), ...validate(3) }; if (!showErrors(found)) { setReturnReview(false); go(2) }; return }
+    if (step === 3) { void pay(); return }
+    if (step === 1 || step === 2) {
+      if (!showErrors(validate(step + 1))) {
+        const readyForReview = returnReview && (step === 2 || !Object.keys(validate(3)).length)
+        setReturnReview(false)
+        go(readyForReview ? 3 : step + 1)
+      }
+      return
+    }
     const mobile = window.matchMedia('(max-width: 1023px)').matches
     if (mobile && substep < 2) {
       const all = validate(0)
@@ -284,9 +295,10 @@ export function BuyPage() {
       return
     }
     const found = { ...validate(0), ...validate(1) }
-    if (!showErrors(found)) { if (returnReview) { setReturnReview(false); go(2) } else go(1) }
+    if (!showErrors(found)) { if (returnReview) { setReturnReview(false); go(3) } else go(1) }
   }
   function back() {
+    setReturnReview(false)
     if (step === 0 && substep > 0) { didNavigate.current = true; setSubstep(substep - 1) }
     else if (step > 0) go(step - 1)
   }
@@ -303,38 +315,14 @@ export function BuyPage() {
     requestAnimationFrame(() => document.getElementById(`tab-${item.uid}`)?.focus())
   }
   function removeItem(uid: string) {
+    setPreviewChoice(null)
     const index = draft.items.findIndex(item => item.uid === uid)
     const rest = draft.items.filter(item => item.uid !== uid)
     const nextItem = rest[Math.min(index, rest.length - 1)]
     updateDraft({ items: rest })
     if (nextItem) { setActiveUid(nextItem.uid); requestAnimationFrame(() => document.getElementById(`tab-${nextItem.uid}`)?.focus()) }
   }
-  return <form data-public-page className={`${publicForm.page} ${styles.shop}`} noValidate onFocus={(event) => {
-    const target = event.target
-    if (!(target instanceof HTMLElement) || target.tabIndex < 0 || target.closest('[data-sticky-actions][data-docked="true"]')) return
-    // Native focus scrolling can leave a control under the sticky preview or
-    // actions, or just a fraction of a pixel outside the viewport.
-    requestAnimationFrame(() => {
-      if (document.activeElement !== target) return
-      // The public shell is the vertical scroller. A horizontally scrolling ancestor (e.g. the item tabs)
-      // also computes overflow-y:auto, so it must not be mistaken for it.
-      let scroller = target.closest<HTMLElement>('[data-public-scroll]') ?? target.parentElement
-      while (scroller && !scroller.hasAttribute('data-public-scroll') && !(/(auto|scroll)/.test(getComputedStyle(scroller).overflowY) && scroller.scrollHeight > scroller.clientHeight)) scroller = scroller.parentElement
-      const rect = target.getBoundingClientRect()
-      const viewport = scroller?.getBoundingClientRect()
-      const viewportTop = Math.max(0, viewport?.top ?? 0)
-      const viewportBottom = Math.min(window.innerHeight, viewport?.bottom ?? window.innerHeight)
-      const previewElement = document.querySelector<HTMLElement>(`.${styles.previewPane}`)
-      const actionsElement = document.querySelector<HTMLElement>(`.${styles.actions}`)
-      const preview = !previewElement?.contains(target) ? previewElement?.getBoundingClientRect() : undefined
-      const actions = !actionsElement?.contains(target) ? actionsElement?.getBoundingClientRect() : undefined
-      const overlaps = (other: DOMRect) => rect.left < other.right && rect.right > other.left
-      const top = preview && overlaps(preview) && preview.top <= viewportTop + 1 && preview.bottom > viewportTop ? preview.bottom + 8 : viewportTop + 8
-      const bottom = actions && overlaps(actions) && actions.bottom >= viewportBottom - 1 && actions.top < viewportBottom ? actions.top - 8 : viewportBottom - 8
-      const delta = rect.top < top ? rect.top - top : rect.bottom > bottom ? rect.bottom - bottom : 0
-      if (delta) (scroller ?? window).scrollBy({ top: delta, behavior: 'instant' })
-    })
-  }} onSubmit={(event) => { event.preventDefault(); next() }}>
+  return <form data-public-page className={`${publicForm.page} ${styles.shop}`} noValidate onFocus={keepFormFocusVisible} onSubmit={(event) => { event.preventDefault(); next() }}>
     <PageHeader title={t('shopTitle')}>{step === 0 && <p>{t('shopLead')}</p>}</PageHeader>
     {storageError ? <p role="status">{t('shopStorageError')}</p> : null}
     {params.get('cancelled') ? <p className={styles.notice} role="status">{t('shopCancelled')}</p> : null}
@@ -352,15 +340,21 @@ export function BuyPage() {
           {draft.items.filter(item => item.uid !== activeItem.uid).map(item => <div role="tabpanel" key={item.uid} id={`panel-${item.uid}`} aria-labelledby={`tab-${item.uid}`} hidden />)}
           <div role="tabpanel" id={`panel-${activeItem.uid}`} aria-labelledby={`tab-${activeItem.uid}`} className={styles.itemPanel} key={activeItem.uid}>
             <BuyItemsStep {...stepProps} activeUid={activeItem.uid} preview={setPreviewChoice} />
-            <div className={styles.petGroup}><BuyPetStep {...stepProps} activeUid={activeItem.uid} /></div>
+            <div className={styles.petGroup}><BuyPetStep {...stepProps} activeUid={activeItem.uid} changeName={() => {
+              const id = `back-${activeItem.uid}`
+              if (window.matchMedia('(max-width: 1023px)').matches) {
+                didNavigate.current = true; pendingErrorFocus.current = id; setSubstep(1)
+              } else document.getElementById(id)?.focus()
+            }} /></div>
             {draft.items.length > 1 && <div className={styles.itemFooter}><span>{t('ornamentN', { n: draft.items.findIndex(item => item.uid === activeItem.uid) + 1 })} · {formatEur(itemPrice(activeItem), locale)}</span><button type="button" className={styles.linkBtn} onClick={() => removeItem(activeItem.uid)}>{t('shopRemoveThis')}</button></div>}
           </div>
         </div>
       </div>}
-      {step === 1 && <><BuyDateStep {...stepProps} /><div className={styles.deliveryContact}><BuyContactStep {...stepProps} withAddress={!pickup} validateField={validateField} validFields={validFields} /></div></>}
-      {step === 2 && <BuyReviewStep {...stepProps} go={(index, uid, sub, field) => { pendingErrorFocus.current = field ?? null; if (uid) setActiveUid(uid); if (sub !== undefined) setSubstep(sub); setChangedSection(uid ?? (index === 3 ? 'contact' : 'delivery')); setReturnReview(true); go(index < 2 ? 0 : 1) }} itemsTotal={itemsTotal} deliveryFee={deliveryFee} total={total} changed={changedSection} />}
+      {step === 1 && <BuyDateStep {...stepProps} />}
+      {step === 2 && <BuyContactStep {...stepProps} withAddress={!pickup} validateField={validateField} validFields={validFields} />}
+      {step === 3 && <BuyReviewStep {...stepProps} go={(index, uid, sub, field) => { pendingErrorFocus.current = field ?? null; if (uid) setActiveUid(uid); if (sub !== undefined) setSubstep(sub); setChangedSection(uid ?? (index === 2 ? 'contact' : 'delivery')); setReturnReview(true); go(index) }} itemsTotal={itemsTotal} deliveryFee={deliveryFee} total={total} changed={changedSection} />}
     </section>
-    <aside hidden={step !== 1} className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><dl aria-live="polite"><div><dt>{t('shopItemsTotal')} ({draft.items.length})</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{deliveryFee ? formatEur(deliveryFee, locale) : t('shopFree')}</dd></div><div className={styles.cartTotal}><dt>{t('shopTotal')}</dt><dd>{formatEur(total, locale)}</dd></div></dl></aside>
-    <StickyActions className={styles.actions}><div className={styles.mobileTotal} hidden={step === 2}><span>{t('shopTotal')}</span><strong data-buy-total><AnimatedPrice value={total} locale={locale} /></strong></div>{(step > 0 || substep > 0) && <Button variant="secondary" disabled={busy} onClick={back}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 2 ? busy ? t('shopPaying') : `${t('shopPayStripe')} · ${formatEur(total, locale)}` : t('continue')}</Button>{step === 2 && <small className={styles.stripeLine}>{t('secureStripe')}</small>}</StickyActions>
+    <aside hidden={step !== 1 && step !== 2} className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><dl aria-live="polite"><div><dt>{t('shopItemsTotal')} ({draft.items.length})</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{deliveryFee ? formatEur(deliveryFee, locale) : t('shopFree')}</dd></div><div className={styles.cartTotal}><dt>{t('shopTotal')}</dt><dd>{formatEur(total, locale)}</dd></div></dl></aside>
+    <StickyActions className={styles.actions}><div className={styles.mobileTotal} hidden={step === 3}><span>{t('shopTotal')}</span><strong data-buy-total><AnimatedPrice value={total} locale={locale} /></strong></div>{(step > 0 || substep > 0) && <Button variant="secondary" disabled={busy} onClick={back}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 3 ? busy ? t('shopPaying') : `${t('shopPayStripe')} · ${formatEur(total, locale)}` : t('continue')}</Button>{step === 3 && <small className={styles.stripeLine}>{t('secureStripe')}</small>}</StickyActions>
   </form>
 }

@@ -60,11 +60,15 @@ class ShopApiTests extends ApiTestSupport {
     }
 
     private MvcResult checkout(String postal, String date, int customs, String email, String ip) throws Exception {
+        return checkoutNamed(postal, date, customs, email, ip, "luna");
+    }
+
+    private MvcResult checkoutNamed(String postal, String date, int customs, String email, String ip, String backName) throws Exception {
         List<Map<String, Object>> items = new ArrayList<>();
         var req = multipart("/api/shop/checkout");
         for (int i = 0; i < customs; i++) {
             items.add(Map.of("kind", "custom", "withName", i == 0, "color", "red", "finish", "shiny", "petName", "Luna" + i,
-                    "backName", "luna", "photos", List.of(Map.of("id", "p" + i, "name", "luna.jpg"))));
+                    "backName", backName, "photos", List.of(Map.of("id", "p" + i, "name", "luna.jpg"))));
             req.file(new MockMultipartFile("photo-p" + i, "luna.jpg", "image/jpeg", JPEG));
         }
         Map<String, Object> payload = Map.of("customerName", "Eva Gruber", "email", email, "phone", "+43 1 234",
@@ -72,6 +76,23 @@ class ShopApiTests extends ApiTestSupport {
                 "deliveryDate", date, "acceptTerms", true, "items", items);
         req.file(new MockMultipartFile("payload", "", "application/json", json(payload).getBytes()));
         return mvc.perform(req.with(r -> { r.setRemoteAddr(ip); return r; })).andReturn();
+    }
+
+    @Test
+    void rejectsLetteringThatExpandsBeyondSixOnUppercase() throws Exception {
+        var res = checkoutNamed("1070", "2026-12-02", 1, "eva@example.com", freshIp(), "Straße");
+        assertThat(res.getResponse().getStatus()).isEqualTo(400);
+        assertThat(this.<String>read(res, "$.code")).isEqualTo("VALIDATION");
+        assertThat(this.<String>read(res, "$.field")).isEqualTo("items[0].backName");
+        org.mockito.Mockito.verify(stripe, org.mockito.Mockito.never()).createCheckoutSession(anyString(), anyString(), anyString(), anyList(), any());
+    }
+
+    @Test
+    void acceptsSixLettersAfterUppercaseExpansion() throws Exception {
+        var res = checkoutNamed("1070", "2026-12-02", 1, "eva@example.com", freshIp(), "ßßß");
+        assertThat(res.getResponse().getStatus()).isEqualTo(200);
+        String code = read(res, "$.orderCode");
+        assertThat(orderRepository.findByCodeIgnoreCase(code).orElseThrow().getOrderItems().getFirst().getNameInOrnament()).isEqualTo("SSSSSS");
     }
 
     private void webhook(String type, String paymentStatus, long amount) throws Exception {
