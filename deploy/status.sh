@@ -30,7 +30,7 @@ ssh -i "$KEY" -o ConnectTimeout=10 "$HOST" '
   uptime -p
   free -h | awk "NR==2{print \"memory: \"\$3\" used / \"\$2} NR==3{print \"swap:   \"\$3\" used / \"\$2}"
   df -h / | awk "NR==2{print \"disk:   \"\$3\" used / \"\$2\" (\"\$5\")\"}"
-  cd /opt/awg && docker compose ps --format "{{.Service}}: {{.Status}}"
-  echo "recent backend errors: $(docker compose logs --since 24h backend 2>/dev/null | grep -c " ERROR ")"
+  cd /opt/awg && sudo docker compose ps --format "{{.Service}}: {{.Status}}"
+  echo "recent backend errors: $(sudo docker compose logs --since 24h backend 2>/dev/null | grep -c " ERROR ")"
   sudo find /var/lib/caddy -name "artwithgab.com.crt" -exec openssl x509 -noout -enddate -in {} \; | sed "s/notAfter=/certificate until: /"
 ' 2>&1

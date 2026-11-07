@@ -21,8 +21,9 @@ sed -e "s#build: ./awg-tracking#image: awg-backend:$TAG#" \
     -e "s#build: ./frontend#image: awg-frontend:$TAG#" \
     "$ROOT/docker-compose.yml" | "${SSH[@]}" 'cat > /opt/awg/docker-compose.yml'
 
+# .env is root-only (written by awg-secret), so compose runs through sudo.
 echo "==> Restarting"
-"${SSH[@]}" 'cd /opt/awg && test -f .env && docker compose --env-file .env up -d --remove-orphans && docker image prune -f >/dev/null'
+"${SSH[@]}" 'cd /opt/awg && sudo test -f .env && sudo docker compose --env-file .env up -d --remove-orphans && docker image prune -f >/dev/null'
 
 echo "==> Waiting for the backend health check"
 for _ in $(seq 1 40); do
@@ -31,5 +32,5 @@ for _ in $(seq 1 40); do
   fi
   sleep 5
 done
-echo "Backend did not become healthy; check: ssh ... 'cd /opt/awg && docker compose logs --tail 100 backend'" >&2
+echo "Backend did not become healthy; check: ssh ... 'cd /opt/awg && sudo docker compose logs --tail 100 backend'" >&2
 exit 1
