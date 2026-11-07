@@ -30,7 +30,7 @@ codex exec -m gpt-6.1-sol -c model_reasoning_effort=high "<task>" < /dev/null
 codex exec -s read-only -m gpt-6.1-sol -c model_reasoning_effort=medium "<review brief>" < /dev/null
 # GLM / DeepSeek through Vibe (read-only: only read tools). Models: glm-5-3 | zai-glm-5-3-flash | deepseek-v4-1-flash
 PATH="$HOME/.local/bin:$PATH" vibe --trust --model glm-5-3 --enabled-tools read_file --enabled-tools grep \
-  --max-turns 20 --time-limit 900 -p "<brief>" < /dev/null
+  --max-turns 60 --time-limit 1500 -p "<brief>" < /dev/null
 # For implementation drop --enabled-tools and add --agent accept-edits (still review the diff afterwards).
 ```
 
@@ -49,6 +49,15 @@ Every brief says: files/area, what done looks like, and "do not edit" for audits
 |---|---|---|---|---|
 | 2026-11-06 | Read-only review (small TS file) | Mistral Vibe (default model) | B | 3 plausible findings on `pickupTimes.ts`, unverified. Owner dropped Mistral's own models. |
 | 2026-11-06 | Smoke test (one-line summary) | GLM-5.3 / GLM-5.3 Flash / DeepSeek V4.1 Flash | A | All three answered correctly headless. |
+| 2026-11-06 | Multi-layer UI fix (public mobile: scrolling, 4-step /buy, single name) | Codex gpt-6.1-sol high | B | Root cause right; Claude review found 3 P1 (name field could not be emptied, two name inputs, legacy back names); E2E 132/132 on WebKit phones after fixes. |
+| 2026-11-06 | Fix list from review (10 items, front + back) | Codex gpt-6.1-sol high | B | All 10 done, backend 107 tests; left 117 E2E failures (axe contrast after layout change, stale specs) for Claude to find. |
+| 2026-11-06 | Read-only review of Codex diff | Claude subagent (general-purpose) | A | 10 findings, the 3 P1 confirmed real. |
+| 2026-11-06 | Staff UX overhaul + sales list + painting hours (front + back + V11) | Codex gpt-6.1-sol high | B | Finished code and tests (backend 119) but hit the ChatGPT usage limit while writing docs; 234k tokens. Split big briefs in two next time. |
+| 2026-11-06 | Read-only backend/front review (Vibe) | GLM-5.3 | B | Run 1 stopped at 30 turns with no report; run 2 (60 turns, narrow file list) gave 3 P2: 2 real (NUL in search, inexact quarter-hour check), 1 false positive (N+1 already batched). |
+| 2026-11-06 | Same read-only review, for comparison (Vibe) | DeepSeek V4.1 Flash | C | Finished in one run (60 turns). 7 findings: 1 real P2 (sales ?page past the end), 1 by-design (review orders not in Unpaid), 5 false positives (N+1 already batched, string deps, per-item undo exists, exact float for quarters, over-limit warning lives in Agenda). GLM-5.3 stays the third auditor. |
+| 2026-11-06 | Fix 40 E2E failures + 2 Agenda rule violations | Codex gpt-6.1-sol high | B | 40 → 6 (3 stale snapshots, 1 old test contradicting its new item-level filter, fixed by Claude). Good per-test diagnosis (most were weekday-comma selectors). Missed on review: pay button broke mid-word at 360px, repeated pet name and colour word on the review card, `<html lang>` always `en`. |
+| 2026-11-06 | Staff phone polish (5 defects from Claude's 360px screenshots) | Codex gpt-6.1-sol high | B | All 5 done, 690/693 E2E first run (1 load flake). Claude's screenshot review found 2 regressions: `StaffText` split dates ("Sat, 28 / Nov") and inventory swatch as a lone header; fixed by Claude. |
+| 2026-11-07 | Public /buy and /form vertical rhythm (owner: odd spacing, big gap at form end) | Codex gpt-6.1-sol high | B | Rhythm 8/24/32 px, duplicate heading removed, review row fixed; looked right in real-phone captures. Missed: hover preview showed a phantom choice after a layout shift (journey-deep failed), fixed by Claude. |
 
 ## Routing changes
 
