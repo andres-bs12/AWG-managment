@@ -43,14 +43,12 @@ public class InvoiceService {
         if (event.orderId() == null) return;
         var order = orders.findById(UUID.fromString(event.orderId())).orElseThrow();
         if (!handover && order.getPaymentState() == PaymentState.UNPAID) return;
-        // An invoice with placeholder seller data is not a valid document: issue nothing until it is configured.
-        if (!props.invoice().configured()) {
-            log.warn("Invoice not issued for order {}: awg.invoice.* seller data is not configured", order.getCode());
-            return;
-        }
+        // Without seller data there is no business to invoice from: send a plain payment
+        // confirmation (no invoice number, no tax wording) instead of a legally incomplete invoice.
+        boolean receipt = !props.invoice().configured();
         // One global lock serializes numbering and the duplicate check, including concurrent callbacks.
         var counter = counters.lockCounter().orElseThrow();
-        String stateKey = order.getPaymentState() + ":" + order.getTotal().setScale(2) + ":"
+        String stateKey = (receipt ? "R:" : "") + order.getPaymentState() + ":" + order.getTotal().setScale(2) + ":"
                 + order.getAmountPaid().setScale(2) + ":" + order.isHandedOver();
         var existing = invoices.findByOrderIdAndStateKey(order.getId(), stateKey);
         Invoice invoice;
@@ -66,9 +64,9 @@ public class InvoiceService {
             invoice.setStateKey(stateKey);
             invoice.setIssuedAt(clock.instant());
             // Orders/customers currently have no locale. Keep German as the explicit default.
-            invoice.setSubject("Rechnung " + number + " · " + order.getCode());
+            invoice.setSubject(receipt ? "Zahlungsbestätigung · " + order.getCode() : "Rechnung " + number + " · " + order.getCode());
             invoice.setBody(renderer.render(order, number, previous, invoice.getIssuedAt(),
-                    new CalendarIndex(days.findAllWithMarket(), LocalDateTime.now(clock.withZone(ZoneId.of(props.zone())))), "de"));
+                    new CalendarIndex(days.findAllWithMarket(), LocalDateTime.now(clock.withZone(ZoneId.of(props.zone())))), "de", receipt));
             invoice.setRecipient(order.getCustomer().getEmail() == null ? "" : order.getCustomer().getEmail().trim());
             invoice = invoices.save(invoice);
         }

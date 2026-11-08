@@ -22,12 +22,29 @@ public class InvoiceRenderer {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
     public String render(Order order, long number, Long previous, Instant issuedAt, CalendarIndex calendar, String locale) {
+        return render(order, number, previous, issuedAt, calendar, locale, false);
+    }
+
+    /** {@code receipt}: payment confirmation for a seller without business data; never claims to be an invoice. */
+    public String render(Order order, long number, Long previous, Instant issuedAt, CalendarIndex calendar, String locale, boolean receipt) {
         boolean en = "en".equals(locale);
         BigDecimal total = order.getTotal();
         BigDecimal paid = order.getAmountPaid();
         BigDecimal balance = total.subtract(paid).max(BigDecimal.ZERO);
         var seller = props.invoice();
         StringBuilder b = new StringBuilder();
+        if (receipt) {
+            String name = nz(order.getCustomer().getName()).trim();
+            // Stall sales without a name are stored as "Walk-in": greet them without it.
+            if (name.equalsIgnoreCase(Customer.PLACEHOLDER_NAME)) name = "";
+            b.append(en ? "Hello" : "Hallo").append(name.isEmpty() ? "" : " " + name).append(",\n\n");
+            b.append(balance.signum() == 0
+                    ? (en ? "thank you for your order! Here is the confirmation of your payment.\n\n" : "danke für deine Bestellung! Hier ist die Bestätigung deiner Zahlung.\n\n")
+                    : (en ? "thank you for your order! Here is the confirmation of your deposit. The rest is paid at handover.\n\n"
+                          : "danke für deine Bestellung! Hier ist die Bestätigung deiner Anzahlung. Den Rest zahlst du bei der Übergabe.\n\n"));
+            line(b, en ? "Payment confirmation" : "Zahlungsbestätigung", DATE.format(issuedAt.atZone(ZoneId.of(props.zone()))));
+            line(b, en ? "Order" : "Bestellung", order.getCode());
+        } else {
         b.append(en ? "Hello,\n\n" : "Hallo,\n\n");
         b.append(balance.signum() == 0 ? (en ? "Final invoice" : "Schlussrechnung") : (en ? "Invoice" : "Rechnung"))
                 .append(": ").append(number).append('\n');
@@ -40,6 +57,7 @@ public class InvoiceRenderer {
         line(b, en ? "Tax information" : "Steuerhinweis", seller.taxNote());
         if (seller.iban() != null && !seller.iban().isBlank()) line(b, "IBAN", seller.iban());
         line(b, en ? "Customer" : "Kunde", order.getCustomer().getName());
+        }
         var address = order.getDeliveryAddress();
         if (address != null) line(b, en ? "Address" : "Adresse", String.join(", ",
                 nz(address.getLine1()), nz(address.getLine2()), nz(address.getPostalCode()), nz(address.getCity())));
@@ -70,7 +88,8 @@ public class InvoiceRenderer {
                 line(b, en ? "   Market pickup" : "   Abholung am Markt", market + ", " + date + " " + time);
             }
         }
-        line(b, en ? "Delivery fee" : "Lieferkosten", money(order.getDeliveryFee() == null ? BigDecimal.ZERO : order.getDeliveryFee(), en));
+        BigDecimal fee = order.getDeliveryFee() == null ? BigDecimal.ZERO : order.getDeliveryFee();
+        if (!receipt || fee.signum() > 0) line(b, en ? "Delivery fee" : "Lieferkosten", money(fee, en));
         line(b, en ? "Total" : "Gesamt", money(total, en));
         line(b, en ? "Paid" : "Bezahlt", money(paid, en));
         line(b, en ? "Balance due" : "Offener Betrag", money(balance, en));
@@ -81,6 +100,7 @@ public class InvoiceRenderer {
         });
         line(b, en ? "Handed over" : "Übergeben", order.isHandedOver() ? (en ? "Yes" : "Ja") : (en ? "No" : "Nein"));
         line(b, en ? "Track your order" : "Bestellung verfolgen", props.shop().publicBaseUrl().replaceAll("/+$", "") + "/track/" + order.getCode());
+        if (receipt) b.append(en ? "\nWarm regards,\nGaby · ArtWithGab\n" : "\nLiebe Grüße\nGaby · ArtWithGab\n");
         return b.toString();
     }
 

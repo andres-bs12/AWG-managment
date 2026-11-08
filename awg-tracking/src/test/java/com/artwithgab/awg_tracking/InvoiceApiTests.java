@@ -111,6 +111,18 @@ class InvoiceApiTests extends ApiTestSupport {
         assertThat(invoices.findByOrderIdOrderByNumberAsc(id).getFirst().getBody()).contains("25.11.2026", "18:00–20:00");
     }
 
+    @Test void paymentConfirmationNeverClaimsToBeAnInvoice() throws Exception {
+        String staff = login();
+        UUID id = UUID.fromString(saleOk(staff, customItem(true, TUE, 10.0, 11.25, "market", dayId(staff, SAT), 14.5)));
+        orders.updatePaymentState(id, PaymentState.DEPOSIT, PaymentMethod.CARD, new BigDecimal("20.00"));
+        var order = orderRepository.findById(id).orElseThrow();
+        String text = renderer.render(order, 7L, 6L, order.getCreatedAt(), calendar.snapshot(), "de", true);
+        assertThat(text).contains("Zahlungsbestätigung", "Bestätigung deiner Anzahlung", "Bezahlt: 20,00 EUR", "Offener Betrag: 42,98 EUR",
+                "Rathausplatz", "14:30", "Liebe Grüße");
+        assertThat(text).doesNotContain("Rechnung", "Test Seller", "UID", "Steuerhinweis", "Ersetzt");
+        java.nio.file.Files.writeString(java.nio.file.Path.of("target", "zahlungsbestaetigung-sample.txt"), text);
+    }
+
     @Test void placeholderSellerDataIsNotConfigured() {
         assertThat(new com.artwithgab.awg_tracking.config.AwgProperties.Invoice("[Firmenname]", "Addr", null, "Note", null).configured()).isFalse();
         assertThat(new com.artwithgab.awg_tracking.config.AwgProperties.Invoice("Seller", "Addr", "[UID falls vorhanden]", "Note", null).configured()).isFalse();
