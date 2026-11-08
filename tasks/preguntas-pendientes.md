@@ -61,3 +61,10 @@ Al empezar el pago, la tienda reserva enseguida la bola y la hora de pintura. Ho
 - **Opción B:** no reservar hasta que Stripe confirme el pago. Esto conlleva el riesgo de vender dos veces la última bola.
 
 ¿Cuál prefieres?
+
+## 13. Facturas por e-mail (2026-11-08)
+
+1. **Datos del vendedor:** nombre comercial, dirección, UID (si hay) y la nota fiscal (por ejemplo, la de Kleinunternehmer). Hasta tenerlos no se emite ninguna factura. No los inventamos.
+2. **Conservación:** las facturas guardan nombre, dirección y e-mail del cliente y no se borran a los 60 días como el resto de datos (la BAO exige 7 años). ¿Lo confirma el asesor?
+3. **Días de entrega:** en la nota se dijo «miércoles y jueves», pero el sistema entrega miércoles y viernes de 18 a 20 h. Se mantuvo miércoles/viernes. ¿Correcto?
+

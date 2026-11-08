@@ -25,7 +25,7 @@ Constants that do not change:
 
 ```bash
 # Codex (implementation)
-codex exec -m gpt-6.1-sol -c model_reasoning_effort=high "<task>" < /dev/null
+codex exec -m gpt-6.1-sol -c model_reasoning_effort=high -s workspace-write "<task>" < /dev/null
 # Codex (audit, read-only)
 codex exec -s read-only -m gpt-6.1-sol -c model_reasoning_effort=medium "<review brief>" < /dev/null
 # GLM / DeepSeek through Vibe (read-only: only read tools). Models: glm-5-3 | zai-glm-5-3-flash | deepseek-v4-1-flash
@@ -58,6 +58,10 @@ Every brief says: files/area, what done looks like, and "do not edit" for audits
 | 2026-11-06 | Fix 40 E2E failures + 2 Agenda rule violations | Codex gpt-6.1-sol high | B | 40 → 6 (3 stale snapshots, 1 old test contradicting its new item-level filter, fixed by Claude). Good per-test diagnosis (most were weekday-comma selectors). Missed on review: pay button broke mid-word at 360px, repeated pet name and colour word on the review card, `<html lang>` always `en`. |
 | 2026-11-06 | Staff phone polish (5 defects from Claude's 360px screenshots) | Codex gpt-6.1-sol high | B | All 5 done, 690/693 E2E first run (1 load flake). Claude's screenshot review found 2 regressions: `StaffText` split dates ("Sat, 28 / Nov") and inventory swatch as a lone header; fixed by Claude. |
 | 2026-11-07 | Public /buy and /form vertical rhythm (owner: odd spacing, big gap at form end) | Codex gpt-6.1-sol high | B | Rhythm 8/24/32 px, duplicate heading removed, review row fixed; looked right in real-phone captures. Missed: hover preview showed a phantom choice after a layout shift (journey-deep failed), fixed by Claude. |
+| 2026-11-08 | Backend invoices + delivery window (V8, outbox, tests) | Codex gpt-6.1-sol high | B | 103 tests green; GLM audit found real gaps (placeholder seller data would be e-mailed, unbounded retries), fixed by Claude. `--full-auto` no longer exists: use `-s workspace-write`. |
+| 2026-11-08 | Multi-ornament UX redesign (/buy, /form) | Codex gpt-6.1-sol high | C | Built to brief, but Claude's screenshot review found the list pushed the editor off the first phone screen with one ornament, a duplicate heading and an empty desktop column; reworked by Claude (list only with 2+), 12 specs adjusted. |
+| 2026-11-08 | Public UX writing pass + thanks page + 1–5 scale (GLM via Vibe, accept-edits) | GLM-5.3 | B | Good first-person German copy with a before→after table; could not run node/npm in Vibe (approval denied), so code was unbuilt; 2 spec breaks and hard-coded scale labels fixed by Claude. |
+| 2026-11-08 | Read-only audit of invoice backend | GLM-5.3 | A | 5 findings: 3 real (placeholder data, retry cap, retention conflict), 1 false positive (lock contention), 1 design note. |
 
 ## Routing changes
 
@@ -66,6 +70,7 @@ Every brief says: files/area, what done looks like, and "do not edit" for audits
 | 2026-11-06 | Initial table; astra moved to medium for complex work | Owner's decision |
 | 2026-11-06 | Mistral's own models removed from routing | Owner: not good enough |
 | 2026-11-06 | GLM-5.3, GLM-5.3 Flash and DeepSeek V4.1 Flash added via Vibe | Included in the owner's Mistral plan |
+| 2026-11-08 | GLM via Vibe implementation briefs must not rely on running node/npm: Claude builds and tests afterwards | Vibe denied every node/npm call in accept-edits mode |
 
 ## Setup status
 

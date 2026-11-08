@@ -2,6 +2,8 @@
 
 ## Hecho
 
+- [x] 2026-11-08 · Feedback del mercado: facturas por e-mail (V8), franja 18–20 h, flujo de varias Kugeln, textos en primera persona, alemán por defecto, gracias mínima con todas las Kugeln, valoración 1–5. Backend 105/105, Node 36/36, E2E 448 en verde, capturas regeneradas y revisadas.
+
 - [x] 2026-11-05 · SEC-F — implementación de M1/L5 y hardening barato I2/I4/I5; política compartida de tokens HTTP/mock, protección de la entrega del iPad, build HTTP obligatorio y escape local, meta referrer, documentación HSTS y CORS. E2E ampliados; validación de navegador pendiente. Ver `docs/sec-f-handoff.md`.
 
 - [x] 2026-11-05 · Task 11 — implementación de staff (P0/P1 solicitados, mock/HTTP, capa de diseño y suite escrita). Build/lint, 23 pruebas Node y 92 backend pasan. Sin Playwright ni commits; detalles y matriz en `docs/task11-staff-handoff.md`.
@@ -21,6 +23,8 @@
 - [x] 2026-11-05 · Sprint 5 — auditoría final doble (Claude + Codex: UI, UX, seguridad; `tasks/audit-final.md`), arreglos backend y frontend con revisión cruzada, códigos de error estables, ventas idempotentes, revisión de pagos, cabeceras de seguridad, fuentes locales.
 
 ## Pendiente (ver `tasks/preguntas-pendientes.md` para decisiones del dueño)
+
+- [ ] Facturas: configurar `INVOICE_BUSINESS_NAME`/`INVOICE_ADDRESS`/`INVOICE_TAX_NOTE` (y `INVOICE_UID` si aplica) con datos aprobados por el asesor; probar V8 en PostgreSQL y el envío con SMTP real. Sin eso no se emite ninguna factura.
 
 - [x] 2026-11-05 · Validación de navegador cerrada: suite completa en verde para `/buy`, `/form`, recogida en mercado, SEC-F (399/404 con tres timeouts por carga que pasan aislados) y capturas regeneradas y revisadas. Sustituye los seguimientos de Fix 9–12, a–e, Task 5–8, 7B y 11.
 - [ ] Staff UX — pendiente tras los arreglos del 2026-11-05 (informes `tasks/audit-results/staff-ux-*`):
