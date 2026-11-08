@@ -16,7 +16,7 @@ import { apiError } from '../../lib/apiError'
 import { formatEur } from '../../lib/money'
 import styles from './BuyPage.module.css'
 import { MAX_PHOTOS, pickupTimes } from './buy/shared'
-import { ItemTabs } from '../../components/public/ItemTabs'
+import { OrnamentOverview } from '../../components/public/OrnamentOverview'
 import { BuyItemsStep } from './buy/BuyItemsStep'
 import { BuyPetStep } from './buy/BuyPetStep'
 import { BuyDateStep } from './buy/BuyDateStep'
@@ -160,7 +160,7 @@ export function BuyPage() {
     for (const field of ['color', 'finish'] as const) if (partial[field]) void api.metrics.track({ event: 'buy_choice', field, value: partial[field] }).catch(() => {})
     if (partial.withName !== undefined) void api.metrics.track({ event: 'buy_choice', field: 'name', value: partial.withName ? 'on' : 'off' }).catch(() => {})
     setDraft((current) => ({ ...current, items: current.items.map((item) => item.uid === uid ? { ...item, ...partial } : item) }))
-    const fields: Record<string, string> = { color: 'color', finish: 'finish', backName: 'back', petName: 'pet', note: 'note', photos: 'photos' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[`${fields[key]}-${uid}`]); return next }); setServerError('')
+    const fields: Record<string, string> = { color: 'color', finish: 'finish', withName: 'back', backName: 'back', petName: 'pet', note: 'note', photos: 'photos' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[`${fields[key]}-${uid}`]); return next }); setServerError('')
   }
   function validate(currentStep: number) {
     const found: Record<string, string> = {}
@@ -290,24 +290,39 @@ export function BuyPage() {
     if (step === 0 && substep > 0) { didNavigate.current = true; setSubstep(substep - 1) }
     else if (step > 0) go(step - 1)
   }
-  function updateDraft(partial: Partial<BuyDraft>) {
-    if (partial.items && partial.items.length > draft.items.length) { setActiveUid(partial.items[partial.items.length - 1].uid); setSubstep(0) }
-    if (partial.items && !partial.items.some(item => item.uid === activeUid)) setActiveUid(partial.items[0]?.uid ?? '')
-    patch(partial)
+  function selectItem(uid: string) {
+    setActiveUid(uid); setSubstep(0); setPreviewChoice(null)
+    requestAnimationFrame(() => {
+      // With one ornament left there is no editor heading; land on its first choice instead.
+      const heading = document.getElementById('ornament-editor-heading') ?? document.getElementById(`color-${uid}`)
+      if (!heading) return
+      heading.focus({ preventScroll: true })
+      heading.scrollIntoView({ block: 'start', behavior: 'instant' })
+      // The compact preview can stick above the editor; reveal its heading below it.
+      const scroller = heading.closest<HTMLElement>('[data-public-scroll]')
+      const preview = document.querySelector<HTMLElement>('[data-public-preview]')
+      const rect = heading.getBoundingClientRect()
+      const artwork = preview?.getBoundingClientRect()
+      const overlaps = artwork && rect.left < artwork.right && rect.right > artwork.left
+      const gap = parseFloat(getComputedStyle(heading).getPropertyValue('--space-4'))
+      const top = Math.max(0, scroller?.getBoundingClientRect().top ?? 0, overlaps && preview && getComputedStyle(preview).position === 'sticky' ? artwork.bottom : 0) + gap
+      if (rect.top < top) (scroller ?? window).scrollBy({ top: rect.top - top, behavior: 'instant' })
+    })
   }
-  function selectItem(uid: string) { setActiveUid(uid); setSubstep(0); setPreviewChoice(null) }
   function addItem() {
-    setPreviewChoice(null)
+    if (draft.items.length >= shopConfig.maxItems) return
     const item = newItem()
-    updateDraft({ items: [...draft.items, item] })
-    requestAnimationFrame(() => document.getElementById(`tab-${item.uid}`)?.focus())
+    patch({ items: [...draft.items, item] })
+    selectItem(item.uid)
   }
   function removeItem(uid: string) {
+    if (draft.items.length <= 1) return
     const index = draft.items.findIndex(item => item.uid === uid)
     const rest = draft.items.filter(item => item.uid !== uid)
-    const nextItem = rest[Math.min(index, rest.length - 1)]
-    updateDraft({ items: rest })
-    if (nextItem) { setActiveUid(nextItem.uid); requestAnimationFrame(() => document.getElementById(`tab-${nextItem.uid}`)?.focus()) }
+    patch({ items: rest })
+    setErrors(current => Object.fromEntries(Object.entries(current).filter(([key]) => !key.endsWith(`-${uid}`))))
+    setPhotoErrors(current => Object.fromEntries(Object.entries(current).filter(([key]) => key !== uid)))
+    selectItem(activeUid === uid ? rest[Math.min(index, rest.length - 1)].uid : activeUid)
   }
   return <form data-public-page className={`${publicForm.page} ${styles.shop}`} noValidate onFocus={(event) => {
     const target = event.target
@@ -347,14 +362,15 @@ export function BuyPage() {
           <div className={styles.previewSummary}><span>{t('shopTotal')}</span><strong data-buy-total><AnimatedPrice value={total} locale={locale} /></strong></div>
         </div>
         <div className={styles.optionsPane}>
-          <ItemTabs items={draft.items} activeUid={activeItem.uid} maxItems={config.maxItems} onSelect={selectItem} onAdd={addItem} />
-          {err('buy-add') && <p className={styles.error} role="alert">{err('buy-add')}</p>}
-          {draft.items.filter(item => item.uid !== activeItem.uid).map(item => <div role="tabpanel" key={item.uid} id={`panel-${item.uid}`} aria-labelledby={`tab-${item.uid}`} hidden />)}
-          <div role="tabpanel" id={`panel-${activeItem.uid}`} aria-labelledby={`tab-${activeItem.uid}`} className={styles.itemPanel} key={activeItem.uid}>
+          {/* A single ornament needs no list: the editor comes first and adding another is offered at the end. */}
+          {draft.items.length > 1 && <div className={styles.ornamentOverview}><OrnamentOverview items={draft.items.map(item => ({ ...item, price: itemPrice(item) }))} activeUid={activeItem.uid} maxItems={config.maxItems} onEdit={selectItem} onAdd={addItem} onRemove={removeItem} /></div>}
+          <div className={styles.itemPanel} key={activeItem.uid}>
+            {draft.items.length > 1 && <h3 id="ornament-editor-heading" className={styles.editorHeading} tabIndex={-1}>{t('multiEditorHeading', { n: draft.items.findIndex(item => item.uid === activeItem.uid) + 1, total: draft.items.length })}{activeItem.petName.trim() ? ` – ${activeItem.petName.trim()}` : ''}</h3>}
             <BuyItemsStep {...stepProps} activeUid={activeItem.uid} preview={setPreviewChoice} />
             <div className={styles.petGroup}><BuyPetStep {...stepProps} activeUid={activeItem.uid} /></div>
-            {draft.items.length > 1 && <div className={styles.itemFooter}><span>{t('ornamentN', { n: draft.items.findIndex(item => item.uid === activeItem.uid) + 1 })} · {formatEur(itemPrice(activeItem), locale)}</span><button type="button" className={styles.linkBtn} onClick={() => removeItem(activeItem.uid)}>{t('shopRemoveThis')}</button></div>}
           </div>
+          {draft.items.length === 1 && <div className={styles.addSingle}><Button id="buy-add" variant="secondary" size="lg" fullWidth disabled={draft.items.length >= config.maxItems} onClick={addItem}>{t('multiAddAnother')}</Button></div>}
+          {err('buy-add') && <p className={styles.error} role="alert">{err('buy-add')}</p>}
         </div>
       </div>}
       {step === 1 && <><BuyDateStep {...stepProps} /><div className={styles.deliveryContact}><BuyContactStep {...stepProps} withAddress={!pickup} validateField={validateField} validFields={validFields} /></div></>}

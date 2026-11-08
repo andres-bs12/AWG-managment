@@ -9,10 +9,10 @@ const contact = { customerName: 'Alex Example', email: 'alex@example.com', phone
 const address = { line1: 'Hauptstraße 1', line2: 'Stiege 2, Tür 3', postalCode: '1010', city: 'Wien' }
 const note = 'Keep the white whiskers'
 const money = (amount: number, locale: Locale = 'de') => new Intl.NumberFormat(locale === 'de' ? 'de-AT' : 'en-IE', { style: 'currency', currency: 'EUR' }).format(amount)
-const preview = (page: Page) => page.locator('form div[role="img"]')
+const preview = (page: Page) => page.locator('[data-public-preview] div[role="img"]')
 // The first column is the persistent preview, above the options at mobile widths.
 const price = (page: Page) => page.locator('form [data-buy-total]:visible').first().locator('span[aria-hidden="true"]')
-const nameOption = (page: Page) => page.getByRole('checkbox', { name: /name (auf|on)/i })
+const nameOption = (page: Page, withName = true) => page.getByRole('radio', { name: withName ? /^(Ja|Yes),/ : /^(Nein|No)$/ })
 const backButton = (page: Page) => page.locator('form').getByRole('button', { name: /^(Zurück|Back)$/ })
 
 async function prepare(page: Page): Promise<ShopConfig> {
@@ -162,8 +162,9 @@ test('two ornaments keep independent colour, finish, names, previews and totals 
   for (const [color, finish, name, label] of [
     ['Rot', 'Glänzend', 'Luna', firstLabel], ['Grün', 'Matt', 'Max', secondLabel],
   ] as const) {
-    await page.getByRole('tab', { name, exact: true }).click()
-    await expect(page.getByRole('tab', { name, exact: true })).toHaveAttribute('aria-selected', 'true')
+    const edit = page.getByRole('button', { name: new RegExp(`Kugel \\d+ · ${name} bearbeiten`) })
+    if (await edit.count()) await edit.click()
+    await expect(page.locator('#ornament-editor-heading')).toContainText(name)
     await expect(page.getByRole('radio', { name: color, exact: true })).toBeChecked()
     await expect(page.getByRole('radio', { name: finish, exact: true })).toBeChecked()
     await expect(preview(page)).toHaveAttribute('aria-label', label)
@@ -174,9 +175,9 @@ test('two ornaments keep independent colour, finish, names, previews and totals 
     await expect(page.getByRole('img', { name: `Foto 1 von ${name}`, exact: true })).toBeVisible()
   }
   // Removal lives in the options card, visible in substep 0 on mobile.
-  await page.getByRole('tab', { name: 'Max', exact: true }).click()
-  await page.getByRole('button', { name: 'Diese Kugel entfernen', exact: true }).click()
-  await expect(page.getByRole('tab', { name: 'Max', exact: true })).toHaveCount(0)
+  // Max is the ornament being edited, so it has no Edit button; removal is still offered.
+  await page.getByRole('button', { name: 'Kugel 2 · Max entfernen', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Kugel 2 · Max entfernen', exact: true })).toHaveCount(0)
   await expect(preview(page)).toHaveAttribute('aria-label', firstLabel)
   const remainingTotal = config.customPrice + config.nameExtra + config.deliveryFee
   await expect(price(page)).toHaveText(money(remainingTotal))
@@ -213,7 +214,7 @@ test('name option adds exactly 12.99, turns to the scripted back and retains its
   await back.click()
   await expect(back).toBeChecked()
   await expect(preview(page).locator('svg text')).toHaveCSS('opacity', '1')
-  await nameOption(page).uncheck()
+  await nameOption(page, false).check()
   await expect(price(page)).toHaveText(money(base))
   await expect(preview(page)).toHaveAttribute('aria-label', 'Rot, Glänzend, Name: kein Name · Vorne')
   await expect(page.locator('input[id^="back-"]')).toHaveCount(0)
@@ -231,7 +232,7 @@ test('name option adds exactly 12.99, turns to the scripted back and retains its
 async function measuredClick(page: Page, control: Locator, expectedLabel: string, expectedPrice: string, priceMustChange: boolean) {
   await control.evaluate((node, expected) => {
     const win = window as unknown as { journeyLatency?: Promise<number> }
-    const image = document.querySelector('form div[role="img"]')!
+    const image = document.querySelector('[data-public-preview] div[role="img"]')!
     const total = [...document.querySelectorAll('form [data-buy-total]')].find(node => node.getClientRects().length)!
     const visiblePrice = total.querySelector('span[aria-hidden="true"]')!
     const exactPrice = total.querySelector('.visually-hidden')!
@@ -265,7 +266,7 @@ test('configuration reacts in under 100ms (median of five colour clicks and five
   if (mobile(page)) await next(page).click()
   await nameOption(page).check()
   await page.locator('input[id^="back-"]').fill('LUNA')
-  await nameOption(page).uncheck()
+  await nameOption(page, false).check()
   if (mobile(page)) await backButton(page).click()
   await expect(price(page)).toHaveText(money(config.customPrice + config.deliveryFee))
   const colourSamples: number[] = []
@@ -279,7 +280,7 @@ test('configuration reacts in under 100ms (median of five colour clicks and five
   if (mobile(page)) await next(page).click()
   const priceSamples: number[] = []
   for (const withName of [true, false, true, false, true]) {
-    priceSamples.push(await measuredClick(page, nameOption(page),
+    priceSamples.push(await measuredClick(page, nameOption(page, withName),
       `Grün, Glänzend, Name: ${withName ? 'LUNA · Hinten' : 'kein Name · Vorne'}`,
       money(config.customPrice + config.deliveryFee + (withName ? config.nameExtra : 0)), true))
     await expect(nameOption(page)).toBeChecked({ checked: withName })

@@ -78,7 +78,7 @@ test('confirms only after Track changes from unpaid to paid, then copies and lin
   await expect(page.getByRole('heading', { name: 'Zahlung wird bestätigt…' })).toHaveCount(0)
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('awg-buy-draft'))).toBeNull()
   const timeline = page.getByRole('list').filter({ has: page.getByRole('listitem').filter({ hasText: /^Bezahlt/ }) })
-  await expect(timeline.getByRole('listitem')).toHaveText(['Bezahlt ✓', 'Wird gemalt', /Lieferung.*2\. Dezember 2026.*abends/])
+  await expect(timeline.getByRole('listitem')).toHaveText(['Bezahlt ✓', 'Wird gemalt', /Lieferung.*2\. Dezember 2026.*18–20 Uhr/])
   await expect(page.getByRole('link', { name: 'Bestellung verfolgen', exact: true })).toHaveAttribute('href', `/track/${code}`)
   await page.getByRole('button', { name: 'Code kopieren', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Code kopiert' })).toBeVisible()
@@ -123,15 +123,16 @@ test('downloads a calendar event for the confirmed delivery date', async ({ page
   const lines = content.split('\r\n')
   expect(lines[0]).toBe('BEGIN:VCALENDAR')
   expect(lines).toContain('BEGIN:VEVENT')
-  expect(lines).toContain(`DTSTART;VALUE=DATE:${deliveryDate.replaceAll('-', '')}`)
-  expect(lines).toContain('DTEND;VALUE=DATE:20261203')
+  // A Vienna delivery is a timed event: 18:00–20:00 Europe/Vienna (no longer all-day).
+  expect(lines).toContain(`DTSTART;TZID=Europe/Vienna:${deliveryDate.replaceAll('-', '')}T180000`)
+  expect(lines).toContain(`DTEND;TZID=Europe/Vienna:${deliveryDate.replaceAll('-', '')}T200000`)
   expect(lines).toContain(`UID:${code}@artwithgab.com`)
   expect(lines.find(line => line.startsWith('SUMMARY:'))).toMatch(/ArtWithGab/)
   expect(lines).toContain('END:VCALENDAR')
 })
 
 for (const transport of ['http', 'mock'] as const) {
-  test(`SEQ sends only one score of 6 via ${transport} and thanks the customer`, async ({ page }) => {
+  test(`SEQ sends only one score of 3 via ${transport} and thanks the customer`, async ({ page }) => {
     const requests: unknown[] = []
     await page.route(metricsEndpoint, async route => {
       expect(route.request().method()).toBe('POST')
@@ -141,19 +142,23 @@ for (const transport of ['http', 'mock'] as const) {
     })
     await paidThanks(page, transport === 'http')
     const seq = page.getByRole('group', { name: 'Wie einfach war die Bestellung?', exact: true })
-    await expect(seq.getByRole('button')).toHaveText(['1', '2', '3', '4', '5', '6', '7'])
-    await seq.getByRole('button', { name: '6', exact: true }).click()
+    await expect(seq.getByRole('radio')).toHaveCount(5)
+    await seq.getByRole('radio', { name: '3', exact: true }).check()
     await expect(seq.getByRole('status')).toHaveText('Danke für dein Feedback.')
-    await expect(seq.getByRole('button')).toHaveCount(0)
-    const expected = [{ event: 'buy_seq', value: '6' }]
+    await expect(seq.getByRole('radio', { name: '3', exact: true })).toBeChecked()
+    const expected = [{ event: 'buy_seq', value: '3' }]
     if (transport === 'http') {
       await expect.poll(() => requests).toEqual(expected)
     } else {
       await expect.poll(() => page.evaluate(() => (window as MetricsWindow).__awgMetrics)).toEqual(expected)
       expect(requests).toEqual([])
     }
-    // The answered state stays visible and offers no second submission.
+    // The answered state stays visible, keeps the chosen value and offers no second submission.
     await page.getByRole('button', { name: 'Code kopieren', exact: true }).focus()
+    await expect(seq.getByRole('radio', { name: '3', exact: true })).toBeChecked()
+    // One answer only: the other options lock after the first choice.
+    await expect(seq.getByRole('radio', { name: '5', exact: true })).toBeDisabled()
+    await expect(seq.getByRole('radio', { name: '3', exact: true })).toBeChecked()
     await expect(seq.getByRole('status')).toHaveText('Danke für dein Feedback.')
     if (transport === 'http') expect(requests).toEqual(expected)
     else expect(await page.evaluate(() => (window as MetricsWindow).__awgMetrics)).toEqual(expected)
@@ -164,7 +169,7 @@ test('cancelled checkout says nothing was charged and restores the saved design'
   await open(page)
   await choose(page)
   if (mobile(page)) await next(page).click()
-  await page.locator('input[type=checkbox]').first().check()
+  await page.getByRole('radio', { name: /^(Ja|Yes),/ }).check()
   await page.locator('input[id^="back-"]').fill('LUNA')
   if (mobile(page)) await next(page).click()
   await page.locator('input[id^="pet-"]').fill('Luna')
@@ -185,7 +190,7 @@ test('cancelled checkout says nothing was charged and restores the saved design'
   await expect(page.getByRole('radio', { name: 'Rot', exact: true })).toBeChecked()
   await expect(page.getByRole('radio', { name: 'Glänzend', exact: true })).toBeChecked()
   if (mobile(page)) await next(page).click()
-  await expect(page.locator('input[type=checkbox]').first()).toBeChecked()
+  await expect(page.getByRole('radio', { name: /^(Ja|Yes),/ })).toBeChecked()
   await expect(page.locator('input[id^="back-"]')).toHaveValue('LUNA')
   if (mobile(page)) await next(page).click()
   await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
@@ -255,7 +260,7 @@ for (const transport of ['http', 'mock'] as const) {
     })
     expect(saved).toEqual({ token: expect.any(String), savedAt: Date.parse('2026-11-05T12:00:00Z') })
     if (transport === 'http') await useHttpMetrics(page)
-    await page.getByRole('group', { name: 'Wie einfach war die Bestellung?' }).getByRole('button', { name: '6', exact: true }).click()
+    await page.getByRole('group', { name: 'Wie einfach war die Bestellung?' }).getByRole('radio', { name: '3', exact: true }).check()
     await expect(page.getByRole('status').filter({ hasText: 'Danke für dein Feedback.' })).toBeVisible()
 
     const allowed = ['buy_view', 'buy_step', 'buy_choice', 'buy_photo_added', 'buy_validation_error', 'buy_pay_click', 'buy_seq']
@@ -276,7 +281,7 @@ for (const transport of ['http', 'mock'] as const) {
       }
       expect(serialized).not.toMatch(/data:image|formtoken|tracktoken|\/form\//)
     }
-    expect(metrics.filter(metric => (metric as BuyMetric).event === 'buy_seq')).toEqual([{ event: 'buy_seq', value: '6' }])
+    expect(metrics.filter(metric => (metric as BuyMetric).event === 'buy_seq')).toEqual([{ event: 'buy_seq', value: '3' }])
   })
 }
 
@@ -329,4 +334,17 @@ test('HTTP checkout stores a dated token only on success and restores customer T
   }, code)
   expect(tokenHeaders.at(-1)).toBeUndefined()
   expect(await stored()).toBeNull()
+})
+
+test('shows every ornament of the order after payment, side by side', async ({ page }) => {
+  await open(page)
+  const view = trackView('paid')
+  view.items.push({ kind: 'custom', color: 'green', finish: 'matte', petName: 'Max', withName: false, backName: '', productionStatus: 'not_started' })
+  await page.route(trackEndpoint, route => route.fulfill({ json: view }))
+  await showThanks(page)
+  await expect(page.getByRole('heading', { level: 1, name: 'Danke für deine Bestellung!' })).toBeVisible()
+  const previews = page.locator('[class*="thanksPreviews"] > *')
+  await expect(previews).toHaveCount(2)
+  const [a, b] = await Promise.all([previews.nth(0).boundingBox(), previews.nth(1).boundingBox()])
+  expect(Math.abs(a!.y - b!.y)).toBeLessThan(2)
 })

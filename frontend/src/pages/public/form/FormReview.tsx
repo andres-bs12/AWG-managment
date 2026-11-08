@@ -16,14 +16,14 @@ export function FormReview({ view, draft, handoffs, edit }: { view: CustomerForm
     {items.map((source, index) => {
       const item = draft.items.find(row => row.orderItemId === source.id)
       const details = item ?? source
-      const title = t('ornamentN', { n: index + 1 })
+      const title = `${t('ornamentN', { n: index + 1 })}${details.petName?.trim() ? ` · ${details.petName.trim()}` : ''}`
       // Colour and finish on one line; an order without either says so once, not twice.
       const look = [source.color && `${t(colorKeys[source.color])}${source.color === 'grey' || source.color === 'white' ? ` (${t('legacyColour')})` : ''}`, source.finish && t(source.finish === 'shiny' ? 'finishShiny' : 'finishMatte')].filter(Boolean).join(' · ') || t('formFinishUnknown')
       return <ReviewCard key={source.id} title={title}
         action={item ? { label: editLabel, ariaLabel: t('editOrnamentNamed', { name: details.petName?.trim() || title }), onClick: () => edit(`pet-${source.id}`) } : undefined}
         rows={[
           { label: t('reviewLook'), value: look },
-          ...(source.withName ? [{ label: t('backName'), value: details.backName }] : []),
+          { label: t('multiNameQuestion'), value: source.withName ? details.backName : t('multiNoName') },
           ...(details.note ? [{ label: t('noteLabel'), value: details.note }] : []),
         ]}>
         <div className={styles.reviewProduct}><div className={styles.reviewPreview}><OrnamentPreview item={previewItem(source, item)} static /></div><p>{details.petName || t(source.kind === 'finished' ? 'finishedOrnament' : 'customOrnament')}</p><span className={styles.price}>{formatEur(source.cost, locale)}</span></div>

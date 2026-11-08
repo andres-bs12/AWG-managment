@@ -6,6 +6,7 @@ import type { CustomerFormView, OrderItem } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
 import { apiError } from '../../lib/apiError'
 import { formatDateLabel, formatHour } from '../../lib/time'
+import { deliveryDatePhrase } from '../../lib/deliveryWindow'
 import { formDraftKey, restoreFormDraft, serializeFormDraft, type FormDraft, type FormItemDraft } from '../../lib/formDraft'
 import { PublicPage, PageHeader, PublicState, ErrorSummary, StickyActions } from '../../components/public/PublicForm'
 import shell from '../../components/public/PublicForm.module.css'
@@ -111,7 +112,7 @@ function CustomerForm({ token }: { token: string }) {
     for (const [prefix, key] of [['pet', 'petName'], ['back', 'backName'], ['photos', 'formPhotos'], ['note', 'noteLabel']]) labels[`${prefix}-${item.orderItemId}`] = `${t(key)} · ${t('ornamentN', { n: index + 1 })}`
   })
   const handoffs = [...new Set((view?.handoffs ?? []).map(handoff => handoff.kind === 'vienna'
-    ? [t('whenVienna'), handoff.date ? formatDateLabel(handoff.date, locale === 'de' ? 'de-AT' : 'en-GB') : ''].filter(Boolean).join(' · ')
+    ? [t('whenVienna'), handoff.date ? deliveryDatePhrase(handoff.date, locale) : ''].filter(Boolean).join(' · ')
     : handoff.kind === 'unknown' ? t('whenTbd')
       : [handoff.marketName, handoff.date ? formatDateLabel(handoff.date, locale === 'de' ? 'de-AT' : 'en-GB') : '', handoff.fromHour != null ? t('whenFrom', { time: formatHour(handoff.fromHour) }) : ''].filter(Boolean).join(' · ')))]
 

@@ -25,7 +25,13 @@ export function BuyItemsStep({ t, draft, config, patchItem, err, described, acti
       </fieldset>{err(`finish-${item.uid}`) && <p className={styles.error} id={`finish-${item.uid}-error`} role="alert">{err(`finish-${item.uid}`)}</p>}
       {soldOut && <div className={styles.waitlist}><button type="button" className={styles.linkBtn} aria-expanded={waitlist} aria-controls={`waitlist-${activeUid}`} onClick={() => setWaitlist(value => !value)}>{t('waitlistNotify')}</button><div id={`waitlist-${activeUid}`} hidden={!waitlist}>{waitlist && <WaitlistSignup onJoin={onJoinWaitlist} />}</div></div>}
       </div><div className={styles.nameGroup}><div className={styles.nameCard} data-on={item.withName}>
-        <label className={styles.check}><input type="checkbox" checked={item.withName} onChange={event => patchItem(item.uid, { withName: event.target.checked })} /><span>{t('shopNameOnBack')}</span><strong className={styles.price}>+{formatEur(config.nameExtra, locale)}</strong></label>
+        <fieldset className={styles.nameChoice}>
+          <legend>{t('multiNameQuestion')}</legend>
+          <div className={styles.nameOptions}>{[false, true].map(withName => <label key={String(withName)} className={styles.nameOption} data-selected={item.withName === withName}>
+            <input className={styles.choiceInput} type="radio" name={`with-name-${item.uid}`} value={String(withName)} checked={item.withName === withName} onChange={() => patchItem(item.uid, { withName })} />
+            <span>{withName ? t('multiNameYes', { price: formatEur(config.nameExtra, locale) }) : t('multiNameNo')}</span>
+          </label>)}</div>
+        </fieldset>
         {item.withName && <div className={styles.nameDetails}><Field label={t('backName')} htmlFor={`back-${item.uid}`} hint={t('shopBackNameHint')} error={err(`back-${item.uid}`)}><input id={`back-${item.uid}`} value={item.backName} maxLength={6} aria-invalid={!!err(`back-${item.uid}`)} aria-describedby={described(`back-${item.uid}`, true)} onChange={event => patchItem(item.uid, { backName: event.target.value.replace(/[^\p{L}]/gu, '').slice(0, 6) })} /></Field><p className={styles.muted}>{t('nameNonRefund')}</p></div>}
       </div></div>
     </div>)}

@@ -1,0 +1,46 @@
+.overview { display: grid; gap: var(--space-4); min-width: 0; }
+.overview h3, .overview p { margin: 0; }
+.list { display: grid; gap: var(--space-3); list-style: none; margin: 0; padding: 0; }
+.row {
+  display: grid;
+  grid-template-columns: var(--size-review-art) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border-thin) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+.row[data-editing='true'] {
+  padding: calc(var(--space-4) - var(--border-thin));
+  border: var(--border-control) solid var(--color-selected);
+  background: var(--color-selected-surface);
+}
+.preview { grid-row: span 2; pointer-events: none; }
+.details { display: grid; gap: var(--space-1); min-width: 0; overflow-wrap: anywhere; }
+.label, .editing { font-weight: var(--type-label-weight); }
+.summary { color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
+.editing { font-size: var(--type-hint-size); }
+.price { grid-column: 2; justify-self: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.actions > button { flex: 1; overflow-wrap: anywhere; }
+@media (min-width: 768px) {
+  .row { grid-template-columns: var(--size-review-art) minmax(0, 1fr) max-content; }
+  .preview { grid-row: span 2; }
+  .price { grid-column: 3; grid-row: 1; }
+  .actions { grid-column: 2 / -1; justify-content: end; }
+  .actions > button { flex: initial; }
+}
+/* Keep the shared Button's public roles explicit while its legacy skin is migrated. */
+.overview button {
+  min-height: var(--touch-lg); padding: var(--space-2) var(--space-4);
+  border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control);
+  background: var(--color-surface-raised); color: var(--color-text);
+  font: var(--type-button-weight) var(--type-button-size)/var(--type-button-line) var(--font-sans);
+  transition: transform var(--dur-press) var(--ease-press);
+}
+.overview button:disabled { opacity: 1; color: var(--color-disabled-text); background: var(--color-disabled-surface); }
+.overview button:focus-visible { outline: none; box-shadow: var(--focus); }
+@media (hover: hover) { .overview button:hover:not(:disabled) { background: var(--color-selection-hover); } }
+@media (prefers-reduced-motion: reduce) { .overview button { transition: none; } .overview button:active { transform: none; } }

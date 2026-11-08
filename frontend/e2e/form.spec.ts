@@ -313,6 +313,11 @@ test('two ornaments keep fixed variants, independent details and the bought name
   await expect(page.locator('input[id^="back-"]')).toHaveCount(1)
   await expect(page.locator('input[type="checkbox"]')).toHaveCount(0)
   await expect(page.locator('input[value="red"], input[value="green"], input[value="shiny"], input[value="matte"]')).toHaveCount(0)
+  const overview = page.getByRole('list', { name: 'In deiner Bestellung' })
+  await expect(overview.locator(':scope > li')).toHaveCount(2)
+  await expect(overview.locator(':scope > li').nth(1)).toContainText('Ohne Namen')
+  await overview.getByRole('button', { name: 'Kugel 2 · Otto bearbeiten', exact: true }).click()
+  await expect(page.locator('[id^="form-editor-"]').nth(1)).toBeFocused()
   const first = prepared.view.items![0], second = prepared.view.items![1]
   await page.locator(`#pet-${first.id}`).fill('Milo')
   await expect(page.locator(`#pet-${second.id}`)).toHaveValue('Otto')

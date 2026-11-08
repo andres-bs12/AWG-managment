@@ -10,7 +10,7 @@ export const legal: Record<'de' | 'en', Record<LegalPageTitle, LegalDocument>> =
       language: 'Die deutsche Fassung ist verbindlich; die englische Fassung dient als Übersetzung.',
       sections: [
         { heading: 'Angaben gemäß § 5 ECG und § 25 MedienG', list: ['[Vollständiger Name / Firmenname]', '[Anschrift]', 'E-Mail: [E-Mail]', 'Telefon: [Telefon]', 'UID-Nummer: [UID-Nummer falls vorhanden]', 'Gewerbe / GISA-Zahl: [GISA-Zahl / Gewerbe]', 'Zuständige Aufsichtsbehörde: [Aufsichtsbehörde]', 'Mitgliedschaft bei der Wirtschaftskammer: [Mitgliedschaft / Fachgruppe falls vorhanden]'] },
-        { heading: 'Über ArtWithGab', paragraphs: ['Gaby bemalt Weihnachtsornamente in Wien von Hand. ArtWithGab verkauft sie 2026 auf Wiener Weihnachtsmärkten und im Online-Shop.'], list: ['Medieninhaber:in: [Medieninhaber:in]', 'Unternehmensgegenstand: [Unternehmensgegenstand]', 'Grundlegende Richtung der Website: [Grundlegende Richtung]'] },
+        { heading: 'Über ArtWithGab', paragraphs: ['Ich bin Gaby und bemale Christbaumkugeln in Wien von Hand. ArtWithGab verkauft sie 2026 auf Wiener Weihnachtsmärkten und im Online-Shop.'], list: ['Medieninhaber:in: [Medieninhaber:in]', 'Unternehmensgegenstand: [Unternehmensgegenstand]', 'Grundlegende Richtung der Website: [Grundlegende Richtung]'] },
       ],
     },
     terms: {
@@ -42,7 +42,7 @@ export const legal: Record<'de' | 'en', Record<LegalPageTitle, LegalDocument>> =
       language: 'The German version is binding; this English version is a translation.',
       sections: [
         { heading: 'Information under § 5 ECG and § 25 MedienG', list: ['[Full name / business name]', '[Address]', 'Email: [Email]', 'Phone: [Phone]', 'VAT ID: [VAT ID if applicable]', 'Trade / GISA number: [GISA number / trade]', 'Supervisory authority: [Supervisory authority]', 'Chamber of Commerce membership: [Membership / trade group if applicable]'] },
-        { heading: 'About ArtWithGab', paragraphs: ['Gaby hand-paints Christmas ornaments in Vienna. ArtWithGab sells them at Vienna Christmas markets in 2026 and through the online shop.'], list: ['Media owner: [Media owner]', 'Business activity: [Business activity]', 'Purpose of this website: [Website purpose]'] },
+        { heading: 'About ArtWithGab', paragraphs: ['I am Gaby and I hand-paint Christmas ornaments in Vienna. ArtWithGab sells them at Vienna Christmas markets in 2026 and through the online shop.'], list: ['Media owner: [Media owner]', 'Business activity: [Business activity]', 'Purpose of this website: [Website purpose]'] },
       ],
     },
     terms: {

@@ -14,6 +14,7 @@ import { ButtonLink } from '../../components/ui/ButtonLink'
 import { Field } from '../../components/ui/Field'
 import { useLocale } from '../../i18n/LocaleContext'
 import { formatDateLabel, formatHour } from '../../lib/time'
+import { deliveryDatePhrase } from '../../lib/deliveryWindow'
 import type { Address, TrackView } from '../../domain/types'
 import styles from './TrackPage.module.css'
 
@@ -128,7 +129,8 @@ export function TrackPage() {
   if (view) {
     const when = view.when
     if (when.kind === 'vienna') {
-      whenLines.push([t('whenVienna'), when.date ? formatDateLabel(when.date, locale === 'de' ? 'de-AT' : 'en-GB') : ''].filter(Boolean).join(' · '))
+      // One phrase with the delivery window, never "Wed / Fri" beside a date.
+      whenLines.push([t('whenVienna'), when.date ? deliveryDatePhrase(when.date, locale) : ''].filter(Boolean).join(' · '))
     } else if (when.kind === 'market') {
       const head = [
         when.date ? formatDateLabel(when.date, locale === 'de' ? 'de-AT' : 'en-GB') : null,

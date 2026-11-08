@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { open, choose, mobile, next, pet, review, axe } from './helpers'
 
-test('chips, tabs and side segments use the exact token geometry', async ({ page }) => {
+test('chips and side segments use the exact token geometry', async ({ page }) => {
   await open(page)
   await choose(page)
   const read = () => page.evaluate(() => {
@@ -11,11 +11,11 @@ test('chips, tabs and side segments use the exact token geometry', async ({ page
       const style = getComputedStyle(node)
       return { blockStart: parseFloat(style.paddingTop), blockEnd: parseFloat(style.paddingBottom), innerGap: parseFloat(style.columnGap), height: node.getBoundingClientRect().height, left: parseFloat(style.paddingLeft), right: parseFloat(style.paddingRight), border: parseFloat(style.borderLeftWidth), expectedLeft: token(inset), expectedRight: token('--space-4'), expectedGap: token('--space-2') }
     })
-    return { size: token('--size-control'), gap: root.getPropertyValue('--space-3').trim(), chips: geometry('[class*="chipRow"] > label', '--space-3'), tabs: geometry('[role="tab"]', '--space-4'), gaps: [...document.querySelectorAll('[class*="chipRow"], [role="tablist"], [class*="itemToolbar"]')].map(node => getComputedStyle(node).gap), shadows: [...document.querySelectorAll('[data-selected="true"] > [class*="swatch"]')].map(node => getComputedStyle(node).boxShadow) }
+    return { size: token('--size-control'), gap: root.getPropertyValue('--space-3').trim(), chips: geometry('[class*="chipRow"] > label', '--space-3'), gaps: [...document.querySelectorAll('[class*="chipRow"]')].map(node => getComputedStyle(node).gap), shadows: [...document.querySelectorAll('[data-selected="true"] > [class*="swatch"]')].map(node => getComputedStyle(node).boxShadow) }
   })
   const values = await read()
   expect(values.size).toBe(48)
-  for (const item of [...values.chips, ...values.tabs]) {
+  for (const item of values.chips) {
     expect(item.height).toBe(48)
     expect(item.blockStart).toBe(0)
     expect(item.blockEnd).toBe(0)
@@ -27,7 +27,7 @@ test('chips, tabs and side segments use the exact token geometry', async ({ page
   for (const gap of values.gaps) expect(gap).toBe(values.gap)
   for (const shadow of values.shadows) expect(shadow).toBe('none')
   if (mobile(page)) await next(page).click()
-  await page.getByRole('checkbox', { name: /name (auf|on)/i }).check()
+  await page.getByRole('radio', { name: /^(Ja|Yes),/ }).check()
   const segments = page.getByRole('group', { name: /Seite der Kugel|Ornament side/ })
   const measured = await segments.evaluate(node => {
     const root = getComputedStyle(document.documentElement)
@@ -44,29 +44,27 @@ test('chips, tabs and side segments use the exact token geometry', async ({ page
   }
 })
 
-test('tabs activate manually and keep the side choice per ornament', async ({ page }) => {
+test('overview edit buttons keep the side choice per ornament', async ({ page }) => {
   await open(page); await choose(page)
   if (mobile(page)) await next(page).click()
-  await page.getByRole('checkbox', { name: /name (auf|on)/i }).check()
+  await page.getByRole('radio', { name: /^Ja,/ }).check()
   await page.getByRole('radio', { name: 'Vorne', exact: true }).locator('..').click()
   await page.getByRole('button', { name: 'Weitere Kugel hinzufügen', exact: true }).click()
-  const first = page.getByRole('tab', { name: 'Kugel 1', exact: true })
-  const second = page.getByRole('tab', { name: 'Kugel 2', exact: true })
-  await expect(second).toBeFocused()
-  await second.press('ArrowLeft')
-  await expect(first).toBeFocused()
-  await expect(second).toHaveAttribute('aria-selected', 'true')
-  await first.press('Enter')
-  await expect(first).toHaveAttribute('aria-selected', 'true')
+  await expect(page.locator('#ornament-editor-heading')).toBeFocused()
+  const first = page.getByRole('button', { name: 'Kugel 1 bearbeiten', exact: true })
+  await first.focus(); await first.press('Enter')
+  // The ornament being edited has no Edit button of its own; the heading names it.
+  await expect(first).toHaveCount(0)
+  await expect(page.locator('#ornament-editor-heading')).toHaveText(/^Kugel 1 von 2/)
   await expect(page.getByRole('radio', { name: 'Vorne', exact: true })).toBeChecked()
-  await expect(page.getByRole('tabpanel')).toHaveCount(1)
-  await expect(page.getByRole('button', { name: 'Weitere Kugel hinzufügen' })).not.toHaveAttribute('role', 'tab')
+  await expect(page.getByRole('tab')).toHaveCount(0)
+  await expect(page.getByRole('tabpanel')).toHaveCount(0)
 })
 
 for (const locale of ['de', 'en'] as const) {
   test(`help disclosures and unchosen preview are truthful (${locale})`, async ({ page }) => {
     await open(page, locale)
-    await expect(page.locator('form [role="img"]')).not.toHaveAttribute('aria-label', /Matte|Matt,/)
+    await expect(page.locator('[data-public-preview] [role="img"]')).not.toHaveAttribute('aria-label', /Matte|Matt,/)
     const finish = page.getByRole('button', { name: locale === 'de' ? 'Oberflächen erklären' : 'Explain finishes' })
     await finish.click(); await expect(finish).toHaveAttribute('aria-expanded', 'true')
     await finish.press('Escape'); await expect(finish).toHaveAttribute('aria-expanded', 'false'); await expect(finish).toBeFocused()
@@ -89,23 +87,23 @@ for (const locale of ['de', 'en'] as const) {
     const date = page.getByRole('radio', { name: locale === 'de' ? 'Mittwoch, 23. Dezember 2026' : 'Wednesday 23 December 2026', exact: true })
     await date.locator('..').click()
     await expect(page.locator('[data-selected-date]')).toHaveAttribute('data-selected', 'true')
-    await expect(page.locator('[data-selected-date] > span')).toHaveText(locale === 'de' ? 'Mi, 23. Dez · abends' : 'Wed, 23 Dec · evening')
+    await expect(page.locator('[data-selected-date] > span')).toHaveText(locale === 'de' ? 'Mi, 23. Dez · 18–20 Uhr' : 'Wed, 23 Dec · 6–8 pm')
     // One shortcut only: the earliest date, above the full calendar.
     await expect(page.locator('[class*="dateCard"][aria-pressed]')).toHaveCount(1)
     await expect(page.locator('[class*="dateCard"][aria-pressed="true"]')).toHaveCount(0)
     await page.locator('[class*="dateCard"][aria-pressed]').click()
     await expect(page.locator('[class*="dateCard"][aria-pressed="true"]')).toHaveCount(1)
-    await expect(page.locator('[data-selected-date] > span')).toHaveText(locale === 'de' ? 'Mi, 2. Dez · abends' : 'Wed, 2 Dec · evening')
+    await expect(page.locator('[data-selected-date] > span')).toHaveText(locale === 'de' ? 'Mi, 2. Dez · 18–20 Uhr' : 'Wed, 2 Dec · 6–8 pm')
     await expect(date).not.toBeChecked()
   })
 
   test(`review uses precise edit actions and static artwork (${locale})`, async ({ page }) => {
     await open(page, locale); await choose(page)
     if (mobile(page)) await next(page).click()
-    await page.getByRole('checkbox', { name: /name (auf|on)/i }).check()
+    await page.getByRole('radio', { name: /^(Ja|Yes),/ }).check()
     await page.locator('input[id^="back-"]').fill('LUNA')
     // pet() starts at the first substep; return there without losing the name.
-    if (mobile(page)) await page.getByRole('tab').click()
+    if (mobile(page)) await page.getByRole('button', { name: locale === 'de' ? 'Zurück' : 'Back', exact: true }).click()
     await pet(page); await review(page)
     // One "Ändern" per card, next to its title; its accessible name says what it opens.
     for (const name of locale === 'de' ? ['Kugel Luna ändern', 'Lieferung ändern', 'Kontakt ändern'] : ['Change ornament Luna', 'Change delivery', 'Change contact']) await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
@@ -118,7 +116,7 @@ for (const locale of ['de', 'en'] as const) {
     }))
     expect(columns.length).toBeGreaterThan(5)
     for (const row of columns) expect(row).toEqual(columns[0])
-    await expect(page.getByText(locale === 'de' ? 'Nach bestätigter Zahlung malt Gaby deine Kugel für den gewählten Liefertag.' : 'Once payment is confirmed, Gaby paints your ornament for your chosen delivery day.')).toBeVisible()
+    await expect(page.getByText(locale === 'de' ? 'Nach der Zahlung male ich deine Kugeln rechtzeitig zu deinem Liefertag.' : 'Once your payment is confirmed, I paint your ornaments in time for your chosen delivery day.')).toBeVisible()
     await axe(page)
   })
 }
