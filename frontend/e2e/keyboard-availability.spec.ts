@@ -163,7 +163,7 @@ test.describe('desktop keyboard checkout', () => {
     const pay = page.getByRole('button', { name: /^Zahlungspflichtig bestellen/ })
     await tabTo(page, pay)
     await expect(pay).toBeEnabled()
-    await expect(pay).toContainText('62,98')
+    await expect(page.locator('main')).toContainText('62,98')
     await expect(page).toHaveURL(/\/buy$/)
   })
 })

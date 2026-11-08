@@ -32,6 +32,7 @@ import { marketPickupDates, paintDatesToTry } from '../../lib/calendar'
 import { hasPaintOverlap } from '../../lib/slots'
 import { addUtcDays, formatDateLabel, formatHour, formatMinutes, hoursOverlap, utcWeekday } from '../../lib/time'
 import { createSeed, DEMO_NOW_HOUR, SEED_REVISION, STAFF_ACCOUNTS, STORAGE_KEY, type MockState } from './seed'
+import { uid as newUuid } from '../../lib/uid'
 
 let state: MockState = load()
 let version = 0
@@ -186,7 +187,7 @@ export function updatePaintingDay(date: string, open: boolean, maxPaintings: num
   if (!Number.isInteger(maxPaintings) || maxPaintings < 0 || maxPaintings > 10) throw new Error('Maximum must be between 0 and 10.')
   state.paintingDays ??= {}; state.paintingDays[date] = { open, maxPaintings }; emit(); return paintingDay(date)
 }
-export function joinWaitlist(email: string) { const token = crypto.randomUUID(); (state.waitlistTokens ??= {})[token] = { email: email.toLowerCase(), confirmed: false }; emit() }
+export function joinWaitlist(email: string) { const token = newUuid(); (state.waitlistTokens ??= {})[token] = { email: email.toLowerCase(), confirmed: false }; emit() }
 export function confirmWaitlist(token: string) { const entry = state.waitlistTokens?.[token]; if (!entry) throw Object.assign(new Error('Unknown token'), { status: 404 }); entry.confirmed = true; state.waitlist ??= []; if (!state.waitlist.includes(entry.email)) state.waitlist.push(entry.email); emit() }
 export function unsubscribeWaitlist(token: string) { const entry = state.waitlistTokens?.[token]; if (entry) { state.waitlist = (state.waitlist ?? []).filter(email => email !== entry.email); delete state.waitlistTokens![token]; emit() } }
 export function makeOrderCode() {

@@ -1,4 +1,5 @@
 import type { OrnamentColor, CustomFinish, DeliveryKind, Photo } from '../domain/types'
+import { uid } from './uid.ts'
 
 export const BUY_DRAFT_KEY = 'awg-buy-draft'
 
@@ -30,7 +31,7 @@ export type BuyDraft = {
 }
 
 export function newItem(): BuyItem {
-  return { uid: crypto.randomUUID(), color: '', finish: '', withName: false, backName: '', petName: '', note: '', photos: [], photosNeedReload: false }
+  return { uid: uid(), color: '', finish: '', withName: false, backName: '', petName: '', note: '', photos: [], photosNeedReload: false }
 }
 
 const emptyDraft = (): BuyDraft => ({

@@ -414,7 +414,7 @@
   grid-template-columns: repeat(7, minmax(0, 1fr));
   justify-items: center;
   gap: var(--space-1) 0;
-  max-width: var(--layout-calendar-max);
+  /* Same width as the shortcut card and "Dein Termin" above and below it: one left and right edge. */
 }
 
 .weekday,
@@ -716,15 +716,18 @@
 
 .dateCards { display: grid; grid-template-columns: 1fr; gap: var(--space-3); margin: 0 0 var(--space-5); }
 .dateCard, .dateSkeleton { min-height: var(--size-date-card); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-surface-raised); }
-.dateCard { display: flex; flex-wrap: wrap; align-content: center; gap: var(--space-1); padding: var(--space-3); text-align: left; color: var(--color-text); cursor: pointer; }
+.dateCard { display: flex; flex-wrap: wrap; align-content: center; gap: var(--space-1); padding: calc(var(--space-4) - var(--border-thin)); text-align: left; color: var(--color-text); cursor: pointer; }
 .dateCard small { flex-basis: 100%; font-weight: var(--type-label-weight); }
-.dateCard[data-selected='true'] { padding: calc(var(--space-3) - var(--border-thin)); border: var(--border-control) solid var(--color-selected); background: var(--color-selected-surface); font-weight: var(--type-label-weight); }
+.dateCard[data-selected='true'] { padding: calc(var(--space-4) - var(--border-control)); border: var(--border-control) solid var(--color-selected); background: var(--color-selected-surface); font-weight: var(--type-label-weight); }
 .dateCard:focus-visible { outline: none; box-shadow: var(--focus); }
 .dateSkeleton { background: var(--color-disabled-surface); }
-@media (min-width: 768px) { .dateCards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
 .reviewProduct { display: grid; grid-template-columns: var(--size-review-art) minmax(0, 1fr) max-content; gap: var(--space-3); align-items: start; }
 .reviewPreview { width: var(--size-review-art); }
+.reviewLines { display: grid; gap: var(--space-1); }
+.reviewLines p { margin: 0; }
+.nowrap { white-space: nowrap; }
+.reviewLines p + p { color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
 .afterPayment { margin: var(--space-5) 0; max-width: var(--measure-prose); }
 .linkBtn { color: var(--color-text); text-underline-offset: var(--space-1); font-weight: var(--type-button-weight); }
 

@@ -60,7 +60,8 @@ for (const locale of ['de', 'en'] as const) {
       deliveryKind: 'market', pickupTime: '15:30', deliveryDate: date, acceptTerms: true,
       items: [{ kind: 'custom', withName: false, color: 'red', finish: 'shiny', petName: 'Luna', photos: 1 }],
     })
-    await expect(page.locator('main')).toContainText(`${copy[locale].pickup} · Rathausplatz`)
+    // The handoff step shows what on one line and where/when on the next.
+    await expect(page.locator('main li').filter({ hasText: copy[locale].pickup })).toContainText('Rathausplatz')
   })
 
   test(`pickup asks for the arrival time before continuing (${locale})`, async ({ page }) => {

@@ -86,7 +86,7 @@ export function PublicLayout() {
           <Link to="/agb">{t('terms')}</Link>
           <Link to="/datenschutz">{t('privacy')}</Link>
         </nav>
-        <a className={styles.social} href="https://instagram.com/artwithgab" rel="noreferrer" target="_blank">
+        <a className={styles.social} href="https://www.instagram.com/art_withgab_" rel="noreferrer" target="_blank">
           <svg className={styles.socialIcon} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <rect x="3.2" y="3.2" width="17.6" height="17.6" rx="5.2" fill="none" stroke="currentColor" strokeWidth="1.9" />
             <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" strokeWidth="1.9" />

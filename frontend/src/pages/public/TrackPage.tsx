@@ -129,8 +129,9 @@ export function TrackPage() {
   if (view) {
     const when = view.when
     if (when.kind === 'vienna') {
-      // One phrase with the delivery window, never "Wed / Fri" beside a date.
-      whenLines.push([t('whenVienna'), when.date ? deliveryDatePhrase(when.date, locale) : ''].filter(Boolean).join(' · '))
+      // What on the first line, when on the second.
+      whenLines.push(t('whenVienna'))
+      if (when.date) whenLines.push(deliveryDatePhrase(when.date, locale))
     } else if (when.kind === 'market') {
       const head = [
         when.date ? formatDateLabel(when.date, locale === 'de' ? 'de-AT' : 'en-GB') : null,

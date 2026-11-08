@@ -38,6 +38,7 @@ import {
   type SalePhase,
 } from './saleDraft'
 import styles from './NewSalePage.module.css'
+import { uid } from '../../lib/uid'
 
 const MIN_PAINT_MINUTES = 15
 const MAX_PAINT_MINUTES = 8 * 60
@@ -122,7 +123,7 @@ export function NewSalePage() {
   const [moveSuggestions, setMoveSuggestions] = useState<Record<string, MoveSuggestion | null>>({})
   const [busy, setBusy] = useState(false)
   const submitLock = useRef(false)
-  const saleKey = useRef(draft.idempotencyKey ?? crypto.randomUUID())
+  const saleKey = useRef(draft.idempotencyKey ?? uid())
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [payMethod, setPayMethod] = useState<PaymentMethod | null>(null)
@@ -141,7 +142,7 @@ export function NewSalePage() {
   useEffect(() => {
     if (consumedParams.current === paramKey) return
     const next = buildDraftFromParams(params)
-    saleKey.current = next.idempotencyKey ?? crypto.randomUUID()
+    saleKey.current = next.idempotencyKey ?? uid()
     next.idempotencyKey = saleKey.current
     setDraft(next)
     if (params.has('fresh') || params.has('start') || params.has('placeItem')) {
@@ -359,7 +360,7 @@ export function NewSalePage() {
   }
 
   function addItem(kind: 'custom' | 'finished') {
-    if (!draft.items.length && !draft.order) saleKey.current = crypto.randomUUID()
+    if (!draft.items.length && !draft.order) saleKey.current = uid()
     setDraft((current) => {
       const next = kind === 'custom' ? makeCustom({ delivery: { mode: 'market', pickupDate: todayPaintingFull(paintingDays, today) ? undefined : today?.date } }) : makeFinished()
       const items = [...current.items.map((item) => item.plannedMove ? { ...item, plannedMove: undefined, slotLocked: false, paintDate: undefined, paintStart: undefined, paintEnd: undefined } : item), fillDayRefs(next, days, markets, seasonEnd)]
@@ -445,7 +446,7 @@ export function NewSalePage() {
 
   function startOver() {
     clearStoredDraft()
-    saleKey.current = crypto.randomUUID()
+    saleKey.current = uid()
     setPayMethod(null)
     setPayState('paid')
     setPaidNote('')
@@ -556,7 +557,7 @@ export function NewSalePage() {
         const stillThere = await api.orders.getOrderByCode(order.code).catch(() => undefined)
         if (stillThere !== null) throw err
       }
-      saleKey.current = crypto.randomUUID()
+      saleKey.current = uid()
       setSuggestions({})
       setMoveSuggestions({})
       setCopied(false)

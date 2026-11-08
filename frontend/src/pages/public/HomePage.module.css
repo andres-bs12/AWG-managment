@@ -79,14 +79,18 @@
   animation: riseIn 0.6s 0.2s var(--scene-ease) both;
 }
 
-.trackBtn { gap: var(--space-2); }
+.cta { gap: var(--space-2); }
 
-.btnIcon {
-  color: var(--gold);
-  animation: twirl 3.4s ease-in-out infinite;
+.ctaIcon {
+  flex: none;
+  width: var(--size-icon);
+  height: var(--size-icon);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-
-.buyBtn { border-color: var(--snow-2); }
 
 /**
  * Short portrait phones: trade title size, gaps and stall height so the copy, both CTAs *and* the
@@ -232,16 +236,6 @@
   }
 }
 
-@keyframes twirl {
-  0%,
-  100% {
-    transform: rotate(0deg) scale(1);
-  }
-  50% {
-    transform: rotate(180deg) scale(1.2);
-  }
-}
-
 /** While the opening curtain is down, hold the entrance so it plays as the curtain lifts. */
 :global(html[data-intro='on']) .copyTop,
 :global(html[data-intro='on']) .stage,
@@ -252,8 +246,7 @@
 @media (prefers-reduced-motion: reduce) {
   .copyTop,
   .stage,
-  .ctas,
-  .btnIcon {
+  .ctas {
     animation: none;
   }
 }

@@ -10,8 +10,8 @@ import type { TrackView } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
 import { clearBuyDraft } from '../../lib/buyDraft'
 import { DELIVERY_WINDOW_END_HOUR, DELIVERY_WINDOW_START_HOUR, deliveryDatePhrase, icsHour } from '../../lib/deliveryWindow'
-import styles from './Panel.module.css'
 import buyStyles from './BuyPage.module.css'
+import thanks from './BuyThanksPage.module.css'
 
 /** RFC 5545 TEXT escaping: no value can break out into another calendar property. */
 const icsText = (value: string) => value.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n|\r/g, '\\n')
@@ -71,34 +71,51 @@ export function BuyThanksPage() {
   if (!code) return <PublicPage variant="status"><h1>{t('shopThanksTitle')}</h1><p>{t('shopThanksNoCode')}</p><ButtonLink to="/track" fullWidth>{t('track')}</ButtonLink></PublicPage>
   const longDate = (date: string) => new Intl.DateTimeFormat(locale === 'de' ? 'de-AT' : 'en-GB', { dateStyle: 'long' }).format(new Date(`${date}T12:00:00`))
   const when = view?.when
-  const handoffLabel = when?.kind === 'market'
-    ? <>{t('pickupTimeline')}{when.date && <> · {[when.marketName, longDate(when.date), when.fromHour != null && t('timeOClock', { time: clock(when.fromHour) })].filter(Boolean).join(' · ')}</>}</>
-    : <>{t('deliveryTimeline')}{when?.date && <> · {deliveryDatePhrase(when.date, locale)}</>}</>
-  // Owner: the title alone, no explanation under it.
-  const seqEnds = [t('seqHardest'), t('seqEasiest')]
-  return <PublicPage variant="status">
-    {!view ? <><h1>{t('confirmingPayment')}</h1><p role="status">{timedOut ? t('confirmationFallback') : t('confirmingPayment')}</p></> : <>
-      <PageHeader title={t('shopThanksTitle')} />
-      {view.items.length > 0 && <div className={buyStyles.thanksPreviews}>{view.items.map((entry, index) => (
-        <OrnamentPreview key={index} item={{ color: entry.color ?? '', finish: entry.finish ?? '', withName: entry.withName, backName: entry.backName }} static />
-      ))}</div>}
-      <OrderTimeline labels={[t('paidTimeline'), t('paintingTimeline'), handoffLabel]} />
-      {view.when.kind !== 'unknown' && view.when.date && <Button variant="secondary" onClick={() => downloadCalendar(view.when)}>{t(view.when.kind === 'market' ? 'addPickupCalendar' : 'addCalendar')}</Button>}
-      <fieldset className={buyStyles.seq}><legend>{t('seqQuestion')}</legend>
-        <div className={buyStyles.seqScale}>
-          <span className={buyStyles.seqEnd}>{seqEnds[0]}</span>
-          {[1, 2, 3, 4, 5].map(value => (
-            <label key={value} className={buyStyles.seqOption} data-selected={seqValue === value}>
-              <input className={buyStyles.choiceInput} type="radio" name="buy-seq" value={value} checked={seqValue === value} disabled={seqValue != null && seqValue !== value} onChange={() => { if (seqValue != null) return; setSeqValue(value); void api.metrics.track({ event: 'buy_seq', value: String(value) }).catch(() => {}) }} />
-              <span>{value}</span>
-            </label>
-          ))}
-          <span className={buyStyles.seqEnd}>{seqEnds[1]}</span>
-        </div>
-        {seqValue != null && <p role="status" className={buyStyles.seqThanks}>{t('seqThanks')}</p>}
-      </fieldset>
-    </>}
-    <div className={styles.codeBlock}><span>{t('trackCode')}</span><strong>{code}</strong><Button variant="secondary" onClick={() => { void navigator.clipboard.writeText(code).then(() => setCopyMessage(t('copiedCode'))).catch(() => setCopyMessage(t('copyFailed'))) }}>{t('copyCode')}</Button><span role="status">{copyMessage}</span></div>
+  // The handoff step: what on the first line, when on the second.
+  const handoffWhen = when?.date
+    ? when.kind === 'market'
+      ? [when.marketName, longDate(when.date), when.fromHour != null && t('timeOClock', { time: clock(when.fromHour) })].filter(Boolean).join(' · ')
+      : deliveryDatePhrase(when.date, locale)
+    : null
+  const handoffLabel = <><span>{t(when?.kind === 'market' ? 'pickupTimeline' : 'deliveryTimeline')}</span>{handoffWhen && <small className={thanks.when}>{handoffWhen}</small>}</>
+  const copy = () => { void navigator.clipboard.writeText(code).then(() => setCopyMessage(t('copiedCode'))).catch(() => setCopyMessage(t('copyFailed'))) }
+  const codeCard = <section className={thanks.codeCard} aria-labelledby="thanks-code-label">
+    <p id="thanks-code-label" className={thanks.codeLabel}>{t('trackCode')}</p>
+    <div className={thanks.codeRow}><strong className={thanks.code}>{code}</strong><Button variant="secondary" onClick={copy}>{t('copyCode')}</Button></div>
+    <span role="status" className={thanks.copyStatus}>{copyMessage}</span>
+  </section>
+  if (!view) return <PublicPage variant="status">
+    <h1>{t('confirmingPayment')}</h1><p role="status">{timedOut ? t('confirmationFallback') : t('confirmingPayment')}</p>
+    {codeCard}
     <ButtonLink to={`/track/${encodeURIComponent(code)}`} fullWidth>{t('goTrack')}</ButtonLink>
+  </PublicPage>
+  return <PublicPage variant="status" className={thanks.page}>
+    <PageHeader title={t('shopThanksTitle')} />
+    {view.items.length > 0 && <div className={buyStyles.thanksPreviews}>{view.items.map((entry, index) => (
+      <OrnamentPreview key={index} item={{ color: entry.color ?? '', finish: entry.finish ?? '', withName: entry.withName, backName: entry.backName }} static />
+    ))}</div>}
+    {codeCard}
+    <section className={thanks.next} aria-labelledby="thanks-next">
+      <h2 id="thanks-next" className={thanks.sectionTitle}>{t('thanksNext')}</h2>
+      <OrderTimeline labels={[t('paidTimeline'), t('paintingTimeline'), handoffLabel]} />
+    </section>
+    <div className={thanks.actions}>
+      <ButtonLink to={`/track/${encodeURIComponent(code)}`} fullWidth>{t('goTrack')}</ButtonLink>
+      {view.when.kind !== 'unknown' && view.when.date && <Button variant="secondary" fullWidth onClick={() => downloadCalendar(view.when)}>{t(view.when.kind === 'market' ? 'addPickupCalendar' : 'addCalendar')}</Button>}
+    </div>
+    <fieldset className={thanks.feedback} aria-describedby="seq-ends">
+      <legend className={thanks.sectionTitle}>{t('seqQuestion')}</legend>
+      <div className={thanks.scale}>
+        {[1, 2, 3, 4, 5].map(value => (
+          <label key={value} className={thanks.option} data-selected={seqValue === value}>
+            <input className={buyStyles.choiceInput} type="radio" name="buy-seq" value={value} checked={seqValue === value} disabled={seqValue != null && seqValue !== value} onChange={() => { if (seqValue != null) return; setSeqValue(value); void api.metrics.track({ event: 'buy_seq', value: String(value) }).catch(() => {}) }} />
+            <span>{value}</span>
+          </label>
+        ))}
+      </div>
+      {/* End labels sit under 1 and 5 so the direction of the scale is obvious. */}
+      <p id="seq-ends" className={thanks.ends}><span>1 = {t('seqHardest')}</span><span>5 = {t('seqEasiest')}</span></p>
+      {seqValue != null && <p role="status" className={thanks.thanks}>{t('seqThanks')}</p>}
+    </fieldset>
   </PublicPage>
 }

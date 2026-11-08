@@ -25,13 +25,16 @@ export function BuyReviewStep({ t, draft, config, itemPrice, formatDate, patch, 
       const title = `${t('ornamentN', { n: index + 1 })}${item.petName.trim() ? ` · ${item.petName.trim()}` : ''}`
       return <ReviewCard key={item.uid} title={title} changed={changed === item.uid}
         action={{ label: t('change'), ariaLabel: t('editOrnamentNamed', { name: item.petName.trim() || title }), onClick: () => go(0, item.uid, 0, `color-${item.uid}`) }}
-        rows={[
-          { label: t('reviewLook'), value: [item.color && t(colorKeys[item.color]), item.finish && t(item.finish === 'shiny' ? 'finishShiny' : 'finishMatte')].filter(Boolean).join(' · ') },
-          ...(item.withName ? [{ label: t('shopNameExtraLine'), value: <>{item.backName} <span className={styles.price}>+{formatEur(config.nameExtra, locale)}</span></> }] : [{ label: t('multiNameQuestion'), value: t('multiNoName') }]),
-          { label: t('multiItemTotal'), value: <strong className={styles.price}>{formatEur(itemPrice(item), locale)}</strong> },
-          ...(item.note.trim() ? [{ label: t('noteLabel'), value: item.note }] : []),
-        ]}>
-        <div className={styles.reviewProduct}><div className={styles.reviewPreview}><OrnamentPreview item={item} static /></div><p>{item.petName}</p><strong className={styles.price}>{formatEur(config.customPrice, locale)}</strong></div>
+        rows={item.note.trim() ? [{ label: t('noteLabel'), value: item.note }] : []}>
+        {/* One compact block: art, what was chosen, one price (the name surcharge is named, not a second total). */}
+        <div className={styles.reviewProduct}>
+          <div className={styles.reviewPreview}><OrnamentPreview item={item} static /></div>
+          <div className={styles.reviewLines}>
+            <p>{[item.color && t(colorKeys[item.color]), item.finish && t(item.finish === 'shiny' ? 'finishShiny' : 'finishMatte')].filter(Boolean).join(' · ')}</p>
+            <p>{item.withName ? <>{t('multiNameValue', { name: item.backName })} <span className={styles.nowrap}>(+{formatEur(config.nameExtra, locale)})</span></> : t('multiNoName')}</p>
+          </div>
+          <strong className={styles.price}>{formatEur(itemPrice(item), locale)}</strong>
+        </div>
         <ReviewThumbs photos={item.photos} alt={i => t('photoAlt', { n: i + 1, name: item.petName || t('yourPet') })} />
       </ReviewCard>
     })}

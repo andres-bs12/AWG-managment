@@ -114,7 +114,8 @@ for (const locale of ['de', 'en'] as const) {
       const [label, value] = [...row.children].map(child => child.getBoundingClientRect())
       return { label: label.left, value: value.left }
     }))
-    expect(columns.length).toBeGreaterThan(5)
+    // Ornament cards are compact (art + choices + one price); delivery and contact still use rows.
+    expect(columns.length).toBeGreaterThan(3)
     for (const row of columns) expect(row).toEqual(columns[0])
     await expect(page.getByText(locale === 'de' ? 'Nach der Zahlung male ich deine Kugeln rechtzeitig zu deinem Liefertag.' : 'Once your payment is confirmed, I paint your ornaments in time for your chosen delivery day.')).toBeVisible()
     await axe(page)

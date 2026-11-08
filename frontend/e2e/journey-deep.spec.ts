@@ -76,7 +76,9 @@ async function expectContact(page: Page) {
 
 async function expectReview(page: Page, total: number, locale: Locale = 'de') {
   await expect(page.locator('#buy-heading')).toHaveText(locale === 'de' ? 'Prüfen & bezahlen' : 'Review & pay')
-  await expect(page.locator('form button[type=submit]')).toHaveText(`${locale === 'de' ? 'Zahlungspflichtig bestellen' : 'Order and pay'} · ${money(total, locale)}`)
+  // The pay button stays on one line on phones: the total lives in the review summary, not in the label.
+  await expect(page.locator('form button[type=submit]')).toHaveText(locale === 'de' ? 'Zahlungspflichtig bestellen' : 'Order and pay')
+  await expect(page.locator('main')).toContainText(money(total, locale))
   for (const value of [contact.customerName, contact.email, contact.phone, address.line1, address.line2, address.postalCode, 'Luna']) {
     await expect(page.locator('form')).toContainText(value)
   }
@@ -187,7 +189,7 @@ test('two ornaments keep independent colour, finish, names, previews and totals 
   await fillDelivery(page)
   await next(page).click()
   await expect(page.locator('form div[role="img"]')).toHaveCount(1)
-  await expect(page.locator('form button[type=submit]')).toHaveText(`Zahlungspflichtig bestellen · ${money(remainingTotal)}`)
+  await expect(page.locator('form button[type=submit]')).toHaveText("Zahlungspflichtig bestellen")
 })
 
 test('name option adds exactly 12.99, turns to the scripted back and retains its value off/on', async ({ page }) => {

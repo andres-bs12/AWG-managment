@@ -16,7 +16,8 @@
   align-items: center;
   justify-content: flex-end;
   padding: 0 16px 20vh;
-  background: #36844f;
+  /* A gradient (not a background-color) so Safari does not tint its bars green and keep it. */
+  background: linear-gradient(#36844f, #36844f);
   color: #ffffff;
 }
 
