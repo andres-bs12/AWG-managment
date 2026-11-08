@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 public class NotificationService {
     private final ObjectProvider<JavaMailSender> sender;
     private final AwgProperties properties;
+    private final InvoiceService invoices;
     @Value("${spring.mail.host:}") private String host;
 
     @Async("notificationExecutor")
@@ -39,6 +40,35 @@ public class NotificationService {
             String body = greeting("Hallo", event.customerName()) + event.kind().german + ".\nBestellung: " + event.code()
                     + "\nGesamt: " + event.total() + " EUR · Bezahlt: " + event.amountPaid() + " EUR\nVerfolge deine Bestellung: " + link + "\n\nVielen Dank!\nArtWithGab\n\n---\n\n" + greeting("Hello", event.customerName()) + event.kind().english + ".\nOrder: " + event.code() + "\nTotal: " + event.total() + " EUR · Paid: " + event.amountPaid() + " EUR\nTrack your order: " + link + "\n\nThank you!\nArtWithGab";
             send(event.customerEmail(), subject, body);
+        }
+    }
+
+    @Async("notificationExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onInvoiceIssued(InvoiceIssued event) {
+        invoices.deliver(event.number(), this::sendInvoice);
+    }
+
+    private Boolean sendInvoice(com.artwithgab.awg_tracking.model.Invoice invoice) {
+        try {
+            JavaMailSender mail = sender.getIfAvailable();
+            if (host == null || host.isBlank() || properties.mail().from() == null || properties.mail().from().isBlank() || mail == null) {
+                log.info("Invoice e-mail not sent (mail not configured): {}", invoice.getNumber());
+                return null;
+            }
+            var message = mail.createMimeMessage();
+            var helper = new org.springframework.mail.javamail.MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+            helper.setFrom(header(properties.mail().from()));
+            helper.setTo(header(invoice.getRecipient()));
+            helper.setSubject(header(invoice.getSubject()));
+            String html = "<!doctype html><html><body><pre style=\"font-family:Arial,sans-serif;white-space:pre-wrap\">"
+                    + org.springframework.web.util.HtmlUtils.htmlEscape(invoice.getBody()) + "</pre></body></html>";
+            helper.setText(invoice.getBody(), html);
+            mail.send(message);
+            return true;
+        } catch (Exception e) {
+            log.warn("Could not send invoice e-mail: {}", invoice.getNumber(), e);
+            return false;
         }
     }
 

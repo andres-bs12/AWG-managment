@@ -9,5 +9,6 @@ import java.util.List;
  */
 public record ShopConfigDto(boolean enabled, BigDecimal customPrice, BigDecimal finishedPrice, BigDecimal nameExtra,
                             BigDecimal deliveryFee, int maxItems, List<ShopColorOptionDto> colors,
-                            String seasonEnd, boolean seasonOver, String deliveriesFrom) {
+                            String seasonEnd, boolean seasonOver, String deliveriesFrom,
+                            String deliveryWindowStart, String deliveryWindowEnd) {
 }

@@ -65,3 +65,10 @@ Hecho (2026-11-04): todos los métodos implementados, proxy `/api` en Vite, Entr
 - New stall dates with Vienna deliveries retain 400 `DAY_HAS_DELIVERIES`, field `days`; the mock follows the same rejection. Painted custom bases are not returned to stock on cancellation.
 
 These are additive DTO changes with no entity/schema change. Deploy the matching backend before the staff frontend; the old config does not contain finishedPrice. The handover/payment pair consists of two absolute server operations; if collection succeeds and handover fails, the balance is already paid and retry completes handover. Order-level handover and hard cancellation remain pending owner decisions.
+
+
+## Task A — fixed delivery window (2026-11-08)
+
+`GET /api/shop/config` adds `deliveryWindowStart: "18:00"` and `deliveryWindowEnd: "20:00"` (configurable `HH:mm`, Europe/Vienna). `GET /api/track/{code}` → `when`, and `GET /api/forms/{token}` → each `handoffs` entry, expose Vienna delivery as `{ kind: "vienna", date, fromHour: 18, toHour: 20, marketName: null, untilHour: null }`. Existing fields and the `vienna` discriminator stay compatible; market pickup `fromHour`/`untilHour` retain their meaning, and `toHour` is null/absent there. TypeScript fields added for older-server compatibility are optional. HTTP methods pass JSON through with no adapter changes; mock config/Track/form return the same new fields. UI consumption belongs to the separate public-UI task.
+
+Invoices run entirely behind existing payment/handover endpoints; no new public endpoint or sensitive invoice data appears in Track. See `contracts-and-dtos.md` and `deploy.md` for numbering, mail retries and seller configuration.

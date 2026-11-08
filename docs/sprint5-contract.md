@@ -30,3 +30,10 @@ Every non-2xx body: `{ status, message, code?, field? }`.
 ## Orders
 - `OrderDto` gains `paymentReview: boolean` — true when Stripe reported a payment that does not match the order (amount/currency); staff must check it in Stripe. Such orders are no longer released automatically.
 - Track `status` values unchanged (`preparing | ready | delivered`); `ready` must be shown as "ready for delivery/pickup", never "out for delivery".
+
+
+## Task A extension — invoices and delivery window (2026-11-08)
+
+- Additive `GET /api/shop/config`: `deliveryWindowStart` and `deliveryWindowEnd` (`HH:mm`, default `18:00`/`20:00`, Europe/Vienna).
+- Track `when` and form `handoffs`: existing `kind: 'vienna'` now has decimal `fromHour` and new `toHour` (18/20 by default). All prior JSON fields remain; `untilHour` remains the market closing hour and is null for delivery. Market/unknown `toHour` is null.
+- Existing paid/deposit and handover mutations now archive numbered invoice snapshots; mail is async after commit and disabled without SMTP. No request changes or invoice endpoints. See `contracts-and-dtos.md` for replacement numbers, idempotence and accounting retention.

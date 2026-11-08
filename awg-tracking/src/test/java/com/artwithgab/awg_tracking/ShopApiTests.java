@@ -34,6 +34,8 @@ class ShopApiTests extends ApiTestSupport {
     @Autowired
     InventoryRepository inventoryRepository;
     @Autowired
+    com.artwithgab.awg_tracking.repository.InvoiceRepository invoices;
+    @Autowired
     com.artwithgab.awg_tracking.service.ShopService shopService;
     @Autowired
     tools.jackson.databind.ObjectMapper objectMapper;
@@ -139,6 +141,9 @@ class ShopApiTests extends ApiTestSupport {
         assertThat(paid.isAwaitingPayment()).isFalse();
         assertThat(paid.getPaymentState().name()).isEqualTo("PAID");
         webhook("checkout.session.completed", "paid", cents);
+        var documents = invoices.findByOrderIdOrderByNumberAsc(order.getId());
+        assertThat(documents).hasSize(1);
+        assertThat(documents.getFirst().getBody()).contains("Offener Betrag: 0,00 EUR", "18:00–20:00", "Lieferkosten:", "1.", "2.");
         mvc.perform(get("/api/metrics/buy").param("from", TUE).param("to", TUE).header("Authorization", bearer(token)))
                 .andExpect(jsonPath("$[?(@.event == 'buy_paid')].count").value(1));
 

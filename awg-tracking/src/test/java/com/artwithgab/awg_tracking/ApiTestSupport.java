@@ -45,6 +45,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         // Tests run on H2; the PostgreSQL migrations are checked against a real database instead.
         "spring.flyway.enabled=false",
         "awg.bootstrap.demo-markets=true",
+        // Fictitious seller data for tests only; production values come from INVOICE_* env vars.
+        "awg.invoice.business-name=Test Seller",
+        "awg.invoice.address=Teststrasse 1, 1010 Wien",
+        "awg.invoice.uid=ATU00000000",
+        "awg.invoice.tax-note=Test tax note",
         "awg.bootstrap.staff[0].name=Gaby",
         "awg.bootstrap.staff[0].email=gaby@artwithgab.com",
         "awg.bootstrap.staff[0].password=gaby-test-pw",

@@ -204,8 +204,10 @@ export type TrackWhen = {
   kind: 'market' | 'vienna' | 'unknown'
   /** ISO date of the handoff day, when known. */
   date: string | null
-  /** Decimal hour the customer can collect from. */
+  /** Decimal hour for pickup or the start of the Vienna delivery window. */
   fromHour: number | null
+  /** End of the Vienna delivery window; absent/null for market pickup. */
+  toHour?: number | null
   marketName: string | null
   /** Decimal hour the stall packs up that day. */
   untilHour: number | null
@@ -299,6 +301,9 @@ export type InventoryItem = { id: string; kind: ItemKind; color: OrnamentColor |
 export type PaintingDay = { date: string; open: boolean; maxPaintings: number; booked: number }
 
 export type ShopConfig = {
+  /** Europe/Vienna wall-clock times (HH:mm). Optional with older servers. */
+  deliveryWindowStart?: string
+  deliveryWindowEnd?: string
   seasonEnd: string
   deliveriesFrom: string | null
   seasonOver: boolean

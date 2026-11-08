@@ -937,7 +937,7 @@ export function getTrackByCode(code: string): TrackView {
     : undefined
   const when: TrackWhen =
     first?.delivery.kind === 'vienna'
-      ? { kind: 'vienna', date: first.delivery.deliveryDate ?? null, fromHour: null, marketName: null, untilHour: null }
+      ? { kind: 'vienna', date: first.delivery.deliveryDate ?? null, fromHour: 18, toHour: 20, marketName: null, untilHour: null }
       : day
         ? {
             kind: 'market',
@@ -1005,8 +1005,9 @@ export function getForm(token: string): CustomerFormView {
       const market = state.markets.find((entry) => entry.id === row.delivery.marketId)
       return {
         kind: row.delivery.kind === 'vienna' ? 'vienna' : day ? 'market' : 'unknown',
-        date: day?.date ?? null,
-        fromHour: row.delivery.pickupHour ?? null,
+        date: row.delivery.kind === 'vienna' ? row.delivery.deliveryDate ?? day?.date ?? null : day?.date ?? null,
+        fromHour: row.delivery.kind === 'vienna' ? 18 : row.delivery.pickupHour ?? null,
+        toHour: row.delivery.kind === 'vienna' ? 20 : null,
         marketName: market?.name ?? null,
         untilHour: day?.closeHour ?? null,
       }

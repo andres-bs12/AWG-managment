@@ -18,7 +18,8 @@ public record AwgProperties(
         Bootstrap bootstrap,
         Shop shop,
         Mail mail,
-        Retention retention
+        Retention retention,
+        Invoice invoice
 ) {
     public record Pricing(BigDecimal custom, BigDecimal finished, BigDecimal nameExtra) {
     }
@@ -47,7 +48,14 @@ public record AwgProperties(
      */
     public record Shop(boolean enabled, String publicBaseUrl, String stripeSecretKey, String stripeWebhookSecret,
                        BigDecimal deliveryFee, int checkoutMinutes, int leadDays, int maxDaysAhead,
-                       java.time.LocalDate seasonEnd, int maxOpenCheckouts, java.time.LocalDate deliveriesFrom) {
+                       java.time.LocalDate seasonEnd, int maxOpenCheckouts, java.time.LocalDate deliveriesFrom,
+                       java.time.LocalTime deliveryWindowStart, java.time.LocalTime deliveryWindowEnd) {
+        public Shop {
+            if (deliveryWindowStart == null) deliveryWindowStart = java.time.LocalTime.of(18, 0);
+            if (deliveryWindowEnd == null) deliveryWindowEnd = java.time.LocalTime.of(20, 0);
+            if (!deliveryWindowStart.isBefore(deliveryWindowEnd))
+                throw new IllegalArgumentException("Delivery window start must be before its end");
+        }
     }
 
     /**
@@ -67,6 +75,16 @@ public record AwgProperties(
 
     /** E-mail notifications; nothing is sent while spring.mail.host is empty. */
     public record Mail(String from, String ownerEmail) {
+    }
+
+    /** Seller identity and tax treatment must be supplied by the owner. No tax status is assumed. */
+    public record Invoice(String businessName, String address, String uid, String taxNote, String iban) {
+        /** False while seller data is missing or still a "[placeholder]": no invoice may be issued then. */
+        public boolean configured() {
+            return java.util.stream.Stream.of(businessName, address, taxNote)
+                    .allMatch(value -> value != null && !value.isBlank() && !value.contains("["))
+                    && (uid == null || !uid.contains("["));
+        }
     }
 
     public record StaffAccount(String name, String email, String password) {

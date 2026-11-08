@@ -27,7 +27,9 @@ import java.util.Optional;
  * against the calendar (marketDayId, isToday, block day).
  */
 @Component
+@lombok.RequiredArgsConstructor
 public class ViewMapper {
+    private final com.artwithgab.awg_tracking.config.AwgProperties properties;
 
     public static String photoUrl(PhotoRef ref) {
         return "/api/photos/" + ref.getPhotoId();
@@ -145,7 +147,9 @@ public class ViewMapper {
 
     public TrackWhenDto when(OrderItem item, CalendarIndex index) {
         if (item.getDeliveryKind() == DeliveryKind.DELIVERY) {
-            return new TrackWhenDto("vienna", item.getHandoffDate().toString(), null, null, null);
+            return new TrackWhenDto("vienna", item.getHandoffDate().toString(),
+                    Hours.of(properties.shop().deliveryWindowStart()), null, null,
+                    Hours.of(properties.shop().deliveryWindowEnd()));
         }
         return handoffDay(item, index)
                 .map(day -> new TrackWhenDto(

@@ -30,6 +30,7 @@ import java.util.Locale;
 public class Bootstrap implements ApplicationRunner {
     private final AwgProperties props;
     private final ScheduleLockRepository lockRepository;
+    private final InvoiceCounterRepository invoiceCounterRepository;
     private final InventoryRepository inventoryRepository;
     private final StaffUserRepository staffUserRepository;
     private final MarketRepository marketRepository;
@@ -43,6 +44,9 @@ public class Bootstrap implements ApplicationRunner {
             ScheduleLock lock = new ScheduleLock();
             lock.setId(ScheduleLock.ID);
             lockRepository.save(lock);
+        }
+        if (!invoiceCounterRepository.existsById(InvoiceCounter.ID)) {
+            invoiceCounterRepository.save(new InvoiceCounter());
         }
         seedInventory();
         seedStaff();

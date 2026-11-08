@@ -84,7 +84,8 @@ public class ShopService {
         LocalDate from = props.shop().deliveriesFrom();
         return new ShopConfigDto(isOpen(), p.custom(), p.finished(), p.nameExtra(), fee(), MAX_ITEMS, colors,
                 end.toString(), LocalDate.now(clock.withZone(java.time.ZoneId.of(props.zone()))).isAfter(end),
-                from == null ? null : from.toString());
+                from == null ? null : from.toString(), props.shop().deliveryWindowStart().toString(),
+                props.shop().deliveryWindowEnd().toString());
     }
 
     private LocalDate seasonEnd() {

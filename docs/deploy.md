@@ -37,6 +37,12 @@ Consulta el estado con `docker compose --env-file .env ps` y los registros con `
 | `STAFF_ANDRES_PASSWORD` | Contraseña inicial para crear la cuenta de Andres. |
 | `SHOP_ENABLED` | `false` desactiva la tienda; usa `true` solo cuando Stripe y el dominio estén configurados. |
 | `SHOP_DELIVERIES_FROM` | Primer día con entregas web (por defecto `2026-11-30`, después del primer fin de semana de mercado). |
+| `DELIVERY_WINDOW_START` / `DELIVERY_WINDOW_END` | Franja fija de entrega en Viena, `HH:mm` en Europe/Vienna; `18:00` / `20:00` por defecto. |
+| `INVOICE_BUSINESS_NAME` | Nombre fiscal del vendedor (`awg.invoice.business-name`); por defecto `[Firmenname]`. |
+| `INVOICE_ADDRESS` | Domicilio fiscal completo (`awg.invoice.address`); por defecto `[Firmenadresse]`. |
+| `INVOICE_UID` | UID, si corresponde; vacío por defecto (la línea no aparece en la factura). Mientras nombre, dirección o nota fiscal sigan vacíos o con `[placeholder]`, no se emite ninguna factura. |
+| `INVOICE_TAX_NOTE` | Texto fiscal aprobado por el asesor; placeholder explícito por defecto. No se presume una exención de IVA. |
+| `INVOICE_IBAN` | IBAN opcional; vacío por defecto, no se muestra si no existe. |
 | `SHOP_SEASON_END` | Último día de entrega de la temporada (por defecto `2026-12-24`); después la tienda muestra la lista de espera. |
 | `STRIPE_SECRET_KEY` | Clave secreta de Stripe correspondiente al entorno de pruebas o producción. |
 | `STRIPE_WEBHOOK_SECRET` | Secreto de firma del endpoint de webhook de Stripe. |
@@ -108,3 +114,13 @@ En producción el tráfico pasa por Cloudflare, luego por Caddy en el servidor y
 ## Copias de seguridad y datos personales
 
 Las copias contienen datos de clientes, fotos, hashes de contraseñas y tokens. Guárdalas fuera del repositorio, en `~/awg-backups/` con permisos `chmod 700`, y cifradas si salen del servidor. Conserva como máximo 30 días de copias. Antes de reabrir una restauración, ejecuta la limpieza de retención para volver a borrar los datos que ya habían caducado.
+
+## Facturas por correo (Task A, 2026-11-08)
+
+Aplicar V8 al iniciar el backend (`ddl-auto=validate`). El contador transaccional y el archivo `invoice` viven en PostgreSQL: incluirlos siempre en backups/restauraciones, sin reiniciar el contador al cambiar de temporada. Cada actualización usa un número nuevo y referencia al documento anterior; nunca se renumeran los documentos existentes.
+
+Los valores `INVOICE_*` y `DELIVERY_WINDOW_*` pasan al backend mediante Compose. Sustituir los placeholders fiscales con datos reales aprobados antes de usar estas facturas comercialmente; la aplicación no determina el régimen de IVA ni inventa un texto de exención. Ver la decisión y los límites en `contracts-and-dtos.md`.
+
+Las facturas usan correo multipart con texto plano y HTML (sin PDF, sin dependencias nuevas). No se envía correo sin `MAIL_HOST`/`MAIL_FROM`; el documento queda pendiente. Tras configurar SMTP y reiniciar, se reintentan cada minuto, hasta 100 por pasada. Revisar errores SMTP en logs y `invoice.sent_at` para comprobar aceptación por el servidor de correo, que no garantiza recepción en la bandeja del cliente. Si el email se introduce después por QR, se asigna a los documentos pendientes de ese pedido. No hay endpoint público de facturas ni datos contables nuevos en Track.
+
+Las facturas conservan su propia copia contable aunque se borren/anonicen los datos operativos. La política definitiva de conservación y el contenido fiscal deben validarse con el asesor; no se aplica a las facturas el borrado operativo de 60 días. Una caída entre la aceptación SMTP y el commit de `sent_at` puede requerir revisión manual para evitar reenviar el mismo documento; SMTP no ofrece entrega exactamente una vez.

@@ -197,6 +197,8 @@ export const mockApi: Api = {
         enabled: true,
         seasonEnd: '2026-12-24',
         deliveriesFrom: '2026-11-30',
+        deliveryWindowStart: '18:00',
+        deliveryWindowEnd: '20:00',
         seasonOver: new Date() >= new Date('2026-12-25T00:00:00'),
         ...mockPricing,
         deliveryFee: 0,
