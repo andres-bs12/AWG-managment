@@ -6,7 +6,11 @@
   will-change: transform;
 }
 
-/** Same flat green as the Track sleigh loader, so every loading moment feels like one family. */
+/**
+ * The same sky as the Home scene. iOS 26 Safari picks its bar colour from what covers the screen
+ * edges while the page loads and keeps it on a page that does not scroll (Home): a green curtain
+ * left green bars behind. With the sky, the bars match the Home from the first frame.
+ */
 .panel {
   position: absolute;
   inset: 0;
@@ -16,9 +20,15 @@
   align-items: center;
   justify-content: flex-end;
   padding: 0 16px 20vh;
-  /* A gradient (not a background-color) so Safari does not tint its bars green and keep it. */
-  background: linear-gradient(#36844f, #36844f);
+  background: linear-gradient(
+    180deg,
+    var(--sky-top) 0%,
+    var(--sky-top) calc(env(safe-area-inset-top, 0px) + 96px),
+    var(--sky-mid) 58%,
+    var(--sky-low) 100%
+  );
   color: #ffffff;
+  text-shadow: 0 2px 0 rgba(20, 70, 140, 0.35);
 }
 
 /** Threads come down from the top edge; each bauble swings from where its thread is tied. */
@@ -63,7 +73,7 @@
   width: 100%;
   height: auto;
   margin-top: -2px;
-  filter: drop-shadow(0 10px 16px rgba(12, 52, 28, 0.35));
+  filter: drop-shadow(0 10px 16px rgba(12, 40, 90, 0.3));
 }
 
 .copy {

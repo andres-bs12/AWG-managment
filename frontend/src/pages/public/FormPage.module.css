@@ -27,6 +27,6 @@
 .photos img { width: var(--size-photo); height: var(--size-photo); border-radius: var(--radius-control); object-fit: cover; }
 .code { display: grid; gap: var(--space-3); padding: var(--space-4); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius-control); text-align: center; }
 .code strong { font-size: var(--type-h2-size); overflow-wrap: anywhere; user-select: all; }
-.form :is(input, textarea, button, summary, [tabindex]) { scroll-margin-block: var(--space-5) var(--space-10); }
+.form :is(input, textarea, button, summary, [tabindex]) { scroll-margin-block: var(--space-5); }
 @media (min-width: 1024px) { .editor { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); } }
 

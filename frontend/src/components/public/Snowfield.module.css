@@ -4,6 +4,8 @@
   position: fixed;
   inset: 0;
   overflow: hidden;
+  /* Negative for the same Safari toolbar reason as WinterBackdrop; still above the backdrop. */
+  z-index: -1;
 }
 
 .flake {

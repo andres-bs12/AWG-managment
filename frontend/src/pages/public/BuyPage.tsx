@@ -13,6 +13,8 @@ import type { Photo, ShopConfig, ShopDeliveryDate, ShopPickupDay } from '../../d
 import { useLocale } from '../../i18n/LocaleContext'
 import { loadBuyDraft, newItem, saveBuyDraft, type BuyDraft, type BuyItem } from '../../lib/buyDraft'
 import { apiError } from '../../lib/apiError'
+import { publicScroller } from '../../lib/publicScroller'
+import { keepFormFocusVisible } from '../../lib/publicFormFocus'
 import { formatEur } from '../../lib/money'
 import styles from './BuyPage.module.css'
 import { MAX_PHOTOS, pickupTimes } from './buy/shared'
@@ -299,14 +301,14 @@ export function BuyPage() {
       heading.focus({ preventScroll: true })
       heading.scrollIntoView({ block: 'start', behavior: 'instant' })
       // The compact preview can stick above the editor; reveal its heading below it.
-      const scroller = heading.closest<HTMLElement>('[data-public-scroll]')
+      const scroller = publicScroller()
       const preview = document.querySelector<HTMLElement>('[data-public-preview]')
       const rect = heading.getBoundingClientRect()
       const artwork = preview?.getBoundingClientRect()
       const overlaps = artwork && rect.left < artwork.right && rect.right > artwork.left
       const gap = parseFloat(getComputedStyle(heading).getPropertyValue('--space-4'))
-      const top = Math.max(0, scroller?.getBoundingClientRect().top ?? 0, overlaps && preview && getComputedStyle(preview).position === 'sticky' ? artwork.bottom : 0) + gap
-      if (rect.top < top) (scroller ?? window).scrollBy({ top: rect.top - top, behavior: 'instant' })
+      const top = Math.max(window.visualViewport?.offsetTop ?? 0, overlaps && preview && getComputedStyle(preview).position === 'sticky' ? artwork.bottom : 0) + gap
+      if (rect.top < top) scroller.scrollBy({ top: rect.top - top, behavior: 'instant' })
     })
   }
   function addItem() {
@@ -324,32 +326,7 @@ export function BuyPage() {
     setPhotoErrors(current => Object.fromEntries(Object.entries(current).filter(([key]) => key !== uid)))
     selectItem(activeUid === uid ? rest[Math.min(index, rest.length - 1)].uid : activeUid)
   }
-  return <form data-public-page className={`${publicForm.page} ${styles.shop}`} noValidate onFocus={(event) => {
-    const target = event.target
-    if (!(target instanceof HTMLElement) || target.tabIndex < 0 || target.closest('[data-sticky-actions][data-docked="true"]')) return
-    // Native focus scrolling can leave a control under the sticky preview or
-    // actions, or just a fraction of a pixel outside the viewport.
-    requestAnimationFrame(() => {
-      if (document.activeElement !== target) return
-      // The public shell is the vertical scroller. A horizontally scrolling ancestor (e.g. the item tabs)
-      // also computes overflow-y:auto, so it must not be mistaken for it.
-      let scroller = target.closest<HTMLElement>('[data-public-scroll]') ?? target.parentElement
-      while (scroller && !scroller.hasAttribute('data-public-scroll') && !(/(auto|scroll)/.test(getComputedStyle(scroller).overflowY) && scroller.scrollHeight > scroller.clientHeight)) scroller = scroller.parentElement
-      const rect = target.getBoundingClientRect()
-      const viewport = scroller?.getBoundingClientRect()
-      const viewportTop = Math.max(0, viewport?.top ?? 0)
-      const viewportBottom = Math.min(window.innerHeight, viewport?.bottom ?? window.innerHeight)
-      const previewElement = document.querySelector<HTMLElement>(`.${styles.previewPane}`)
-      const actionsElement = document.querySelector<HTMLElement>(`.${styles.actions}`)
-      const preview = !previewElement?.contains(target) ? previewElement?.getBoundingClientRect() : undefined
-      const actions = !actionsElement?.contains(target) ? actionsElement?.getBoundingClientRect() : undefined
-      const overlaps = (other: DOMRect) => rect.left < other.right && rect.right > other.left
-      const top = preview && overlaps(preview) && preview.top <= viewportTop + 1 && preview.bottom > viewportTop ? preview.bottom + 8 : viewportTop + 8
-      const bottom = actions && overlaps(actions) && actions.bottom >= viewportBottom - 1 && actions.top < viewportBottom ? actions.top - 8 : viewportBottom - 8
-      const delta = rect.top < top ? rect.top - top : rect.bottom > bottom ? rect.bottom - bottom : 0
-      if (delta) (scroller ?? window).scrollBy({ top: delta, behavior: 'instant' })
-    })
-  }} onSubmit={(event) => { event.preventDefault(); next() }}>
+  return <form data-public-page className={`${publicForm.page} ${styles.shop}`} noValidate onFocus={keepFormFocusVisible} onSubmit={(event) => { event.preventDefault(); next() }}>
     <PageHeader title={t('shopTitle')}>{step === 0 && <p>{t('shopLead')}</p>}</PageHeader>
     {storageError ? <p role="status">{t('shopStorageError')}</p> : null}
     {params.get('cancelled') ? <p className={styles.notice} role="status">{t('shopCancelled')}</p> : null}
@@ -376,7 +353,7 @@ export function BuyPage() {
       {step === 1 && <><BuyDateStep {...stepProps} /><div className={styles.deliveryContact}><BuyContactStep {...stepProps} withAddress={!pickup} validateField={validateField} validFields={validFields} /></div></>}
       {step === 2 && <BuyReviewStep {...stepProps} go={(index, uid, sub, field) => { pendingErrorFocus.current = field ?? null; if (uid) setActiveUid(uid); if (sub !== undefined) setSubstep(sub); setChangedSection(uid ?? (index === 3 ? 'contact' : 'delivery')); setReturnReview(true); go(index < 2 ? 0 : 1) }} itemsTotal={itemsTotal} deliveryFee={deliveryFee} total={total} changed={changedSection} />}
     </section>
-    <aside hidden={step !== 1} className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><dl aria-live="polite"><div><dt>{t('shopItemsTotal')} ({draft.items.length})</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{deliveryFee ? formatEur(deliveryFee, locale) : t('shopFree')}</dd></div><div className={styles.cartTotal}><dt>{t('shopTotal')}</dt><dd>{formatEur(total, locale)}</dd></div></dl></aside>
+    <aside hidden={step !== 1} className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><dl aria-live="polite"><div><dt>{t(draft.items.length > 1 ? 'shopItemsTotal' : 'shopItemOne')} ({draft.items.length})</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{deliveryFee ? formatEur(deliveryFee, locale) : t('shopFree')}</dd></div><div className={styles.cartTotal}><dt>{t('shopTotal')}</dt><dd>{formatEur(total, locale)}</dd></div></dl></aside>
     <StickyActions className={styles.actions}><div className={styles.mobileTotal} hidden={step === 2}><span>{t('shopTotal')}</span><strong data-buy-total><AnimatedPrice value={total} locale={locale} /></strong></div>{(step > 0 || substep > 0) && <Button variant="secondary" disabled={busy} onClick={back}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 2 ? busy ? t('shopPaying') : t('shopPayStripe') : t('continue')}</Button>{step === 2 && <small className={styles.stripeLine}>{t('secureStripe')}</small>}</StickyActions>
   </form>
 }

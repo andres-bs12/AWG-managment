@@ -11,8 +11,8 @@ export function PageHeader({ title, children }: { title: string; children?: Reac
 }
 export function InsetNote({ children, tone }: { children: ReactNode; tone?: 'warning' }) { return <div className={styles.inset} data-tone={tone}>{children}</div> }
 export function StickyActions({ children, className = '' }: { children: ReactNode; className?: string }) {
-  const ref = usePublicActions()
-  return <div ref={ref} data-sticky-actions className={`${styles.actions} ${className}`}>{children}</div>
+  const { ref, endRef } = usePublicActions()
+  return <><div ref={ref} data-sticky-actions className={`${styles.actions} ${className}`}>{children}</div><span ref={endRef} className={styles.actionsEnd} aria-hidden="true" /></>
 }
 export function Card({ children }: { children: ReactNode }) { return <section className={styles.card}>{children}</section> }
 export function PublicState({ title, children, error = false }: { title: string; children: ReactNode; error?: boolean }) {

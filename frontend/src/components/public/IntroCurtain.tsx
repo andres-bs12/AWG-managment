@@ -127,7 +127,7 @@ export function IntroCurtain({ label, onReveal, onDone }: Props) {
       <svg className={styles.hem} viewBox="0 0 400 24" preserveAspectRatio="none" aria-hidden="true">
         <path
           d="M0 0 H400 V8 Q390 20 380 8 Q366 22 352 8 Q340 16 328 8 Q312 24 296 8 Q284 18 272 8 Q256 22 240 8 Q228 16 216 8 Q200 24 184 8 Q172 18 160 8 Q144 22 128 8 Q116 16 104 8 Q88 24 72 8 Q60 18 48 8 Q32 22 16 8 Q8 16 0 8 Z"
-          fill="#36844f"
+          fill="var(--sky-low)"
         />
       </svg>
     </div>,

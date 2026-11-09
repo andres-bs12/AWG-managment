@@ -1,27 +1,32 @@
 import type { FocusEvent } from 'react'
+import { publicScroller } from './publicScroller.ts'
 
-/** Keep the focused control and its focus ring clear of the public scroll viewport and action bar. */
+/** Keep the focused control and its ring inside the visible document viewport, clear of overlays. */
 export function keepFormFocusVisible(event: FocusEvent<HTMLElement>) {
   const target = event.target
   const form = event.currentTarget
-  if (!(target instanceof HTMLElement) || target.tabIndex < 0 || target.closest('[data-sticky-actions][data-docked="true"]')) return
+  if (!(target instanceof HTMLElement) || target.tabIndex < 0) return
   requestAnimationFrame(() => {
     if (document.activeElement !== target) return
-    // The public shell is the vertical scroller. A horizontally scrolling ancestor (e.g. the item tabs)
-    // also computes overflow-y:auto, so it must not be mistaken for it.
-    let scroller = target.closest<HTMLElement>('[data-public-scroll]') ?? target.parentElement
-    while (scroller && !scroller.hasAttribute('data-public-scroll') && !(/(auto|scroll)/.test(getComputedStyle(scroller).overflowY) && scroller.scrollHeight > scroller.clientHeight)) scroller = scroller.parentElement
     const rect = target.getBoundingClientRect()
-    const viewport = scroller?.getBoundingClientRect()
     const gap = parseFloat(getComputedStyle(form).getPropertyValue('--space-2'))
-    const top = Math.max(0, viewport?.top ?? 0) + gap
-    let bottom = Math.min(window.innerHeight, viewport?.bottom ?? window.innerHeight) - gap
+    const viewport = window.visualViewport
+    const viewportTop = viewport?.offsetTop ?? 0
+    const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight)
+    let top = viewportTop + gap
+    let bottom = viewportBottom - gap
+    const overlaps = (other: DOMRect) => rect.left < other.right && rect.right > other.left
+    const preview = form.querySelector<HTMLElement>('[data-public-preview]')
+    if (preview && !preview.contains(target) && getComputedStyle(preview).position === 'sticky') {
+      const artwork = preview.getBoundingClientRect()
+      if (overlaps(artwork) && artwork.top <= top && artwork.bottom > viewportTop) top = artwork.bottom + gap
+    }
     const actions = form.querySelector<HTMLElement>('[data-sticky-actions]')
     if (actions && !actions.contains(target)) {
       const bar = actions.getBoundingClientRect()
-      if (bar.top < bottom && bar.bottom >= bottom) bottom = bar.top - gap
+      if (overlaps(bar) && bar.top < bottom && bar.bottom > top) bottom = bar.top - gap
     }
     const delta = rect.top < top ? rect.top - top : rect.bottom > bottom ? rect.bottom - bottom : 0
-    if (delta) (scroller ?? window).scrollBy({ top: delta, behavior: 'instant' })
+    if (delta) publicScroller().scrollBy({ top: delta, behavior: 'instant' })
   })
 }

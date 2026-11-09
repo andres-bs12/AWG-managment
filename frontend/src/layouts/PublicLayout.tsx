@@ -4,6 +4,7 @@ import { IntroCurtain } from '../components/public/IntroCurtain'
 import { Snowfield } from '../components/public/Snowfield'
 import { WinterBackdrop } from '../components/public/WinterBackdrop'
 import { useLocale } from '../i18n/LocaleContext'
+import { keepFormFocusVisible } from '../lib/publicFormFocus'
 import styles from './PublicLayout.module.css'
 
 /** The opening curtain plays once per page load, and only when the visit starts on home. */
@@ -30,22 +31,11 @@ export function PublicLayout() {
   }, [intro])
 
   return (
-    <div data-public-scroll className={`${styles.shell} ${quiet ? styles.quiet : ''}`} onFocus={(event) => {
+    <div data-public-shell className={`${styles.shell} ${quiet ? styles.quiet : ''}`} onFocus={(event) => {
       const target = event.target
-      const shell = event.currentTarget
-      // Forms handle their sticky overlays themselves. Header and footer links
-      // also need clearance: native focus scrolling can leave a fractional
-      // pixel (and the focus ring) clipped by this shell's scroll viewport.
+      // Forms repair their own focus; header/footer links need the same viewport clearance.
       if (!(target instanceof HTMLElement) || target.closest('main')) return
-      requestAnimationFrame(() => {
-        if (document.activeElement !== target) return
-        const rect = target.getBoundingClientRect()
-        const viewport = shell.getBoundingClientRect()
-        const top = Math.max(0, viewport.top) + 8
-        const bottom = Math.min(window.innerHeight, viewport.bottom) - 8
-        const delta = rect.top < top ? rect.top - top : rect.bottom > bottom ? rect.bottom - bottom : 0
-        if (delta) shell.scrollBy({ top: delta, behavior: 'instant' })
-      })
+      keepFormFocusVisible(event)
     }}>
       {intro ? (
         <IntroCurtain

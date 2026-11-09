@@ -1,95 +1,89 @@
 import { useLayoutEffect, useRef } from 'react'
 
-/**
- * Dock actions outside the scrollport so even unfocused targets cannot sit underneath them.
- * The docked bar spans the card's full width and continues it; once the end of the card scrolls
- * into view the bar returns to the flow as the card's last row ("stuck"), so it merges with the
- * card's bottom edge instead of floating as a pill inside a pill. The switch keeps every content
- * position: the scrollport grows by exactly the height the bar now takes in the flow.
- */
+/** CSS owns sticky positioning; observe the card end and available reading room only. */
 export function usePublicActions() {
   const ref = useRef<HTMLDivElement>(null)
+  const endRef = useRef<HTMLSpanElement>(null)
   useLayoutEffect(() => {
     const bar = ref.current
+    const end = endRef.current
     const page = bar?.closest<HTMLElement>('[data-public-page]')
-    const shell = bar?.closest<HTMLElement>('[data-public-scroll]')
-    if (!bar || !page || !shell) return
+    if (!bar || !end || !page) return
+    const root = document.documentElement
     const desktop = matchMedia('(min-width: 1024px)')
     const visualViewport = window.visualViewport
+    let preview: HTMLElement | null = null
     let frame = 0
-    const reset = () => {
-      delete bar.dataset.docked
-      delete bar.dataset.stuck
-      delete shell.dataset.dockedActions
-      shell.style.removeProperty('--public-sticky-bottom')
-    }
+    let previousHeight = 0
+    let previousTop = 0
     const measure = () => {
+      const currentPreview = page.querySelector<HTMLElement>('[data-public-preview]')
+      if (currentPreview !== preview) {
+        if (preview) resize.unobserve(preview)
+        preview = currentPreview
+        if (preview) resize.observe(preview)
+      }
       const css = getComputedStyle(page)
       const gap = parseFloat(css.getPropertyValue('--space-4'))
       const control = parseFloat(css.getPropertyValue('--size-control'))
       const height = visualViewport?.height ?? innerHeight
+      const top = visualViewport?.offsetTop ?? 0
+      const reserved = Math.ceil(bar.getBoundingClientRect().height)
       const keyboardOrZoom = height < innerHeight - control
-      if (desktop.matches) {
-        reset()
-        delete page.dataset.relaxedPreview
-        return
+      const sticky = !desktop.matches && !keyboardOrZoom && height - reserved - gap >= 3 * control
+      const relaxed = !desktop.matches && (!sticky || height - reserved - gap - (preview?.offsetHeight ?? 0) < 3 * control)
+      const clearance = `${sticky ? reserved : 0}px`
+      const changed = bar.dataset.relaxedActions !== String(!sticky) || page.dataset.relaxedPreview !== String(relaxed)
+        || root.style.getPropertyValue('--public-actions-height') !== clearance
+        || height !== previousHeight || top !== previousTop
+      previousHeight = height
+      previousTop = top
+      bar.dataset.relaxedActions = String(!sticky)
+      page.dataset.relaxedPreview = String(relaxed)
+      root.style.setProperty('--public-actions-height', clearance)
+      page.style.setProperty('--public-sticky-top', `${!relaxed && !desktop.matches ? preview?.offsetHeight ?? 0 : 0}px`)
+      // Resizing or opening the keyboard can move a sticky region over the current field.
+      const active = document.activeElement
+      if (changed && active instanceof HTMLElement && page.contains(active)) {
+        requestAnimationFrame(() => {
+          if (document.activeElement === active) active.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+        })
       }
-      const rect = page.getBoundingClientRect()
-      bar.style.setProperty('--public-actions-left', `${rect.left}px`)
-      bar.style.setProperty('--public-actions-width', `${rect.width}px`)
-      const wasStuck = bar.dataset.stuck === 'true'
-      bar.dataset.docked = 'true'
-      const barRect = bar.getBoundingClientRect()
-      const reserved = Math.ceil(barRect.height)
-      // Where the bar's slot starts at the end of the card, measured the same way in both states.
-      const slotGap = parseFloat(css.getPropertyValue('--space-5'))
-      const contentEnd = wasStuck ? barRect.top - slotGap : rect.bottom - parseFloat(css.paddingBottom)
-      // A short viewport or the virtual keyboard needs reading room before sticky regions.
-      const dock = !keyboardOrZoom && height - reserved - gap >= 3 * control
-      const preview = page.querySelector<HTMLElement>('[data-public-preview]')
-      page.dataset.relaxedPreview = String(!dock || height - reserved - gap - (preview?.offsetHeight ?? 0) < 3 * control)
-      const stuck = dock && contentEnd + slotGap + reserved <= innerHeight
-      // Switching between docked and stuck resizes the scrollport. A focused control was placed for
-      // the previous geometry, so ask the page's focus repair (onFocus handlers) to place it again.
-      if (stuck !== wasStuck) {
-        const active = document.activeElement
-        if (active instanceof HTMLElement && page.contains(active) && !bar.contains(active)) requestAnimationFrame(() => active.dispatchEvent(new FocusEvent('focusin', { bubbles: true })))
-      }
-      if (dock && stuck) {
-        bar.dataset.stuck = 'true'
-        shell.style.removeProperty('--public-sticky-bottom')
-        delete shell.dataset.dockedActions
-      } else if (dock) {
-        delete bar.dataset.stuck
-        shell.style.setProperty('--public-sticky-bottom', `${reserved}px`)
-        shell.dataset.dockedActions = 'true'
-      } else reset()
     }
     const schedule = () => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(measure)
     }
+    // The marker stays at the card's natural bottom while the bar sticks to the viewport.
+    const intersection = new IntersectionObserver(([entry]) => {
+      bar.dataset.stuck = String(entry.boundingClientRect.bottom <= (entry.rootBounds?.bottom ?? innerHeight))
+    }, { threshold: [0, 1] })
+    intersection.observe(end)
     const resize = new ResizeObserver(schedule)
     resize.observe(bar)
     resize.observe(page)
     const content = new MutationObserver(schedule)
     content.observe(page, { childList: true, subtree: true })
-    shell.addEventListener('scroll', schedule, { passive: true })
     desktop.addEventListener('change', schedule)
     window.addEventListener('resize', schedule)
     visualViewport?.addEventListener('resize', schedule)
+    visualViewport?.addEventListener('scroll', schedule)
     measure()
     return () => {
       cancelAnimationFrame(frame)
+      intersection.disconnect()
       resize.disconnect()
       content.disconnect()
-      shell.removeEventListener('scroll', schedule)
       desktop.removeEventListener('change', schedule)
       window.removeEventListener('resize', schedule)
       visualViewport?.removeEventListener('resize', schedule)
-      reset()
+      visualViewport?.removeEventListener('scroll', schedule)
+      root.style.removeProperty('--public-actions-height')
+      page.style.removeProperty('--public-sticky-top')
+      delete bar.dataset.stuck
+      delete bar.dataset.relaxedActions
       delete page.dataset.relaxedPreview
     }
   }, [])
-  return ref
+  return { ref, endRef }
 }

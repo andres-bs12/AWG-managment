@@ -136,12 +136,9 @@
   --layout-calendar-max: 420px;
   --layout-gutter: var(--space-4);
   --layout-header-height: var(--space-8);
-  /* The docked action bar continues the card: no gap between the scrollport and the bar. */
-  --layout-sticky-gap: 0px;
+  /* Runtime measurements for document focus clearance on public forms. */
   --public-sticky-top: 0px;
-  --public-sticky-bottom: 0px;
-  --public-actions-left: 0px;
-  --public-actions-width: 100%;
+  --public-actions-height: 0px;
   --measure-prose: 65ch;
   --measure-hint: 52ch;
   --measure-heading: 28ch;

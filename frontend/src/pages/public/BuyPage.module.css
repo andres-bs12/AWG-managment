@@ -322,6 +322,8 @@
 
 /* Name on the back: a card with the option + price, a front/back preview and, when on, the field. */
 .nameCard {
+  /* Same right edge as the text fields below it. */
+  max-width: var(--layout-field-max);
   padding: var(--space-4);
   border: var(--border-thin) solid var(--color-control-border);
   border-radius: var(--radius-control);
@@ -670,8 +672,6 @@
   }
   .mobileTotal strong { font-size: 1rem; }
   .stripeLine { font-size: 0.75rem; }
-  .shop { scroll-padding-bottom: 10rem; }
-  .step :is(input, textarea, button, fieldset, [role='alert']) { scroll-margin-bottom: 10rem; }
 }
 
 /* ── Configurator (docs/design-system.md L3, §7.10, §7.16) ──────────────── */
@@ -687,8 +687,8 @@
 
 .deliveryContact { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--snow-2); }
 @media (max-width: 1023px) {
-  .step :is(input, textarea, button, summary, fieldset) { scroll-margin-block: var(--space-4) 10rem; }
-  .design :is(input, textarea, button, summary) { scroll-margin-top: 15rem; }
+  .step :is(input, textarea, button, summary, fieldset) { scroll-margin-block: var(--space-4); }
+  .design :is(input, textarea, button, summary) { scroll-margin-top: calc(var(--public-sticky-top) + var(--space-4)); }
   .design[data-substep='0'] .nameGroup, .design[data-substep='0'] .petGroup,
   .design[data-substep='1'] .choiceGroup, .design[data-substep='1'] .petGroup,
   .design[data-substep='2'] .choiceGroup, .design[data-substep='2'] .nameGroup { display: none; }

@@ -83,9 +83,8 @@ for (const locale of ['de', 'en'] as const) {
 }
 
 test('the mobile action bar spans the card and merges with its end', async ({ page }) => {
-  test.skip(!mobile(page), 'The bar docks below 1024px only.')
+  test.skip(!mobile(page), 'The bar sticks below 1024px only.')
   await open(page); await choose(page); await pet(page); await next(page).click()
-  const shell = page.locator('[data-public-scroll]')
   const bar = page.locator('[data-sticky-actions]')
   const geometry = () => page.evaluate(() => {
     const card = document.querySelector('[data-public-page]')!.getBoundingClientRect()
@@ -94,14 +93,15 @@ test('the mobile action bar spans the card and merges with its end', async ({ pa
     const css = getComputedStyle(actions)
     return { stuck: actions.dataset.stuck === 'true', cardLeft: card.left, cardRight: card.right, cardBottom: card.bottom, left: box.left, right: box.right, bottom: box.bottom, top: box.top, shadow: css.boxShadow, radius: [css.borderTopLeftRadius, css.borderBottomLeftRadius] }
   })
-  await shell.evaluate(node => { node.scrollTop = 0 })
+  await page.locator(':focus').evaluateAll(nodes => nodes.forEach(node => (node as HTMLElement).blur()))
+  await page.evaluate(() => window.scrollTo(0, 0))
   await expect.poll(async () => (await geometry()).stuck).toBe(false)
   let box = await geometry()
   expect([box.left, box.right]).toEqual([box.cardLeft, box.cardRight])
   expect(box.bottom).toBe(page.viewportSize()!.height)
   expect(box.radius[1]).toBe('0px')
   await expectActionClearance(page)
-  await shell.evaluate(node => { node.scrollTop = node.scrollHeight })
+  await page.evaluate(() => window.scrollTo(0, document.scrollingElement!.scrollHeight))
   await expect(bar).toHaveAttribute('data-stuck', 'true')
   box = await geometry()
   expect([box.left, box.right, box.bottom]).toEqual([box.cardLeft, box.cardRight, box.cardBottom])

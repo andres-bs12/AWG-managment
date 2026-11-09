@@ -46,18 +46,33 @@ export async function axe(page: Page) {
   expect(results.violations).toEqual([])
 }
 
-export async function expectActionClearance(page: Page, mode = mobile(page) ? 'docked' : 'flow') {
-  await expect.poll(() => page.locator('[data-sticky-actions]').evaluate((bar, expected) => {
-    const shell = bar.closest('[data-public-scroll]')!
-    const viewport = shell.getBoundingClientRect()
-    const actions = bar.getBoundingClientRect()
-    if (expected === 'flow') return getComputedStyle(bar).position === 'static'
-      && !shell.hasAttribute('data-docked-actions') && !(bar as HTMLElement).dataset.docked
-    const inside = actions.left >= 0 && actions.right <= innerWidth && actions.bottom <= innerHeight + 0.5
-    // At the end of the card the bar returns to the flow as the card's last row.
-    if ((bar as HTMLElement).dataset.stuck === 'true') return getComputedStyle(bar).position === 'static' && inside
-    // Docked: the scrollport ends exactly where the bar starts, so nothing can sit underneath it.
-    return getComputedStyle(bar).position === 'fixed' && viewport.bottom <= actions.top + 0.5 && inside
-  }, mode)).toBe(true)
+export async function expectDocumentScroll(page: Page) {
+  await expect.poll(() => page.evaluate(() => {
+    const shell = document.querySelector<HTMLElement>('[data-public-shell]')!
+    const scroller = document.scrollingElement!
+    const style = getComputedStyle(shell)
+    return scroller === document.documentElement && style.overflowY === 'visible'
+      && shell.scrollTop === 0 && scroller.scrollWidth <= scroller.clientWidth
+      && shell.scrollWidth <= shell.clientWidth
+  })).toBe(true)
 }
 
+export async function expectActionClearance(page: Page, mode = mobile(page) ? 'sticky' : 'flow') {
+  await expectDocumentScroll(page)
+  await expect.poll(() => page.locator('[data-sticky-actions]').evaluate((bar, expected) => {
+    const actions = bar.getBoundingClientRect()
+    const viewport = window.visualViewport
+    const top = viewport?.offsetTop ?? 0
+    const bottom = top + (viewport?.height ?? innerHeight)
+    const active = document.activeElement
+    const rect = active?.getBoundingClientRect()
+    const visibleFocus = !active || active === document.body || !rect || (
+      rect.top >= top && rect.bottom <= bottom
+      && (bar.contains(active) || rect.right <= actions.left || rect.left >= actions.right
+        || rect.bottom <= actions.top || rect.top >= actions.bottom))
+    if (expected === 'flow') return getComputedStyle(bar).position === 'static' && visibleFocus
+    // Sticky stays in flow even at the card end; only its corners/shadow change there.
+    const inside = actions.left >= 0 && actions.right <= innerWidth && actions.bottom <= bottom + 0.5
+    return getComputedStyle(bar).position === 'sticky' && inside && visibleFocus
+  }, mode)).toBe(true)
+}

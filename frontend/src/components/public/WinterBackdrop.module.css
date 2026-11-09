@@ -7,7 +7,13 @@
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  z-index: 0;
+  /*
+   * Negative z-index on purpose: iOS 26 Safari skips viewport-sized fixed layers with a negative
+   * z-index when it picks a colour for its toolbars (WebKit LocalFrameView::fixedContainerEdges,
+   * NegativeZIndex). With z-index 0 it sampled the pale snow and painted a solid band; now the
+   * toolbars stay clear glass over the page, as on apple.com. The shell isolates the stacking.
+   */
+  z-index: -2;
   /** Isolates the scenery so its animations never trigger layout or paint in the page above. */
   contain: layout paint;
 }
@@ -16,10 +22,16 @@
 .sky {
   position: absolute;
   inset: 0;
+  /*
+   * iOS 26 Safari paints its top bar with the html background (var(--sky-top)) while the page is at
+   * the top. The sky stays exactly that colour under the bar (safe area + address bar) so the bar
+   * and the page meet without a visible band.
+   */
   background: linear-gradient(
     180deg,
     var(--sky-top) 0%,
-    var(--sky-mid) 26%,
+    var(--sky-top) calc(env(safe-area-inset-top, 0px) + 96px),
+    var(--sky-mid) 30%,
     var(--sky-low) 46%,
     var(--sky-horizon) 60%,
     var(--sky-horizon) 100%
@@ -239,9 +251,11 @@
     display: none;
   }
 
+  /* Kept below the top bar area, so it never lightens the strip that must match Safari's bar. */
   .sun {
     width: 110vw;
-    top: -30%;
+    top: calc(env(safe-area-inset-top, 0px) + 40px);
+    right: -40vw;
   }
 }
 

@@ -83,11 +83,11 @@ test('overview supports keyboard edit, removal, max count and narrow reflow', as
   await expect(page.locator('#ornament-editor-heading')).toBeFocused()
   await expect(page.locator('#buy-add')).toBeEnabled()
   await page.setViewportSize({ width: 360, height: 740 })
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && [...document.querySelectorAll('[data-public-scroll]')].every(node => node.scrollWidth <= node.clientWidth))).toBe(true)
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth && document.body.scrollWidth <= innerWidth)).toBe(true)
   for (const button of await rows.nth(0).getByRole('button').all()) expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(56)
   await axe(page)
   await page.setViewportSize({ width: 1920, height: 1080 })
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && [...document.querySelectorAll('[data-public-scroll]')].every(node => node.scrollWidth <= node.clientWidth))).toBe(true)
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth && document.body.scrollWidth <= innerWidth)).toBe(true)
 })
 
 test('a named first ornament never turns on the name for a new ornament', async ({ page }) => {

@@ -1,20 +1,14 @@
 .shell {
-  min-height: 100%;
-  height: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
   position: relative;
-  /** Never clip: if a short window cannot fit the scene, let it scroll instead of hiding CTAs. */
-  overflow-x: hidden;
-  overflow-y: auto;
-  background: var(--sky-top);
+  /* Clip sideways without creating a scroll container for sticky descendants. */
+  overflow-x: clip;
+  /* Keeps the negative z-index scenery (backdrop, snow) above the body background. */
+  isolation: isolate;
   color: var(--snow);
-}
-
-/* Docked actions occupy their own viewport space, below the clipped scrollport. */
-.shell[data-docked-actions='true'] {
-  height: calc(100% - var(--public-sticky-bottom) - var(--layout-sticky-gap));
-  min-height: 0;
 }
 
 /** Routes with a reading panel on top: the scene stays, the drama goes down. */
