@@ -78,7 +78,9 @@ export function TrackPage() {
       .catch((err) => {
         if (cancelled) return
         setLoaded(null)
-        setError(apiError(err, locale, t('trackNotFound')).text)
+        // The heading already says the code did not match; the line below only says what to do.
+        const notFound = !(err && typeof err === 'object' && 'code' in err) || (err as { code?: string }).code === 'ORDER_NOT_FOUND'
+        setError(notFound ? t('trackNotFound') : apiError(err, locale, t('trackNotFound')).text)
         setPhase('done')
         setDialogOpen(true)
       })

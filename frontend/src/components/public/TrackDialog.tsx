@@ -70,7 +70,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error, lookup
       inputRef.current?.focus()
       return
     }
-    if (!/^AWG[A-Z0-9]{4,6}$/i.test(next)) { setLocalError(t('trackNotFound')); inputRef.current?.focus(); return }
+    if (!/^AWG[A-Z0-9]{4,6}$/i.test(next)) { setLocalError(t('trackCodeFormat')); inputRef.current?.focus(); return }
     setLocalError('')
     setBusy(true)
     try {

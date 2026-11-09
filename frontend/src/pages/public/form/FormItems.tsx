@@ -36,13 +36,14 @@ export function FormItems({ items, draft, errors, photoErrors, patch, addFiles, 
         <h3>{source.petName || t('ornamentN', { n: index + 1 })}</h3>
         <p className={styles.muted}>{t('finishedOrnament')}</p>
         <div className={styles.preview}><OrnamentPreview item={previewItem(source)} static /></div>
-        <dl className={styles.facts}><div><dt>{t('shopColour')}</dt><dd>{source.color ? t(colorKeys[source.color]) : t('colorUnknown')}</dd></div><div><dt>{t('shopFinish')}</dt><dd>{source.finish ? t(source.finish === 'shiny' ? 'finishShiny' : 'finishMatte') : t('formFinishUnknown')}</dd></div>{source.withName && <div><dt>{t('backName')}</dt><dd>{source.backName}</dd></div>}</dl>
+        <dl className={styles.facts}><div><dt>{t('shopColour')}</dt><dd>{source.color ? t(colorKeys[source.color]) : t('formFinishUnknown')}</dd></div><div><dt>{t('shopFinish')}</dt><dd>{source.finish ? t(source.finish === 'shiny' ? 'finishShiny' : 'finishMatte') : t('formFinishUnknown')}</dd></div>{source.withName && <div><dt>{t('backName')}</dt><dd>{source.backName}</dd></div>}</dl>
       </div></Card>
       const id = source.id
       return <Card key={id}><div className={styles.item} onFocusCapture={() => setActiveId(id)}>
-        <h3 id={`form-editor-${id}`} tabIndex={-1}>{t('multiEditorHeading', { n: index + 1, total: items.length })}{item.petName.trim() ? ` – ${item.petName.trim()}` : ''}</h3>
-        <p className={styles.muted}>{source.withName ? item.backName.trim() ? t('multiNameValue', { name: item.backName }) : t('multiNamePending') : t('multiNoName')}</p>
-        <dl className={styles.facts}><div><dt>{t('shopColour')}</dt><dd>{source.color ? t(colorKeys[source.color]) : t('colorUnknown')}{(source.color === 'grey' || source.color === 'white') && <> · {t('legacyColour')}</>}</dd></div><div><dt>{t('shopFinish')}</dt><dd>{source.finish ? t(source.finish === 'shiny' ? 'finishShiny' : 'finishMatte') : t('formFinishUnknown')}</dd></div></dl>
+        {/* Same rule as /buy: "Kugel 1 von 1" and the name summary only help when there are several. */}
+        <h3 id={`form-editor-${id}`} tabIndex={-1}>{items.length > 1 ? `${t('multiEditorHeading', { n: index + 1, total: items.length })}${item.petName.trim() ? ` – ${item.petName.trim()}` : ''}` : item.petName.trim() || t('formSingleOrnament')}</h3>
+        {items.length > 1 && <p className={styles.muted}>{source.withName ? item.backName.trim() ? t('multiNameValue', { name: item.backName }) : t('multiNamePending') : t('multiNoName')}</p>}
+        <dl className={styles.facts}><div><dt>{t('shopColour')}</dt><dd>{source.color ? t(colorKeys[source.color]) : t('formFinishUnknown')}{(source.color === 'grey' || source.color === 'white') && <> · {t('legacyColour')}</>}</dd></div><div><dt>{t('shopFinish')}</dt><dd>{source.finish ? t(source.finish === 'shiny' ? 'finishShiny' : 'finishMatte') : t('formFinishUnknown')}</dd></div></dl>
         <div className={styles.editor}>
           <div className={styles.preview}><OrnamentPreview readOnly item={previewItem(source, item)} /></div>
           <div className={styles.fields}>

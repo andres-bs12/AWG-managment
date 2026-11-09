@@ -27,6 +27,9 @@ export function BuyThanksPage() {
   const [view, setView] = useState<TrackView | null>(null)
   const [timedOut, setTimedOut] = useState(false)
   const [seqValue, setSeqValue] = useState<number | null>(null)
+  const [emailSent, setEmailSent] = useState(false)
+  // Only promise the confirmation e-mail when the server is configured to send it.
+  useEffect(() => { let active = true; void api.shop.getConfig().then(config => { if (active) setEmailSent(!!config.confirmationEmail) }).catch(() => {}); return () => { active = false } }, [])
 
   useEffect(() => {
     if (!code) return
@@ -90,7 +93,7 @@ export function BuyThanksPage() {
     <ButtonLink to={`/track/${encodeURIComponent(code)}`} fullWidth>{t('goTrack')}</ButtonLink>
   </PublicPage>
   return <PublicPage variant="status" className={thanks.page}>
-    <PageHeader title={t('shopThanksTitle')} />
+    <PageHeader title={t('shopThanksTitle')}>{emailSent && <p className={thanks.lead}>{t('thanksEmailSent')}</p>}</PageHeader>
     {view.items.length > 0 && <div className={buyStyles.thanksPreviews}>{view.items.map((entry, index) => (
       <OrnamentPreview key={index} item={{ color: entry.color ?? '', finish: entry.finish ?? '', withName: entry.withName, backName: entry.backName }} static />
     ))}</div>}

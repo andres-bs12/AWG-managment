@@ -110,7 +110,7 @@ for (const locale of ['de', 'en'] as const) {
 test('reload restores text, omits local bytes, and requests photos again', async ({ page }) => {
   await openForm(page); await fillForm(page)
   await next(page).click(); await page.reload()
-  await expect(page.locator('#form-heading')).toHaveText('Deine Kugel(n)')
+  await expect(page.locator('#form-heading')).toHaveText(/^Deine Kugeln?$/)
   await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
   await expect(page.locator('input[id^="back-"]')).toHaveValue('Luna')
   await expect(page.locator('#form-email')).toHaveValue('alex@example.com')
@@ -381,7 +381,7 @@ test('the stepper names each section once and the step count is only for screen 
   await openForm(page)
   const nav = page.getByRole('navigation', { name: 'Schritt 1 von 2' })
   await expect(nav).toBeVisible()
-  await expect(nav.getByText('Deine Kugel(n)', { exact: true })).toBeVisible()
+  await expect(nav.getByText(/^Deine Kugeln?$/)).toBeVisible()
   await expect(nav.getByText('Prüfen & absenden', { exact: true })).toBeVisible()
   await expect(page.getByText(/Schritt 1 von 2/)).toHaveCount(0)
 })

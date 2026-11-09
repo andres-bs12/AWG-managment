@@ -5,7 +5,7 @@ const messages: Record<string, [string, string]> = {
   PHOTO_INVALID: ['A photo could not be read. Please add it again (JPEG, PNG, WebP or HEIC).', 'Ein Foto konnte nicht gelesen werden. Bitte füge es erneut hinzu (JPEG, PNG, WebP oder HEIC).'],
   VALIDATION: ['Please check this value.', 'Bitte überprüfe diese Angabe.'],
   NOT_FOUND: ['This item could not be found.', 'Dieser Eintrag wurde nicht gefunden.'],
-  ORDER_NOT_FOUND: ['Order not found. Check your code.', 'Bestellung nicht gefunden. Bitte überprüfe deinen Code.'],
+  ORDER_NOT_FOUND: ['There is no order with this code. Check the letters and numbers.', 'Zu diesem Code gibt es keine Bestellung. Prüfe Buchstaben und Zahlen.'],
   FORM_EXPIRED: ['This link has expired. Write to us if you need anything.', 'Dieser Link ist abgelaufen. Schreib uns, wenn du etwas brauchst.'],
   FORM_LOCKED: ['Painting has started or the order was handed over. Changes are no longer possible.', 'Die Bemalung hat begonnen oder die Bestellung wurde übergeben. Änderungen sind nicht mehr möglich.'],
   POSTAL_OUTSIDE_VIENNA: ['Please enter a Vienna postal code (1010–1230).', 'Bitte gib eine Wiener Postleitzahl (1010–1230) ein.'],
@@ -32,5 +32,7 @@ export function apiError(error: unknown, locale: Locale, fallback: string): { te
   const generic = !problem.code || ['BAD_REQUEST', 'VALIDATION', 'CONFLICT'].includes(problem.code)
   if (locale === 'en' && generic && problem.message) return { text: problem.message, field: problem.field }
   const translation = problem.code ? messages[problem.code] : undefined
-  return { text: translation ? translation[locale === 'de' ? 1 : 0] : problem.message || fallback, field: problem.field }
+  if (translation) return { text: translation[locale === 'de' ? 1 : 0], field: problem.field }
+  // Server messages are English only: German pages fall back to their own copy instead of mixing languages.
+  return { text: locale === 'en' ? problem.message || fallback : fallback, field: problem.field }
 }

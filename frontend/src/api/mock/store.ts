@@ -923,7 +923,7 @@ function trackStatusFor(order: Order, items: OrderItem[]): TrackView['status'] {
 
 export function getTrackByCode(code: string): TrackView {
   const order = getOrderByCode(code)
-  if (!order) throw new Error('Order not found. Check the code.')
+  if (!order) throw Object.assign(new Error('Order not found. Check the code.'), { code: 'ORDER_NOT_FOUND', status: 404 })
   const customer = state.customers.find((c) => c.id === order.customerId)
   const items = state.items.filter((i) => i.orderId === order.id)
   const first = items[0]

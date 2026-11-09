@@ -205,7 +205,8 @@ function CustomerForm({ token }: { token: string }) {
     {view && terminal === 'locked' ? <ButtonLink to={`/track/${encodeURIComponent(view.orderCode)}`}>{t('goTrack')}</ButtonLink> : <ButtonLink to="/">{t('backHome')}</ButtonLink>}
   </PublicState>
 
-  const stepLabels = [t('formOrnaments'), t('formReviewStep')]
+  const ornamentCount = view ? (view.items ?? [view.item]).length : 1
+  const stepLabels = [t(ornamentCount > 1 ? 'formOrnamentsMany' : 'formOrnamentsOne'), t('formReviewStep')]
   return <form data-public-page className={`${shell.page} ${styles.form}`} noValidate onFocus={keepFormFocusVisible} onSubmit={event => { event.preventDefault(); if (uploads.current.size) return; if (step === 'review') void submit(); else if (!showErrors(validate())) { setErrors({}); setServerField(null); focusRequest.current = 'form-heading'; setStep('review') } }}>
     <PageHeader title={t('formTitle')}><p>{t('formLead')}</p></PageHeader>
     <ProgressSteps labels={stepLabels} current={step === 'details' ? 0 : 1} label={t('progress', { n: step === 'details' ? 1 : 2, total: 2 })} compact />
