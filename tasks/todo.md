@@ -2,6 +2,7 @@
 
 ## Hecho
 
+- [x] 2026-11-09 · v1.2 local (sin subir): barras de Safari iOS 26 transparentes (WinterBackdrop/Snowfield con z-index negativo, ver AGENTS.md), scroll del documento con barra sticky en CSS, aviso de e-mail en gracias según `confirmationEmail`, barrido UX/copy a 360/1280 (Track sin inglés en alemán, `/form` sin «Kugel 1 von 1», singular/plural, «Abholtag» en recogida, vista previa por hover solo con ratón). Backend 107/107, Node 40/40, E2E 468 en verde, capturas regeneradas y revisadas.
 - [x] 2026-11-08 · Feedback del mercado: facturas por e-mail (V8), franja 18–20 h, flujo de varias Kugeln, textos en primera persona, alemán por defecto, gracias mínima con todas las Kugeln, valoración 1–5. Backend 105/105, Node 36/36, E2E 448 en verde, capturas regeneradas y revisadas.
 
 - [x] 2026-11-05 · SEC-F — implementación de M1/L5 y hardening barato I2/I4/I5; política compartida de tokens HTTP/mock, protección de la entrega del iPad, build HTTP obligatorio y escape local, meta referrer, documentación HSTS y CORS. E2E ampliados; validación de navegador pendiente. Ver `docs/sec-f-handoff.md`.
@@ -24,6 +25,7 @@
 
 ## Pendiente (ver `tasks/preguntas-pendientes.md` para decisiones del dueño)
 
+- [ ] **v1.2 en iPhone real (dueño):** comprobar en Safari que las barras superior e inferior se ven como cristal en Home, Track y `/form` (en `/buy` la inferior toma el crema de la barra de acciones), al cargar y al hacer scroll. No se puede emular en el Mac (sin Xcode; Responsive Design Mode no emula Liquid Glass). Si alguna barra sigue teñida, anotar la pantalla y la versión de iOS.
 - [ ] Facturas: configurar `INVOICE_BUSINESS_NAME`/`INVOICE_ADDRESS`/`INVOICE_TAX_NOTE` (y `INVOICE_UID` si aplica) con datos aprobados por el asesor; probar V8 en PostgreSQL y el envío con SMTP real. Sin eso no se emite ninguna factura.
 
 - [x] 2026-11-05 · Validación de navegador cerrada: suite completa en verde para `/buy`, `/form`, recogida en mercado, SEC-F (399/404 con tres timeouts por carga que pasan aislados) y capturas regeneradas y revisadas. Sustituye los seguimientos de Fix 9–12, a–e, Task 5–8, 7B y 11.

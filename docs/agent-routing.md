@@ -62,6 +62,9 @@ Every brief says: files/area, what done looks like, and "do not edit" for audits
 | 2026-11-08 | Multi-ornament UX redesign (/buy, /form) | Codex gpt-6.1-sol high | C | Built to brief, but Claude's screenshot review found the list pushed the editor off the first phone screen with one ornament, a duplicate heading and an empty desktop column; reworked by Claude (list only with 2+), 12 specs adjusted. |
 | 2026-11-08 | Public UX writing pass + thanks page + 1–5 scale (GLM via Vibe, accept-edits) | GLM-5.3 | B | Good first-person German copy with a before→after table; could not run node/npm in Vibe (approval denied), so code was unbuilt; 2 spec breaks and hard-coded scale labels fixed by Claude. |
 | 2026-11-08 | Read-only audit of invoice backend | GLM-5.3 | A | 5 findings: 3 real (placeholder data, retry cap, retention conflict), 1 false positive (lock contention), 1 design note. |
+| 2026-11-08 | iOS Safari bars + document scroll (Codex D) | Codex gpt-6.1-sol high | B | Moved public pages to document scroll and a CSS sticky action bar (needed for Safari glass); left 8 failing specs, one with a wrong radio-group boundary and one asserting a no-scroll Home that HEAD never met. Did not find the toolbar tint cause. |
+| 2026-11-09 | Safari 26 toolbar band diagnosis (read-only, web research) | Codex gpt-6-astra medium | A | Found the real mechanism in WebKit `LocalFrameView::fixedContainerEdges`: viewport-sized fixed layers are sampled unless their z-index is negative. Claude verified in the WebKit source and applied it (backdrop −2, snow −1, shell `isolation`); pixel-identical in WebKit on every public screen. |
+| 2026-11-09 | Same diagnosis, in parallel | Codex gpt-6.1-sol high | B | Correct mechanism and sources, but proposed a speculative sticky-probe workaround instead of the source-level exclusion. |
 
 ## Routing changes
 
@@ -71,6 +74,7 @@ Every brief says: files/area, what done looks like, and "do not edit" for audits
 | 2026-11-06 | Mistral's own models removed from routing | Owner: not good enough |
 | 2026-11-06 | GLM-5.3, GLM-5.3 Flash and DeepSeek V4.1 Flash added via Vibe | Included in the owner's Mistral plan |
 | 2026-11-08 | GLM via Vibe implementation briefs must not rely on running node/npm: Claude builds and tests afterwards | Vibe denied every node/npm call in accept-edits mode |
+| 2026-11-09 | Astra model id is `gpt-6-astra` (no `.1`); `gpt-6.1-astra` is rejected on the ChatGPT plan. For browser-engine questions, ask for source-level evidence (WebKit/Chromium code), not blog workarounds | Astra beat sol on the Safari diagnosis by reading WebKit source |
 
 ## Setup status
 
