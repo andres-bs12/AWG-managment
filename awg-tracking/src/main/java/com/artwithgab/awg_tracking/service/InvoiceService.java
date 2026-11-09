@@ -64,7 +64,7 @@ public class InvoiceService {
             invoice.setStateKey(stateKey);
             invoice.setIssuedAt(clock.instant());
             // Orders/customers currently have no locale. Keep German as the explicit default.
-            invoice.setSubject(receipt ? "Zahlungsbestätigung · " + order.getCode() : "Rechnung " + number + " · " + order.getCode());
+            invoice.setSubject(receipt ? "Danke für deine Bestellung · Code " + order.getCode() : "Rechnung " + number + " · " + order.getCode());
             invoice.setBody(renderer.render(order, number, previous, invoice.getIssuedAt(),
                     new CalendarIndex(days.findAllWithMarket(), LocalDateTime.now(clock.withZone(ZoneId.of(props.zone())))), "de", receipt));
             invoice.setRecipient(order.getCustomer().getEmail() == null ? "" : order.getCustomer().getEmail().trim());

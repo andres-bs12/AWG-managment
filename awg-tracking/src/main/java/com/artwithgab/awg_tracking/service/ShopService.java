@@ -45,6 +45,7 @@ import java.util.*;
 public class ShopService {
     /** Pickup arrival times are offered every 30 minutes. */
     static final int PICKUP_STEP_MINUTES = 30;
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.host:}") private String mailHost;
 
     private static final double CUSTOM_HOURS = 1.0;
     private static final double CUSTOM_WITH_NAME_HOURS = 1.25;
@@ -85,7 +86,12 @@ public class ShopService {
         return new ShopConfigDto(isOpen(), p.custom(), p.finished(), p.nameExtra(), fee(), MAX_ITEMS, colors,
                 end.toString(), LocalDate.now(clock.withZone(java.time.ZoneId.of(props.zone()))).isAfter(end),
                 from == null ? null : from.toString(), props.shop().deliveryWindowStart().toString(),
-                props.shop().deliveryWindowEnd().toString());
+                props.shop().deliveryWindowEnd().toString(), mailConfigured());
+    }
+
+    /** The thank-you page may only promise an e-mail the server will actually send. */
+    private boolean mailConfigured() {
+        return mailHost != null && !mailHost.isBlank() && props.mail().from() != null && !props.mail().from().isBlank();
     }
 
     private LocalDate seasonEnd() {

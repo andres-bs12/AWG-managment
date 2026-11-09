@@ -199,6 +199,8 @@ export const mockApi: Api = {
         deliveriesFrom: '2026-11-30',
         deliveryWindowStart: '18:00',
         deliveryWindowEnd: '20:00',
+        // The demo shows the confirmation line; no e-mail is actually sent in mock mode.
+        confirmationEmail: true,
         seasonOver: new Date() >= new Date('2026-12-25T00:00:00'),
         ...mockPricing,
         deliveryFee: 0,

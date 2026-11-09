@@ -304,6 +304,8 @@ export type ShopConfig = {
   /** Europe/Vienna wall-clock times (HH:mm). Optional with older servers. */
   deliveryWindowStart?: string
   deliveryWindowEnd?: string
+  /** True when the server sends the order confirmation e-mail; the thanks page only promises it then. */
+  confirmationEmail?: boolean
   seasonEnd: string
   deliveriesFrom: string | null
   seasonOver: boolean

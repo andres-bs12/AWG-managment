@@ -10,5 +10,7 @@ import java.util.List;
 public record ShopConfigDto(boolean enabled, BigDecimal customPrice, BigDecimal finishedPrice, BigDecimal nameExtra,
                             BigDecimal deliveryFee, int maxItems, List<ShopColorOptionDto> colors,
                             String seasonEnd, boolean seasonOver, String deliveriesFrom,
-                            String deliveryWindowStart, String deliveryWindowEnd) {
+                            String deliveryWindowStart, String deliveryWindowEnd,
+                            /* True when the server can send the order confirmation e-mail (SMTP configured). */
+                            boolean confirmationEmail) {
 }
