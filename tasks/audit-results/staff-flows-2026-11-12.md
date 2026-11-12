@@ -40,3 +40,6 @@ Missing space in "Paint Sat, 28 Nov ·15:30"; New sale header off-centre, summar
 ## v3.1 fix log
 - Fixed before the audit report arrived: #18, #19 (address + district on every Vienna card), #21 (X, Escape, backdrop; "Not yet" removed), "Retry configuration" (New sale load bug, painting-day ranges > 62 days).
 - #23 kept as is: the owner asked to keep Save with a "Saved" confirmation on Stock (2026-11-12).
+- Deliveries card fits the first cart at 360×640: on phones the Hand over button shares the name row and the payment line reads "Collect €X · deposit paid" (one line).
+- Codex cross-audit (4 P2) fixed: New sale "Total · paid" shows the order total; Painting days reports edits to the page before the save answers; the handover dialog closes with Escape/backdrop (only "Cancel order?" keeps Escape blocked, it has a typed reason); mock painting days return 63 dates like the backend.
+- Verified: `npm run check` (tsc, lint, 92 Node tests); staff-mobile, staff-review, sales and search specs on desktop + both staff phones (103/103 after updating the Escape test); 4 a11y-visual snapshots regenerated and reviewed by eye. Full suite runs in GitHub Actions on `release/v3.1`.

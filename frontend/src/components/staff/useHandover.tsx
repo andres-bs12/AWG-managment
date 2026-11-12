@@ -64,7 +64,7 @@ export function useHandover(onChanged: (change: { orderId: string; code: string;
   const count = selected.length
   const noun = `${count} ${count === 1 ? 'ornament' : 'ornaments'}`
   // One clear question, a checklist only when the order has several ornaments, and at most two actions.
-  const dialog = pending ? <StaffDialog title={pending.target ? 'Hand over' : 'Undo handover'} busy={busy} onClose={dismiss} preventEscape>
+  const dialog = pending ? <StaffDialog title={pending.target ? 'Hand over' : 'Undo handover'} busy={busy} onClose={dismiss}>
     <p className={styles.lead}><StaffText>{`${pending.bundle.order.code} · ${customerLabel(pending.bundle.customer?.name)}`}</StaffText></p>
     {items.length > 1 ? <fieldset className={styles.pick}><legend>{pending.target ? 'Which ornaments does the customer take now?' : 'Which handovers should be undone?'}</legend>
       {items.map(item => {

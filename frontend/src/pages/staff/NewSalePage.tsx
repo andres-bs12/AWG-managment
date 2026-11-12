@@ -894,7 +894,7 @@ export function NewSalePage() {
                       </div> : null}
                     </div>
                   ) : null}
-                  <StaffActions className={styles.actions} total={balanceDue != null && paidAmount != null ? balanceDue : order.total} totalLabel={paidAmount == null ? 'Total' : balanceDue === 0 ? 'Total · paid' : 'Balance due'}>
+                  <StaffActions className={styles.actions} total={balanceDue != null && paidAmount != null && balanceDue > 0 ? balanceDue : order.total} totalLabel={paidAmount == null ? 'Total' : balanceDue === 0 ? 'Total · paid' : 'Balance due'}>
                     <Button tone="staff" size="lg" onClick={startOver}>
                       New sale
                     </Button>

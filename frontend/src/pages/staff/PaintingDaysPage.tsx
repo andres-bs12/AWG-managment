@@ -109,14 +109,14 @@ export function PaintingDaysPage() {
       <section className={pickerStyles.panel} aria-labelledby="painting-day-heading">
         {selected && <h2 id="painting-day-heading">{formatDateLabel(selected)}</h2>}
         {selectedDay
-          ? <DayRow key={`${selectedDay.date}:${loaded}`} day={selectedDay} showDate={false} onSaved={handleSaved} />
+          ? <DayRow key={`${selectedDay.date}:${loaded}`} day={selectedDay} showDate={false} onSaved={handleSaved} onEdit={handleSaved} />
           : !loading && !error && <p>No painting day is open for choosing in this month.</p>}
       </section>
     </div>}
   </section>
 }
 /** One compact row per day. Every change saves on its own (toggles at once, typed numbers after a pause), in order. */
-export function DayRow({ day, showDate = true, onSaved }: { day: PaintingDay; showDate?: boolean; onSaved?: (day: PaintingDay) => void }) {
+export function DayRow({ day, showDate = true, onSaved, onEdit }: { day: PaintingDay; showDate?: boolean; onSaved?: (day: PaintingDay) => void; onEdit?: (day: PaintingDay) => void }) {
   const [start, setStart] = useState(formatHour(day.openHour))
   const [end, setEnd] = useState(formatHour(day.closeHour))
   const [open, setOpen] = useState(day.open)
@@ -180,6 +180,8 @@ export function DayRow({ day, showDate = true, onSaved }: { day: PaintingDay; sh
     const openHour = parseHour(nextStart), closeHour = parseHour(nextEnd)
     if (!nextStart || !nextEnd || !Number.isFinite(openHour) || !Number.isFinite(closeHour) || openHour < 0 || closeHour >= 24 || openHour >= closeHour || !Number.isInteger(openHour * 4) || !Number.isInteger(closeHour * 4)) { setError('Choose painting hours from 00:00 to 23:45 in 15-minute steps, with end after start.'); setState('error'); return }
     latest.current = { open: nextOpen, max: number, openHour, closeHour }
+    // Tell the page at once, so reopening this day before the save answers shows the edit, not the old value.
+    onEdit?.({ ...day, open: nextOpen, maxPaintings: number, openHour, closeHour })
     setError(''); setState('saving')
     send(wait)
   }

@@ -1,11 +1,16 @@
 import { defineConfig } from '@playwright/test'
 
+// PW_PORT lets two agents run suites side by side; PW_WORKERS defaults to all cores but one.
+const port = Number(process.env.PW_PORT ?? 5199)
+const workers = process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : process.env.CI ? 2 : 7
+
 export default defineConfig({
+  workers,
   testDir: './e2e',
   timeout: 30_000,
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.02, animations: 'disabled' } },
-  use: { baseURL: 'http://127.0.0.1:5199', screenshot: 'only-on-failure', trace: 'retain-on-failure' },
-  webServer: { command: 'VITE_DATA_SOURCE=mock npm run dev -- --host 127.0.0.1 --port 5199 --strictPort', url: 'http://127.0.0.1:5199', reuseExistingServer: false, timeout: 120_000 },
+  use: { baseURL: `http://127.0.0.1:${port}`, screenshot: 'only-on-failure', trace: 'retain-on-failure' },
+  webServer: { command: `VITE_DATA_SOURCE=mock npm run dev -- --host 127.0.0.1 --port ${port} --strictPort`, url: `http://127.0.0.1:${port}`, reuseExistingServer: false, timeout: 120_000 },
   projects: [
     ...[[320, 480], [360, 640], [375, 553], [390, 664], [393, 659], [412, 780], [430, 739], [440, 741], [375, 667], [393, 852], [440, 956]].map(([width, height]) => ({
       name: `phone-${width}x${height}`,

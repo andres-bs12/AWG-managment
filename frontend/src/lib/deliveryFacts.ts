@@ -46,7 +46,7 @@ export function viennaDistrict(postalCode?: string | null): string | null {
 export function paymentLine(row: Pick<Row, 'paymentState' | 'remaining'>, format: (n: number) => string): { text: string; due: boolean } | null {
   const due = row.remaining ?? 0
   if (due <= 0) return row.paymentState ? { text: 'Paid', due: false } : null
-  return { text: `${row.paymentState === 'deposit' ? 'Deposit paid' : 'Not paid yet'} · collect ${format(due)} at handover`, due: true }
+  return { text: `Collect ${format(due)} · ${row.paymentState === 'deposit' ? 'deposit paid' : 'not paid yet'}`, due: true }
 }
 
 /** Why the Hand over button is disabled, or null when it can be used. */

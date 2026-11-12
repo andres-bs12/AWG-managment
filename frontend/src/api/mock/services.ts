@@ -120,7 +120,7 @@ const saleKeys = new Map<string, import('../../domain/types').Order>()
 export const mockApi: Api = {
   prices: { get: () => later(() => currentPrices()), update: (input) => later(() => updatePrices(input)) },
   inventory: { list: () => later(() => listInventory().map(row => ({ ...row }))), update: (id, quantity, expectedQuantity) => later(() => updateInventory(id, quantity, expectedQuantity)) },
-  paintingDays: { list: (from, to) => later(() => { const dates = []; const d = new Date(`${from}T12:00:00Z`); while (d.toISOString().slice(0, 10) <= to && dates.length < 62) { dates.push(paintingDay(d.toISOString().slice(0, 10))); d.setUTCDate(d.getUTCDate() + 1) } return dates }), update: (date, open, max, hours) => later(() => updatePaintingDay(date, open, max, hours)) },
+  paintingDays: { list: (from, to) => later(() => { const dates = []; const d = new Date(`${from}T12:00:00Z`); while (d.toISOString().slice(0, 10) <= to && dates.length < 63) { dates.push(paintingDay(d.toISOString().slice(0, 10))); d.setUTCDate(d.getUTCDate() + 1) } return dates }), update: (date, open, max, hours) => later(() => updatePaintingDay(date, open, max, hours)) },
   auth: {
     login: (email, password) => later(() => mockLogin(email, password), 280),
     me: (token) => later(() => mockMe(token), 40),

@@ -9,7 +9,10 @@
     "build:mock": "VITE_DATA_SOURCE=mock VITE_ALLOW_MOCK_BUILD=1 npm run build",
     "lint": "oxlint && node scripts/lint-staff-styles.mjs",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "check": "tsc -b && npm run lint && node --test tests/*.test.mjs",
+    "test:changed": "playwright test --only-changed --project=desktop --project=mobile --project=staff-phone-360x640",
+    "test:full": "playwright test"
   },
   "dependencies": {
     "@fontsource-variable/baloo-2": "^5.3.0",

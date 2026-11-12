@@ -19,6 +19,7 @@
 | Visual / UX audits, test fixing | **Claude Opus subagent** (Agent tool, `model: "opus"`) or Codex sol | Opus can run Playwright and read screenshots; Codex sol for code audits and implementation. |
 
 Constants that do not change:
+- Process and test tiers: `docs/reglas-aprendidas.md` §0.1 (quick checks per edit, changed specs per block, full suite once per version in CI).
 - **Cross-LLM audit:** the reviewer is never the model family that wrote the code. Claude code → Codex or GLM/DeepSeek audits. Codex code → Claude or GLM/DeepSeek audits.
 - Codex cannot open ports: Playwright and the browser always run on Claude.
 - Mistral's own models (Large 4, Medium) are **not used** (owner: not good enough).
@@ -42,6 +43,16 @@ codex exec -s read-only -m gpt-6.1-sol -c model_reasoning_effort=low "Reply with
 ```
 
 Every brief says: files/area, what done looks like, and "do not edit" for audits.
+
+## Plantilla de encargo (brief template, 2026-11-12)
+
+Every brief is short and contains exactly:
+1. **Goal** in one or two sentences, with the owner's words when they matter.
+2. **Read first:** `AGENTS.md`, `docs/reglas-aprendidas.md` (+ `docs/design-system.md` for public UI).
+3. **Files you may edit** (explicit list) and "do not touch anything else; other agents work in parallel".
+4. **Done means:** the concrete behaviour, plus "update the E2E assertions for what you changed and run that spec on one project with `PW_PORT=<own port>`".
+5. **Verify:** `npm run check` (+ `./mvnw test -Dtest=…` for backend); captures only of the screens you changed, at 360 and 1280 px, and look at them.
+6. **Report in ≤ 250 words:** files, decisions to confirm, command results, capture paths. Do not commit. Never run the full suite.
 
 ## Learning loop
 
@@ -121,3 +132,5 @@ Every brief says: files/area, what done looks like, and "do not edit" for audits
 | 2026-11-12 | Staff Statistics page (charts, ranges, mock) + mobile redesign after owner feedback | Claude Opus subagent | B | First version overflowed tiles and was too long on phones (owner caught it); v2 with section filter and overflow assertions fixed it (Sales view 1.4 screens). |
 | 2026-11-12 | Small staff P2 batch (8 items) | Claude Haiku subagent | B | 7/8 done; correctly stopped on the item that needed a DTO change; used a negative margin in the More menu (to review visually). |
 | 2026-11-12 | Read-only audit of new backend (prices, stats, agenda fields) via Vibe | GLM-5.3 | A | First run 429 (no capacity); second run: 3 real P2 (era surcharge fallback, no price audit trail, V14 untested on PostgreSQL), no false positives. |
+| 2026-11-12 | E2E repair after the v3.1 staff/public changes | Claude Opus subagent | A− | Fixed selectors/fixtures and 2 real product bugs (43 px calendar cells, stale editor after a retried save); left the 360×640 deliveries height and 4 snapshots to the PM, correctly. Long run (~60 min) partly due to external CPU load. |
+| 2026-11-12 | Read-only cross-audit of the Claude-written v3.1 frontend | Codex gpt-6.1-sol (medium) | A | 4 real P2 (paid total shown as €0.00, stale painting-day editor on reselect, handover dialog still blocked Escape, mock 62 vs 63 dates), no false positives; all fixed. |

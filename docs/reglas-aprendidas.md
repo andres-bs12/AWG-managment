@@ -16,6 +16,26 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 8. **Auditoría cruzada:** nunca revisa el mismo LLM que escribió el código. Opus planifica y verifica; el reparto está en `docs/agent-routing.md`.
 9. Código, comentarios e identificadores en inglés; respuestas al dueño en español latinoamericano.
 
+## 0.1 Flujo rápido y barato (dueño, 2026-11-12: «ahorrar tokens, resultados de alta calidad»)
+
+**Niveles de prueba** (scripts en `frontend/package.json`):
+
+| Cuándo | Qué | Tiempo |
+|---|---|---|
+| Después de cada edición | `npm run check` (tsc + lint + tests Node) y **solo** la spec de la pantalla tocada en un proyecto: `npx playwright test e2e/<spec> --project=desktop` | 1–2 min |
+| Al cerrar un bloque | `npm run test:changed` (specs cambiadas en desktop, mobile y staff 360) | 3–8 min |
+| Una vez por versión | Suite completa **en GitHub Actions** (push a `release/*`, `.github/workflows/ci.yml`); local `npm run test:full` solo si el CI no está disponible, y siempre antes de desplegar | 12–30 min |
+
+**Reglas del flujo:**
+1. **Quien cambia un comportamiento actualiza su prueba en el mismo encargo** y la corre. Nunca dejar pruebas viejas para el final (v3.1 acumuló 54 fallos por esto).
+2. **Un archivo, un agente.** Repartir por conjuntos de archivos que no se tocan; cada agente arranca su propio servidor en un puerto propio (`PW_PORT`), así nadie espera a nadie.
+3. **Modelo según la tarea:** Haiku para trabajo acotado/mecánico; Opus para auditorías visuales y pantallas complejas; Codex (si tiene créditos) para auditar código escrito por Claude o implementar lo complejo; GLM-5.3 para auditar backend. Fable solo como último recurso.
+4. **Una auditoría amplia por versión** (al empezar) y **una auditoría cruzada de código** al final. No auditar después de cada cambio.
+5. **Informes cortos:** cada agente entrega ≤ 250 palabras (archivos, decisiones, resultados, rutas de capturas). El PM no lee transcripciones ni logs completos: solo resúmenes y como mucho 2 capturas por área.
+6. **Capturas visuales** (`a11y-visual`) se regeneran y revisan **una vez**, al final de la versión.
+7. **Commit y push de respaldo** al terminar cada bloque grande (en la rama `release/vX.Y`), sin desplegar.
+8. Plantilla de encargo: `docs/agent-routing.md` → «Plantilla de encargo».
+
 ## 1. Textos (copy) — lo que el dueño más corrige
 
 - **Menos es más.** El dueño quitó repetidamente frases de relleno o de «tranquilidad»: la lista «Handbemalt · abends · Stripe», el aviso «sin reembolso» bajo el nombre (2026-11-12) y la promesa «Once your payment is confirmed, I paint your ornaments in time for your delivery day» del checkout (2026-11-12). **No añadas frases que expliquen el proceso, prometan plazos o tranquilicen** si el cliente no las necesita para decidir. Ante la duda, no la pongas y pregunta.

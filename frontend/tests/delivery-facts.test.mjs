@@ -30,8 +30,8 @@ test('vienna district comes from the postcode', () => {
 })
 
 test('payment line says who owes what', () => {
-  assert.deepEqual(paymentLine({ paymentState: 'unpaid', remaining: 49.99 }, eur), { text: 'Not paid yet · collect €49.99 at handover', due: true })
-  assert.deepEqual(paymentLine({ paymentState: 'deposit', remaining: 25 }, eur), { text: 'Deposit paid · collect €25.00 at handover', due: true })
+  assert.deepEqual(paymentLine({ paymentState: 'unpaid', remaining: 49.99 }, eur), { text: 'Collect €49.99 · not paid yet', due: true })
+  assert.deepEqual(paymentLine({ paymentState: 'deposit', remaining: 25 }, eur), { text: 'Collect €25.00 · deposit paid', due: true })
   assert.deepEqual(paymentLine({ paymentState: 'paid', remaining: 0 }, eur), { text: 'Paid', due: false })
 })
 
