@@ -1,7 +1,11 @@
 import { useLayoutEffect, useRef } from 'react'
 
-/** CSS owns sticky positioning; observe the card end and available reading room only. */
-export function usePublicActions() {
+/**
+ * CSS owns sticky positioning; observe the card end and available reading room only.
+ * `inFlow` keeps the bar at the end of the card (review steps: a tall pay/back stack would cover the
+ * summary the customer is checking).
+ */
+export function usePublicActions(inFlow = false) {
   const ref = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLSpanElement>(null)
   useLayoutEffect(() => {
@@ -26,7 +30,7 @@ export function usePublicActions() {
       const top = visualViewport?.offsetTop ?? 0
       const reserved = Math.ceil(bar.getBoundingClientRect().height)
       const keyboardOrZoom = height < innerHeight - control
-      const sticky = !desktop.matches && !keyboardOrZoom && height - reserved - gap >= 3 * control
+      const sticky = !inFlow && !desktop.matches && !keyboardOrZoom && height - reserved - gap >= 3 * control
       const relaxed = !desktop.matches && (!sticky || height - reserved - gap - (preview ? previewHeight : 0) < 3 * control)
       const clearance = `${sticky ? reserved : 0}px`
       const previewClearance = `${preview && !relaxed && !desktop.matches ? previewHeight : 0}px`
@@ -82,6 +86,6 @@ export function usePublicActions() {
       delete bar.dataset.relaxedActions
       delete page.dataset.relaxedPreview
     }
-  }, [])
+  }, [inFlow])
   return { ref, endRef }
 }

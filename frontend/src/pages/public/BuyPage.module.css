@@ -670,6 +670,9 @@
 }
 
 .actions { min-width: 0; }
+/* This form is a block, not a grid: `.page:where(form) > .actions` would drop the 24px
+   content-to-actions gap and glue the bar to the last control (owner, 2026-11-12). */
+form.shop > .actions { margin-top: var(--space-5); }
 .actions:not(:has(.reviewBack)) { flex-wrap: nowrap; }
 .reviewCart { margin-top: 0; }
 .reviewEmail { overflow-wrap: anywhere; }
@@ -760,10 +763,7 @@
   /* Preview 5/12, options 7/12; the preview column is sticky and vertically centred. */
   .design { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-6); align-items: start; }
   /* Match the options column of the 5:7 grid, then cap at the name field's width. */
-  /* Desktop actions are in flow (not sticky) and `.page > .actions` drops their top margin for grid
-     forms; this form is not a grid, so restore the 24px content-to-actions gap here. */
   .shop:has(.design) .actions {
-    margin-top: var(--space-5);
     margin-inline-start: calc((100% - var(--space-6)) * 5 / 12 + var(--space-6));
     width: calc((100% - var(--space-6)) * 7 / 12);
     max-width: var(--layout-field-max);

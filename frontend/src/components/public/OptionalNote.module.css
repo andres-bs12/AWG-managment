@@ -1,8 +1,11 @@
 .note summary { display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--touch); padding-inline: var(--space-2); margin-inline: calc(-1 * var(--space-2)); border-radius: var(--radius-small); color: var(--color-text); font-weight: var(--type-label-weight); list-style: none; cursor: pointer; }
+/* Keep the 44px target but lay out only the ~24px text line, so the row sits on the same 32px
+   rhythm as the other groups instead of floating in 43px on each side (owner, 2026-11-12). */
+.note summary { margin-block: calc((var(--space-5) - var(--touch)) / 2); }
 .note summary::-webkit-details-marker { display: none; }
 .note summary::after { content: ''; width: var(--space-2); height: var(--space-2); border-right: var(--border-control) solid currentColor; border-bottom: var(--border-control) solid currentColor; transform: rotate(45deg); transition: transform var(--dur-change) var(--ease-enter); }
 .note[open] summary::after { transform: rotate(-135deg); }
-.note[open] summary { margin-bottom: var(--space-2); }
+.note[open] summary { margin-bottom: calc((var(--space-5) - var(--touch)) / 2 + var(--space-2)); }
 .note summary:focus-visible { outline: none; box-shadow: var(--focus); }
 /* The summary supplies the visible title; retain the textarea's associated label. */
 .field > label { position: absolute; width: var(--border-thin); height: var(--border-thin); padding: 0; margin: calc(-1 * var(--border-thin)); overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }

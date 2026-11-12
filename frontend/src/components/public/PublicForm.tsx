@@ -10,8 +10,8 @@ export function PageHeader({ title, children }: { title: string; children?: Reac
   return <header className={styles.header}><h1>{title}</h1>{children && <div className={styles.lead}>{children}</div>}</header>
 }
 export function InsetNote({ children, tone }: { children: ReactNode; tone?: 'warning' }) { return <div className={styles.inset} data-tone={tone}>{children}</div> }
-export function StickyActions({ children, className = '' }: { children: ReactNode; className?: string }) {
-  const { ref, endRef } = usePublicActions()
+export function StickyActions({ children, className = '', inFlow = false }: { children: ReactNode; className?: string; inFlow?: boolean }) {
+  const { ref, endRef } = usePublicActions(inFlow)
   return <><div ref={ref} data-sticky-actions className={`${styles.actions} ${className}`}>{children}</div><span ref={endRef} className={styles.actionsEnd} aria-hidden="true" /></>
 }
 export function Card({ children }: { children: ReactNode }) { return <section className={styles.card}>{children}</section> }
