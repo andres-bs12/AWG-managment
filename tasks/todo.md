@@ -1,5 +1,12 @@
 # Tareas AWG
 
+## v3.1 · próximos cambios del dueño (2026-11-12, empezar cuando el CI de `2feb5a0` esté en verde)
+
+- [ ] **Móvil, campo del nombre del adorno (`/buy`, `/form`):** al tocar el input y empezar a escribir, la pantalla baja de golpe y luego sube y baja un poco con cada letra. Debe quedarse quieta mientras se escribe (probable choque entre el teclado/visualViewport, la reparación de foco de `lib/publicFormFocus.ts` y la vista previa que se actualiza con cada letra). Verificar en iPhone real.
+- [ ] **Track:** quitar la opción de cambiar la dirección de entrega («change delivery address»); al dueño le resulta rara.
+- [ ] **Formularios públicos (`/buy`, `/form`):** el botón de continuar ya no flota (sticky); va fijo en su sitio, al final del contenido. Revisar la barra de acciones (`usePublicActions.ts`, `PublicForm.module.css`) y las pruebas `public-mobile`/`layout` que asumen la barra sticky.
+- [ ] **Track:** añadir un acceso a Instagram (contacto / contenido / «síguenos»), discreto y con buen UX: que no moleste, pero que quede claro que también nos pueden contactar por ahí. Sin texto de relleno (§1 de `docs/reglas-aprendidas.md`).
+
 ## Integración de ramas (2026-11-12)
 
 - [x] Contenido del merge de producción v1.1 integrado con UI pública reciente; V8–V11 intactas y facturas V12. Backend 131 tests (javaagent), TypeScript/lint y 61 Node pasan.
