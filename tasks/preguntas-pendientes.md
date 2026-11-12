@@ -68,3 +68,7 @@ Respuestas del dueño (2026-11-08):
 1. **Datos del vendedor:** no hay empresa registrada, así que hoy no se emiten facturas formales (el sistema no envía nada sin `awg.invoice.*`). Pendiente: decidir si se envía una confirmación de pago sencilla en lugar de una factura.
 2. **Conservación de 7 años:** aprobada en principio. El negocio dura dos semanas y no espera superar el límite; conviene que lo confirme un asesor.
 3. **Días de entrega:** miércoles y viernes, de 18 a 20 h (confirmado).
+
+## 2026-11-12 · Endpoint de cambio de dirección sin uso
+
+Track ya no permite cambiar la dirección de entrega (decisión del dueño, v3.1). El endpoint público `PATCH /api/track/{code}/address` (`PublicController` → `TrackingService.updateViennaAddress`) sigue en el backend sin que ningún frontend lo llame. Recomendación: borrarlo en la próxima versión para reducir superficie pública (la dirección se puede corregir desde el staff). Pendiente de tu OK.
