@@ -24,7 +24,8 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 |---|---|---|
 | Después de cada edición | `npm run check` (tsc + lint + tests Node) y **solo** la spec de la pantalla tocada en un proyecto: `npx playwright test e2e/<spec> --project=desktop` | 1–2 min |
 | Al cerrar un bloque | `npm run test:changed` (specs cambiadas en desktop, mobile y staff 360) | 3–8 min |
-| Una vez por versión | Suite completa **en GitHub Actions** (push a `release/*`, `.github/workflows/ci.yml`); local `npm run test:full` solo si el CI no está disponible, y siempre antes de desplegar | 12–30 min |
+| Cada push a `release/*` o `main` (automático) | CI `e2e-quick`: todas las specs en desktop, mobile, phone-360x640 y staff-phone-360x640 (~270 pruebas) | ~10 min |
+| **Al final de la versión, antes de desplegar** (obligatorio) | CI `e2e-full`: suite completa (~717) repartida en 4 máquinas. Se lanza a mano: GitHub → Actions → CI → «Run workflow», o `gh workflow run CI --ref release/vX.Y`; luego `scripts/ci-wait.sh`. No se despliega sin este run en verde para el commit exacto que se sube; `deploy/deploy.sh` lo comprueba y se niega a desplegar si falta (solo emergencias: `AWG_SKIP_CI_CHECK=1`) | ~12 min |
 
 **Reglas del flujo:**
 1. **Quien cambia un comportamiento actualiza su prueba en el mismo encargo** y la corre. Nunca dejar pruebas viejas para el final (v3.1 acumuló 54 fallos por esto).
@@ -35,7 +36,7 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 6. **Capturas visuales** (`a11y-visual`) se regeneran y revisan **una vez**, al final de la versión.
 7. **Commit y push de respaldo** al terminar cada bloque grande (en la rama `release/vX.Y`), sin desplegar.
 8. Plantilla de encargo: `docs/agent-routing.md` → «Plantilla de encargo».
-9. **Después de cada push, vigilar el CI hasta su resultado:** `scripts/ci-wait.sh` en segundo plano (sale con error si el run falla o no aparece). Una lista vacía de `gh run list` es un error que se investiga, nunca «todavía no corrió». No se dice «subido» ni se cierra el turno sin informar el resultado del CI; si falla, se corrige en el mismo turno. (Dueño, 2026-11-12: el E2E falló en GitHub y nadie se enteró.) `ci-wait.sh` espera todos los runs del commit: el del PR salta `e2e`, así que un run verde solo no prueba nada; mirar que `e2e` aparezca como `success`, no `skipped`.
+9. **Después de cada push, vigilar el CI hasta su resultado:** `scripts/ci-wait.sh` en segundo plano (sale con error si el run falla o no aparece). Una lista vacía de `gh run list` es un error que se investiga, nunca «todavía no corrió». No se dice «subido» ni se cierra el turno sin informar el resultado del CI; si falla, se corrige en el mismo turno. (Dueño, 2026-11-12: el E2E falló en GitHub y nadie se enteró.) `ci-wait.sh` espera todos los runs del commit: el del PR salta `e2e`, así que un run verde solo no prueba nada; mirar que `e2e-quick` (o `e2e-full` antes de desplegar) aparezca como `success`, no `skipped`.
 10. **Varios agentes a la vez, en ramas de `release/vX.Y`** (dueño, 2026-11-12):
     - Cada agente trabaja en **su propio worktree** con una rama que sale de `release/vX.Y` (por ejemplo `feat/v3.1-<tema>`). Nunca en la carpeta principal ni en la rama `release/vX.Y` directamente mientras otro agente la usa.
     - Puerto propio para Playwright: `PW_PORT=5201` (5202, …); 5199 queda para la sesión principal.

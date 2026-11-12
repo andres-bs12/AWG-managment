@@ -9,6 +9,20 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TAG="$(git -C "$ROOT" rev-parse --short HEAD)$(git -C "$ROOT" diff --quiet HEAD -- awg-tracking frontend || echo -dirty)"
 SSH=(ssh -i "$KEY" -o StrictHostKeyChecking=accept-new "$HOST")
 
+# The full E2E suite (CI e2e-full, started by hand) must be green for this exact commit.
+# Emergency override only: AWG_SKIP_CI_CHECK=1 deploy/deploy.sh
+if [ "${AWG_SKIP_CI_CHECK:-}" != "1" ]; then
+  SHA="$(git -C "$ROOT" rev-parse HEAD)"
+  if ! git -C "$ROOT" diff --quiet HEAD; then echo "Refusing to deploy: uncommitted changes (the CI did not test them)." >&2; exit 1; fi
+  FULL="$(gh run list --commit "$SHA" --workflow CI --event workflow_dispatch --json conclusion --jq 'map(select(.conclusion == "success")) | length')"
+  if [ "${FULL:-0}" = "0" ]; then
+    echo "Refusing to deploy ${SHA:0:7}: no green full E2E run (e2e-full) for this commit." >&2
+    echo "Run: gh workflow run CI --ref $(git -C "$ROOT" rev-parse --abbrev-ref HEAD) && scripts/ci-wait.sh" >&2
+    exit 1
+  fi
+  echo "==> Full CI suite is green for ${SHA:0:7}"
+fi
+
 echo "==> Building images (tag $TAG)"
 docker build --platform linux/arm64 -q -t "awg-backend:$TAG" "$ROOT/awg-tracking"
 docker build --platform linux/arm64 -q -t "awg-frontend:$TAG" "$ROOT/frontend"

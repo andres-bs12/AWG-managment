@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Waits for EVERY GitHub Actions run of the current commit (push and pull_request) and exits
-# non-zero unless all succeed. A PR run skips e2e, so one green run alone proves nothing.
+# non-zero unless all succeed. A PR run skips E2E, so one green run alone proves nothing.
+# After `gh workflow run CI --ref <branch>` (full suite), it also waits for that dispatch run.
 # Run it after every push: an empty run list is an error, never "not started yet".
 set -euo pipefail
 sha=$(git rev-parse HEAD)
@@ -28,4 +29,4 @@ for id in $ids; do
   fi
   gh run view "$id" --json jobs --jq '.jobs[] | "  \(.name): \(.conclusion)"'
 done
-[ "$failed" = 0 ] && echo "CI: all runs green (check above that e2e ran and was not skipped)" || exit 1
+[ "$failed" = 0 ] && echo "CI: all runs green (check above that e2e-quick, or e2e-full before a deploy, ran and was not skipped)" || exit 1
