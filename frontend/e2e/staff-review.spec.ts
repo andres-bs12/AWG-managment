@@ -49,7 +49,10 @@ test('offline boot retains the token, retries, and failed logout clears the shar
 
 test('401 redirects through the router, keeps the draft, and restores its route after login', async ({ page }) => {
   const fixture = await httpFixture(page)
+  // New sale reads the agenda on mount; expiring it before that read lands would 401 from this page.
+  const agendaLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/agenda/days')
   await signedIn(page, '/staff/sales/new')
+  await agendaLoaded
   await page.getByRole('button', { name: /Add finished product/ }).click()
   const stored = await page.evaluate(() => sessionStorage.getItem('awg-sale-draft'))
   await page.evaluate(() => { (window as Window & { staffNavigationProbe?: string }).staffNavigationProbe = 'kept' })

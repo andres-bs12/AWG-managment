@@ -94,6 +94,10 @@ export function BuyPage() {
   useEffect(() => {
     if (!didNavigate.current || pendingErrorFocus.current) return
     headingRef.current?.focus({ preventScroll: true })
+    // Start from the top first: when the new step is shorter than the old scroll position, Linux
+    // WebKit otherwise lands every later programmatic scroll (this one, focus, scrollIntoView)
+    // short by the nav's offset until the page next reaches the top.
+    window.scrollTo({ top: 0, behavior: 'instant' })
     navRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' })
   }, [step])
   useEffect(() => {
