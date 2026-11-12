@@ -106,7 +106,9 @@ class SalesApiTests extends ApiTestSupport {
             mvc.perform(get("/api/orders").param("query", query).header("Authorization", bearer(token)))
                     .andExpect(jsonPath("$.orders[0].id").value(found.getId().toString()));
         }
-        for (String query : new String[]{"66", "%_", "Q"}) {
+        // "60" is in the phone but too short for phone search; codes never contain 0, so random
+        // codes from other tests cannot match it ("66" could, which made this test flaky).
+        for (String query : new String[]{"60", "%_", "Q"}) {
             mvc.perform(get("/api/orders").param("query", query).header("Authorization", bearer(token)))
                     .andExpect(jsonPath("$.totalElements").value(0));
         }
