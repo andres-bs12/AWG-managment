@@ -804,7 +804,6 @@ form.shop > .actions { margin-top: var(--space-5); }
 .reviewLines p { margin: 0; }
 .nowrap { white-space: nowrap; }
 .reviewLines p + p { color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
-.afterPayment { margin: var(--space-5) 0; max-width: var(--measure-prose); }
 .linkBtn { color: var(--color-text); text-underline-offset: var(--space-1); font-weight: var(--type-button-weight); }
 
 .shop button { transition: transform 100ms ease; }

@@ -1,11 +1,11 @@
 # Contexto del proyecto — ArtWithGab (AWG)
 
-**Actualizado:** 2026-11-12 (v3: release/v1.1 integrada, seguridad pre-release, V12/V13, E2E 715 en verde)
+**Actualizado:** 2026-11-12 (v3.1 en preparación en la rama `release/v3.1`: sin la promesa de plazo de pintura en el checkout, reglas aprendidas; v3.0.2 sigue en producción)
 **Propósito de este archivo:** memoria persistente para el dueño del proyecto y los agentes que trabajen en este repositorio.
 
 ## Instrucción de mantenimiento
 
-Lee este archivo al comenzar una tarea. Después de un cambio importante, actualízalo para reflejar el estado real: decisiones nuevas, trabajo terminado, pendientes, problemas conocidos y cambios locales relevantes. Mantén un resumen útil y conciso; no copies la conversación completa ni dejes como vigente información obsoleta. Antes de describir o cambiar el estado del código, revisa `git status` y los diffs actuales.
+Lee este archivo y **`docs/reglas-aprendidas.md`** (errores que no se repiten, reglas de copy, espaciado, color, móvil y seguridad) al comenzar una tarea; añade allí cada corrección nueva del dueño. Después de un cambio importante, actualízalo para reflejar el estado real: decisiones nuevas, trabajo terminado, pendientes, problemas conocidos y cambios locales relevantes. Mantén un resumen útil y conciso; no copies la conversación completa ni dejes como vigente información obsoleta. Antes de describir o cambiar el estado del código, revisa `git status` y los diffs actuales.
 
 No descartes, reviertas ni sobrescribas cambios locales sin confirmar como parte de otra tarea sin una instrucción explícita.
 
@@ -49,6 +49,7 @@ El esquema de referencia está en `docs/README.md`; las entidades reales del bac
 ## Mapa del repositorio
 
 - `README.md`: inicio rápido y enlaces principales.
+- `docs/reglas-aprendidas.md`: reglas destiladas de todas las correcciones y auditorías; lectura obligatoria.
 - `docs/README.md`: contexto, decisiones de producto, límites y modelo canónico.
 - `docs/contracts-and-dtos.md`: razones de diseño de DTOs del backend.
 - `docs/frontend-api-swap.md`: mapa de endpoints sugeridos y trabajo pendiente para cambiar de mocks a HTTP.

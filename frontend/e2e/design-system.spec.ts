@@ -116,7 +116,8 @@ for (const locale of ['de', 'en'] as const) {
     // Ornament cards are compact (art + choices + one price); delivery and contact still use rows.
     expect(columns.length).toBeGreaterThan(3)
     for (const row of columns) expect(row).toEqual(columns[0])
-    await expect(page.getByText(locale === 'de' ? /^Nach der Zahlung male ich deine Kugeln? rechtzeitig bis zu deinem Liefertag\.$/ : /^Once your payment is confirmed, I paint your ornaments? in time for your delivery day\.$/)).toBeVisible()
+    // The review no longer promises a painting timeline under the totals (owner, 2026-11-12).
+    await expect(page.getByText(/rechtzeitig bis zu deinem|in time for your (delivery|pickup) day/)).toHaveCount(0)
     await axe(page)
   })
 }
