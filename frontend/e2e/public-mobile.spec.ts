@@ -1,6 +1,10 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { choose, chooseFirstDate, next, open, photo } from './helpers'
 
+// Scroll-geometry checks are timing-sensitive: this file runs its tests in order even with
+// fullyParallel, so sibling pages do not compete for the CPU while sticky bars settle.
+test.describe.configure({ mode: 'default' })
+
 /** Check actual geometry, including overflow ancestors; visibility alone misses clipped buttons. */
 async function insideViewport(target: Locator) {
   await expect(target).toBeVisible()

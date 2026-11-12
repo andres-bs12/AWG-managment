@@ -24,7 +24,7 @@ for id in $ids; do
   if ! gh run watch "$id" --exit-status --interval 30 > /dev/null; then
     failed=1
     echo "CI: run $id FAILED. Failing steps:" >&2
-    gh run view "$id" --log-failed 2>&1 | grep -iE "error|fail|✘" | head -40 >&2
+    { gh run view "$id" --log-failed 2>&1 | grep -iE "[0-9]+ (passed|failed|flaky)|error:|✘" | head -40 >&2; } || true
   fi
   gh run view "$id" --json jobs --jq '.jobs[] | "  \(.name): \(.conclusion)"'
 done
