@@ -34,6 +34,7 @@
   --color-disabled-text: #5c6b80;
 
   --size-control: 48px;
+  --size-editor-bar: 64px;
   --size-swatch: 24px;
   --size-check: 24px;
   --size-help-glyph: 24px;
@@ -122,6 +123,7 @@
   /* Visible glyph of the photo remove control; its hit area stays --touch. */
   --size-remove-glyph: 24px;
   --size-preview-mobile: 140px;
+  --size-preview-tablet: 220px;
   --size-preview-desktop: 280px;
   --size-preview-success: 150px;
   --size-textarea-min: 96px;
@@ -135,6 +137,9 @@
   --layout-postcode-max: 8rem;
   --layout-calendar-max: 420px;
   --layout-gutter: var(--space-4);
+  /* Home height reserves include the wrapping legal footer and 56px actions. */
+  --layout-home-reserve: 500px;
+  --layout-home-short-reserve: 420px;
   --layout-header-height: var(--space-8);
   /* Runtime measurements for document focus clearance on public forms. */
   --public-sticky-top: 0px;

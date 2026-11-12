@@ -1,5 +1,5 @@
 import { apiError } from '../../lib/apiError'
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/client'
 import { Button } from '../ui/Button'
@@ -14,12 +14,13 @@ type Props = {
   initialCode?: string
   error?: string
   lookup?: typeof api.tracking.getByCode
+  openerRef?: RefObject<HTMLElement | null>
 }
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
 /** Mount only while the pop-up should be visible — mounting is what resets and focuses it. */
-export function TrackDialog({ onClose, onSubmit, initialCode = '', error, lookup = api.tracking.getByCode }: Props) {
+export function TrackDialog({ onClose, onSubmit, initialCode = '', error, lookup = api.tracking.getByCode, openerRef }: Props) {
   const { t, locale } = useLocale()
   const titleId = useId()
   const hintId = useId()
@@ -31,7 +32,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error, lookup
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    restoreRef.current = document.activeElement as HTMLElement | null
+    restoreRef.current = openerRef?.current ?? document.activeElement as HTMLElement | null
     const { overflow } = document.body.style
     document.body.style.overflow = 'hidden'
     const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 220)
@@ -40,7 +41,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error, lookup
       document.body.style.overflow = overflow
       restoreRef.current?.focus?.()
     }
-  }, [])
+  }, [openerRef])
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') {
@@ -109,7 +110,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error, lookup
             <circle cx="30" cy="30" r="9" fill="var(--berry)" />
             <circle cx="62" cy="38" r="7" fill="var(--gold)" />
             <circle cx="92" cy="30" r="9" fill="var(--green-bright)" />
-            <circle cx="124" cy="38" r="7" fill="var(--gift-blue)" />
+            <circle cx="124" cy="38" r="7" fill="var(--snow-field)" />
             <circle cx="156" cy="30" r="9" fill="var(--berry)" />
             <circle cx="188" cy="38" r="7" fill="var(--gold)" />
           </svg>
@@ -167,6 +168,6 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error, lookup
         </form>
       </div>
     </div>,
-    document.body,
+    document.querySelector('[data-public-shell]') ?? document.body,
   )
 }

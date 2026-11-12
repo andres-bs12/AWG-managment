@@ -342,8 +342,8 @@ public class ShopService {
                 throw new BadRequestException("Choose shiny or matte for each ornament.").code("VALIDATION").field("items[" + n + "].finish");
             }
             {
-                if (item.petName() == null || item.petName().isBlank()) throw new BadRequestException("Add your pet's name for each custom ornament.");
-                if (item.photos() == null || item.photos().isEmpty()) throw new BadRequestException("Add at least one photo for " + item.petName().trim() + ".");
+                // The pet's name is optional: customers are only asked for a name when it is painted on the back.
+                if (item.photos() == null || item.photos().isEmpty()) throw new BadRequestException("Add at least one photo for each ornament.");
                 for (FormPhotoRef ref : item.photos()) {
                     if (!files.containsKey("photo-" + ref.id())) throw new BadRequestException("A photo could not be uploaded. Add it again.");
                 }

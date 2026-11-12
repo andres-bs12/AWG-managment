@@ -3,17 +3,19 @@ import assert from 'node:assert/strict'
 import { keepFormFocusVisible } from '../src/lib/publicFormFocus.ts'
 
 // Model viewport geometry only; browser sticky layout and Tab order are covered in E2E.
-function repair({ field, bar, preview, viewport, inActions = false, active = true }) {
+function repair({ field, bar, preview, overlay, viewport, inActions = false, active = true }) {
   class Element {
     tabIndex = 0
     constructor(rect) { this.rect = { left: 16, right: 344, ...rect } }
     getBoundingClientRect() { return this.rect }
     contains(target) { return this === target || (this === actions && inActions) }
+    querySelector() { return this === artwork ? content : null }
   }
   const target = new Element(field)
   const actions = bar && new Element(bar)
   const artwork = preview && new Element(preview)
-  const form = { querySelector: selector => selector === '[data-public-preview]' ? artwork : actions }
+  const content = overlay && new Element(overlay)
+  const form = { querySelector: selector => selector === '[data-public-sticky]' ? artwork : actions }
   const scrolls = []
   const globals = {
     HTMLElement: Element,
@@ -42,6 +44,10 @@ test('scrolls the document until the entire focused field clears the sticky acti
 test('reveals a field below the sticky preview without treating a desktop side column as an obstruction', () => {
   assert.deepEqual(repair({ field: { top: 40, bottom: 88 }, preview: { top: 0, bottom: 180 } }), [{ top: -148, behavior: 'instant' }])
   assert.deepEqual(repair({ field: { top: 40, bottom: 88, left: 500, right: 700 }, preview: { top: 0, bottom: 180 } }), [])
+})
+
+test('clears the editor overlay even though its sticky anchor occupies zero height', () => {
+  assert.deepEqual(repair({ field: { top: 40, bottom: 88 }, preview: { top: 0, bottom: 0 }, overlay: { top: 0, bottom: 64 } }), [{ top: -32, behavior: 'instant' }])
 })
 
 test('repairs focus against the panned visual viewport when a keyboard reduces the reading area', () => {

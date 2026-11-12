@@ -5,6 +5,7 @@ import { api } from '../../api/client'
 import type { CustomerFormView, OrderItem } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
 import { apiError } from '../../lib/apiError'
+import { petNameFromBack } from '../../lib/petName'
 import { formatDateLabel, formatHour } from '../../lib/time'
 import { deliveryDatePhrase } from '../../lib/deliveryWindow'
 import { formDraftKey, restoreFormDraft, serializeFormDraft, type FormDraft, type FormItemDraft } from '../../lib/formDraft'
@@ -101,16 +102,17 @@ function CustomerForm({ token }: { token: string }) {
   }, [loading, terminal, step, errors, serverField, view])
 
   useEffect(() => {
-    const title = loading ? t('formTitle') : terminal ? t(`form${terminal === 'expired' ? 'Expired' : terminal === 'invalid' ? 'Invalid' : 'Locked'}Title`) : step === 'review' ? t('formReviewStep') : t('formTitle')
+    const title = loading ? t('formTitle') : terminal ? t(`form${terminal === 'expired' ? 'Expired' : terminal === 'invalid' ? 'Invalid' : 'Locked'}Title`) : step === 'review' ? t('formReviewStep') : t((view?.items ?? (view ? [view.item] : [])).length > 1 ? 'formTitleMany' : 'formTitle')
     document.title = `${title} · ${t('brand')}`
-  }, [loading, terminal, step, t])
+  }, [loading, terminal, step, view, t])
 
   const formItems = view ? targets(view) : []
   const displayedErrors = { ...Object.fromEntries(Object.entries(errors).map(([id, key]) => [id, t(key)])), ...(serverField ? { [serverField.id]: apiError(serverField.issue, locale, t('shopFixErrors')).text } : {}) }
-  const labels: Record<string, string> = { 'form-name': t('yourName'), 'form-phone': t('phone'), 'form-email': t('email'), 'form-line1': t('shopStreet'), 'form-line2': t('shopLine2'), 'form-postal': t('shopPostal'), 'form-city': t('shopCity') }
-  draft.items.forEach((item, index) => {
-    for (const [prefix, key] of [['pet', 'petName'], ['back', 'backName'], ['photos', 'formPhotos'], ['note', 'noteLabel']]) labels[`${prefix}-${item.orderItemId}`] = `${t(key)} · ${t('ornamentN', { n: index + 1 })}`
-  })
+  const allItems = view ? view.items ?? [view.item] : []
+  const summaryErrors = Object.fromEntries(Object.entries(displayedErrors).map(([id, message]) => {
+    const index = allItems.findIndex(item => ['pet', 'back', 'photos', 'note'].some(prefix => id === `${prefix}-${item.id}`))
+    return [id, `${message}${allItems.length > 1 && index >= 0 ? ` · ${t('ornamentN', { n: index + 1 })}` : ''}`]
+  }))
   const handoffs = [...new Set((view?.handoffs ?? []).map(handoff => handoff.kind === 'vienna'
     ? [t('whenVienna'), handoff.date ? deliveryDatePhrase(handoff.date, locale) : ''].filter(Boolean).join(' · ')
     : handoff.kind === 'unknown' ? t('whenTbd')
@@ -123,7 +125,9 @@ function CustomerForm({ token }: { token: string }) {
     setIssue(null)
   }
   function patchItem(id: string, partial: Partial<FormItemDraft>) {
-    setDraft(current => ({ ...current, items: current.items.map(item => item.orderItemId === id ? { ...item, ...partial } : item) }))
+    // A paid name on the back is the pet's name (same rule as /buy): it is asked once.
+    const named = !!view && targets(view).find(source => source.id === id)?.withName
+    setDraft(current => ({ ...current, items: current.items.map(item => { if (item.orderItemId !== id) return item; const next = { ...item, ...partial }; return named ? { ...next, petName: petNameFromBack(next.backName) } : next }) }))
     clear(Object.keys(partial).map(key => `${({ petName: 'pet', backName: 'back' } as Record<string, string>)[key] ?? key}-${id}`))
   }
   function patchContact(partial: Partial<ContactValues>) {
@@ -135,8 +139,8 @@ function CustomerForm({ token }: { token: string }) {
   function validate(): Record<string, string> {
     const found: Record<string, string> = {}
     for (const item of draft.items) {
-      if (!item.petName.trim()) found[`pet-${item.orderItemId}`] = 'formNeedPet'
-      if (formItems.find(source => source.id === item.orderItemId)?.withName && !item.backName.trim()) found[`back-${item.orderItemId}`] = 'formNeedBackName'
+      const named = formItems.find(source => source.id === item.orderItemId)?.withName
+      if (named && !item.backName.trim()) found[`back-${item.orderItemId}`] = 'formNeedBackName'
       if (!item.photos.length) found[`photos-${item.orderItemId}`] = 'needPhoto'
     }
     if (!draft.customerName.trim()) found['form-name'] = 'formNeedName'
@@ -179,7 +183,7 @@ function CustomerForm({ token }: { token: string }) {
     sendingRef.current = true; setSending(true); setIssue(null)
     try {
       const result = await api.forms.submitForm(token, { address: view?.needsAddress ? draft.address : undefined, customerName: draft.customerName, phone: draft.phone, email: draft.email,
-        items: draft.items.map(({ orderItemId, petName, backName, note, photos }) => ({ orderItemId, petName, backName, note, photos })),
+        items: draft.items.map(({ orderItemId, petName, backName, note, photos }) => ({ orderItemId, petName: formItems.find(source => source.id === orderItemId)?.withName && backName.trim() ? petNameFromBack(backName) : petName, backName, note, photos })),
       }, { rememberToken: !staffHandoff })
       try { sessionStorage.removeItem(formDraftKey(token)) } catch { setStorageError(true) }
       // The Track page already shows the order state: go there and confirm the save once.
@@ -205,24 +209,28 @@ function CustomerForm({ token }: { token: string }) {
     {view && terminal === 'locked' ? <ButtonLink to={`/track/${encodeURIComponent(view.orderCode)}`}>{t('goTrack')}</ButtonLink> : <ButtonLink to="/">{t('backHome')}</ButtonLink>}
   </PublicState>
 
-  const ornamentCount = view ? (view.items ?? [view.item]).length : 1
+  const ornamentCount = allItems.length
   const stepLabels = [t(ornamentCount > 1 ? 'formOrnamentsMany' : 'formOrnamentsOne'), t('formReviewStep')]
   return <form data-public-page className={`${shell.page} ${styles.form}`} noValidate onFocus={keepFormFocusVisible} onSubmit={event => { event.preventDefault(); if (uploads.current.size) return; if (step === 'review') void submit(); else if (!showErrors(validate())) { setErrors({}); setServerField(null); focusRequest.current = 'form-heading'; setStep('review') } }}>
-    <PageHeader title={t('formTitle')}><p>{t('formLead')}</p></PageHeader>
+    <PageHeader title={t(ornamentCount > 1 ? 'formTitleMany' : 'formTitle')}><p>{t('formLead')}</p></PageHeader>
     <ProgressSteps labels={stepLabels} current={step === 'details' ? 0 : 1} label={t('progress', { n: step === 'details' ? 1 : 2, total: 2 })} compact />
     {storageError && <p className={styles.muted} role="status">{t('shopStorageError')}</p>}
     {issue != null && <p className={styles.error} role="alert">{apiError(issue, locale, t('formSaveError')).text}</p>}
     <section className={styles.step} aria-labelledby="form-heading">
-      <h2 ref={heading} id="form-heading" tabIndex={-1}>{step === 'details' ? stepLabels[0] : stepLabels[1]}</h2>
-      <ErrorSummary errors={displayedErrors} labels={labels} onFocus={id => { const control = document.getElementById(id) ?? document.getElementById(id.replace('photos-', 'photos-block-')); const details = control?.closest('details'); if (details) details.open = true; control?.focus() }} />
-      {step === 'details' ? <>
-        <p className={styles.muted}>{t('formCanEdit')}</p>
-        <FormItems items={view.items ?? [view.item]} draft={draft.items} errors={displayedErrors} photoErrors={Object.fromEntries(Object.entries(photoErrors).map(([id, key]) => [id, key ? t(key) : '']))} patch={patchItem} addFiles={addFiles} validate={validateField} />
-        <ContactFields prefix="form" values={{ ...draft, ...draft.address, line2: draft.address.line2 ?? '' }} onChange={patchContact} error={id => displayedErrors[id]} onBlur={validateField} withAddress={view.needsAddress} announceErrors={false} validFields={validFields} deliveryPhone={view.needsAddress} />
-      </> : <FormReview view={view} draft={draft} handoffs={handoffs} edit={edit} />}
+      <header className={styles.stepHeader}>
+        <h2 ref={heading} id="form-heading" tabIndex={-1}>{step === 'details' ? stepLabels[0] : stepLabels[1]}</h2>
+        {step === 'details' && <p className={styles.muted}>{t('formCanEdit')}</p>}
+      </header>
+      <ErrorSummary errors={summaryErrors} onFocus={id => { const control = document.getElementById(id) ?? document.getElementById(id.replace('photos-', 'photos-block-')); const details = control?.closest('details'); if (details) details.open = true; control?.focus() }} />
+      {step === 'details' ? <div className={styles.details}>
+        <div className={styles.ornaments}><FormItems items={view.items ?? [view.item]} draft={draft.items} errors={displayedErrors} photoErrors={Object.fromEntries(Object.entries(photoErrors).map(([id, key]) => [id, key ? t(key) : '']))} patch={patchItem} addFiles={addFiles} validate={validateField} /></div>
+        <div className={styles.contact}><ContactFields prefix="form" values={{ ...draft, ...draft.address, line2: draft.address.line2 ?? '' }} onChange={patchContact} error={id => displayedErrors[id]} onBlur={validateField} withAddress={view.needsAddress} announceErrors={false} validFields={validFields} deliveryPhone={view.needsAddress} /></div>
+      </div> : <FormReview view={view} draft={draft} handoffs={handoffs} edit={edit} />}
     </section>
-    <StickyActions>{step === 'review' && <Button variant="secondary" disabled={sending} onClick={() => { setErrors({}); focusRequest.current = 'form-heading'; setStep('details') }}>{t('back')}</Button>}
+    <StickyActions className={step === 'review' ? styles.reviewActions : ''}>
       {/* Keep blur validation from moving the button before a mouse click submits. */}
-      <Button type="submit" size="lg" disabled={sending || reading > 0} aria-busy={sending || reading > 0} onMouseDown={event => event.preventDefault()}>{reading ? t('photoReading') : sending ? t('formSending') : step === 'details' ? t('continue') : t('send')}</Button></StickyActions>
+      <Button type="submit" size="lg" disabled={sending || reading > 0} aria-busy={sending || reading > 0} onMouseDown={event => event.preventDefault()}>{reading ? t('photoReading') : sending ? t('formSending') : step === 'details' ? t('continue') : t('send')}</Button>
+      {step === 'review' && <Button className={styles.back} variant="secondary" size="lg" disabled={sending} onClick={() => { setErrors({}); focusRequest.current = 'form-heading'; setStep('details') }}>{t('back')}</Button>}
+    </StickyActions>
   </form>
 }

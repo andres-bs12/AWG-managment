@@ -10,11 +10,11 @@ test('the delivery window is 18:00 to 20:00', () => {
 })
 
 test('the window label is localized', () => {
-  assert.equal(deliveryWindowLabel('de'), '18–20 Uhr')
-  assert.equal(deliveryWindowLabel('en'), '6–8 pm')
+  assert.equal(deliveryWindowLabel('de'), '18–20\u00a0Uhr')
+  assert.equal(deliveryWindowLabel('en'), '6–8\u00a0pm')
 })
 
 test('a chosen day becomes one phrase with weekday and window', () => {
-  assert.equal(deliveryDatePhrase('2026-12-02', 'de'), 'Mittwoch, 2. Dezember 2026 · 18–20 Uhr')
-  assert.equal(deliveryDatePhrase('2026-12-04', 'en'), 'Friday, 4 December 2026 · 6–8 pm')
+  assert.equal(deliveryDatePhrase('2026-12-02', 'de'), 'Mittwoch, 2. Dezember 2026 · 18–20\u00a0Uhr')
+  assert.equal(deliveryDatePhrase('2026-12-04', 'en'), 'Friday, 4 December 2026 · 6–8\u00a0pm')
 })

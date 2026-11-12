@@ -70,7 +70,7 @@ test('ordinary contact fields follow the spacing scale', async ({ page }) => {
     const label = await page.locator(`label[for="${id}"]`).boundingBox()
     const input = await page.locator(`#${id}`).boundingBox()
     expect(input!.y - label!.y - label!.height).toBeGreaterThanOrEqual(6)
-    expect(input!.y - label!.y - label!.height).toBeLessThanOrEqual(10)
+    expect(input!.y - label!.y - label!.height, id).toBeLessThanOrEqual(10)
   }
   const name = await page.locator('#buy-name').boundingBox()
   const emailLabel = await page.locator('label[for="buy-email"]').boundingBox()

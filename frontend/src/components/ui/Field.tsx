@@ -10,9 +10,11 @@ type Props = {
   /** Extra class, e.g. a column span when the field sits in a form grid. */
   className?: string
   announceError?: boolean
+  /** Keep the association when a containing group renders the error across its row. */
+  renderError?: boolean
 }
 
-export function Field({ label, htmlFor, hint, error, children, className, announceError = true }: Props) {
+export function Field({ label, htmlFor, hint, error, children, className, announceError = true, renderError = true }: Props) {
   const control = isValidElement(children) && typeof children.type === 'string'
     ? children as ReactElement<{ 'aria-invalid'?: boolean; 'aria-describedby'?: string }>
     : null
@@ -26,7 +28,7 @@ export function Field({ label, htmlFor, hint, error, children, className, announ
       </label>
       {hint ? <p className={styles.hint} id={`${htmlFor}-hint`}>{hint}</p> : null}
       <div className={styles.control} data-field-control>{control ? cloneElement(control, { 'aria-invalid': error ? true : undefined, 'aria-describedby': description }) : children}</div>
-      {error ? (
+      {error && renderError ? (
         <p className={styles.error} id={`${htmlFor}-error`} role={announceError ? 'alert' : undefined}>
           {error}
         </p>

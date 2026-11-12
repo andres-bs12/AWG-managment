@@ -6,3 +6,19 @@
 .panel { display: block; min-width: 0; width: 100%; flex-basis: 100%; grid-column: 1 / -1; max-width: var(--measure-hint); padding: var(--space-4); margin-top: var(--space-2); border-radius: var(--radius-small); background: var(--color-surface-raised); color: var(--color-text); font-size: var(--type-hint-size); font-weight: var(--type-hint-weight); line-height: var(--type-hint-line); overflow-wrap: anywhere; }
 .panel[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .trigger:active { transform: none; } }
+
+/* Keep the original trigger and raised panel outside the public shell. */
+.glyph { display: none; }
+:global([data-public-shell]) .legacyGlyph { display: none; }
+/* Use the inherited label line box without growing the public legend. */
+:global([data-public-shell]) .trigger { margin-block: calc((1lh - var(--touch)) / 2); margin-inline: calc(-1 * var(--space-2)); }
+:global([data-public-shell]) .glyph { display: grid; place-items: center; width: var(--size-help-glyph); height: var(--size-help-glyph); border: var(--border-control) solid currentColor; border-radius: var(--radius-circle); font-size: var(--type-caption-size); font-weight: var(--type-label-weight); line-height: 1; }
+/* Public hover and focus mark the glyph inside the full touch target. */
+@media (hover: hover) {
+  :global([data-public-shell]) .trigger:hover { background: transparent; }
+  :global([data-public-shell]) .trigger:hover .glyph { background: var(--color-selection-hover); }
+}
+:global([data-public-shell]) .trigger:focus-visible { box-shadow: none; }
+:global([data-public-shell]) .trigger:focus-visible .glyph { box-shadow: var(--focus); }
+:global([data-public-shell]) .trigger[aria-expanded='true'] .glyph { background: var(--color-selection-hover); }
+:global([data-public-shell]) .panel { flex: 0 0 100%; max-width: none; padding: 0; margin-top: var(--space-1); border-radius: 0; background: transparent; color: var(--color-text-muted); }

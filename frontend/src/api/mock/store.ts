@@ -91,7 +91,13 @@ function persist() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   } catch {
-    /* quota */
+    // Phone photos overflow the localStorage quota. Keep the orders without their image data,
+    // otherwise a full page load (the checkout redirect) would lose the order just placed.
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, items: state.items.map(item => ({ ...item, photos: item.photos.map(photo => ({ ...photo, dataUrl: '' })) })) }))
+    } catch {
+      /* quota */
+    }
   }
 }
 

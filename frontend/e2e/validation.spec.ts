@@ -6,13 +6,11 @@ test('validation, focus and associated errors across steps', async ({ page }) =>
   await expect(page.locator('fieldset[id^="color-"]')).toBeFocused()
   await expect(page.locator('[id^="color-"][id$="-error"]')).toBeVisible()
   await choose(page)
-  if (mobile(page)) { await next(page).click(); await next(page).click() }
   await next(page).click()
-  await expect(page.locator('input[id^="pet-"]')).toBeFocused()
+  await expect(page.locator('button[id^="photos-"]')).toBeFocused()
   await expect(page.locator('[id^="photos-"][id$="-error"]')).toBeVisible()
-  await page.locator('input[id^="pet-"]').fill('Luna')
   await next(page).click(); await expect(page.locator('button[id^="photos-"]')).toBeFocused()
-  await page.locator('input[type=file]').setInputFiles(photo); await expect(page.locator('img[alt*="Luna"]')).toBeVisible(); await next(page).click()
+  await page.locator('input[type=file]').setInputFiles(photo); await expect(page.locator('img[alt^="Foto 1"]')).toBeVisible(); await next(page).click()
   await next(page).click(); await expect(page.locator('#buy-date')).toBeFocused()
   await expect(page.locator('#buy-date-error')).toBeVisible()
   await chooseFirstDate(page); await next(page).click()
@@ -39,8 +37,6 @@ test('contact errors are associated and reject short and non-Vienna postcodes', 
 
 test('photo upload rejects invalid and oversized files and limits the count', async ({ page }) => {
   await open(page); await choose(page)
-  if (mobile(page)) { await next(page).click(); await next(page).click() }
-  await page.locator('input[id^="pet-"]').fill('Luna')
   const upload = page.locator('input[type=file]')
   await upload.setInputFiles({ name: 'bad.txt', mimeType: 'text/plain', buffer: Buffer.from('not an image') })
   await expect(page.getByRole('alert').filter({ hasText: /Foto|photo/i })).toBeVisible()
@@ -48,7 +44,7 @@ test('photo upload rejects invalid and oversized files and limits the count', as
   await expect(page.getByRole('alert').filter({ hasText: /10 MB/ })).toBeVisible()
   await upload.setInputFiles(Array.from({ length: 7 }, () => photo))
   await expect(page.getByRole('alert').filter({ hasText: /6/ })).toBeVisible()
-  await expect(page.locator('img[alt*="Luna"]')).toHaveCount(6)
+  await expect(page.locator('img[alt^="Foto"]')).toHaveCount(6)
 })
 
 test('sold-out choices cannot be selected and explain why', async ({ page }) => {

@@ -13,9 +13,9 @@ import type { Photo, ShopConfig, ShopDeliveryDate, ShopPickupDay } from '../../d
 import { useLocale } from '../../i18n/LocaleContext'
 import { loadBuyDraft, newItem, saveBuyDraft, type BuyDraft, type BuyItem } from '../../lib/buyDraft'
 import { apiError } from '../../lib/apiError'
-import { publicScroller } from '../../lib/publicScroller'
 import { keepFormFocusVisible } from '../../lib/publicFormFocus'
 import { formatEur } from '../../lib/money'
+import { petNameFromBack } from '../../lib/petName'
 import styles from './BuyPage.module.css'
 import { MAX_PHOTOS, pickupTimes } from './buy/shared'
 import { OrnamentOverview } from '../../components/public/OrnamentOverview'
@@ -43,8 +43,8 @@ export function BuyPage() {
   const [previewChoice, setPreviewChoice] = useState<Partial<BuyItem> | null>(null)
   const [changedSection, setChangedSection] = useState('')
   const [returnReview, setReturnReview] = useState(false)
-  const [substep, setSubstep] = useState(0)
   const [activeUid, setActiveUid] = useState(draft.items[0].uid)
+  const [removed, setRemoved] = useState<{ item: BuyItem; index: number; label: string } | null>(null)
   const [sides, setSides] = useState<Record<string, OrnamentSide>>({})
   const [dates, setDates] = useState<ShopDeliveryDate[]>([])
   const [datesState, setDatesState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -62,6 +62,8 @@ export function BuyPage() {
   const headingRef = useRef<HTMLHeadingElement>(null)
   const didNavigate = useRef(false)
   const pendingErrorFocus = useRef<string | null>(null)
+  const editorBar = useRef<HTMLDivElement>(null)
+  const [barStuck, setBarStuck] = useState(false)
 
   useEffect(() => {
     // Reload returns to design so reference photos can be added again. During
@@ -89,7 +91,7 @@ export function BuyPage() {
     if (!didNavigate.current || pendingErrorFocus.current) return
     headingRef.current?.focus({ preventScroll: true })
     navRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' })
-  }, [step, substep])
+  }, [step])
   useEffect(() => {
     const id = pendingErrorFocus.current
     if (!id) return
@@ -98,7 +100,25 @@ export function BuyPage() {
     target.focus({ preventScroll: true })
     target.scrollIntoView({ block: 'center' })
     pendingErrorFocus.current = null
-  }, [step, substep, activeUid, errors])
+  }, [step, activeUid, errors])
+
+  const multi = draft.items.length > 1
+  const designReady = !!config?.enabled && !config.seasonOver && step === 0 && multi
+  useEffect(() => {
+    // The slim editor bar is the first row of its panel: once their tops differ, the bar is stuck.
+    if (!designReady) return
+    let frame = 0
+    const measure = () => {
+      const bar = editorBar.current
+      const panel = bar?.parentElement
+      if (bar && panel) setBarStuck(bar.getBoundingClientRect().top - panel.getBoundingClientRect().top > 1)
+    }
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
+    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule)
+    schedule()
+    return () => { cancelAnimationFrame(frame); window.removeEventListener('scroll', schedule); window.removeEventListener('resize', schedule) }
+  }, [designReady, activeUid])
 
   const signature = draft.items.map((item) => `${item.color}:${item.withName ? 1 : 0}`).join(',')
   useEffect(() => {
@@ -158,10 +178,12 @@ export function BuyPage() {
   const described = (key: string, hint = false) => [hint ? `${key}-hint` : '', err(key) ? `${key}-error` : ''].filter(Boolean).join(' ') || undefined
   function patch(partial: Partial<BuyDraft>) { if (partial.deliveryKind && partial.deliveryKind !== draft.deliveryKind) void api.metrics.track({ event: 'buy_choice', field: 'delivery', value: partial.deliveryKind }).catch(() => {}); const changedFields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', postalCode: 'buy-postal' }; setValidFields(current => current.filter(id => !Object.keys(partial).some(key => changedFields[key] === id))); setDraft((current) => ({ ...current, ...partial })); const fields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', line2: 'buy-line2', postalCode: 'buy-postal', deliveryDate: 'buy-date', pickupTime: 'buy-time', deliveryKind: 'buy-date', acceptTerms: 'buy-terms' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[fields[key]]); return next }); setServerError('') }
   function patchItem(uid: string, partial: Partial<BuyItem>) {
-    if (partial.withName !== undefined) setSides(current => ({ ...current, [uid]: partial.withName ? 'back' : 'front' }))
+    // Toggling or clearing the name unpins the side, so an empty back never stays selected.
+    if (partial.withName !== undefined || partial.backName?.trim() === '') setSides(current => { const next = { ...current }; delete next[uid]; return next })
     for (const field of ['color', 'finish'] as const) if (partial[field]) void api.metrics.track({ event: 'buy_choice', field, value: partial[field] }).catch(() => {})
     if (partial.withName !== undefined) void api.metrics.track({ event: 'buy_choice', field: 'name', value: partial.withName ? 'on' : 'off' }).catch(() => {})
-    setDraft((current) => ({ ...current, items: current.items.map((item) => item.uid === uid ? { ...item, ...partial } : item) }))
+    // A paid name on the back is the pet's name: it is asked once and identifies the ornament too.
+    setDraft((current) => ({ ...current, items: current.items.map((item) => { if (item.uid !== uid) return item; const next = { ...item, ...partial }; return { ...next, petName: next.withName ? petNameFromBack(next.backName) : '' } }) }))
     const fields: Record<string, string> = { color: 'color', finish: 'finish', withName: 'back', backName: 'back', petName: 'pet', note: 'note', photos: 'photos' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[`${fields[key]}-${uid}`]); return next }); setServerError('')
   }
   function validate(currentStep: number) {
@@ -170,12 +192,11 @@ export function BuyPage() {
       if (!draft.items.length) found['buy-add'] = 'shopNeedItem'
       for (const item of draft.items) {
         if (!shopConfig.colors.some((option) => option.color === item.color && option.inStock)) found[`color-${item.uid}`] = 'shopChooseColor'
-        if (item.color && !shopConfig.colors.some(option => option.color === item.color && option.finish === item.finish && option.inStock)) found[`finish-${item.uid}`] = 'shopChooseFinish'
+        if (!item.finish || (item.color && !shopConfig.colors.some(option => option.color === item.color && option.finish === item.finish && option.inStock))) found[`finish-${item.uid}`] = 'shopChooseFinish'
         if (item.withName && !item.backName.trim()) found[`back-${item.uid}`] = 'shopBackNameRequired'
       }
     }
     if (currentStep === 1) for (const item of draft.items) {
-      if (!item.petName.trim()) found[`pet-${item.uid}`] = 'required'
       if (!item.photos.length) found[`photos-${item.uid}`] = 'shopNeedPhotoShop'
     }
     if (currentStep === 2 && draft.deliveryKind === 'vienna' && (datesState !== 'ready' || !dates.some((date) => date.date === draft.deliveryDate))) found['buy-date'] = 'shopNeedDate'
@@ -202,17 +223,23 @@ export function BuyPage() {
     const field = ({ 'buy-name': 'customerName', 'buy-email': 'email', 'buy-phone': 'phone', 'buy-line1': 'line1', 'buy-postal': 'postalCode' } as Record<string, string>)[id]
     if (error && field) void api.metrics.track({ event: 'buy_validation_error', step: 'delivery', field, code: error === 'required' ? 'required' : 'invalid' }).catch(() => {})
   }
+  /** First problem = first unfinished ornament, in the order its fields are asked. */
+  function firstError(found: Record<string, string>) {
+    const fields = ['color', 'finish', 'back', 'pet', 'photos', 'note']
+    for (const item of draft.items) for (const field of fields) if (found[`${field}-${item.uid}`]) return `${field}-${item.uid}`
+    return Object.keys(found)[0]
+  }
   function showErrors(found: Record<string, string>) {
     setErrors(found)
     if (Object.keys(found).length) {
-      const first = Object.keys(found)[0]
+      const first = firstError(found)
       pendingErrorFocus.current = first
       const item = draft.items.find(entry => first.endsWith(`-${entry.uid}`))
-      if (item) { setActiveUid(item.uid); setSubstep(first.startsWith('pet-') || first.startsWith('photos-') || first.startsWith('note-') ? 2 : first.startsWith('back-') ? 1 : 0) }
+      if (item) setActiveUid(item.uid)
     }
     return Object.keys(found).length > 0
   }
-  function go(next: number) { void api.metrics.track({ event: 'buy_step', step: (['design', 'delivery', 'review'] as const)[next] }).catch(() => {}); didNavigate.current = true; setErrors({}); setServerError(''); setPreviewChoice(null); void navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { state: { buyStep: next } }) }
+  function go(next: number) { void api.metrics.track({ event: 'buy_step', step: (['design', 'delivery', 'review'] as const)[next] }).catch(() => {}); didNavigate.current = true; setErrors({}); setServerError(''); setPreviewChoice(null); setRemoved(null); void navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { state: { buyStep: next } }) }
   async function addFiles(uid: string, files: File[] | null) {
     if (!files) return
     const available = MAX_PHOTOS - (draft.items.find((item) => item.uid === uid)?.photos.length ?? MAX_PHOTOS)
@@ -258,7 +285,7 @@ export function BuyPage() {
           ? { deliveryKind: 'market' as const, pickupTime: draft.pickupTime }
           : { address: { line1: draft.line1.trim(), line2: draft.line2.trim() || undefined, postalCode: draft.postalCode.trim(), city: 'Wien' } }),
         deliveryDate: draft.deliveryDate, acceptTerms: draft.acceptTerms,
-        items: draft.items.map((item) => ({ kind: 'custom', withName: item.withName, color: item.color || undefined, finish: item.finish || undefined, petName: item.petName.trim(), backName: item.withName ? item.backName.trim() : undefined, note: item.note.trim() || undefined, photos: item.photos })),
+        items: draft.items.map((item) => ({ kind: 'custom', withName: item.withName, color: item.color || undefined, finish: item.finish || undefined, petName: item.withName ? petNameFromBack(item.backName) : '', backName: item.withName ? item.backName.trim() : undefined, note: item.note.trim() || undefined, photos: item.photos })),
       })
       // Only follow Stripe Checkout or a same-origin URL (the mock success page).
       const target = new URL(result.checkoutUrl, window.location.origin)
@@ -278,71 +305,86 @@ export function BuyPage() {
   function next() {
     if (step === 2) { void pay(); return }
     if (step === 1) { const found = { ...validate(2), ...validate(3) }; if (!showErrors(found)) { setReturnReview(false); go(2) }; return }
-    const mobile = window.matchMedia('(max-width: 1023px)').matches
-    if (mobile && substep < 2) {
-      const all = validate(0)
-      const found = Object.fromEntries(Object.entries(all).filter(([key]) => key.endsWith(`-${activeItem.uid}`) && (substep === 0 ? key.startsWith('color-') || key.startsWith('finish-') : key.startsWith('back-'))))
-      if (!showErrors(found)) { didNavigate.current = true; setSubstep(substep + 1) }
-      return
-    }
+    // One ornament is one page on every screen size: the whole design is checked at once.
     const found = { ...validate(0), ...validate(1) }
     if (!showErrors(found)) { if (returnReview) { setReturnReview(false); go(2) } else go(1) }
   }
   function back() {
-    if (step === 0 && substep > 0) { didNavigate.current = true; setSubstep(substep - 1) }
-    else if (step > 0) go(step - 1)
+    if (step > 0) go(step - 1)
   }
   function selectItem(uid: string) {
-    setActiveUid(uid); setSubstep(0); setPreviewChoice(null)
+    setActiveUid(uid); setPreviewChoice(null)
     requestAnimationFrame(() => {
       // With one ornament left there is no editor heading; land on its first choice instead.
       const heading = document.getElementById('ornament-editor-heading') ?? document.getElementById(`color-${uid}`)
       if (!heading) return
       heading.focus({ preventScroll: true })
       heading.scrollIntoView({ block: 'start', behavior: 'instant' })
-      // The compact preview can stick above the editor; reveal its heading below it.
-      const scroller = publicScroller()
-      const preview = document.querySelector<HTMLElement>('[data-public-preview]')
-      const rect = heading.getBoundingClientRect()
-      const artwork = preview?.getBoundingClientRect()
-      const overlaps = artwork && rect.left < artwork.right && rect.right > artwork.left
-      const gap = parseFloat(getComputedStyle(heading).getPropertyValue('--space-4'))
-      const top = Math.max(window.visualViewport?.offsetTop ?? 0, overlaps && preview && getComputedStyle(preview).position === 'sticky' ? artwork.bottom : 0) + gap
-      if (rect.top < top) scroller.scrollBy({ top: rect.top - top, behavior: 'instant' })
     })
   }
   function addItem() {
     if (draft.items.length >= shopConfig.maxItems) return
     const item = newItem()
+    setRemoved(null)
     patch({ items: [...draft.items, item] })
-    selectItem(item.uid)
+    setActiveUid(item.uid); setPreviewChoice(null)
+    // A new ornament starts at the top of the step, where its title and large preview are.
+    requestAnimationFrame(() => {
+      headingRef.current?.focus({ preventScroll: true })
+      navRef.current?.scrollIntoView({ block: 'start', behavior: 'instant' })
+    })
   }
   function removeItem(uid: string) {
     if (draft.items.length <= 1) return
     const index = draft.items.findIndex(item => item.uid === uid)
     const rest = draft.items.filter(item => item.uid !== uid)
+    const gone = draft.items[index]
+    // Keep the removed ornament (photos included) until the next step so one tap brings it back.
+    setRemoved({ item: gone, index, label: `${t('ornamentN', { n: index + 1 })}${gone.petName.trim() ? ` – ${gone.petName.trim()}` : ''}` })
     patch({ items: rest })
     setErrors(current => Object.fromEntries(Object.entries(current).filter(([key]) => !key.endsWith(`-${uid}`))))
     setPhotoErrors(current => Object.fromEntries(Object.entries(current).filter(([key]) => key !== uid)))
-    selectItem(activeUid === uid ? rest[Math.min(index, rest.length - 1)].uid : activeUid)
+    const nextUid = activeUid === uid ? rest[Math.min(index, rest.length - 1)].uid : activeUid
+    setActiveUid(nextUid); setPreviewChoice(null)
+    requestAnimationFrame(() => {
+      // Focus moves to the remaining ornament, but the undo notice must stay in view.
+      (document.getElementById('ornament-editor-heading') ?? document.getElementById(`color-${nextUid}`))?.focus({ preventScroll: true })
+      document.getElementById('buy-undo')?.scrollIntoView({ block: 'center', behavior: 'instant' })
+    })
   }
+  function undoRemove() {
+    if (!removed || draft.items.length >= shopConfig.maxItems) return
+    const items = [...draft.items]
+    items.splice(Math.min(removed.index, items.length), 0, removed.item)
+    setRemoved(null)
+    patch({ items })
+    selectItem(removed.item.uid)
+  }
+  const activeIndex = draft.items.findIndex(item => item.uid === activeItem.uid)
   return <form data-public-page className={`${publicForm.page} ${styles.shop}`} noValidate onFocus={keepFormFocusVisible} onSubmit={(event) => { event.preventDefault(); next() }}>
     <PageHeader title={t('shopTitle')}>{step === 0 && <p>{t('shopLead')}</p>}</PageHeader>
     {storageError ? <p role="status">{t('shopStorageError')}</p> : null}
     {params.get('cancelled') ? <p className={styles.notice} role="status">{t('shopCancelled')}</p> : null}
     <div ref={navRef}><ProgressSteps labels={stepLabels} current={step} label={t('progress', { n: step + 1, total: stepLabels.length })} compact /></div>
     <section className={styles.step} aria-labelledby="buy-heading">
-      <h2 id="buy-heading" ref={headingRef} tabIndex={-1}>{stepLabels[step]}</h2>
-      {step === 0 && <div className={styles.design} data-substep={substep}>
+      <h2 id="buy-heading" ref={headingRef} tabIndex={-1}>{step === 0 ? draft.items.length > 1 ? t('designHeadingN', { n: activeIndex + 1, total: draft.items.length }) : t('designHeading') : stepLabels[step]}</h2>
+      {step === 0 && <div className={styles.design}>
         <div data-public-preview className={styles.previewPane}>
           <OrnamentPreview key={activeItem.uid} item={{ ...activeItem, ...previewChoice }} side={sides[activeItem.uid]} onSideChange={side => setSides(current => ({ ...current, [activeItem.uid]: side }))} />
           <div className={styles.previewSummary}><span>{t('shopTotal')}</span><strong data-buy-total><AnimatedPrice value={total} locale={locale} /></strong></div>
         </div>
         <div className={styles.optionsPane}>
           {/* A single ornament needs no list: the editor comes first and adding another is offered at the end. */}
-          {draft.items.length > 1 && <div className={styles.ornamentOverview}><OrnamentOverview items={draft.items.map(item => ({ ...item, price: itemPrice(item) }))} activeUid={activeItem.uid} maxItems={config.maxItems} onEdit={selectItem} onAdd={addItem} onRemove={removeItem} /></div>}
+          {draft.items.length > 1 && <div className={styles.ornamentOverview}><OrnamentOverview items={draft.items.map(item => ({ ...item, price: itemPrice(item) }))} activeUid={activeItem.uid} maxItems={config.maxItems} onEdit={uid => { setActiveUid(uid); setPreviewChoice(null) }} onRemove={removeItem} onAdd={addItem} /></div>}
+          {removed && <p id="buy-undo" className={styles.undo} role="status"><span>{t('multiRemoved', { ornament: removed.label })}</span><button type="button" className={styles.linkBtn} onClick={undoRemove}>{t('undo')}</button></p>}
           <div className={styles.itemPanel} key={activeItem.uid}>
-            {draft.items.length > 1 && <h3 id="ornament-editor-heading" className={styles.editorHeading} tabIndex={-1}>{t('multiEditorHeading', { n: draft.items.findIndex(item => item.uid === activeItem.uid) + 1, total: draft.items.length })}{activeItem.petName.trim() ? ` – ${activeItem.petName.trim()}` : ''}</h3>}
+            {/* Phones: the large preview scrolls away; this slim bar keeps saying which ornament is open. */}
+            {draft.items.length > 1 && <div ref={editorBar} data-public-sticky className={styles.editorBar} data-stuck={barStuck}>
+              <div data-public-sticky-content className={styles.editorBarContent}>
+                <span className={styles.editorArt} aria-hidden="true"><OrnamentPreview item={{ ...activeItem, ...previewChoice }} static /></span>
+                <h3 id="ornament-editor-heading" className={styles.editorHeading} tabIndex={-1}>{t('multiEditorHeading', { n: activeIndex + 1, total: draft.items.length })}{activeItem.petName.trim() ? ` – ${activeItem.petName.trim()}` : ''}</h3>
+              </div>
+            </div>}
             <BuyItemsStep {...stepProps} activeUid={activeItem.uid} preview={setPreviewChoice} />
             <div className={styles.petGroup}><BuyPetStep {...stepProps} activeUid={activeItem.uid} /></div>
           </div>
@@ -351,9 +393,9 @@ export function BuyPage() {
         </div>
       </div>}
       {step === 1 && <><BuyDateStep {...stepProps} /><div className={styles.deliveryContact}><BuyContactStep {...stepProps} withAddress={!pickup} validateField={validateField} validFields={validFields} /></div></>}
-      {step === 2 && <BuyReviewStep {...stepProps} go={(index, uid, sub, field) => { pendingErrorFocus.current = field ?? null; if (uid) setActiveUid(uid); if (sub !== undefined) setSubstep(sub); setChangedSection(uid ?? (index === 3 ? 'contact' : 'delivery')); setReturnReview(true); go(index < 2 ? 0 : 1) }} itemsTotal={itemsTotal} deliveryFee={deliveryFee} total={total} changed={changedSection} />}
+      {step === 2 && <BuyReviewStep {...stepProps} go={(index, uid, _sub, field) => { pendingErrorFocus.current = field ?? null; if (uid) setActiveUid(uid); setChangedSection(uid ?? (index === 3 ? 'contact' : 'delivery')); setReturnReview(true); go(index < 2 ? 0 : 1) }} itemsTotal={itemsTotal} deliveryFee={deliveryFee} total={total} changed={changedSection} />}
     </section>
     <aside hidden={step !== 1} className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><dl aria-live="polite"><div><dt>{t(draft.items.length > 1 ? 'shopItemsTotal' : 'shopItemOne')} ({draft.items.length})</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{deliveryFee ? formatEur(deliveryFee, locale) : t('shopFree')}</dd></div><div className={styles.cartTotal}><dt>{t('shopTotal')}</dt><dd>{formatEur(total, locale)}</dd></div></dl></aside>
-    <StickyActions className={styles.actions}><div className={styles.mobileTotal} hidden={step === 2}><span>{t('shopTotal')}</span><strong data-buy-total><AnimatedPrice value={total} locale={locale} /></strong></div>{(step > 0 || substep > 0) && <Button variant="secondary" disabled={busy} onClick={back}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 2 ? busy ? t('shopPaying') : t('shopPayStripe') : t('continue')}</Button>{step === 2 && <small className={styles.stripeLine}>{t('secureStripe')}</small>}</StickyActions>
+    <StickyActions className={styles.actions}><div className={styles.mobileTotal} hidden={step === 2}><span>{t('shopTotal')}</span><strong data-buy-total><AnimatedPrice value={total} locale={locale} /></strong></div>{step === 1 && <Button variant="secondary" disabled={busy} onClick={back}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 2 ? busy ? t('shopPaying') : t('shopPayStripe') : t('continue')}</Button>{step === 2 && <small className={styles.stripeLine}>{t('secureStripe')}</small>}{/* Review: paying comes first in reading order (phones stack the buttons); wider screens put Back on the left with CSS order. */}{step === 2 && <Button variant="secondary" className={styles.reviewBack} disabled={busy} onClick={back}>{t('back')}</Button>}</StickyActions>
   </form>
 }

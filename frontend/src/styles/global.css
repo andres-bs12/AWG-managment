@@ -45,6 +45,11 @@ html:has([data-public-shell]) body {
   background-image: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 30%, var(--sky-low) 46%, var(--sky-horizon) 60%, var(--snow-shade) 100%);
 }
 
+/* No rubber-band past the ends of a public page: it exposed the flat html colour around the scene. */
+html:has([data-public-shell]) {
+  overscroll-behavior-y: none;
+}
+
 html:has([data-public-shell]) {
   scroll-padding-bottom: calc(var(--public-actions-height, 0px) + var(--space-4));
 }

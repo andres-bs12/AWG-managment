@@ -1,8 +1,8 @@
-/* Thanks page: one column, 24px between blocks, 8px inside a block. */
+/* Thanks page: one column, 32px between blocks; the rating starts 24px after its divider. */
 .page { display: grid; gap: var(--space-6); }
 .page > * { margin: 0; }
 
-.lead { margin: var(--space-2) 0 0; max-width: var(--measure-prose); color: var(--color-text-muted); }
+.lead { text-wrap: pretty; margin: var(--space-2) 0 0; max-width: var(--measure-prose); color: var(--color-text-muted); }
 
 .sectionTitle { margin: 0 0 var(--space-3); padding: 0; font-size: var(--type-label-size); line-height: var(--type-label-line); font-weight: var(--type-label-weight); color: var(--color-text); }
 
@@ -14,11 +14,12 @@
 .copyStatus:empty { display: none; }
 
 .next { display: grid; }
-.when { display: block; margin-top: var(--space-1); font-size: var(--type-hint-size); line-height: var(--type-hint-line); font-weight: var(--type-body-weight); color: var(--color-text-muted); }
+.handoff { display: grid; gap: var(--space-1); }
+.when { font-size: var(--type-hint-size); line-height: var(--type-hint-line); font-weight: var(--type-body-weight); color: var(--color-text-muted); }
 
 .actions { display: grid; gap: var(--space-3); }
 
-.feedback { min-width: 0; margin: 0; padding: var(--space-6) 0 0; border: 0; border-top: var(--border-thin) solid var(--color-border); }
+.feedback { min-width: 0; margin: 0; padding: var(--space-5) 0 0; border: 0; border-top: var(--border-thin) solid var(--color-border); }
 .feedback legend { float: left; width: 100%; }
 .feedback legend + * { clear: both; }
 .scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-2); }

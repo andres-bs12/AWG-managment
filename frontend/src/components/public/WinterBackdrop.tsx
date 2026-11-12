@@ -32,6 +32,8 @@ function Turbine({ className }: { className: string }) {
 export function WinterBackdrop({ mood = 'hero' }: Props) {
   return (
     <div className={`${styles.backdrop} ${mood === 'calm' ? styles.calm : ''}`} aria-hidden="true">
+      {/* The scene keeps the small-viewport height so nothing moves when the browser bars slide away. */}
+      <div className={styles.scene}>
       <div className={styles.sky} />
       <div className={styles.sun} />
 
@@ -78,6 +80,7 @@ export function WinterBackdrop({ mood = 'hero' }: Props) {
 
       <div className={styles.field}>
         <div className={styles.drift} />
+      </div>
       </div>
     </div>
   )

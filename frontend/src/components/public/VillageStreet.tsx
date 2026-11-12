@@ -1,5 +1,5 @@
 import { Cyclist, LampElf, Reindeer, Snowman, WalkingElf, WalkingNeighbour, WavingElf, Yeti } from './FlatFolk'
-import { Bush, CottageHouse, Fir, GingerHouse, Sprout, StarTree } from './FlatTown'
+import { CottageHouse, Fir, GingerHouse, Sled, Snowballs, StarTree } from './FlatTown'
 import styles from './VillageStreet.module.css'
 
 /**
@@ -47,20 +47,21 @@ export function VillageStreet() {
         </div>
       </div>
 
-      {/* front snow, kept to the far sides so the buttons in the middle stay clear */}
+      {/*
+        Front snow, kept to the far sides so the buttons in the middle stay clear. Two small
+        stories instead of filler plants: a child finishing the snowman, and the sled being loaded.
+      */}
       <div className={`${styles.front} ${styles.frontLeft}`}>
         <Fir className={`${styles.firFront} ${styles.wide}`} />
-        <Bush className={`${styles.bush} ${styles.wide}`} />
         <Fir className={styles.firFront} />
-        <Bush className={styles.bush} />
+        <Snowballs className={styles.snowballs} />
         <Snowman className={styles.snowman} />
-        <Sprout className={styles.sprout} />
+        <WavingElf className={styles.kid} coat="#4a7ab5" coatShade="#2f5c94" />
       </div>
       <div className={`${styles.front} ${styles.frontRight}`}>
-        <Sprout className={styles.sprout} />
         <Yeti className={styles.yeti} />
+        <Sled className={styles.sled} />
         <Reindeer className={styles.reindeer} />
-        <Bush className={styles.bush} />
         <Fir className={`${styles.firFront} ${styles.wide}`} />
       </div>
     </div>

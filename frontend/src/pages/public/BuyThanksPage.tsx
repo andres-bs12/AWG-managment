@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { OrnamentPreview } from '../../components/public/OrnamentPreview'
+import { OrnamentLoader } from '../../components/public/OrnamentLoader'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
 import type { TrackView } from '../../domain/types'
@@ -36,7 +37,7 @@ export function BuyThanksPage() {
     let active = true
     let timer = 0
     const deadline = Date.now() + 60000
-    // A stalled Track request must not keep the customer waiting indefinitely.
+    // A stalled Track request must not keep the customer waiting without an explanation.
     const timeout = window.setTimeout(() => { if (active) setTimedOut(true) }, 60000)
     async function poll() {
       try {
@@ -45,8 +46,10 @@ export function BuyThanksPage() {
         if (result.paymentState === 'paid') { window.clearTimeout(timeout); setView(result); clearBuyDraft(); return }
       } catch { /* A temporary failure or webhook delay is retried until the deadline. */ }
       if (!active) return
-      if (Date.now() >= deadline) setTimedOut(true)
-      else timer = window.setTimeout(poll, 3000)
+      // After a minute the copy explains the delay; a late webhook still completes this page.
+      const late = Date.now() >= deadline
+      if (late) setTimedOut(true)
+      timer = window.setTimeout(poll, late ? 10000 : 3000)
     }
     void poll()
     return () => { active = false; window.clearTimeout(timer); window.clearTimeout(timeout) }
@@ -80,20 +83,21 @@ export function BuyThanksPage() {
       ? [when.marketName, longDate(when.date), when.fromHour != null && t('timeOClock', { time: clock(when.fromHour) })].filter(Boolean).join(' · ')
       : deliveryDatePhrase(when.date, locale)
     : null
-  const handoffLabel = <><span>{t(when?.kind === 'market' ? 'pickupTimeline' : 'deliveryTimeline')}</span>{handoffWhen && <small className={thanks.when}>{handoffWhen}</small>}</>
+  const handoffLabel = <span className={thanks.handoff}><span>{t(when?.kind === 'market' ? 'pickupTimeline' : 'deliveryTimeline')}</span>{handoffWhen && <small className={thanks.when}>{handoffWhen}</small>}</span>
   const copy = () => { void navigator.clipboard.writeText(code).then(() => setCopyMessage(t('copiedCode'))).catch(() => setCopyMessage(t('copyFailed'))) }
   const codeCard = <section className={thanks.codeCard} aria-labelledby="thanks-code-label">
     <p id="thanks-code-label" className={thanks.codeLabel}>{t('trackCode')}</p>
     <div className={thanks.codeRow}><strong className={thanks.code}>{code}</strong><Button variant="secondary" onClick={copy}>{t('copyCode')}</Button></div>
     <span role="status" className={thanks.copyStatus}>{copyMessage}</span>
   </section>
-  if (!view) return <PublicPage variant="status">
-    <h1>{t('confirmingPayment')}</h1><p role="status">{timedOut ? t('confirmationFallback') : t('confirmingPayment')}</p>
+  if (!view) return <PublicPage variant="status" className={thanks.page}>
+    <PageHeader title={t(timedOut ? 'confirmationFallbackTitle' : 'confirmingPayment')}><p role="status">{t(timedOut ? 'confirmationFallback' : 'confirmingBody')}</p></PageHeader>
+    {!timedOut && <OrnamentLoader variant="inline" />}
     {codeCard}
-    <ButtonLink to={`/track/${encodeURIComponent(code)}`} fullWidth>{t('goTrack')}</ButtonLink>
+    <ButtonLink to={`/track/${encodeURIComponent(code)}`} variant={timedOut ? 'primary' : 'secondary'} fullWidth>{t('goTrack')}</ButtonLink>
   </PublicPage>
   return <PublicPage variant="status" className={thanks.page}>
-    <PageHeader title={t('shopThanksTitle')}>{emailSent && <p className={thanks.lead}>{t('thanksEmailSent')}</p>}</PageHeader>
+    <PageHeader title={t('shopThanksTitle')}>{emailSent && <p className={thanks.lead}>{t(view.items.length === 1 ? 'thanksEmailSentOne' : 'thanksEmailSentMany')}</p>}</PageHeader>
     {view.items.length > 0 && <div className={buyStyles.thanksPreviews}>{view.items.map((entry, index) => (
       <OrnamentPreview key={index} item={{ color: entry.color ?? '', finish: entry.finish ?? '', withName: entry.withName, backName: entry.backName }} static />
     ))}</div>}

@@ -23,7 +23,7 @@ export function HelpTip({ label, children }: { label: string; children: ReactNod
     return () => { document.removeEventListener('keydown', escape); document.removeEventListener('pointerdown', outside) }
   }, [open])
   return <span ref={root} className={styles.root}>
-    <button ref={trigger} type="button" className={styles.trigger} aria-label={label} aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}><span aria-hidden="true">(?)</span></button>
+    <button ref={trigger} type="button" className={styles.trigger} aria-label={label} aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}><span className={styles.legacyGlyph} aria-hidden="true">(?)</span><span className={styles.glyph} aria-hidden="true">?</span></button>
     <span id={id} className={styles.panel} hidden={!open}>{children}</span>
   </span>
 }

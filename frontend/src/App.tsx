@@ -29,14 +29,15 @@ const LegalPage = lazy(() => import('./pages/public/LegalPage').then(module => (
 // The guide import and route are removed from production builds by Vite.
 const DesignGuide = import.meta.env.DEV ? lazy(() => import('./pages/dev/DesignGuide').then(module => ({ default: module.DesignGuide }))) : null
 
+/** Public routes wait on the sky scene (data-public-shell switches the html/body background); staff on its own surface. */
 function RouteFallback() {
   const { pathname } = useLocation()
-  return pathname.startsWith('/staff') ? <p role="status" style={{ minHeight: '100vh', margin: 0, padding: 'var(--space-5)', background: 'var(--staff-bg)', color: 'var(--staff-ink)' }}>Loading…</p> : <OrnamentLoader />
+  return pathname.startsWith('/staff') ? <p role="status" style={{ minHeight: '100vh', margin: 0, padding: 'var(--space-5)', background: 'var(--staff-bg)', color: 'var(--staff-ink)' }}>Loading…</p> : <div data-public-shell><OrnamentLoader variant="screen" /></div>
 }
 
 export default function App() {
   if (import.meta.env.DEV && DesignGuide && window.location.pathname === '/dev/design') {
-    return <LocaleProvider><BrowserRouter><Suspense fallback={<OrnamentLoader />}><Routes><Route path="/dev/design" element={<DesignGuide />} /></Routes></Suspense></BrowserRouter></LocaleProvider>
+    return <LocaleProvider><BrowserRouter><Suspense fallback={<OrnamentLoader variant="screen" />}><Routes><Route path="/dev/design" element={<DesignGuide />} /></Routes></Suspense></BrowserRouter></LocaleProvider>
   }
   return (
     <LocaleProvider>

@@ -8,12 +8,15 @@
 
 | Role | Model / tool | Use for |
 |---|---|---|
-| Orchestrator | **Claude Opus** (Claude Code) | Plans, splits work, delegates, merges results, decides. Does the hard parts itself: delicate backend, security, integration, browser/Playwright, computer use. Final word on every change. |
+| Orchestrator / project manager | **Claude Opus** (Claude Code) | Owner (2026-11-11): act as project manager and delegate by default. Plans, splits work, delegates, merges results, decides. Does the hard parts itself: delicate backend, security, integration, browser/Playwright, computer use. Final word on every change. |
 | Complex implementation (peer) | **Codex `gpt-6.1-astra`, effort medium** | Hard features or refactors when Opus is busy orchestrating. Expensive: only for genuinely complex work. |
 | Standard implementation | **Codex `gpt-6.1-sol`, medium / high** | Most features and fixes. High when the task spans several layers or files. |
 | Easy / mechanical work | **GLM-5.3 Flash** or **DeepSeek V4.1 Flash** (via Vibe) | Renames, copy edits, small tests, boilerplate, docs touch-ups. Compare both in the log. |
 | Medium work / third auditor | **GLM-5.3** (via Vibe) | Single-file features; independent read-only reviews (different family from Claude and GPT). |
 | Images and visual review | **Codex `gpt-6.1-terra`** / **ChatGPT** | Image generation, reading screenshots, visual critique. |
+| Scoped UI implementation / auditor (non-Claude, non-GPT) | **Gemini 3.8 Flash** via Antigravity CLI `agy` | Single-component front-end work, read-only reviews of Claude or Codex code. Fallback when Codex is out of credits. |
+| Last resort (temporary) | **Claude Fable 5.2** (Agent tool, `model: "fable"`) | **Only for problems no Opus subagent or Codex sol can solve** (owner, 2026-11-11). Available until Saturday 2026-11-14. Counts as Claude for the cross-LLM rule. |
+| Visual / UX audits, test fixing | **Claude Opus subagent** (Agent tool, `model: "opus"`) or Codex sol | Opus can run Playwright and read screenshots; Codex sol for code audits and implementation. |
 
 Constants that do not change:
 - **Cross-LLM audit:** the reviewer is never the model family that wrote the code. Claude code → Codex or GLM/DeepSeek audits. Codex code → Claude or GLM/DeepSeek audits.
@@ -32,6 +35,10 @@ codex exec -s read-only -m gpt-6.1-sol -c model_reasoning_effort=medium "<review
 PATH="$HOME/.local/bin:$PATH" vibe --trust --model glm-5-3 --enabled-tools read_file --enabled-tools grep \
   --max-turns 60 --time-limit 1500 -p "<brief>" < /dev/null
 # For implementation drop --enabled-tools and add --agent accept-edits (still review the diff afterwards).
+# Gemini through Antigravity (`agy models` lists ids: gemini-3.8-flash-high|medium|low)
+agy --model gemini-3.8-flash-high --mode accept-edits -p "<task>" --print-timeout 1500s < /dev/null
+# Codex credits: smoke-test first; the ChatGPT plan returns "You've hit your usage limit … try again at HH:MM".
+codex exec -s read-only -m gpt-6.1-sol -c model_reasoning_effort=low "Reply with just OK" < /dev/null
 ```
 
 Every brief says: files/area, what done looks like, and "do not edit" for audits.
@@ -65,11 +72,25 @@ Every brief says: files/area, what done looks like, and "do not edit" for audits
 | 2026-11-08 | iOS Safari bars + document scroll (Codex D) | Codex gpt-6.1-sol high | B | Moved public pages to document scroll and a CSS sticky action bar (needed for Safari glass); left 8 failing specs, one with a wrong radio-group boundary and one asserting a no-scroll Home that HEAD never met. Did not find the toolbar tint cause. |
 | 2026-11-09 | Safari 26 toolbar band diagnosis (read-only, web research) | Codex gpt-6-astra medium | A | Found the real mechanism in WebKit `LocalFrameView::fixedContainerEdges`: viewport-sized fixed layers are sampled unless their z-index is negative. Claude verified in the WebKit source and applied it (backdrop −2, snow −1, shell `isolation`); pixel-identical in WebKit on every public screen. |
 | 2026-11-09 | Same diagnosis, in parallel | Codex gpt-6.1-sol high | B | Correct mechanism and sources, but proposed a speculative sticky-probe workaround instead of the source-level exclusion. |
+| 2026-11-11 | Public loader rewrite (single component) | Gemini 3.8 Flash via `agy`, accept-edits | F | Two headless runs made no edits: every shell call (even `ls`) was auto-denied; `--settings` allow rules like `command(ls *)` did not match. Only `--dangerously-skip-permissions` works, which Claude Code's safety classifier blocks. Reassigned to GLM-5.3. Use agy for read-only reviews only until a safe allow-rule syntax is found. |
+| 2026-11-11 | Public loader rewrite (OrnamentLoader screen/inline + shared PetBauble) | GLM-5.3 via Vibe, accept-edits | B | Clean, in scope, compiled first time. Claude's screenshot review: the screen caption sat on the pale lower sky and was unreadable; moved under the baubles. |
+| 2026-11-11 | Read-only audit of the GLM loader, diff pasted in the prompt (`--mode plan`, no tools) | Gemini 3.8 Flash via `agy` | B | 3 findings: 1 real (duplicate `aria-label` on the live region), 2 false positives (claimed Safari cannot parse `min()` inside `clamp()`; `100lvh` gap already covered by the html sky). Pasting the diff avoids the shell-permission problem. |
+| 2026-11-11 | Fix stale E2E after the /buy redesign + full suite (6 projects), build, lint, node tests | Claude Fable 5.2 (subagent) | A | 8 failures fixed, all test-side, each with a clear cause (incl. a wrong `.first()` locator, not an app bug); 462/470 then only `design.png` snapshots left; node stub selector fixed. Claude regenerated and reviewed the snapshots. |
+| 2026-11-11 | Pixel audit of /buy step 1 | Claude Fable 5.2 (subagent) | F | Hit the 5-hour rate limit after capturing; stopped by Claude when the owner restricted Fable to last-resort use. Reassigned to an Opus subagent. |
+| 2026-11-12 | Pixel audit of /buy step 1 (8 widths × DE/EN, 311 captures, measured) | Claude Opus subagent | A | 20 defects with px evidence and fixes (duplicate ornament naming, EN truncation, chip wrap, low-contrast add button, misaligned desktop actions, bold-weight layout shift…) and the root cause of the failing speed test (remount detached the observed node). Best visual audit so far; use Opus for visual audits. |
+| 2026-11-12 | Pixel audits of /buy delivery+review+thanks and /form+Track+Home | Claude Opus subagents (2, parallel) | A | 21 and 25 defects with px evidence; caught a wrong Track label ("not personalised" for named ornaments). Parallel agents shared port 5199; one switched to a temporary port by itself. |
+| 2026-11-12 | Three batches of public UI fixes from those audits (20 + 21 + 25 items) | Codex gpt-6.1-sol high | B | All items implemented, tsc/lint clean, ~150k tokens per batch. Opus cross-review found 10 real regressions (review Back flicker loop, Track address fields lost spacing, focus lost on Track miss dialog, photo remove target over the add tile, staff HelpTip changed despite the brief, colour label bug surfaced) and the full suite showed 9 failing specs. |
+| 2026-11-12 | Cross-review of the Codex batches (read-only) | Claude Opus subagent | A | 10 findings, all concrete with failure scenarios; hit the 5-hour limit once and resumed. |
+| 2026-11-11 | Read-only audit of the /buy gap fix (`--mode plan`, it also read files itself) | Gemini 3.8 Flash via `agy` | C | 5 findings: 1 real but minor (style cleanup without `finally`), 4 false positives (data-stuck "missing" although verified present, mini ornament "never shown" although a media rule shows it, desktop editor bar, a pre-existing max-height). Use Gemini only as a secondary auditor; verify each claim. |
+| 2026-11-11 | Read-only code review of the step-1 polish (Vibe, read tools only) | GLM-5.3 | A | 3 findings, all real and missed by Claude: staff HelpTip panel would sit inline (non-wrapping legend), preview side stayed pinned across Nein/Ja because the local state survived, and a regex lookbehind would break the chunk on Safari < 16.4. Could not read the scratchpad diff (sandbox), so it reviewed the files directly. GLM-5.3 stays the main code auditor for Claude-written code. |
 
 ## Routing changes
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-11-11 | Fable 5.2 only as a last resort; visual audits and test fixing go to Opus subagents, code to Codex sol (credits back after 19:53) | Owner's decision; Fable also hit its 5-hour limit mid-audit |
+| 2026-11-11 | Gemini via agy: no headless implementation (permission prompts cannot be answered and full auto-approve is blocked). Use it as a read-only auditor with the diff pasted into the prompt and `--mode plan` | Two runs with zero edits; the pasted-diff audit worked |
+| 2026-11-11 | Opus works as project manager and delegates by default. Gemini 3.8 Flash (agy) joins as implementer/auditor; Fable 5.2 for heavy load until 2026-11-14; Codex only when the smoke test shows credits | Owner's decision; Codex hit the ChatGPT limit |
 | 2026-11-06 | Initial table; astra moved to medium for complex work | Owner's decision |
 | 2026-11-06 | Mistral's own models removed from routing | Owner: not good enough |
 | 2026-11-06 | GLM-5.3, GLM-5.3 Flash and DeepSeek V4.1 Flash added via Vibe | Included in the owner's Mistral plan |
@@ -78,7 +99,8 @@ Every brief says: files/area, what done looks like, and "do not edit" for audits
 
 ## Setup status
 
-- Claude Code: ✅
+- Claude Code: ✅ (Fable 5.2 available until 2026-11-14)
+- Antigravity CLI `agy`: ✅ `~/.local/bin/agy`, signed in; models Gemini 3.8 Flash (high/medium/low), also Claude Sonnet/Opus 4.6 and GPT-OSS 120B (do not use those for cross-LLM audits of Claude/GPT code).
 - Codex CLI: ✅
 - Mistral Vibe 3.1: ✅ `~/.local/bin/vibe`, signed in (key in the macOS Keychain). Plan: Education, €127.50/month Vibe Code + €12.75/month API, resets on the 1st; pay-as-you-go **off**.
 - GLM-5.3 and GLM-5.3 Flash: ✅ built into Vibe.

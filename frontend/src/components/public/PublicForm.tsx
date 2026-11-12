@@ -18,11 +18,11 @@ export function Card({ children }: { children: ReactNode }) { return <section cl
 export function PublicState({ title, children, error = false }: { title: string; children: ReactNode; error?: boolean }) {
   return <PublicPage className={styles.state}><PageHeader title={title} /><div className={styles.stateBody} role={error ? 'alert' : undefined}>{children}</div></PublicPage>
 }
-export function ErrorSummary({ errors, labels, onFocus }: { errors: Record<string, string>; labels: Record<string, string>; onFocus: (id: string) => void }) {
+export function ErrorSummary({ errors, onFocus }: { errors: Record<string, string>; onFocus: (id: string) => void }) {
   const { t } = useLocale()
   if (!Object.keys(errors).length) return null
   return <div className={styles.errorSummary} role="alert" tabIndex={-1} aria-labelledby="form-errors-heading">
-    <h3 id="form-errors-heading">{t('shopFixErrors')}</h3><ul>{Object.entries(errors).map(([id, message]) => <li key={id}><a href={`#${id}`} onClick={event => { event.preventDefault(); onFocus(id) }}>{labels[id] || t('formDetails')}: {message}</a></li>)}</ul>
+    <h3 id="form-errors-heading">{t('shopFixErrors')}</h3><ul>{Object.entries(errors).map(([id, message]) => <li key={id}><a href={`#${id}`} onClick={event => { event.preventDefault(); onFocus(id) }}>{message}</a></li>)}</ul>
   </div>
 }
 

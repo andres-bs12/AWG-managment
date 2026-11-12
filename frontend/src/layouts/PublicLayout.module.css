@@ -150,7 +150,7 @@
   .footer {
     gap: 6px;
     padding: 0 10px 4px;
-    font-size: 0.78rem;
+    font-size: var(--type-hint-size);
   }
 
   .social {
@@ -184,3 +184,14 @@
 
 .legal { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 .legal a { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; justify-content: center; color: var(--public-ink); font-weight: 700; }
+
+/*
+ * iOS 26 Safari shows the page through its glass bottom toolbar. A document that ends at the
+ * small viewport has nothing under that toolbar, and Safari fills the gap with the html
+ * background (sky blue) under the snow. So a short page is as tall as the LARGE viewport: its
+ * snow continues under the toolbar and the footer is the last thing in it. Long pages are not
+ * affected, so there is never empty space after the footer (an extra spacer row was tried on
+ * 2026-11-11 and left a large blank area). Do not tint the toolbar with a fixed/sticky strip
+ * either: Safari then paints it solid instead of glass.
+ */
+.shell { min-height: 100lvh; }

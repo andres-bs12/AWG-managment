@@ -7,5 +7,5 @@ export function OptionalNote({ id, value, onChange, error, announceError = true 
   const { t } = useLocale()
   const root = useRef<HTMLDetailsElement>(null)
   useEffect(() => { if (error && root.current) root.current.open = true }, [error])
-  return <details ref={root} className={styles.note}><summary>{t('optionalNote')}</summary><Field label={t('note')} htmlFor={id} error={error} announceError={announceError}><textarea id={id} maxLength={1000} value={value} onChange={event => onChange(event.target.value)} /></Field></details>
+  return <details ref={root} className={styles.note}><summary>{t('optionalNote')}</summary><Field className={styles.field} label={t('note')} htmlFor={id} error={error} announceError={announceError}><textarea id={id} maxLength={1000} value={value} onChange={event => onChange(event.target.value)} /></Field></details>
 }

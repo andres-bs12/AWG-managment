@@ -11,7 +11,7 @@ import java.util.UUID;
 /** Mirrors `ItemFormPayload`. */
 public record ItemFormRequest(
         @NotNull UUID orderItemId,
-        @NotBlank @Size(max = 60) String petName,
+        @Size(max = 60) String petName,
         @Size(max = 6) String backName,
         @Size(max = 1000) String note,
         @NotNull @Size(max = 6) @Valid List<FormPhotoRef> photos

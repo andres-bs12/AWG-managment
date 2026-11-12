@@ -9,7 +9,7 @@ import styles from './FlatFolk.module.css'
 const INK = '#2a1f2d'
 const SKIN = { light: '#f4c9a4', mid: '#d9a074', deep: '#8d5a3b' } as const
 
-type Hat = 'elf' | 'beanie'
+type Hat = 'elf' | 'beanie' | 'bun'
 
 type HeadProps = {
   x: number
@@ -21,28 +21,39 @@ type HeadProps = {
   ears?: boolean
 }
 
-/** Head + hat, facing right, centred on (x, y) with a 6.5 radius. */
+/**
+ * Head + hat, turned three-quarters to the right, centred on (x, y) with an 8 radius. The head is
+ * deliberately large for the body: at 40px tall a small head turns the figure into a cone.
+ */
 function Head({ x, y, skin, hat, hatColor, trim = '#fbfdff', ears = false }: HeadProps) {
   return (
     <g transform={`translate(${x - 20} ${y - 21})`}>
-      {ears ? <path d="M14.6 19.6 L9.6 17.2 L14 23.4 Z" fill={skin} /> : null}
-      <circle cx="20" cy="21" r="6.5" fill={skin} />
-      <circle cx="22.8" cy="20.4" r="0.95" fill={INK} />
-      <circle cx="24.4" cy="23.2" r="1.4" fill="#e8846f" opacity="0.55" />
-      <path d="M22 24.6 Q23.6 25.6 25 24.4" stroke={INK} strokeWidth="0.8" fill="none" strokeLinecap="round" />
+      {ears ? <path d="M13.2 19.8 Q8 16.4 6.6 18 Q8.4 22.8 13 24.4 Z" fill={skin} /> : null}
+      {hat === 'bun' ? <circle cx="12.6" cy="13.4" r="4.2" fill={hatColor} /> : null}
+      <circle cx="20" cy="21" r="8" fill={skin} />
+      <circle cx="21.4" cy="21.2" r="1.1" fill={INK} />
+      <circle cx="25.6" cy="21.2" r="1.1" fill={INK} />
+      <circle cx="18.6" cy="24.4" r="1.7" fill="#e8846f" opacity="0.5" />
+      <circle cx="26.8" cy="24.2" r="1.5" fill="#e8846f" opacity="0.5" />
+      <path d="M21.6 24.8 Q23.5 26.7 25.4 24.8" stroke={INK} strokeWidth="0.9" fill="none" strokeLinecap="round" />
       {hat === 'beanie' ? (
         <>
-          <path d="M13.3 19.4 A6.8 6.8 0 0 1 26.7 19.4 Z" fill={hatColor} />
-          <circle cx="20" cy="11.8" r="2.2" fill={trim} />
-          <rect x="12.8" y="17.6" width="14.4" height="3" rx="1.5" fill={trim} />
+          <path d="M11.8 19.6 A8.3 8.3 0 0 1 28.2 19.6 Z" fill={hatColor} />
+          <circle cx="20" cy="10.2" r="2.7" fill={trim} />
+          <rect x="11.2" y="17.2" width="17.6" height="3.8" rx="1.9" fill={trim} />
+        </>
+      ) : hat === 'elf' ? (
+        <>
+          {/* the tip flops backwards with a pom, which is what reads as "elf" at this size */}
+          <path d="M12 19.4 Q12.4 10 20 9.6 Q25.6 9.6 28 16 L28.2 19.4 Z" fill={hatColor} />
+          <path d="M14.6 12.4 Q8.6 6.8 4.4 10.4 Q9.4 10.8 13 16.6 Z" fill={hatColor} />
+          <circle cx="4.6" cy="10.8" r="2.4" fill={trim} />
+          <rect x="11.2" y="17.2" width="17.6" height="3.8" rx="1.9" fill={trim} />
         </>
       ) : (
         <>
-          {/* the tip flops backwards, which is what reads as "elf" at 20px */}
-          <path d="M13.4 19.4 Q13.6 11.6 20 11.2 Q24.2 11 26.6 15.6 L26.8 19.4 Z" fill={hatColor} />
-          <path d="M15.4 13.6 Q10.2 9.6 6.6 12.8 Q10.6 12.6 14.2 17.4 Z" fill={hatColor} />
-          <circle cx="6.4" cy="13" r="2.1" fill={trim} />
-          <rect x="12.6" y="17.4" width="14.8" height="3.2" rx="1.6" fill={trim} />
+          {/* hair swept back into a bun */}
+          <path d="M11.9 21 Q11 12.6 20 12.8 Q26.6 12.8 28.1 19 Q22 14.6 15.6 17.4 Q13.6 18.6 13.4 23 Z" fill={hatColor} />
         </>
       )}
     </g>
@@ -60,12 +71,19 @@ type PersonProps = {
   boots?: string
   mitten?: string
   scarf?: string
+  apron?: string
   belt?: boolean
   ears?: boolean
-  pose?: 'walk' | 'stand' | 'wave' | 'hang'
+  pose?: 'walk' | 'stand' | 'wave' | 'hang' | 'paint'
 }
 
-/** The shared body: feet on y=62 of a 40x64 box, facing right. */
+/** The raised mitten of the `wave`/`hang` poses, in the figure's own units (LampElf hangs from it). */
+const RAISED_HAND = { x: 30.2, y: 17.6 }
+
+/**
+ * The shared body: feet on y=60 of a 40x64 box, facing right. Rounded coat with a fur hem, sleeves
+ * with mittens and short legs — soft shapes only, so nothing reads as a triangle when it is small.
+ */
 function PersonBody({
   skin = SKIN.light,
   hat = 'beanie',
@@ -77,6 +95,7 @@ function PersonBody({
   boots = '#3b2a22',
   mitten,
   scarf,
+  apron,
   belt = false,
   ears = false,
   pose = 'stand',
@@ -88,52 +107,64 @@ function PersonBody({
   return (
     <>
       <g className={walking ? styles.legA : undefined}>
-        <rect x="15.6" y="41" width="4.8" height="16" rx="2.4" fill={legs} />
-        <path d="M14.6 55.6 h6.4 q3.6 0 3.6 3.4 v1.2 H14.6 Z" fill={boots} />
+        <rect x="15.4" y="44" width="5" height="13.4" rx="2.5" fill={legs} />
+        <path d="M14.6 55.6 h6.2 q3.8 0 3.8 3.4 v1.2 H14.6 Z" fill={boots} />
       </g>
       <g className={walking ? styles.legB : undefined}>
-        <rect x="19.6" y="41" width="4.8" height="16" rx="2.4" fill={legs} />
-        <path d="M18.6 55.6 h6.4 q3.6 0 3.6 3.4 v1.2 H18.6 Z" fill={boots} />
+        <rect x="19.6" y="44" width="5" height="13.4" rx="2.5" fill={legs} />
+        <path d="M18.8 55.6 h6.2 q3.8 0 3.8 3.4 v1.2 H18.8 Z" fill={boots} />
       </g>
 
+      {/* far sleeve, behind the coat */}
       <g className={walking ? styles.armB : undefined}>
-        <path d="M19 30.4 L18 40.4" stroke={coatShade} strokeWidth="4.4" strokeLinecap="round" />
-        <circle cx="17.8" cy="41.6" r="2.1" fill={hand} />
+        <path d="M17.4 32.4 L16 41" stroke={coatShade} strokeWidth="5" strokeLinecap="round" />
+        <circle cx="15.8" cy="42.6" r="2.6" fill={hand} />
       </g>
 
-      <path d="M12.6 45.6 Q12.2 30.6 20 28.2 Q27.8 30.6 27.4 45.6 Z" fill={coat} />
-      <path d="M12.6 45.6 Q12.2 30.6 20 28.2 Q16 33 16.4 45.6 Z" fill={coatShade} opacity="0.45" />
+      <path d="M12.4 46.6 Q10.8 33 16 30.4 Q20 28.6 24 30.4 Q29.2 33 27.6 46.6 Q20 49.4 12.4 46.6 Z" fill={coat} />
+      <path d="M12.4 46.6 Q10.8 33 16 30.4 Q14.6 38 16.4 47.6 Q14 47.4 12.4 46.6 Z" fill={coatShade} opacity="0.5" />
+      {apron ? <path d="M17.4 33 H24.8 Q27 40 26.4 46.9 Q21.6 48.4 17 47.9 Q16.2 40 17.4 33 Z" fill={apron} /> : null}
+      {/* fur hem */}
+      <path d="M12.6 46 Q20 48.8 27.4 46" stroke={trim} strokeWidth="2.6" fill="none" strokeLinecap="round" />
       {belt ? (
         <>
-          <rect x="12.5" y="38.4" width="15" height="3" fill={INK} />
-          <rect x="18.4" y="38" width="3.6" height="3.8" rx="0.8" fill="#ffd166" />
+          <path d="M11.9 39.4 Q20 41.4 28.1 39.4" stroke={INK} strokeWidth="2.6" fill="none" />
+          <rect x="18.2" y="38.2" width="3.8" height="3.8" rx="0.9" fill="#ffd166" />
         </>
       ) : null}
       {scarf ? (
         <>
-          <path d="M15.2 29.4 Q20 32.6 24.8 29.4" stroke={scarf} strokeWidth="3.6" fill="none" strokeLinecap="round" />
-          <path d="M16.6 31 L15 37.4" stroke={scarf} strokeWidth="3" strokeLinecap="round" />
+          <path d="M14.6 29.6 Q20 33 25.4 29.6" stroke={scarf} strokeWidth="3.8" fill="none" strokeLinecap="round" />
+          <path d="M16.4 31.4 L15 38.2" stroke={scarf} strokeWidth="3.2" strokeLinecap="round" />
         </>
       ) : null}
 
       {raised ? (
         <g className={pose === 'wave' ? styles.wave : undefined}>
-          <path d="M21.4 31.2 L26.8 25.6 L28.6 18.6" stroke={coat} strokeWidth="4.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="29" cy="16.6" r="2.3" fill={hand} />
+          <path d={`M23 32.2 Q29.6 29 ${RAISED_HAND.x - 0.4} 20.4`} stroke={coat} strokeWidth="5" fill="none" strokeLinecap="round" />
+          <circle cx={RAISED_HAND.x} cy={RAISED_HAND.y} r="2.8" fill={hand} />
+        </g>
+      ) : pose === 'paint' ? (
+        <g className={styles.paint}>
+          <path d="M22.6 32.4 Q27 34 31 31.4" stroke={coat} strokeWidth="5" fill="none" strokeLinecap="round" />
+          <path d="M31.4 31 L37 27.4" stroke="#8b5a2b" strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M36.4 27.8 L38.4 26.5" stroke="#e0473f" strokeWidth="2.4" strokeLinecap="round" />
+          <circle cx="31.4" cy="31" r="2.6" fill={hand} />
         </g>
       ) : (
         <g className={walking ? styles.armA : undefined}>
-          <path d="M21 30.4 L22.4 40.4" stroke={coat} strokeWidth="4.4" strokeLinecap="round" />
-          <circle cx="22.6" cy="41.6" r="2.1" fill={hand} />
+          <path d="M22.6 32.4 L24 41" stroke={coat} strokeWidth="5" strokeLinecap="round" />
+          <circle cx="24.2" cy="42.6" r="2.6" fill={hand} />
         </g>
       )}
 
-      <Head x={20} y={21} skin={skin} hat={hat} hatColor={hatColor} trim={trim} ears={ears} />
+      <Head x={20} y={20} skin={skin} hat={hat} hatColor={hatColor} trim={trim} ears={ears} />
     </>
   )
 }
 
-type FigureProps = { className?: string }
+/** `x`/`y`/`width`/`height` place a figure inside another SVG (the stall scene). */
+type FigureProps = { className?: string; x?: number; y?: number; width?: number; height?: number }
 
 /** Ground shadow under every standing figure, so nobody floats on the snow. */
 function Shadow({ cx, rx }: { cx: number; rx: number }) {
@@ -214,7 +245,7 @@ export function Cyclist({ className }: FigureProps) {
   )
 
   return (
-    <svg className={className} viewBox="0 0 76 64" aria-hidden="true">
+    <svg className={className} viewBox="0 -6 76 70" aria-hidden="true">
       <ellipse cx="38" cy="61.6" rx="30" ry="2" fill="#3a5a96" opacity="0.18" />
       <g className={styles.ride}>
         {wheel(15)}
@@ -337,9 +368,9 @@ export function LampElf({ className }: FigureProps) {
       </g>
       <rect x="12" y="24.6" width="20" height="4.4" rx="1.4" fill="#1f7a4d" />
 
-      {/* the raised mitten in PersonBody sits at (29, 16.6); this hangs it from the arm at (42, 44) */}
+      {/* hangs the raised mitten of PersonBody (RAISED_HAND) from the arm at (42, 44) */}
       <g className={styles.swing} style={{ transformOrigin: '42px 44px' }}>
-        <g transform="translate(42 44) rotate(-20) translate(-29 -16.6)">
+        <g transform={`translate(42 44) rotate(-20) translate(${-RAISED_HAND.x} ${-RAISED_HAND.y})`}>
           <PersonBody
             pose="hang"
             skin={SKIN.light}
@@ -355,6 +386,84 @@ export function LampElf({ className }: FigureProps) {
           />
         </g>
       </g>
+    </svg>
+  )
+}
+
+/** Gaby at work: apron on, brush in hand, painting the ornament that hangs from her stand. */
+export function Painter({ className, ...place }: FigureProps) {
+  return (
+    <svg className={className} {...place} viewBox="0 0 56 64" aria-hidden="true">
+      <ellipse cx="26" cy="61.6" rx="20" ry="2" fill="#3a5a96" opacity="0.18" />
+      {/* stand with the ornament she is painting */}
+      <path d="M48 60 V26 Q48 22 44 22 H41" stroke="#7a4a23" strokeWidth="2.4" fill="none" strokeLinecap="round" />
+      <path d="M43 60 H53" stroke="#7a4a23" strokeWidth="2.4" strokeLinecap="round" />
+      <g className={styles.sway}>
+        <path d="M41 22 V25" stroke="#7a4a23" strokeWidth="1.2" />
+        <rect x="39.4" y="24.4" width="3.2" height="2.6" rx="0.8" fill="#d2b66f" />
+        <circle cx="41" cy="32" r="5.6" fill="#b03a2e" />
+        <circle cx="41" cy="32.4" r="3" fill="#fff3e0" />
+        <path d="M39.3 31.2 L39 29.6 L40.4 30.5 Z M42.7 31.2 L43 29.6 L41.6 30.5 Z" fill="#f0a04b" />
+        <circle cx="41" cy="32.8" r="1.7" fill="#f0a04b" />
+      </g>
+      <PersonBody
+        pose="paint"
+        skin={SKIN.mid}
+        hat="bun"
+        hatColor="#5b3a22"
+        coat="#e0473f"
+        coatShade="#b53229"
+        apron="#fff6e2"
+        legs="#2c3d6b"
+        mitten={SKIN.mid}
+      />
+    </svg>
+  )
+}
+
+/** The stall cat: sits on the counter, tail swishing, blinking now and then. */
+export function SittingCat({ className, ...place }: FigureProps) {
+  return (
+    <svg className={className} {...place} viewBox="-8 -8 36 36" aria-hidden="true">
+      <path className={styles.catTail} d="M4 25 Q-6 24 -4 13" stroke="#e08a35" strokeWidth="3.6" fill="none" strokeLinecap="round" />
+      <path d="M3.4 28 Q1.6 11 13 11 Q24.4 11 22.6 28 Z" fill="#f0a04b" />
+      <ellipse cx="13" cy="21.4" rx="4.6" ry="6" fill="#fff3e0" />
+      <path d="M6.2 3.4 L5.4 -5 L12 0 Z M19.8 3.4 L20.6 -5 L14 0 Z" fill="#f0a04b" />
+      <path d="M7.4 1.6 L7 -2.4 L10.2 0 Z M18.6 1.6 L19 -2.4 L15.8 0 Z" fill="#f6b7a8" />
+      <circle cx="13" cy="6.4" r="7.8" fill="#f0a04b" />
+      <path d="M13 -1.2 V2 M10.2 -0.6 L10.8 2 M15.8 -0.6 L15.2 2" stroke="#d9822b" strokeWidth="1.2" strokeLinecap="round" />
+      <ellipse cx="13" cy="9.2" rx="3.8" ry="2.8" fill="#fff3e0" />
+      <g className={styles.blink}>
+        <circle cx="10" cy="6" r="1.15" fill={INK} />
+        <circle cx="16" cy="6" r="1.15" fill={INK} />
+      </g>
+      <path d="M12.2 8.2 h1.6 l-0.8 1 Z" fill="#e8846f" />
+      <path d="M11.4 10.2 Q12.2 11 13 10.2 Q13.8 11 14.6 10.2" stroke={INK} strokeWidth="0.7" fill="none" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/** The stall dog: sits in front of the counter with a red collar and a wagging tail. */
+export function SittingDog({ className, ...place }: FigureProps) {
+  return (
+    <svg className={className} {...place} viewBox="-6 -2 42 42" aria-hidden="true">
+      <ellipse cx="16" cy="37.4" rx="14" ry="1.8" fill="#3a5a96" opacity="0.18" />
+      <path className={styles.dogTail} d="M6 31 Q-3 30 -1 21" stroke="#c98a4b" strokeWidth="3.6" fill="none" strokeLinecap="round" />
+      <path d="M5.4 37 Q3.4 17 16 16 Q28.6 17 26.6 37 Z" fill="#f6e7d2" />
+      <rect x="11.6" y="27" width="4.4" height="10" rx="2.2" fill="#fff6ea" />
+      <rect x="17.6" y="27" width="4.4" height="10" rx="2.2" fill="#fff6ea" />
+      <g className={styles.tilt}>
+        <path d="M10 4.4 Q4 6 6.2 17 Q10.6 15.4 12 8 Z M26 4.4 Q32 6 29.8 17 Q25.4 15.4 24 8 Z" fill="#b5713d" />
+        <circle cx="18" cy="9.6" r="8.4" fill="#f6e7d2" />
+        <path d="M18 1.4 Q25.6 1.6 26.2 9 Q21 9.6 18 5 Z" fill="#b5713d" opacity="0.9" />
+        <circle cx="14.8" cy="9" r="1.15" fill={INK} />
+        <circle cx="21.2" cy="9" r="1.15" fill={INK} />
+        <ellipse cx="18" cy="13.4" rx="4" ry="3" fill="#fffaf2" />
+        <circle cx="18" cy="12.2" r="1.4" fill={INK} />
+        <path d="M16.9 14.6 q1.1 3.2 2.2 0 Z" fill="#ef8fa0" />
+      </g>
+      <path d="M11.4 17.6 Q18 20.8 24.6 17.6" stroke="#e0473f" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+      <circle cx="18" cy="20.4" r="1.5" fill="#ffd166" />
     </svg>
   )
 }

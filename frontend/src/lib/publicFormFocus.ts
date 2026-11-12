@@ -16,9 +16,10 @@ export function keepFormFocusVisible(event: FocusEvent<HTMLElement>) {
     let top = viewportTop + gap
     let bottom = viewportBottom - gap
     const overlaps = (other: DOMRect) => rect.left < other.right && rect.right > other.left
-    const preview = form.querySelector<HTMLElement>('[data-public-preview]')
+    const preview = form.querySelector<HTMLElement>('[data-public-sticky]')
     if (preview && !preview.contains(target) && getComputedStyle(preview).position === 'sticky') {
-      const artwork = preview.getBoundingClientRect()
+      // The editor anchor has zero height; its absolute content is the visible obstruction.
+      const artwork = (preview.querySelector<HTMLElement>('[data-public-sticky-content]') ?? preview).getBoundingClientRect()
       if (overlaps(artwork) && artwork.top <= top && artwork.bottom > viewportTop) top = artwork.bottom + gap
     }
     const actions = form.querySelector<HTMLElement>('[data-sticky-actions]')

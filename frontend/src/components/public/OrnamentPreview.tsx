@@ -26,10 +26,12 @@ export function OrnamentPreview({ item, static: isStatic = false, side: chosenSi
   const { t } = useLocale()
   // null = follow the name option (show the back while a name is on); a click pins a side.
   const [side, setSide] = useState<OrnamentSide | null>(null)
-  const [paused, setPaused] = useState(false)
   const instance = useId()
-  const showBack = !isStatic && item.withName && (chosenSide ?? side ?? 'back') === 'back'
-  const shade: Shade = item.color || (isStatic || readOnly ? 'unknown' : 'beige')
+  // Without a typed name the back is empty, so the front stays in view until there is a name to show.
+  const pinned = onSideChange ? chosenSide : (chosenSide ?? side)
+  const showBack = !isStatic && item.withName && !!item.backName.trim() && (pinned ?? 'back') === 'back'
+  // No colour yet = a neutral ball; a beige one read as if Beige were already chosen.
+  const shade: Shade = item.color || 'unknown'
   const colorLabel = item.color ? `${t(COLOR_KEYS[item.color])}${item.color === 'grey' || item.color === 'white' ? ` · ${t('legacyColour')}` : ''}` : t(isStatic || readOnly ? 'colorUnknown' : 'previewNoColor')
   const finishLabel = item.finish ? t(item.finish === 'shiny' ? 'finishShiny' : 'finishMatte') : t(isStatic || readOnly ? 'formFinishUnknown' : 'previewNoFinish')
   const name = item.withName && item.backName ? item.backName : t('previewNoName')
@@ -38,7 +40,7 @@ export function OrnamentPreview({ item, static: isStatic = false, side: chosenSi
   const svgId = `orn${instance.replace(/[^a-zA-Z0-9]/g, '')}`
 
   const description = t('previewDescription', { choices: t('previewLabel', { color: colorLabel, finish: finishLabel, name }), side: t(showBack ? 'previewBack' : 'previewFront') })
-  return <div className={styles.preview} data-preview={isStatic ? 'static' : 'live'} data-paused={paused}>
+  return <div className={styles.preview} data-preview={isStatic ? 'static' : 'live'}>
     <div className={styles.stage} role="img" aria-label={description}>
       <div className={styles.turn} data-back={showBack}>
         <svg viewBox="0 0 200 230" className={styles.art} aria-hidden="true">
@@ -64,7 +66,8 @@ export function OrnamentPreview({ item, static: isStatic = false, side: chosenSi
         </svg>
       </div>
     </div>
-    {!isStatic && item.withName && <SegmentedControl tone="public" hideLegend legend={t('previewSide')} name={sideName} value={showBack ? 'back' : 'front'} options={[{ value: 'front', label: t('previewFront') }, { value: 'back', label: t('previewBack') }]} onChange={value => { setSide(value); onSideChange?.(value) }} />}
-    {!isStatic && <><p className={styles.disclaimer}>{t('previewDisclaimer')}</p><button className={styles.pause} type="button" aria-label={t(paused ? 'resumePreview' : 'pausePreview')} onClick={() => setPaused(value => !value)}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2">{paused ? <path d="m8 5 11 7-11 7Z" /> : <><path d="M8 5v14M16 5v14" /></>}</svg></button></>}
+    {!isStatic && item.withName && item.backName && <SegmentedControl tone="public" hideLegend legend={t('previewSide')} name={sideName} value={showBack ? 'back' : 'front'} options={[{ value: 'front', label: t('previewFront') }, { value: 'back', label: t('previewBack') }]} onChange={value => { setSide(value); onSideChange?.(value) }} />}
+    {/* Each sentence stays whole: on narrow screens the line breaks between them, never mid-sentence. */}
+    {!isStatic && <p className={styles.disclaimer}>{(t('previewDisclaimer').match(/[^.]+\.?/g) ?? []).map(part => part.trim()).filter(Boolean).map((sentence, index) => <span key={index}>{index > 0 ? ' ' : ''}<span className={styles.sentence}>{sentence}</span></span>)}</p>}
   </div>
 }

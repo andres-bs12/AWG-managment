@@ -123,7 +123,6 @@ test.describe('desktop keyboard checkout', () => {
     await tab(page)
     await expect(backName).toBeFocused()
     await expect(backName).toHaveValue('LUNA')
-    await typeInto(page, page.locator('input[id^="pet-"]'), 'Luna')
     await tabTo(page, page.getByRole('button', { name: 'Foto hinzufügen, 0 von 6', exact: true }))
     const chooser = page.waitForEvent('filechooser')
     await page.keyboard.press('Enter')
@@ -168,7 +167,7 @@ test.describe('desktop keyboard checkout', () => {
   })
 })
 
-test('Tab and Shift+Tab exclude hidden substeps, collapsed notes and the native file input', async ({ page }) => {
+test('Tab and Shift+Tab exclude collapsed notes and the native file input', async ({ page }) => {
   // Long keyboard walk: every Tab checks focus geometry, so it needs more than 30s on a loaded machine.
   test.slow()
   await open(page)
@@ -179,13 +178,6 @@ test('Tab and Shift+Tab exclude hidden substeps, collapsed notes and the native 
   const option = page.getByRole('radio', { name: /^Ja,/ })
   const hiddenBack = page.locator('input[id^="back-"]')
   await expect(hiddenBack).toHaveCount(0)
-  if (mobile(page)) {
-    await expect(option).toBeHidden()
-    await expect(page.locator('input[id^="pet-"]')).toBeHidden()
-    await continueByKeyboard(page, 'Enter')
-    await expect(page.locator('#buy-heading')).toBeFocused()
-    await expect(page.locator('fieldset[id^="color-"]')).toBeHidden()
-  }
   await tabTo(page, page.getByRole('radio', { name: 'Nein', exact: true }))
   await page.keyboard.press('ArrowRight')
   await typeInto(page, hiddenBack, 'LUNA')
@@ -193,13 +185,7 @@ test('Tab and Shift+Tab exclude hidden substeps, collapsed notes and the native 
   await expect(option).toBeFocused()
   await page.keyboard.press('ArrowLeft')
   await expect(hiddenBack).toHaveCount(0)
-  if (mobile(page)) {
-    await continueByKeyboard(page, 'Space')
-    await expect(page.locator('#buy-heading')).toBeFocused()
-    await expect(option).toBeHidden()
-  }
-  await tabTo(page, page.locator('input[id^="pet-"]'))
-  await tab(page)
+  await tabTo(page, page.getByRole('button', { name: 'Foto hinzufügen, 0 von 6', exact: true }))
   await expect(page.getByRole('button', { name: 'Foto hinzufügen, 0 von 6', exact: true })).toBeFocused()
   await tab(page)
   await expect(page.locator('summary')).toBeFocused()
@@ -208,12 +194,7 @@ test('Tab and Shift+Tab exclude hidden substeps, collapsed notes and the native 
   // With a single ornament, adding another is offered after its details.
   await expect(page.locator('#buy-add')).toBeFocused()
   await tab(page)
-  if (mobile(page)) {
-    await expect(page.getByRole('button', { name: /^(Zurück|Back)$/ })).toBeFocused()
-    await tab(page)
-  }
   await expect(next(page)).toBeFocused()
-  if (mobile(page)) await tab(page, true)
   await tab(page, true)
   await tab(page, true)
   await expect(page.locator('summary')).toBeFocused()
@@ -225,7 +206,6 @@ test('Tab and Shift+Tab exclude hidden substeps, collapsed notes and the native 
   await tab(page)
   await expect(page.locator('#buy-add')).toBeFocused()
   await tab(page)
-  if (mobile(page)) await tab(page)
   await expect(next(page)).toBeFocused()
   // Check every footer link explicitly in both directions. In particular,
   // Impressum must be fully inside the scroll viewport, including at 360px.
@@ -273,11 +253,8 @@ for (const locale of ['de', 'en'] as const) {
     })
     await useHttpAvailability(page)
     await choose(page)
-    if (mobile(page)) await next(page).click()
     await page.getByRole('radio', { name: /^(Ja|Yes),/ }).check()
     await page.locator('input[id^="back-"]').fill('LUNA')
-    if (mobile(page)) await next(page).click()
-    await page.locator('input[id^="pet-"]').fill('Luna')
     await page.locator('input[type=file]').setInputFiles(photo)
     await expect(page.getByRole('img', { name: /^(Foto|Photo) 1 (von|of) Luna$/ })).toBeVisible()
     await page.locator('summary').click()
@@ -317,8 +294,6 @@ for (const locale of ['de', 'en'] as const) {
     await expect(page.locator('form')).toContainText('LUNA')
     // Inspect the in-memory photo and note by reopening their exact editor.
     await page.getByRole('button', { name: locale === 'de' ? 'Kugel Luna ändern' : 'Change ornament Luna', exact: true }).click()
-    if (mobile(page)) { await next(page).click(); await next(page).click() }
-    await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
     await expect(page.getByRole('img', { name: /^(Foto|Photo) 1 (von|of) Luna$/ })).toBeVisible()
     await page.locator('summary').click()
     await expect(page.locator('textarea[id^="note-"]')).toHaveValue('Keep the white whiskers')

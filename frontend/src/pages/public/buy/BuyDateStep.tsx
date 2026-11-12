@@ -53,7 +53,14 @@ function ViennaSection({ t, draft, dates, datesState, setDatesRetry, patch, form
   useLayoutEffect(() => {
     const node = calendar.current
     if (!node) return
-    const measure = () => setList(node.getBoundingClientRect().width < 7 * parseFloat(getComputedStyle(node).getPropertyValue('--touch')))
+    const measure = () => {
+      const css = getComputedStyle(node)
+      // Measure the grid's potential width independently of the list's narrower inset.
+      const listInset = node.querySelector('[data-list="true"]') && matchMedia('(max-width: 767px)').matches
+        ? 2 * parseFloat(css.getPropertyValue('--space-4')) : 0
+      const width = node.getBoundingClientRect().width + listInset - parseFloat(css.borderLeftWidth) - parseFloat(css.borderRightWidth)
+      setList(width < 7 * parseFloat(css.getPropertyValue('--touch')))
+    }
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(node)
@@ -68,8 +75,8 @@ function ViennaSection({ t, draft, dates, datesState, setDatesRetry, patch, form
     <p className={styles.muted} role="status" hidden={datesState === 'ready' && dates.length > 0}>{datesState === 'loading' ? t('shopDatesLoading') : datesState === 'error' ? t('shopDatesError') : datesState === 'ready' && !dates.length ? t('shopDatesNone') : ''}</p>
     {datesState === 'error' && <Button variant="secondary" onClick={() => setDatesRetry(value => value + 1)}>{t('shopRetry')}</Button>}
     {(datesState === 'loading' || datesState === 'idle') && <div className={styles.dateCards} aria-hidden="true"><div className={styles.dateSkeleton} /></div>}
-    {datesState === 'ready' && earliest && <div className={styles.dateCards}><button type="button" className={styles.dateCard} data-selected={draft.deliveryDate === earliest.date} data-earliest aria-pressed={draft.deliveryDate === earliest.date} onClick={() => patch({ deliveryDate: earliest.date })}><small>{t('earliestDate')}</small><span>{compactDate(earliest.date)} · {t('eveningShort')}</span></button></div>}
-    <fieldset ref={calendar} id="buy-date" tabIndex={-1} className={styles.calendarField} aria-busy={datesState === 'loading'} aria-describedby={described('buy-date')}><legend className="visually-hidden">{t('shopStepDate')}</legend>
+    {datesState === 'ready' && earliest && <div className={styles.dateCards}><button type="button" className={styles.dateCard} data-selected={draft.deliveryDate === earliest.date} data-earliest aria-pressed={draft.deliveryDate === earliest.date} onClick={() => patch({ deliveryDate: earliest.date })}><small>{t('earliestDate')}</small><span>{compactDate(earliest.date)}</span></button></div>}
+    <fieldset ref={calendar} id="buy-date" tabIndex={-1} className={styles.calendarField} aria-busy={datesState === 'loading'} aria-invalid={!!err('buy-date')} aria-describedby={described('buy-date')}><legend className="visually-hidden">{t('shopStepDate')}</legend>
       {datesState === 'ready' && months.map(month => { const first = new Date(`${month}-01T12:00:00`); const offset = (first.getDay() + 6) % 7; const count = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate(); return <div key={month}><h3>{new Intl.DateTimeFormat(lang, { month: 'long', year: 'numeric' }).format(first)}</h3><div className={styles.calendar} data-list={list}>{Array.from({ length: 7 }, (_, i) => <span key={`w${i}`} className={styles.weekday}>{new Intl.DateTimeFormat(lang, { weekday: 'short' }).format(new Date(2026, 10, 2 + i))}</span>)}{Array.from({ length: offset }, (_, i) => <span key={`blank${i}`} />)}{Array.from({ length: count }, (_, i) => { const date = `${month}-${String(i + 1).padStart(2, '0')}`; const available = dates.some(d => d.date === date); return available ? <label key={date} className={styles.day} data-selected={draft.deliveryDate === date}><input className={styles.choiceInput} type="radio" name="delivery-date" aria-label={formatDate(date)} checked={draft.deliveryDate === date} onChange={() => patch({ deliveryDate: date })} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); patch({ deliveryDate: date }) } }} /><span className={styles.dayNumber}>{i + 1}</span><span className={styles.dayFull}>{formatDate(date)}</span></label> : <span key={date} className={styles.unavailable}>{i + 1}</span> })}</div></div> })}
     </fieldset>
     {err('buy-date') && <p className={styles.error} id="buy-date-error" role="alert">{err('buy-date')}</p>}
@@ -88,6 +95,7 @@ function PickupSection({ t, draft, pickupDays, pickupState, setDatesRetry, patch
     <p className={styles.sectionLead}>{t('pickupLead')}</p>
     <p className={styles.muted} role="status" hidden={pickupState === 'ready' && pickupDays.length > 0}>{pickupState === 'loading' ? t('pickupDaysLoading') : pickupState === 'error' ? t('pickupDaysError') : pickupState === 'ready' && !pickupDays.length ? t('pickupDaysNone') : ''}</p>
     {pickupState === 'error' && <Button variant="secondary" onClick={() => setDatesRetry(value => value + 1)}>{t('shopRetry')}</Button>}
+    <div className={styles.pickupDayGroup}>
     <fieldset id="buy-date" tabIndex={-1} className={styles.chips} aria-busy={pickupState === 'loading'} aria-describedby={described('buy-date')}><legend>{t('pickupDayHeading')}</legend>
       {(pickupState === 'loading' || pickupState === 'idle') && <div className={styles.pickupDays} aria-hidden="true"><div className={styles.dateSkeleton} /><div className={styles.dateSkeleton} /></div>}
       {pickupState === 'ready' && markets.map(place => <div key={place} className={styles.pickupMarket}>
@@ -99,6 +107,7 @@ function PickupSection({ t, draft, pickupDays, pickupState, setDatesRetry, patch
       </div>)}
     </fieldset>
     {err('buy-date') && <p className={styles.error} id="buy-date-error" role="alert">{err('buy-date')}</p>}
+    </div>
     {day && <fieldset id="buy-time" tabIndex={-1} className={styles.chips} aria-describedby={described('buy-time')}><legend>{t('pickupTimeHeading')}</legend>
       <div className={styles.timeRow}>{times.map(time => <label key={time} className={`${styles.chip} ${styles.timeChip}`} data-selected={draft.pickupTime === time}>
         <input className={styles.choiceInput} type="radio" name="pickup-time" value={time} checked={draft.pickupTime === time} onChange={() => patch({ pickupTime: time })} /><span>{time}</span>

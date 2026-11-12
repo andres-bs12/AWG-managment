@@ -12,7 +12,7 @@ Use **must**, **must not** and the values below as implementation requirements. 
 |---|---|
 | P1 · Premium, calm, warm, handmade | Warm opaque surfaces, generous grouping, flat artwork, quiet borders. Craft comes from the ornament, not gradients on controls, extra badges or decoration around every sentence. |
 | P2 · Ornament first | One large illustrated ornament in the configurator; smaller static versions in review. Uploaded photos remain reference tiles and must never become the painted portrait. |
-| P3 · One primary action per screen | One filled primary button in the current task area. Back, add, edit, copy and calendar actions are secondary/tertiary. Home uses **Track order** as primary and **Choose an ornament** as secondary. |
+| P3 · One primary action per screen | One filled primary button in the current task area. Back, add, edit, copy and calendar actions are secondary/tertiary. Home uses **Online bestellen / Order online** as primary and **Bestellung verfolgen / Track order** as secondary (owner decision). |
 | P4 · Less text, never unclear | Each hint answers one question. Every choice has a label, every amount has a meaning, every error offers a recovery. Constraints belong at the decision they affect. |
 | P5 · Proximity is meaning | Related elements must be closer than unrelated groups by at least one step of the spacing scale. Spacing is owned by the parent layout; never add child margins to parent gaps. |
 | P6 · Honest state | An illustrative preview is not a promise of likeness; an API date is not a reservation; a Stripe return is not payment confirmation; a request is not proof of email delivery. |
@@ -20,7 +20,7 @@ Use **must**, **must not** and the values below as implementation requirements. 
 
 Precedence: owner decisions and product constraints in `AGENTS.md` → this document for public visual/content rules → the latest **Form design rules** in [sprint 6](sprint6-buy-ux.md#form-design-rules-public-forms-buy-form) and approved [premium plan](plan-buy-premium.md) → exploratory research. This document consolidates those decisions and supplies missing values. It does not authorize legal wording, new business rules or payment changes.
 
-Resolved conflicts: use three `/buy` screens (Design, Delivery, Review & pay); mobile design has three substeps (Colour/finish, Back name, Pet/photos). Owner decision (2026-11-05): from 768px related personal-data fields share a row on the six-column grid (Name | E-Mail, Telefon, Straße | Stiege/Tür, PLZ | Ort), aligned with subgrid; below 768px one column except PLZ + Ort. Show one “Frühester Termin” shortcut plus the calendar (owner decision 2026-11-05, superseding the earlier three cards). Never put a reference photo on the ornament. Earlier research proposing five shop screens, photo compositing, invented evening hours, alternate payment labels or automatic date selection is superseded.
+Resolved conflicts: use three `/buy` screens (Design, Delivery, Review & pay). Owner decision 2026-11-11: the design screen has **no mobile substeps**; one ornament is one page on every width, and below 1024px the large preview is not sticky (a slim bar with a mini ornament and “Kugel 2 von 2 – Luna” is). Substep and sticky-preview wording elsewhere in this document is superseded. Owner decision (2026-11-05): from 768px related personal-data fields share a row on the six-column grid (Name | E-Mail, Telefon, Straße | Stiege/Tür, PLZ | Ort), aligned with subgrid; below 768px one column except PLZ + Ort. Show one “Frühester Termin” shortcut plus the calendar (owner decision 2026-11-05, superseding the earlier three cards). Never put a reference photo on the ornament. Earlier research proposing five shop screens, photo compositing, invented evening hours, alternate payment labels or automatic date selection is superseded.
 
 ## 2. Tokens and colour
 
@@ -252,7 +252,7 @@ All gaps are measured from the rendered edge of one element to the next. The tab
 | `--size-swatch` | `24px` | Colour/finish swatch |
 | `--size-photo` | `76px` | Photo and add tile |
 | `--size-review-art` | `76px` | Review preview column |
-| `--size-preview-mobile`, `--size-preview-desktop` | `140px`, `280px` | Ornament artwork max height/mobile, max width/desktop |
+| `--size-preview-mobile`, `--size-preview-tablet`, `--size-preview-desktop` | `140px`, `220px`, `280px` | Ornament artwork max height/mobile and tablet (768–1023px), max width/desktop |
 | `--size-preview-success` | `150px` | Static success art |
 | `--size-step-marker` | `32px` | Non-interactive progress marker |
 | `--size-progress-rail` | `4px` | Substep bar/connector |
@@ -325,7 +325,7 @@ Paths below are relative to `frontend/src/`. **Existing** is the current impleme
 
 | Contract | Rule |
 |---|---|
-| Anatomy/sizes | Visible legend, native radio/checkbox, swatch/icon, label, optional hint/reason, selected check. Choice card min-height `--size-choice-card` (72px), padding 16px, 12px gap. Chip height `--size-control` (48px), the same as inputs and buttons, so every chip in a group has one height. The content is one line, centred with flex. Sold-out text goes on the same line as a secondary label; it is never a second line that stretches siblings. Padding follows the **concentric rule**: the 24px swatch sits concentric with the pill's end cap, so its inset is (48 − 24) / 2 = 12px (`--space-3`) at the leading edge and vertically, with 16px (`--space-4`) after the text at the trailing edge. Content gap 8px. The swatch has no border ring when selected. |
+| Anatomy/sizes | Visible legend, native radio/checkbox, swatch/icon, label, optional hint/reason, selected check. Choice card min-height `--size-choice-card` (72px), padding 16px, 12px gap. Chip height `--size-control` (48px), the same as inputs and buttons, so every chip in a group has one height. The content is one line, centred with flex. Sold-out text goes on the same line as a secondary label; it is never a second line that stretches siblings. Padding follows the **concentric rule**: the 24px swatch sits concentric with the pill's end cap, so its inset is (48 − 24) / 2 = 12px (`--space-3`) at the leading edge and vertically, with 16px (`--space-4`) after the text at the trailing edge. Content gap 8px. Chips sit 12px apart; below 380px wide, use an 8px gap and a 12px trailing inset so all three colours fit in DE and EN. The swatch has no border ring when selected. Before a colour is chosen the live preview is a neutral ball, not beige. Step-1 groups (colour, finish, name, photos, note) are 32px apart; field errors share the Field error style (600 weight). The finish help is a 24px outlined “?” inside a 44px target that does not change the label height; its text opens as a muted hint on its own line. |
 | States | CMP0. Checked hint becomes white. Disabled choices stay visible with reason. Invalid group associates one error and focuses its first enabled choice. Hover/focus preview may update illustration temporarily; it must not change price, submitted choice or checked state. |
 | Spacing/usage | Chip gap 12px (`--space-3`) in both directions, the same as choice cards. Group gap 32px. Legend→options 8px. Prefer one row of wrapping labelled swatches, not a colour-only picker. Never render the check column empty or collapse options without a specific “Change colour” action. |
 
@@ -393,6 +393,8 @@ Paths below are relative to `frontend/src/`. **Existing** is the current impleme
 | States/do/don't | Card itself is static, unless explicitly a ChoiceCard. Changed row may fade once (200ms); it must not become selected green. Show ornament, colour + finish, pet, separate name surcharge, delivery, contact and totals accurately. Fixed order facts in `/form` are read-only with explicit text, not disabled controls. No live preview buttons or duplicated disclaimer in review. |
 
 ### 7.10 Multiple-item tabs and add action
+
+> **Owner decision 2026-11-11 (supersedes the tab toolbar and the 2026-11-08 card list):** with two or more ornaments the picker is a wrapping grid of tiles in `components/public/OrnamentOverview.tsx` (mini ornament, pet name or “Kugel n”, price; C1 on the open one; dashed “+ Kugel” tile). Tiles are buttons with `aria-current`, not tabs; the colour/finish/name summary is visually hidden text. Tapping a tile swaps the editor in place. Removal is a 48px trash button beside the editor heading with an accessible name (“Kugel 2 entfernen”) and an undo notice. The table below is kept for history.
 
 **Implementation:** `BuyPage.tsx` `.itemTabs`/`optionsPane` and `BuyItemsStep.tsx`; proposed `components/public/ItemTabs.tsx`.
 
@@ -462,7 +464,7 @@ Paths below are relative to `frontend/src/`. **Existing** is the current impleme
 
 | Contract | Rule |
 |---|---|
-| Anatomy/sizes | Stage, ornament, side selector when relevant, one honest disclaimer. Mobile art max-height 140px, desktop width max 280px, review 76px, success 150px; reserve aspect ratio. Use colour/finish/name tokens in §2.4. Caption hint role, 8px from side control. |
+| Anatomy/sizes | Stage, ornament, side selector when relevant, one honest disclaimer. Mobile art max-height 140px, tablet max-height 220px from 768–1023px, desktop width max 280px, review 76px, success 150px; reserve aspect ratio. Use colour/finish/name tokens in §2.4. Caption hint role, 8px from side control. |
 | States | Unconfigured placeholder explicitly labelled; hover/focus on enabled choices temporarily previews without committing; pointer leave/blur restores. Committed colour updates instantly with 200ms layered opacity transition. Back-name enable may flip once for 450ms; name updates immediately as typed. Button states come from SegmentedControl. No disabled fake product; invalid choices remain explained beside controls. |
 | Do/don't | Interactive variant has accessible description naming colour, finish and side; static review variant has no hidden buttons, no repeated disclaimer and no motion. Cat/dog illustrations alternate via 200ms fade on a 10s cycle, paused on interaction; §8 requires a pause mechanism for continuing motion. Never present an uploaded photo as painting. No idle sway in task UI. |
 
@@ -482,7 +484,7 @@ Paths below are relative to `frontend/src/`. **Existing** is the current impleme
 
 | Contract | Rule |
 |---|---|
-| Anatomy/sizes | Reserved final geometry + neutral disabled-surface shape; `aria-hidden` skeleton, container `aria-busy`, one localized `role=status` sentence. Ornament loader may be 36px artwork inside a 64px reserved region (new tokens `--size-loader-art:36px`, `--size-loader-region:64px`). |
+| Anatomy/sizes | Reserved final geometry + neutral disabled-surface shape; `aria-hidden` skeleton, container `aria-busy`, one localized `role=status` sentence. Ornament loader (2026-11-11) reuses the opening curtain's art: two pet baubles (`PetBauble.tsx`, cat and dog) swinging on threads plus four pastel dots. `variant="screen"` is the full-height route fallback on the bare sky (no fixed layer, caption right under the baubles on the blue sky, white text); `variant="inline"` is 56px baubles on short grey threads inside a card. One `role=status` with its text as the only accessible name (no `aria-label`). |
 | States | Busy versus timeout/failure; no fabricated hover/focus/pressed/selected/disabled. Skeleton is static by default; optional 200ms entrance fade, no continuous shimmer. Actual actions retain their focus and dimensions. |
 | Do/don't | Do not delay resolved data for a decorative animation. Never put an empty status region on screen with no loading text. Hide old skeleton semantics after content arrives. |
 

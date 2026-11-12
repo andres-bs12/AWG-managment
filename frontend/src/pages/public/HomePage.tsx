@@ -33,17 +33,11 @@ export function HomePage() {
       </div>
 
       <div className={styles.ctas}>
-        {/* One primary action (order), tracking is secondary. Icons: Lucide shopping-bag and truck (ISC). */}
-        <ButtonLink to="/buy" size="lg" fullWidth className={styles.cta}>
-          <svg className={styles.ctaIcon} viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M16 10a4 4 0 0 1-8 0" /><path d="M3.103 6.034h17.794" /><path d="M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z" />
-          </svg>
+        {/* One primary action (order), tracking is secondary. Text only: the scene is the illustration. */}
+        <ButtonLink to="/buy" size="lg" fullWidth>
           {t('buyCta')}
         </ButtonLink>
-        <Button variant="secondary" size="lg" fullWidth className={styles.cta} onClick={() => setDialogOpen(true)}>
-          <svg className={styles.ctaIcon} viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" /><path d="M15 18H9" /><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14" /><circle cx="17" cy="18" r="2" /><circle cx="7" cy="18" r="2" />
-          </svg>
+        <Button variant="secondary" size="lg" fullWidth onClick={() => setDialogOpen(true)}>
           {t('trackCta')}
         </Button>
       </div>

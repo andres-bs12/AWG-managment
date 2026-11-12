@@ -2,9 +2,9 @@
   /**
    * The stall width drives the whole scene: the street, houses and villagers are all sized from it,
    * so their proportions hold on every screen. The svh term is the height left after the copy,
-   * buttons and chrome; 1.08 converts that height into a width for the stall plus its street.
+   * buttons, wrapping legal footer and chrome; 1.08 converts that height into a width for the stall plus its street.
    */
-  --stall-w: min(520px, 88vw, calc((100svh - 268px) * 1.08));
+  --stall-w: min(520px, 88vw, calc((100svh - var(--layout-home-reserve)) * 1.08));
   --street-h: calc(var(--stall-w) * 0.13);
   position: relative;
   z-index: 2;
@@ -79,19 +79,6 @@
   animation: riseIn 0.6s 0.2s var(--scene-ease) both;
 }
 
-.cta { gap: var(--space-2); }
-
-.ctaIcon {
-  flex: none;
-  width: var(--size-icon);
-  height: var(--size-icon);
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 /**
  * Short portrait phones: trade title size, gaps and stall height so the copy, both CTAs *and* the
  * footer line all stay on screen without a scroll.
@@ -115,7 +102,7 @@
   }
 
   .hero {
-    --stall-w: min(520px, 88vw, calc((100svh - 380px) * 1.08));
+    --stall-w: min(520px, 88vw, calc((100svh - var(--layout-home-short-reserve)) * 1.08));
   }
 }
 

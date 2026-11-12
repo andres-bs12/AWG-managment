@@ -87,6 +87,25 @@
   background: var(--snow-2);
 }
 
+/* Public controls use the public roles; staff retains its own button skin. */
+:global([data-public-shell]) .btn {
+  min-height: var(--size-control);
+  padding-inline: var(--space-4);
+  font: var(--type-button-weight) var(--type-button-size)/var(--type-button-line) var(--font-sans);
+  letter-spacing: var(--type-button-tracking);
+}
+
+:global([data-public-shell]) .btn.lg { min-height: var(--touch-lg); }
+
+:global([data-public-shell]) .secondary {
+  border-color: var(--color-control-border);
+}
+
+:global([data-public-shell]) .secondary:hover:not(:disabled),
+:global([data-public-shell]) .secondary:active:not(:disabled) {
+  background: var(--color-selection-hover);
+}
+
 .staff.secondary {
   background: var(--staff-surface);
   color: var(--staff-ink);

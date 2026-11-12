@@ -65,8 +65,8 @@ test('confirms only after Track changes from unpaid to paid, then copies and lin
     if (state === 'unpaid') unpaidResponses++
   })
   await showThanks(page)
-  await expect(page.getByRole('heading', { name: 'Zahlung wird bestätigt…' })).toBeVisible()
-  await expect(page.getByRole('status').filter({ hasText: 'Zahlung wird bestätigt…' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Deine Zahlung wird geprüft' })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: 'Das dauert meist nur ein paar Sekunden.' })).toBeVisible()
   await expect.poll(() => unpaidResponses).toBeGreaterThan(0)
   await expect(page.getByRole('heading', { name: 'Danke für deine Bestellung!' })).toHaveCount(0)
   await expect(page.getByRole('listitem').filter({ hasText: /^Bezahlt/ })).toHaveCount(0)
@@ -75,10 +75,10 @@ test('confirms only after Track changes from unpaid to paid, then copies and lin
 
   paid = true
   await expect(page.getByRole('heading', { name: 'Danke für deine Bestellung!' })).toBeVisible({ timeout: 10_000 })
-  await expect(page.getByRole('heading', { name: 'Zahlung wird bestätigt…' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Deine Zahlung wird geprüft' })).toHaveCount(0)
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('awg-buy-draft'))).toBeNull()
   const timeline = page.getByRole('list').filter({ has: page.getByRole('listitem').filter({ hasText: /^Bezahlt/ }) })
-  await expect(timeline.getByRole('listitem')).toHaveText(['Bezahlt ✓', 'Wird gemalt', /Lieferung.*2\. Dezember 2026.*18–20 Uhr/])
+  await expect(timeline.getByRole('listitem')).toHaveText(['Bezahlt ✓', 'Wird gemalt', /Lieferung.*2\.\sDezember\s2026.*18–20\sUhr/])
   await expect(page.getByRole('link', { name: 'Bestellung verfolgen', exact: true })).toHaveAttribute('href', `/track/${code}`)
   await page.getByRole('button', { name: 'Code kopieren', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Code kopiert' })).toBeVisible()
@@ -97,12 +97,12 @@ for (const response of ['unpaid', 'stalled'] as const) {
       // The stalled case deliberately leaves the request pending until teardown.
     })
     await showThanks(page)
-    await expect(page.getByRole('heading', { name: 'Zahlung wird bestätigt…' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Deine Zahlung wird geprüft' })).toBeVisible()
     await expect.poll(() => requests).toBeGreaterThan(0)
-    const fallback = page.getByRole('status').filter({ hasText: 'Wir konnten deine Zahlung noch nicht bestätigen.' })
+    const fallback = page.getByRole('status').filter({ hasText: 'Die Bestätigung dauert länger als sonst.' })
     await expect(fallback).toHaveCount(0)
     await page.clock.fastForward(60_001)
-    await expect(fallback).toHaveText('Wir konnten deine Zahlung noch nicht bestätigen. Bitte prüfe deine Bestellung gleich in Track.')
+    await expect(fallback).toHaveText('Die Bestätigung dauert länger als sonst. Heb deinen Code auf und sieh in ein paar Minuten unter „Bestellung verfolgen“ nach.')
     await expect(page.getByRole('listitem').filter({ hasText: /^Bezahlt/ })).toHaveCount(0)
     await expect(page.getByRole('group', { name: 'Wie einfach war die Bestellung?' })).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'Bestellung verfolgen', exact: true })).toHaveAttribute('href', `/track/${code}`)
@@ -168,11 +168,8 @@ for (const transport of ['http', 'mock'] as const) {
 test('cancelled checkout says nothing was charged and restores the saved design', async ({ page }) => {
   await open(page)
   await choose(page)
-  if (mobile(page)) await next(page).click()
   await page.getByRole('radio', { name: /^(Ja|Yes),/ }).check()
   await page.locator('input[id^="back-"]').fill('LUNA')
-  if (mobile(page)) await next(page).click()
-  await page.locator('input[id^="pet-"]').fill('Luna')
   await page.locator('input[type=file]').setInputFiles(photo)
   await expect(page.getByRole('img', { name: 'Foto 1 von Luna', exact: true })).toBeVisible()
   await page.locator('summary').filter({ hasText: 'Notiz für Gaby' }).click()
@@ -189,11 +186,8 @@ test('cancelled checkout says nothing was charged and restores the saved design'
   await expect(page.getByRole('status').filter({ hasText: 'nichts abgebucht' })).toBeVisible()
   await expect(page.getByRole('radio', { name: 'Rot', exact: true })).toBeChecked()
   await expect(page.getByRole('radio', { name: 'Glänzend', exact: true })).toBeChecked()
-  if (mobile(page)) await next(page).click()
   await expect(page.getByRole('radio', { name: /^(Ja|Yes),/ })).toBeChecked()
   await expect(page.locator('input[id^="back-"]')).toHaveValue('LUNA')
-  if (mobile(page)) await next(page).click()
-  await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
   await page.locator('summary').filter({ hasText: 'Notiz für Gaby' }).click()
   await expect(page.locator('textarea[id^="note-"]')).toHaveValue('Keep the white whiskers')
   await expect(page.getByRole('status').filter({ hasText: 'Fotos können nach dem Neuladen' })).toBeVisible()
@@ -236,7 +230,6 @@ for (const transport of ['http', 'mock'] as const) {
       name: 'Clara Privatprobe', email: 'clara.privatprobe@example.com', street: 'Privatprobegasse 47',
       pet: 'Sternenpfote', note: 'Please paint the tiny silver spot on the left ear',
     }
-    await page.locator('input[id^="pet-"]').fill(personal.pet)
     await page.locator('summary').filter({ hasText: 'Notiz für Gaby' }).click()
     await page.locator('textarea[id^="note-"]').fill(personal.note)
     await delivery(page)

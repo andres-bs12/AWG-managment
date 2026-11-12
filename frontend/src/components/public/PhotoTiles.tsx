@@ -19,6 +19,7 @@ export function PhotoTiles({ uid, petName, photos, needsReload, error, fileError
   const count = useRef<HTMLParagraphElement>(null)
   const focusPending = useRef(false)
   const id = `photos-${uid}`
+  const showWarning = !needsReload && photos.some(photo => photo.dataUrl.startsWith('data:'))
   // Restore after React commits the tiles: at the limit the add button is removed.
   // A frame callback can focus the old button just before that removal and lose focus.
   useLayoutEffect(() => {
@@ -27,7 +28,7 @@ export function PhotoTiles({ uid, petName, photos, needsReload, error, fileError
     const target = add.current ?? count.current
     target?.focus()
   }, [photos, reading])
-  const description = [`${id}-hint`, `${id}-count`, needsReload ? `${id}-reload` : '', error ? `${id}-error` : '', fileError ? `${id}-file-error` : ''].filter(Boolean).join(' ')
+  const description = [`${id}-hint`, `${id}-count`, needsReload ? `${id}-reload` : '', showWarning ? `${id}-warning` : '', error ? `${id}-error` : '', fileError ? `${id}-file-error` : ''].filter(Boolean).join(' ')
   return <div id={`photos-block-${uid}`} className={styles.block} role="group" aria-labelledby={`${id}-label`} aria-describedby={description} tabIndex={-1} aria-busy={reading}>
     <p className={styles.label} id={`${id}-label`}>{t('formPhotos')}</p>
     <p className={styles.hint} id={`${id}-hint`}>{t('shopPhotosHint')} {t('photoFormats')}</p>
@@ -42,7 +43,8 @@ export function PhotoTiles({ uid, petName, photos, needsReload, error, fileError
       </span>)}
       {photos.length < MAX_PHOTOS && <button ref={add} type="button" id={id} className={styles.add} aria-label={t('addPhotoCount', { n: photos.length, max: MAX_PHOTOS })} aria-describedby={description} aria-invalid={!!error || !!fileError} aria-disabled={reading} aria-busy={reading} onClick={() => { if (!busy.current) picker.current?.click() }}>{reading ? <span className={styles.reading}>{t('photoReading')}</span> : '+'}</button>}
     </div>
-    <p ref={count} id={`${id}-count`} className={styles.count} role="status" tabIndex={-1}>{reading ? t('photoReading') : t('shopPhotosCount', { n: photos.length, max: MAX_PHOTOS })}{!needsReload && photos.some(photo => photo.dataUrl.startsWith('data:')) && <> · {t('shopPhotosWarningShort')}</>}</p>
+    <p ref={count} id={`${id}-count`} className={styles.count} role="status" tabIndex={-1}>{reading ? t('photoReading') : t('shopPhotosCount', { n: photos.length, max: MAX_PHOTOS })}</p>
+    {showWarning && <p id={`${id}-warning`} className={styles.warning}>{t('shopPhotosWarningShort')}</p>}
     <input ref={picker} id={`gallery-${uid}`} className="visually-hidden" type="file" accept="image/*" multiple tabIndex={-1} aria-hidden="true" onChange={event => {
       const files = Array.from(event.target.files ?? [])
       event.target.value = ''

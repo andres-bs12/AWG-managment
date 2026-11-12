@@ -25,10 +25,10 @@ export async function chooseFirstDate(page: Page) {
   await expect(radio).toBeChecked()
 }
 export async function pet(page: Page, name = 'Luna') {
-  if (mobile(page)) { await next(page).click(); await next(page).click() }
-  await page.locator('input[id^="pet-"]').fill(name)
+  // There is no pet-name field: a name is only asked for when it is painted on the back.
+  void name
   await page.locator('input[type=file]').setInputFiles(photo)
-  await expect(page.locator('img[alt*="Luna"], img[alt*="Max"]')).toBeVisible()
+  await expect(page.locator('img[alt^="Foto 1"], img[alt^="Photo 1"]')).toBeVisible()
 }
 export async function delivery(page: Page) {
   await next(page).click()

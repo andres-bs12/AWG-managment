@@ -4,7 +4,15 @@
  */
 .backdrop {
   position: fixed;
-  inset: 0;
+  /*
+   * Fixed size, not `inset: 0`: on phones the fixed viewport grows when the browser bars slide
+   * away, which resized the whole scene while scrolling. The layer always covers the largest
+   * viewport; the scene inside keeps the smallest one and the rest continues as snow.
+   */
+  inset: 0 0 auto;
+  height: 100vh;
+  height: 100lvh;
+  background: var(--snow-shade);
   overflow: hidden;
   pointer-events: none;
   /*
@@ -16,6 +24,14 @@
   z-index: -2;
   /** Isolates the scenery so its animations never trigger layout or paint in the page above. */
   contain: layout paint;
+}
+
+/* Everything in the scene is placed in percentages of this box, which never changes size. */
+.scene {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 100vh;
+  height: 100svh;
 }
 
 /** One gradient for the whole sky with many close stops, so no band edge is ever visible. */

@@ -10,7 +10,7 @@ export const DELIVERY_WINDOW_END_HOUR = 20
 
 /** '18–20 Uhr' / '6–8 pm'. */
 export function deliveryWindowLabel(locale: Locale): string {
-  return locale === 'de' ? '18–20 Uhr' : '6–8 pm'
+  return locale === 'de' ? '18–20\u00a0Uhr' : '6–8\u00a0pm'
 }
 
 /** Clock part for an ICS time value: 18 → '180000'. */

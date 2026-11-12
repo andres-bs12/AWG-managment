@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { axe, choose, expectActionClearance, mobile, next, open, pet } from './helpers'
 
 const copy = {
-  de: { market: 'Abholung am Markt', vienna: 'Lieferung in Wien', time: 'Bitte wähle, wann du kommst.', edit: 'Lieferung ändern', pickup: 'Abholung' },
+  de: { market: 'Abholung am Markt', vienna: 'Lieferung in Wien', time: 'Wähle, wann du kommst.', edit: 'Lieferung ändern', pickup: 'Abholung' },
   en: { market: 'Pick up at the market', vienna: 'Delivery in Vienna', time: 'Please choose when you will come.', edit: 'Change delivery', pickup: 'Pickup' },
 } as const
 
@@ -58,7 +58,7 @@ for (const locale of ['de', 'en'] as const) {
     expect(sent).toEqual({
       customerName: 'Alex Example', email: 'alex@example.com', phone: '123456789',
       deliveryKind: 'market', pickupTime: '15:30', deliveryDate: date, acceptTerms: true,
-      items: [{ kind: 'custom', withName: false, color: 'red', finish: 'shiny', petName: 'Luna', photos: 1 }],
+      items: [{ kind: 'custom', withName: false, color: 'red', finish: 'shiny', petName: '', photos: 1 }],
     })
     // The handoff step shows what on one line and where/when on the next.
     await expect(page.locator('main li').filter({ hasText: copy[locale].pickup })).toContainText('Rathausplatz')
@@ -98,8 +98,12 @@ test('the mobile action bar spans the card and merges with its end', async ({ pa
   await expect.poll(async () => (await geometry()).stuck).toBe(false)
   let box = await geometry()
   expect([box.left, box.right]).toEqual([box.cardLeft, box.cardRight])
-  expect(box.bottom).toBe(page.viewportSize()!.height)
-  expect(box.radius[1]).toBe('0px')
+  // While floating the bar sits one --space-2 above the screen edge with every corner rounded,
+  // so iOS Safari keeps its bottom toolbar glass.
+  const float = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('[data-public-page]')!).getPropertyValue('--space-2')))
+  expect(float).toBeGreaterThan(0)
+  expect(box.bottom).toBe(page.viewportSize()!.height - float)
+  expect(box.radius[1]).not.toBe('0px')
   await expectActionClearance(page)
   await page.evaluate(() => window.scrollTo(0, document.scrollingElement!.scrollHeight))
   await expect(bar).toHaveAttribute('data-stuck', 'true')

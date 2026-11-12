@@ -16,3 +16,7 @@
 .swatch[data-color='green'] { background: var(--ornament-green); }
 
 .seg[data-selected='true'][data-disabled='true'] { font-weight: 400; border-color: var(--color-control-border); }
+
+/* Public help can occupy its own full-width line below the legend. */
+:global([data-public-shell]) .legend { flex-wrap: wrap; }
+:global([data-public-shell]) .help { display: contents; }

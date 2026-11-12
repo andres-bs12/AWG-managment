@@ -586,3 +586,39 @@ export function Sprout({ className }: Props) {
     </svg>
   )
 }
+
+/** Wooden sled loaded with wrapped presents, ready for the reindeer next to it. */
+export function Sled({ className }: Props) {
+  return (
+    <svg className={className} viewBox="0 0 72 48" aria-hidden="true" focusable="false">
+      <ellipse cx="36" cy="45.6" rx="30" ry="2" fill="#3a5a96" opacity="0.18" />
+      {/* presents */}
+      <rect x="14" y="14" width="20" height="16" rx="2.5" fill="#e0473f" />
+      <rect x="22" y="14" width="4" height="16" fill="#ffd166" />
+      <path d="M24 14 q-5 -6 -8 -2 q3 3 8 2 q5 1 8 -2 q-3 -4 -8 2 Z" fill="#ffd166" />
+      <rect x="34" y="18" width="16" height="12" rx="2.5" fill="#4a7ab5" />
+      <rect x="40.4" y="18" width="3.2" height="12" fill="#f7fbff" />
+      <rect x="25" y="5" width="15" height="11" rx="2.5" fill="#2fae6a" />
+      <rect x="31" y="5" width="3" height="11" fill="#fff6e2" />
+      {/* deck, posts and the curled runner */}
+      <rect x="8" y="29" width="48" height="5" rx="2.5" fill="#b86f30" />
+      <rect x="8" y="29" width="48" height="2" rx="1" fill="#e2a964" />
+      <path d="M16 34 V41 M46 34 V41" stroke="#7d4419" strokeWidth="3" strokeLinecap="round" />
+      <path d="M6 42 H56 Q66 42 66 33 Q66 28 61 28" stroke="#e0473f" strokeWidth="3.4" fill="none" strokeLinecap="round" />
+      <path d="M56 31.4 Q61 31.4 63 28.6" stroke="#7d4419" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/** A few rolled snowballs: the snowman is still being built. */
+export function Snowballs({ className }: Props) {
+  return (
+    <svg className={className} viewBox="0 0 40 24" aria-hidden="true" focusable="false">
+      <ellipse cx="20" cy="22" rx="17" ry="1.8" fill="#3a5a96" opacity="0.16" />
+      <circle cx="12" cy="14" r="8" fill="#f6f9ff" stroke="#cfdcef" strokeWidth="1" />
+      <circle cx="27" cy="16.4" r="5.6" fill="#f6f9ff" stroke="#cfdcef" strokeWidth="1" />
+      <circle cx="20" cy="7" r="4" fill="#f6f9ff" stroke="#cfdcef" strokeWidth="1" />
+      <path d="M5.4 16 A8 8 0 0 0 14 21.8 A9 9 0 0 1 5.4 16 Z" fill="#dbe6f5" />
+    </svg>
+  )
+}

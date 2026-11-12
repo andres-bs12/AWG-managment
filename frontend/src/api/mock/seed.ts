@@ -13,7 +13,7 @@ import { mockPricing } from './pricing'
 
 export const DEMO_NOW_HOUR = 15 + 10 / 60
 /** Bump when demo orders change. load() reseeds if revision mismatches. */
-export const SEED_REVISION = 12
+export const SEED_REVISION = 13
 export const STORAGE_KEY = `awg-mock-store-v${SEED_REVISION}`
 
 export const STAFF_ACCOUNTS: Array<StaffUser & { password: string }> = [
@@ -130,6 +130,8 @@ export function createSeed(): MockState {
       id: 'orn-100',
       orderId: 'ord-100',
       kind: 'custom',
+      color: 'red',
+      finish: 'shiny',
       petName: 'Milo',
       withName: true,
       backName: 'MILO',
@@ -147,6 +149,8 @@ export function createSeed(): MockState {
       id: 'orn-101',
       orderId: 'ord-101',
       kind: 'custom',
+      color: 'red',
+      finish: 'shiny',
       petName: 'Bruno',
       withName: false,
       backName: '',
@@ -161,6 +165,8 @@ export function createSeed(): MockState {
       id: 'orn-102',
       orderId: 'ord-102',
       kind: 'custom',
+      color: 'red',
+      finish: 'shiny',
       petName: 'Nala',
       withName: true,
       backName: 'NALA',
@@ -175,6 +181,8 @@ export function createSeed(): MockState {
       id: 'orn-103',
       orderId: 'ord-103',
       kind: 'custom',
+      color: 'red',
+      finish: 'shiny',
       petName: 'Anna',
       withName: true,
       backName: 'ANNA',
@@ -193,6 +201,8 @@ export function createSeed(): MockState {
       id: 'orn-104',
       orderId: 'ord-104',
       kind: 'custom',
+      color: 'red',
+      finish: 'shiny',
       petName: 'Otto',
       withName: true,
       backName: 'OTTO',
@@ -211,6 +221,8 @@ export function createSeed(): MockState {
       id: 'orn-105',
       orderId: 'ord-105',
       kind: 'custom',
+      color: 'red',
+      finish: 'shiny',
       petName: 'Lena',
       withName: true,
       backName: 'LENA',
@@ -229,6 +241,8 @@ export function createSeed(): MockState {
       id: 'orn-106',
       orderId: 'ord-106',
       kind: 'custom',
+      color: 'red',
+      finish: 'shiny',
       petName: 'Felix',
       withName: false,
       backName: '',
@@ -243,6 +257,8 @@ export function createSeed(): MockState {
       id: 'orn-107a',
       orderId: 'ord-107',
       kind: 'custom',
+      color: 'red',
+      finish: 'shiny',
       petName: 'Pip',
       withName: true,
       backName: 'PIP',
@@ -257,6 +273,8 @@ export function createSeed(): MockState {
       id: 'orn-107b',
       orderId: 'ord-107',
       kind: 'custom',
+      color: 'red',
+      finish: 'shiny',
       petName: 'Dot',
       withName: false,
       backName: '',
@@ -271,6 +289,8 @@ export function createSeed(): MockState {
       id: 'orn-wait',
       orderId: 'ord-wait',
       kind: 'custom',
+      color: 'red',
+      finish: 'shiny',
       petName: '',
       withName: true,
       backName: '',

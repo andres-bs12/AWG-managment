@@ -1,6 +1,13 @@
 .form { display: grid; gap: var(--space-5); }
 .form > nav { margin: 0; }
 .step { display: grid; gap: var(--space-5); min-width: 0; }
+.stepHeader { display: grid; gap: var(--space-2); }
+.details { display: grid; gap: var(--space-6); min-width: 0; }
+.ornaments { display: grid; gap: var(--space-5); min-width: 0; }
+.contact { min-width: 0; padding-top: var(--space-5); border-top: var(--border-thin) solid var(--color-border); }
+.reviewActions { flex-direction: column; }
+.form .reviewActions > button { flex: none; width: 100%; }
+@media (min-width: 768px) { .reviewActions { flex-direction: row; } .form .reviewActions > button { flex: 1; width: auto; } .form .reviewActions > .back { order: -1; } }
 .step h2 { margin: 0; font-family: var(--font-display); font-size: var(--type-h2-size); line-height: var(--type-h2-line); font-weight: var(--type-h2-weight); letter-spacing: var(--type-h2-tracking); }
 .step h2:focus { outline: none; box-shadow: none; }
 .item { display: grid; gap: var(--space-5); min-width: 0; }
@@ -13,7 +20,7 @@
 .facts > div { display: flex; gap: var(--space-2); }
 .facts dt { color: var(--color-text-muted); }
 .facts dd { margin: 0; font-weight: var(--type-label-weight); }
-.muted { margin: 0; color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
+.muted { text-wrap: pretty; margin: 0; color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
 .review { display: grid; gap: var(--space-4); }
 .review > section { margin: 0; }
 .reviewProduct { display: grid; grid-template-columns: var(--size-review-art) minmax(0, 1fr) max-content; gap: var(--space-3); align-items: center; }
@@ -30,3 +37,5 @@
 .form :is(input, textarea, button, summary, [tabindex]) { scroll-margin-block: var(--space-5); }
 @media (min-width: 1024px) { .editor { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); } }
 
+/* Phones at the stall: a compact ornament keeps the first field on the same screen. */
+@media (max-width: 767px) { .preview svg { max-height: var(--size-preview-mobile); } }

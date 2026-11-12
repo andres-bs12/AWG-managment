@@ -31,6 +31,7 @@ export function TrackPage() {
   // Arriving from the QR form: confirm the save once, here where the order state is shown.
   const formSaved = !!(useLocation().state as { formSaved?: boolean } | null)?.formSaved
   const timers = useRef<number[]>([])
+  const dialogOpener = useRef<HTMLButtonElement | null>(null)
 
   const [fetchPhase, setPhase] = useState<Phase>(codeParam ? 'checking' : 'idle')
   const [reloadKey, setReloadKey] = useState(0)
@@ -50,6 +51,7 @@ export function TrackPage() {
 
     let cancelled = false
     setPhase('checking')
+    setDialogOpen(false)
     setLoaded(null)
     setError('')
     setEditing(false)
@@ -78,11 +80,11 @@ export function TrackPage() {
       .catch((err) => {
         if (cancelled) return
         setLoaded(null)
-        // The heading already says the code did not match; the line below only says what to do.
+        // Name the code that was looked up, so a typo is easy to spot.
         const notFound = !(err && typeof err === 'object' && 'code' in err) || (err as { code?: string }).code === 'ORDER_NOT_FOUND'
-        setError(notFound ? t('trackNotFound') : apiError(err, locale, t('trackNotFound')).text)
+        setError(notFound ? t('trackMissBody', { code: codeParam.toUpperCase() }) : apiError(err, locale, t('trackNotFound')).text)
         setPhase('done')
-        setDialogOpen(true)
+        setDialogOpen(false)
       })
 
     return () => {
@@ -123,7 +125,7 @@ export function TrackPage() {
     status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
   const stepIndex = status === 'delivered' ? 2 : status === 'ready' ? 1 : 0
   const steps = [t('stepPainting'), t('ready'), t('stepHandover')]
-  /** Sleigh only after a hit — misses stay in the dialog without this animation. */
+  /** Sleigh only after a hit — misses use the page recovery state without this animation. */
   const showWipe = phase === 'loading' || phase === 'leaving'
 
   /** Two short lines: the slot the customer picked, then how long the stall is still around. */
@@ -205,7 +207,7 @@ export function TrackPage() {
                     </Button> : <p>{locale === 'de' ? 'Öffne deinen persönlichen Formularlink, um die Lieferadresse zu ändern.' : 'Open your personal form link to change the delivery address.'}</p>}
                   </>
                 ) : (
-                  <div>
+                  <div className={styles.addressFields}>
                     <Field label={t('street')} htmlFor="line1" error={addressField === 'line1' ? addressError : undefined}>
                       <input
                         id="line1"
@@ -240,10 +242,10 @@ export function TrackPage() {
             ) : null}
 
             <div className={styles.actions}>
-              <ButtonLink to="/" variant="secondary" className={styles.homeBtn}>
+              <ButtonLink to="/" variant="secondary">
                 {t('backHome')}
               </ButtonLink>
-              <button type="button" className={styles.another} onClick={() => setDialogOpen(true)}>
+              <button type="button" className={styles.another} onClick={event => { dialogOpener.current = event.currentTarget; setDialogOpen(true) }}>
                 {t('trackAnother')}
               </button>
             </div>
@@ -251,19 +253,19 @@ export function TrackPage() {
         </section>
       ) : null}
 
-      {!view && phase !== 'checking' && phase !== 'loading' && phase !== 'leaving' ? (
-        <section className={styles.card}>
-          <div className={styles.artSmall} aria-hidden="true">
+      {!view && (!!codeParam || !dialogOpen) && phase !== 'checking' && phase !== 'loading' && phase !== 'leaving' ? (
+        <section className={`${styles.card} ${error ? styles.emptyCard : ''}`}>
+          {!error && <div className={styles.artSmall} aria-hidden="true">
             <PaintingOrnament label={t('artPainting')} />
-          </div>
+          </div>}
           <div className={styles.details}>
             <h1 className={styles.title}>{error ? t('trackMissTitle') : t('trackTitle')}</h1>
             <p className={styles.sub}>{error || t('trackLead')}</p>
-            <Button size="lg" fullWidth className={styles.openBtn} onClick={() => setDialogOpen(true)}>
-              {t('trackOpen')}
+            <Button size="lg" fullWidth className={styles.openBtn} onClick={event => { dialogOpener.current = event.currentTarget; setDialogOpen(true) }}>
+              {t(error ? 'trackAnother' : 'trackOpen')}
             </Button>
             <div className={styles.actions}>
-              <ButtonLink to="/" variant="secondary" className={styles.homeBtn}>
+              <ButtonLink to="/" variant="secondary">
                 {t('backHome')}
               </ButtonLink>
             </div>
@@ -273,9 +275,9 @@ export function TrackPage() {
 
       {dialogOpen ? (
         <TrackDialog
+          openerRef={dialogOpener}
           onClose={() => setDialogOpen(false)}
           initialCode={codeParam ?? ''}
-          error={error}
           onSubmit={(next) => {
             setDialogOpen(false)
             setError('')

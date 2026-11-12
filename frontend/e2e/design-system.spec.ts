@@ -9,9 +9,10 @@ test('chips and side segments use the exact token geometry', async ({ page }) =>
     const token = (name: string) => parseFloat(root.getPropertyValue(name))
     const geometry = (selector: string, inset: string) => [...document.querySelectorAll<HTMLElement>(selector)].map(node => {
       const style = getComputedStyle(node)
-      return { blockStart: parseFloat(style.paddingTop), blockEnd: parseFloat(style.paddingBottom), innerGap: parseFloat(style.columnGap), height: node.getBoundingClientRect().height, left: parseFloat(style.paddingLeft), right: parseFloat(style.paddingRight), border: parseFloat(style.borderLeftWidth), expectedLeft: token(inset), expectedRight: token('--space-4'), expectedGap: token('--space-2') }
+      return { blockStart: parseFloat(style.paddingTop), blockEnd: parseFloat(style.paddingBottom), innerGap: parseFloat(style.columnGap), height: node.getBoundingClientRect().height, left: parseFloat(style.paddingLeft), right: parseFloat(style.paddingRight), border: parseFloat(style.borderLeftWidth), expectedLeft: token(inset), expectedRight: token(innerWidth < 380 ? '--space-3' : '--space-4'), expectedGap: token('--space-2') }
     })
-    return { size: token('--size-control'), gap: root.getPropertyValue('--space-3').trim(), chips: geometry('[class*="chipRow"] > label', '--space-3'), gaps: [...document.querySelectorAll('[class*="chipRow"]')].map(node => getComputedStyle(node).gap), shadows: [...document.querySelectorAll('[data-selected="true"] > [class*="swatch"]')].map(node => getComputedStyle(node).boxShadow) }
+    // Compact trailing insets and gaps keep the three colours together in both languages.
+    return { size: token('--size-control'), gap: root.getPropertyValue(innerWidth < 380 ? '--space-2' : '--space-3').trim(), chips: geometry('[class*="chipRow"] > label', '--space-3'), gaps: [...document.querySelectorAll('[class*="chipRow"]')].map(node => getComputedStyle(node).gap), shadows: [...document.querySelectorAll('[data-selected="true"] > [class*="swatch"]')].map(node => getComputedStyle(node).boxShadow) }
   })
   const values = await read()
   expect(values.size).toBe(48)
@@ -26,8 +27,8 @@ test('chips and side segments use the exact token geometry', async ({ page }) =>
   for (const chip of values.chips) expect(chip.innerGap).toBe(chip.expectedGap)
   for (const gap of values.gaps) expect(gap).toBe(values.gap)
   for (const shadow of values.shadows) expect(shadow).toBe('none')
-  if (mobile(page)) await next(page).click()
   await page.getByRole('radio', { name: /^(Ja|Yes),/ }).check()
+  await page.locator('input[id^="back-"]').fill('LUNA')
   const segments = page.getByRole('group', { name: /Seite der Kugel|Ornament side/ })
   const measured = await segments.evaluate(node => {
     const root = getComputedStyle(document.documentElement)
@@ -46,16 +47,17 @@ test('chips and side segments use the exact token geometry', async ({ page }) =>
 
 test('overview edit buttons keep the side choice per ornament', async ({ page }) => {
   await open(page); await choose(page)
-  if (mobile(page)) await next(page).click()
   await page.getByRole('radio', { name: /^Ja,/ }).check()
+  await page.locator('input[id^="back-"]').fill('LUNA')
   await page.getByRole('radio', { name: 'Vorne', exact: true }).locator('..').click()
   await page.getByRole('button', { name: 'Weitere Kugel hinzufügen', exact: true }).click()
-  await expect(page.locator('#ornament-editor-heading')).toBeFocused()
-  const first = page.getByRole('button', { name: 'Kugel 1 bearbeiten', exact: true })
+  await expect(page.locator('#buy-heading')).toBeFocused()
+  const first = page.getByRole('button', { name: 'Kugel 1 – Luna bearbeiten', exact: true })
   await first.focus(); await first.press('Enter')
-  // The ornament being edited has no Edit button of its own; the heading names it.
+  // The ornament being edited is marked in the picker; the heading names it.
   await expect(first).toHaveCount(0)
-  await expect(page.locator('#ornament-editor-heading')).toHaveText(/^Kugel 1 von 2/)
+  await expect(page.getByRole('button', { name: 'Kugel 1 – Luna, in Bearbeitung', exact: true })).toHaveAttribute('aria-current', 'true')
+  await expect(page.locator('#ornament-editor-heading')).toHaveText(/^Kugel 1\s+von\s+2/)
   await expect(page.getByRole('radio', { name: 'Vorne', exact: true })).toBeChecked()
   await expect(page.getByRole('tab')).toHaveCount(0)
   await expect(page.getByRole('tabpanel')).toHaveCount(0)
@@ -99,11 +101,8 @@ for (const locale of ['de', 'en'] as const) {
 
   test(`review uses precise edit actions and static artwork (${locale})`, async ({ page }) => {
     await open(page, locale); await choose(page)
-    if (mobile(page)) await next(page).click()
     await page.getByRole('radio', { name: /^(Ja|Yes),/ }).check()
     await page.locator('input[id^="back-"]').fill('LUNA')
-    // pet() starts at the first substep; return there without losing the name.
-    if (mobile(page)) await page.getByRole('button', { name: locale === 'de' ? 'Zurück' : 'Back', exact: true }).click()
     await pet(page); await review(page)
     // One "Ändern" per card, next to its title; its accessible name says what it opens.
     for (const name of locale === 'de' ? ['Kugel Luna ändern', 'Lieferung ändern', 'Kontakt ändern'] : ['Change ornament Luna', 'Change delivery', 'Change contact']) await expect(page.getByRole('button', { name, exact: true })).toBeVisible()

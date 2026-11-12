@@ -22,7 +22,7 @@ export function BuyReviewStep({ t, draft, config, itemPrice, formatDate, patch, 
   const day = pickup ? pickupDays.find(entry => entry.date === draft.deliveryDate) : undefined
   return <>
     {draft.items.map((item, index) => {
-      const title = `${t('ornamentN', { n: index + 1 })}${item.petName.trim() ? ` · ${item.petName.trim()}` : ''}`
+      const title = `${t('ornamentN', { n: index + 1 })}${item.petName.trim() ? ` – ${item.petName.trim()}` : ''}`
       return <ReviewCard key={item.uid} title={title} changed={changed === item.uid}
         action={{ label: t('change'), ariaLabel: t('editOrnamentNamed', { name: item.petName.trim() || title }), onClick: () => go(0, item.uid, 0, `color-${item.uid}`) }}
         rows={item.note.trim() ? [{ label: t('noteLabel'), value: item.note }] : []}>
@@ -41,8 +41,8 @@ export function BuyReviewStep({ t, draft, config, itemPrice, formatDate, patch, 
     <ReviewCard title={pickup ? t('methodMarket') : t('methodVienna')} changed={changed === 'delivery'}
       action={{ label: t('change'), ariaLabel: t('editDeliveryShort'), onClick: () => go(2, undefined, undefined, 'buy-date') }}
       rows={pickup ? [
+        ...(day ? [{ label: t('pickupWhere'), value: pickupPlace(day, t) }] : []),
         { label: t('yourDate'), value: day ? `${compactDate(day.date)} · ${t('timeOClock', { time: draft.pickupTime })}` : formatDate(draft.deliveryDate) },
-        ...(day ? [{ label: t('pickupDayHeading'), value: pickupPlace(day, t) }] : []),
       ] : [
         { label: t('yourDate'), value: draft.deliveryDate ? `${compactDate(draft.deliveryDate)} · ${t('eveningShort')}` : '' },
         { label: t('addressHeading'), value: <>{draft.line1}<br />{draft.line2 && <>{draft.line2}<br /></>}{draft.postalCode} Wien</> },
@@ -51,10 +51,10 @@ export function BuyReviewStep({ t, draft, config, itemPrice, formatDate, patch, 
       action={{ label: t('change'), ariaLabel: t('editContactShort'), onClick: () => go(3, undefined, undefined, 'buy-name') }}
       rows={[
         { label: t('yourName'), value: draft.customerName },
-        { label: t('email'), value: draft.email },
+        { label: t('email'), value: <span className={styles.reviewEmail}>{draft.email.slice(0, draft.email.indexOf('@') + 1)}<wbr />{draft.email.slice(draft.email.indexOf('@') + 1)}</span> },
         { label: t('phone'), value: draft.phone },
       ]} />
-    <section className={styles.reviewCard}><h3>{t('shopTotal')}</h3><dl className={styles.totals}><div><dt>{t(draft.items.length > 1 ? 'shopItemsTotal' : 'shopItemOne')}</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{deliveryFee ? formatEur(deliveryFee, locale) : t('shopFree')}</dd></div><div><dt>{t('shopTotal')}</dt><dd><strong>{formatEur(total, locale)}</strong></dd></div></dl></section>
+    <section className={`${styles.cart} ${styles.reviewCart}`} aria-labelledby="review-cart-heading"><h3 id="review-cart-heading">{t('shopCart')}</h3><dl><div><dt>{t(draft.items.length > 1 ? 'shopItemsTotal' : 'shopItemOne')}</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{deliveryFee ? formatEur(deliveryFee, locale) : t('shopFree')}</dd></div><div className={styles.cartTotal}><dt>{t('shopTotal')}</dt><dd>{formatEur(total, locale)}</dd></div></dl></section>
     <p className={styles.afterPayment}>{t(draft.items.length > 1 ? 'afterPaymentMany' : 'afterPaymentOne', { day: t(pickup ? 'afterPaymentPickupDay' : 'afterPaymentDeliveryDay') })}</p>
     <div className={styles.terms}><div className={styles.inset}><p>{t('personalisedNoReturn')}</p>{draft.items.some(item => item.withName) && <p>{t('nameNonRefund')}</p>}</div>
     <div className={styles.check}><input id="buy-terms" aria-labelledby="buy-terms-label" type="checkbox" checked={draft.acceptTerms} aria-invalid={!!err('buy-terms')} aria-describedby={described('buy-terms')} onChange={event => patch({ acceptTerms: event.target.checked })} /><label id="buy-terms-label" htmlFor="buy-terms">{t('shopTermsBefore')}<a href="/agb" target="_blank" rel="noopener noreferrer">{t('terms')}</a>{t('shopTermsAfter')} {t('shopPrivacyBefore')}<a href="/datenschutz" target="_blank" rel="noopener noreferrer">{t('privacy')}</a>.</label></div>

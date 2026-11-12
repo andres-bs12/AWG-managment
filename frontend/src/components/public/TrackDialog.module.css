@@ -12,8 +12,9 @@
   inset: 0;
   border: 0;
   padding: 0;
-  background: rgba(10, 18, 36, 0.62);
-  backdrop-filter: blur(4px);
+  /* A plain translucent layer (no backdrop-filter): iOS 26 Safari only dims its toolbars along
+     with the page for a childless dimming layer; a blurred one leaves them bright blue. */
+  background: var(--color-overlay);
   animation: fadeIn 0.22s ease both;
 }
 
@@ -31,7 +32,7 @@
   background: var(--public-surface);
   color: var(--public-ink);
   box-shadow: 0 26px 60px rgba(8, 16, 34, 0.42);
-  text-align: center;
+  text-align: left;
   animation: popIn 0.34s var(--pop-ease) both;
 }
 
@@ -42,15 +43,17 @@
   right: 0;
   height: 32px;
   border-radius: calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0;
-  background: linear-gradient(90deg, var(--green) 0%, var(--green-deep) 100%);
+  /* Sky blue like the scene behind the dialog; green stays reserved for the action. */
+  background: var(--sky-top);
   overflow: hidden;
 }
 
 .ribbonArt {
   position: absolute;
   left: 50%;
-  bottom: -16px;
-  width: 260px;
+  top: 0;
+  width: min(var(--size-preview-desktop), 100%);
+  height: 100%;
   transform: translateX(-50%);
   animation: ribbonSway 5s ease-in-out infinite;
 }
@@ -132,10 +135,11 @@
 }
 
 .hint {
-  margin: var(--space-2) auto 0;
+  margin: var(--space-2) 0 0;
   max-width: 34ch;
-  color: var(--public-muted);
-  font-size: var(--fs-body);
+  color: var(--color-text-muted);
+  font-size: var(--type-body-size);
+  text-wrap: pretty;
 }
 
 .form {
@@ -148,19 +152,19 @@
   font-size: var(--fs-body);
   font-weight: 700;
   letter-spacing: 0.12em;
-  text-align: center;
+  text-align: left;
   text-transform: uppercase;
 }
 
 .codeInput::placeholder {
-  color: #7a879a;
+  color: var(--color-text-muted);
   opacity: 1;
   font-weight: 600;
   letter-spacing: 0.08em;
 }
 
 .submit {
-  margin-top: var(--space-2);
+  margin-top: var(--space-5);
   background: var(--green);
 }
 

@@ -2,6 +2,12 @@
 
 ## Hecho
 
+- [x] 2026-11-12 · Public UI review follow-up: implemented findings 1–3 and 5–11; finding 4 and ContactFields were already fixed and left untouched. TypeScript/lint pass (existing warnings; 26 staff CSS contracts), plus 5 focus tests. Browser verification remains pending; no Playwright. See `tasks/public-ui-review-fixes-2026-11-12.md`.
+
+- [x] 2026-11-12 · Public QR form, Track and Home: implemented the 25 requested fixes; TypeScript, lint (existing warnings) and 40 Node tests pass. Playwright/browser and viewport checks remain pending per owner instruction. See `tasks/public-qr-track-home-fixes-2026-11-12.md` for the numbered file map.
+
+- [x] 2026-11-12 · Public `/buy` delivery, review and thanks: implemented fixes 1–18 and 20–21 (no fix 19 supplied), including full-row address errors, spacing/calendar limits, public action sizing/sticky states, review totals/copy and thanks loader/pluralization. TypeScript and lint pass with existing warnings. Browser/visual verification remains pending; no Playwright or ports used.
+- [x] 2026-11-12 · Public `/buy` step 1: implemented the 20 requested layout, label, control, photo, note, help and preview-state fixes. `npx tsc -b --noEmit` and lint pass (existing warnings); updated design-system E2E expectations. Browser/visual verification remains pending; no Playwright or ports used.
 - [x] 2026-11-09 · v1.2 local (sin subir): barras de Safari iOS 26 transparentes (WinterBackdrop/Snowfield con z-index negativo, ver AGENTS.md), scroll del documento con barra sticky en CSS, aviso de e-mail en gracias según `confirmationEmail`, barrido UX/copy a 360/1280 (Track sin inglés en alemán, `/form` sin «Kugel 1 von 1», singular/plural, «Abholtag» en recogida, vista previa por hover solo con ratón). Backend 107/107, Node 40/40, E2E 468 en verde, capturas regeneradas y revisadas.
 - [x] 2026-11-08 · Feedback del mercado: facturas por e-mail (V8), franja 18–20 h, flujo de varias Kugeln, textos en primera persona, alemán por defecto, gracias mínima con todas las Kugeln, valoración 1–5. Backend 105/105, Node 36/36, E2E 448 en verde, capturas regeneradas y revisadas.
 

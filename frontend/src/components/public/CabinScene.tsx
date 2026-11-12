@@ -1,3 +1,4 @@
+import { Painter, SittingCat, SittingDog } from './FlatFolk'
 import styles from './CabinScene.module.css'
 
 type Props = {
@@ -45,17 +46,6 @@ export function CabinScene({ title }: Props) {
           <circle cx="42" cy="276" r="2.6" fill="var(--gold)" />
           <circle cx="20" cy="282" r="2.2" fill="var(--gift-blue)" />
         </g>
-        {/* round snowy bushes and a little sprout on the right, so not every plant is a triangle */}
-        <g className={styles.pineRight}>
-          <circle cx="372" cy="306" r="18" fill="#2b6d5c" />
-          <circle cx="396" cy="302" r="22" fill="var(--pine-light)" />
-          <circle cx="414" cy="310" r="14" fill="#2b6d5c" />
-          <path d="M378 290 Q396 276 414 292 Q396 286 378 290 Z M360 296 Q370 288 382 296 Z" fill="#f2f8ff" />
-          <circle cx="388" cy="310" r="2.4" fill="var(--berry)" />
-          <circle cx="404" cy="302" r="2.4" fill="var(--berry)" />
-          <path d="M352 324 V312 M352 314 Q344 306 346 302 Q352 306 352 314 Q360 306 358 302 Q352 306 352 314" stroke="#2f7f86" strokeWidth="2.4" fill="#4aa3a8" strokeLinecap="round" />
-        </g>
-
         {/*
           Chimney steam. It leaves the mouth at y=44, right behind the chimney's snow lip, and is
           drawn before the cabin so the lip hides where each puff is born.
@@ -133,8 +123,6 @@ export function CabinScene({ title }: Props) {
             ))}
             <rect x="104" y="266" width="212" height="6" rx="3" fill="#7a4a23" />
             <g>
-              <rect x="112" y="246" width="30" height="20" rx="4" fill="var(--berry)" />
-              <rect x="124" y="246" width="6" height="20" fill="var(--gold)" />
               <rect x="152" y="250" width="26" height="16" rx="4" fill="var(--gift-blue)" />
               <rect x="162" y="250" width="6" height="16" fill="#f7fbff" />
               <circle cx="206" cy="256" r="10" fill="#2fae6a" />
@@ -228,12 +216,12 @@ export function CabinScene({ title }: Props) {
             <rect x="44" y="306" width="36" height="7" fill="var(--gold)" />
             <path d="M62 296 l-6 -8 l6 3 l6 -3 Z" fill="var(--gold)" />
           </g>
-          <g>
-            <rect x="344" y="302" width="30" height="22" rx="4" fill="var(--gift-blue)" />
-            <rect x="356" y="302" width="7" height="22" fill="#f7fbff" />
-            <rect x="344" y="310" width="30" height="6" fill="#f7fbff" />
-          </g>
         </g>
+
+        {/* What the stall is about: the cat on the counter, the dog in front, Gaby painting an ornament. */}
+        <SittingCat x={96} y={236} width={40} height={40} />
+        <SittingDog x={84} y={281} width={46} height={46} />
+        <Painter x={350} y={248} width={69} height={79} />
       </svg>
     </div>
   )

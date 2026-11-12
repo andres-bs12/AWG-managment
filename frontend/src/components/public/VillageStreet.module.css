@@ -105,17 +105,17 @@
 }
 
 .walkElf {
-  width: max(24px, calc(var(--s) * 0.075));
+  width: max(30px, calc(var(--s) * 0.1));
   animation: strollRight 36s linear -8s infinite;
 }
 
 .walkNeighbour {
-  width: max(24px, calc(var(--s) * 0.075));
+  width: max(30px, calc(var(--s) * 0.1));
   animation: strollLeft 44s linear -26s infinite;
 }
 
 .cycle {
-  width: max(50px, calc(var(--s) * 0.15));
+  width: max(58px, calc(var(--s) * 0.19));
   animation: strollRight 15s linear -4s infinite;
 }
 
@@ -200,7 +200,7 @@
 }
 
 .elf {
-  width: calc(var(--s) * 0.075);
+  width: calc(var(--s) * 0.1);
 }
 
 /** Extra outer pieces on the front snow that only wide screens have room for. */
@@ -211,7 +211,7 @@
 /** Keeps clear of the button row in the middle (two buttons + gap ≈ 440–520px). */
 .front {
   top: calc(100% + 12px);
-  height: calc(var(--s) * 0.17);
+  height: calc(var(--s) * 0.2);
 }
 
 .frontLeft {
@@ -222,24 +222,27 @@
   left: calc(50% + 270px);
 }
 
-.bush {
-  width: calc(var(--s) * 0.12);
+.sled {
+  width: calc(var(--s) * 0.2);
+}
+.snowballs {
+  width: calc(var(--s) * 0.09);
+}
+.kid {
+  width: calc(var(--s) * 0.1);
 }
 
 .snowman {
-  width: calc(var(--s) * 0.08);
-}
-
-.sprout {
-  width: calc(var(--s) * 0.05);
-}
-
-.yeti {
   width: calc(var(--s) * 0.11);
 }
 
+
+.yeti {
+  width: calc(var(--s) * 0.13);
+}
+
 .reindeer {
-  width: calc(var(--s) * 0.16);
+  width: calc(var(--s) * 0.19);
 }
 
 @media (min-width: 1024px) {

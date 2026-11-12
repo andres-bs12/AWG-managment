@@ -10,11 +10,10 @@ for (const locale of ['de', 'en']) test(`checkout captures complete ${locale.toU
     api.shop.checkout = async (input: unknown) => { (window as unknown as { checkout: unknown }).checkout = input; return new Promise<never>(() => {}) }
   })
   await choose(page)
-  if (mobile(page)) await next(page).click()
   await page.getByRole('radio', { name: /^(Ja|Yes),/ }).check()
   await page.locator('input[id^="back-"]').fill('LUNA')
-  if (mobile(page)) await next(page).click()
-  await page.locator('input[id^="pet-"]').fill('Luna')
+  // A paid back name is also the pet's name: there is no second name field.
+  await expect(page.locator('input[id^="pet-"]')).toHaveCount(0)
   await page.locator('input[type=file]').setInputFiles(photo)
   await expect(page.locator('img[alt*="Luna"]')).toBeVisible()
   await review(page)
@@ -31,15 +30,11 @@ test('two ornaments retain independent choices', async ({ page }) => {
   await page.locator('#buy-add').click()
   await choose(page, /^(Rot|Red)$/, /^(Matt|Matte)$/)
   await pet(page, 'Max')
-  await page.getByRole('button', { name: 'Kugel 1 · Luna bearbeiten', exact: true }).click()
+  await page.getByRole('button', { name: 'Kugel 1 bearbeiten', exact: true }).click()
   await expect(page.getByRole('radio', { name: /^(Rot|Red)$/ })).toBeChecked()
   await expect(page.getByRole('radio', { name: /^(Glänzend|Shiny)$/ })).toBeChecked()
-  if (mobile(page)) { await next(page).click(); await next(page).click() }
-  await expect(page.locator('input[id^="pet-"]')).toHaveValue('Luna')
-  await page.getByRole('button', { name: 'Kugel 2 · Max bearbeiten', exact: true }).click()
+  await page.getByRole('button', { name: 'Kugel 2 bearbeiten', exact: true }).click()
   await expect(page.getByRole('radio', { name: /^(Matt|Matte)$/ })).toBeChecked()
-  if (mobile(page)) { await next(page).click(); await next(page).click() }
-  await expect(page.locator('input[id^="pet-"]')).toHaveValue('Max')
   await next(page).click()
   await expect(page.locator('#buy-date')).toBeVisible()
 })

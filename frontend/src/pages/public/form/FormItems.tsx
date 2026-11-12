@@ -42,12 +42,10 @@ export function FormItems({ items, draft, errors, photoErrors, patch, addFiles, 
       return <Card key={id}><div className={styles.item} onFocusCapture={() => setActiveId(id)}>
         {/* Same rule as /buy: "Kugel 1 von 1" and the name summary only help when there are several. */}
         <h3 id={`form-editor-${id}`} tabIndex={-1}>{items.length > 1 ? `${t('multiEditorHeading', { n: index + 1, total: items.length })}${item.petName.trim() ? ` – ${item.petName.trim()}` : ''}` : item.petName.trim() || t('formSingleOrnament')}</h3>
-        {items.length > 1 && <p className={styles.muted}>{source.withName ? item.backName.trim() ? t('multiNameValue', { name: item.backName }) : t('multiNamePending') : t('multiNoName')}</p>}
         <dl className={styles.facts}><div><dt>{t('shopColour')}</dt><dd>{source.color ? t(colorKeys[source.color]) : t('formFinishUnknown')}{(source.color === 'grey' || source.color === 'white') && <> · {t('legacyColour')}</>}</dd></div><div><dt>{t('shopFinish')}</dt><dd>{source.finish ? t(source.finish === 'shiny' ? 'finishShiny' : 'finishMatte') : t('formFinishUnknown')}</dd></div></dl>
         <div className={styles.editor}>
           <div className={styles.preview}><OrnamentPreview readOnly item={previewItem(source, item)} /></div>
           <div className={styles.fields}>
-            <Field label={t('petName')} htmlFor={`pet-${id}`} error={errors[`pet-${id}`]} announceError={false}><input id={`pet-${id}`} maxLength={60} value={item.petName} onBlur={() => validate(`pet-${id}`)} onChange={event => patch(id, { petName: event.target.value })} /></Field>
             {source.withName && <Field label={t('backName')} htmlFor={`back-${id}`} hint={t('formBackNameHint')} error={errors[`back-${id}`]} announceError={false}><input id={`back-${id}`} maxLength={6} value={item.backName} onBlur={() => validate(`back-${id}`)} onChange={event => patch(id, { backName: event.target.value })} /></Field>}
             <PhotoTiles uid={id} petName={item.petName} photos={item.photos} needsReload={item.photosNeedReload} error={errors[`photos-${id}`]} fileError={photoErrors[id]} announceErrors={false} onAdd={files => addFiles(id, files)} onRemove={photoId => patch(id, { photos: item.photos.filter(photo => photo.id !== photoId) })} />
             <OptionalNote id={`note-${id}`} value={item.note} onChange={note => patch(id, { note })} error={errors[`note-${id}`]} announceError={false} />
