@@ -92,6 +92,36 @@ class AgendaOrderApiTests extends ApiTestSupport {
     }
 
     @Test
+    void handoverTracksItemsAndOnlyStartsExpiryAfterTheLastItem() throws Exception {
+        String token = login();
+        String order = saleOk(token, finishedItem(), finishedItem());
+        MvcResult bundle = mvc.perform(get("/api/orders/" + order + "/bundle").header("Authorization", bearer(token))).andReturn();
+        String first = read(bundle, "$.items[0].id");
+        String second = read(bundle, "$.items[1].id");
+        mvc.perform(patch("/api/orders/" + order + "/handed-over").header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("handedOver", true, "itemIds", java.util.List.of(first)))))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/orders/" + order + "/bundle").header("Authorization", bearer(token)))
+                .andExpect(jsonPath("$.order.handedOver").value(false))
+                .andExpect(jsonPath("$.items[0].handedOver").value(true))
+                .andExpect(jsonPath("$.items[1].handedOver").value(false));
+        mvc.perform(patch("/api/orders/" + order + "/handed-over").header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("handedOver", true, "itemIds", java.util.List.of(second)))))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/orders/" + order + "/bundle").header("Authorization", bearer(token)))
+                .andExpect(jsonPath("$.order.handedOver").value(true))
+                .andExpect(jsonPath("$.order.handedOverAt").isNotEmpty());
+        mvc.perform(patch("/api/orders/" + order + "/handed-over").header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("handedOver", false, "itemIds", java.util.List.of(first)))))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/orders/" + order + "/bundle").header("Authorization", bearer(token)))
+                .andExpect(jsonPath("$.order.handedOver").value(false))
+                .andExpect(jsonPath("$.order.handedOverAt").doesNotExist())
+                .andExpect(jsonPath("$.items[0].handedOver").value(false))
+                .andExpect(jsonPath("$.items[1].handedOver").value(true));
+    }
+
+    @Test
     void handedOverBeforeFinishingIs409() throws Exception {
         String token = login();
         String order = saleOk(token, customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0));

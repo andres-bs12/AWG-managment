@@ -11,8 +11,8 @@ export function useItemStatus(bundle: Bundle | null, save: (itemId: string, stat
     if (!bundle || busy || unconfirmed) return
     const item = bundle.items.find(row => row.id === itemId)
     if (!item || item.productionStatus === status) return
-    if (status !== 'finished' && bundle.order.handedOver && !window.confirm('This will undo the whole order handover and restart its retention period. Continue?')) return
-    if (status === 'finished' && item.kind === 'custom' && (!item.formComplete || !item.petName || !item.photos.length) && !window.confirm('This custom ornament is missing form details or photos. Mark it ready anyway?')) return
+    if (status !== 'finished' && (item.handedOver ?? bundle.order.handedOver) && !window.confirm('This will undo this ornament’s handover. Continue?')) return
+    if (status === 'finished' && item.kind === 'custom' && (!item.formComplete || (item.withName && !item.backName) || !item.photos.length) && !window.confirm('This custom ornament is missing form details or photos. Mark it ready anyway?')) return
     if (status === 'finished' && bundle.items.filter(row => row.productionStatus !== 'finished').length === 1) { setPending(itemId); return }
     await save(itemId, status, `${item.petName || 'Ornament'} updated.`)
   }

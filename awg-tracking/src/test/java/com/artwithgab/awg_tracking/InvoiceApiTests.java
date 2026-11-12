@@ -30,8 +30,8 @@ class InvoiceApiTests extends ApiTestSupport {
         assertThat(deposit.getFirst().getBody()).contains("Gesamt: 39,99 EUR", "Bezahlt: 10,00 EUR", "Offener Betrag: 29,99 EUR");
         orders.updatePaymentState(id, PaymentState.PAID, PaymentMethod.CASH, null);
         orders.updatePaymentState(id, PaymentState.PAID, PaymentMethod.CASH, null);
-        orders.setHandedOver(id, true);
-        orders.setHandedOver(id, true);
+        orders.setHandedOver(id, true, null);
+        orders.setHandedOver(id, true, null);
         var issued = invoices.findByOrderIdOrderByNumberAsc(id);
         assertThat(issued).hasSize(3);
         assertThat(issued.get(1).getNumber()).isEqualTo(issued.getFirst().getNumber() + 1);
@@ -41,10 +41,21 @@ class InvoiceApiTests extends ApiTestSupport {
         assertThat(deposit.getFirst().getBody()).contains("Offener Betrag: 29,99 EUR");
     }
 
+    @Test void partialHandoverIssuesTheFinalSnapshotOnlyWhenEveryItemIsHandedOver() throws Exception {
+        UUID id = UUID.fromString(saleOk(login(), finishedItem(), finishedItem()));
+        orders.updatePaymentState(id, PaymentState.PAID, PaymentMethod.CASH, null);
+        var items = orderRepository.findById(id).orElseThrow().getOrderItems();
+        orders.setHandedOver(id, true, java.util.List.of(items.getFirst().getId()));
+        assertThat(invoices.findByOrderIdOrderByNumberAsc(id)).hasSize(1);
+        orders.setHandedOver(id, true, java.util.List.of(items.getLast().getId()));
+        assertThat(invoices.findByOrderIdOrderByNumberAsc(id)).hasSize(2);
+        assertThat(invoices.findByOrderIdOrderByNumberAsc(id).getLast().getBody()).contains("Übergeben: Ja");
+    }
+
     @Test void handoverDoesNotInventAnUnrecordedPayment() throws Exception {
         UUID id = UUID.fromString(saleOk(login(), finishedItem()));
         orders.updatePaymentState(id, PaymentState.DEPOSIT, PaymentMethod.CASH, new BigDecimal("5.00"));
-        orders.setHandedOver(id, true);
+        orders.setHandedOver(id, true, null);
         assertThat(invoices.findByOrderIdOrderByNumberAsc(id).getLast().getBody()).contains("Offener Betrag: 34,99 EUR", "Übergeben: Ja");
     }
 

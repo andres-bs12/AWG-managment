@@ -1,3 +1,4 @@
+import { paintedNameValid } from '../../lib/paintedName'
 import { keepFormFocusVisible } from '../../lib/publicFormFocus'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -140,7 +141,7 @@ function CustomerForm({ token }: { token: string }) {
     const found: Record<string, string> = {}
     for (const item of draft.items) {
       const named = formItems.find(source => source.id === item.orderItemId)?.withName
-      if (named && !item.backName.trim()) found[`back-${item.orderItemId}`] = 'formNeedBackName'
+      if (named && !paintedNameValid(item.backName)) found[`back-${item.orderItemId}`] = item.backName ? 'formPaintedNameTooLong' : 'formNeedBackName'
       if (!item.photos.length) found[`photos-${item.orderItemId}`] = 'needPhoto'
     }
     if (!draft.customerName.trim()) found['form-name'] = 'formNeedName'
@@ -187,15 +188,15 @@ function CustomerForm({ token }: { token: string }) {
       }, { rememberToken: !staffHandoff })
       try { sessionStorage.removeItem(formDraftKey(token)) } catch { setStorageError(true) }
       // The Track page already shows the order state: go there and confirm the save once.
-      void navigate(`/track/${encodeURIComponent(result.orderCode)}`, { state: { formSaved: true } })
+      void navigate(`/track/${encodeURIComponent(result.orderCode)}`, { replace: true, state: { formSaved: true } })
     } catch (error) {
       const terminal = terminalFor(error)
       if (terminal) { setTerminal(terminal); setIssue(error); return }
       const field = apiError(error, locale, t('formSaveError')).field ?? ''
       const match = field.match(/^items\[(\d+)\]\.(\w+)/)
-      const item = match ? draft.items[Number(match[1])] : field === 'photos' ? draft.items[0] : undefined
-      const name = match?.[2] ?? 'photos'
-      const itemIds: Record<string, string> = { petName: 'pet', backName: 'back', note: 'note', photos: 'photos' }
+      const item = match ? draft.items[Number(match[1])] : ['photos', 'petName', 'backName'].includes(field) ? draft.items[0] : undefined
+      const name = match?.[2] ?? field
+      const itemIds: Record<string, string> = { petName: 'back', backName: 'back', note: 'note', photos: 'photos' }
       const contactIds: Record<string, string> = { customerName: 'form-name', phone: 'form-phone', email: 'form-email', address: 'form-line1', 'address.line1': 'form-line1', 'address.line2': 'form-line2', 'address.postalCode': 'form-postal', 'address.city': 'form-city' }
       const id = item && itemIds[name] ? `${itemIds[name]}-${item.orderItemId}` : contactIds[field]
       if (id) { focusRequest.current = id; setErrors({}); setServerField({ id, issue: error }); setStep('details') } else setIssue(error)

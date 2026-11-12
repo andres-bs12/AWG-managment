@@ -27,6 +27,6 @@ public class PaintingDayController {
     @PatchMapping("/{date}")
     public PaintingDayDto update(@PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                  @Valid @RequestBody UpdatePaintingDayRequest body) {
-        return service.update(date, body.open(), body.maxPaintings());
+        return service.update(date, body.open(), body.maxPaintings(), body.openHour(), body.closeHour());
     }
 }

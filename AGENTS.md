@@ -1,6 +1,6 @@
 # Contexto del proyecto — ArtWithGab (AWG)
 
-**Actualizado:** 2026-11-12 (public QR form, Track and Home fixes)
+**Actualizado:** 2026-11-12 (integración de release/v1.1 en feat/backend-domain; facturas V12 y UI pública actual)
 **Propósito de este archivo:** memoria persistente para el dueño del proyecto y los agentes que trabajen en este repositorio.
 
 ## Instrucción de mantenimiento
@@ -95,7 +95,7 @@ Paquete `com.artwithgab.awg_tracking` (con guion bajo; no cambiarlo). Capas: `mo
 - Los precios los calcula el servidor (`awg.pricing.*`).
 - Pedidos web `PENDING`/`REVIEW` ocupan horas y se muestran como reservas rayadas sin datos del cliente en Agenda; no aparecen como entregas hasta que se confirme el pago. Se encuentran en `/staff/attention`.
 - Arranque: `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev` (datos demo y usuarios demo: `gaby@artwithgab.com`/`gaby`, `andres@artwithgab.com`/`andres`). Tests: `./mvnw test` (107 tests; verificados el 2026-11-09 con Byte Buddy como `-javaagent` en el sandbox).
-- Esquema con Flyway (`db/migration/V1..V4`), `ddl-auto=validate`; los tests usan H2 sin Flyway. Un cambio de entidad necesita una migración nueva.
+- Esquema con Flyway (`db/migration/V1..V12`), `ddl-auto=validate`; los tests usan H2 sin Flyway. Un cambio de entidad necesita una migración nueva.
 - Errores `{status, message, code, field}` con códigos estables (`docs/sprint5-contract.md`); el front los traduce con `frontend/src/lib/apiError.ts`.
 - Ventas del staff idempotentes (`Idempotency-Key`). Pago Stripe con importe distinto → `checkoutStatus=REVIEW` (no se libera; el staff lo resuelve al anotar el pago). Cancelar/abandonar cierra la sesión de Stripe (`expireOrReconcile`).
 - Stock editable con `expectedQuantity` (409 `STOCK_CHANGED`), días de pintura (`PaintingDay`, máximo 2 por defecto), fin de temporada `awg.shop.season-end` (24-dic), lista de espera.
@@ -103,9 +103,9 @@ Paquete `com.artwithgab.awg_tracking` (con guion bajo; no cambiarlo). Capas: `mo
 - Entregas web desde `awg.shop.deliveries-from` (30-nov-2026). El enlace del formulario caduca 30 días tras la entrega (`Order.handedOverAt`, `FormLinkPolicy`, 404 `FORM_EXPIRED`). Track oculta nombres para códigos antiguos cortos sin token.
 - `RetentionService` (cada noche): borra fotos y datos personales 60 días tras la entrega (365 si nunca se entregó) y la lista de espera sin confirmar a los 7 días. Lista de espera con doble opt-in (`/waitlist/confirm#token`, `/waitlist/unsubscribe#token`).
 - E-mails al dueño y al cliente por evento de pedido (`NotificationService`, tras commit, asíncrono); sin `MAIL_HOST` no se envía nada.
-- Facturas (2026-11-08, feedback del mercado): e-mail con Rechnung al pagar (Stripe o staff), al registrar depósito (muestra pagado, saldo y fecha/hora de entrega) y al cambiar a pagado o entregar; cada estado es un documento nuevo con número consecutivo (V8) que referencia el anterior. Cola persistente, máximo 10 intentos SMTP. **No se emite ninguna factura mientras `awg.invoice.*` (nombre, dirección, nota fiscal) esté vacío o con `[placeholder]`**: en ese caso (el actual, porque el dueño no tiene empresa) se envía una «Zahlungsbestätigung» sin número ni datos fiscales, con asunto «Danke für deine Bestellung · Code …». `ShopConfigDto.confirmationEmail` dice si hay SMTP, y la página de gracias solo menciona el e-mail cuando es `true`. UID opcional. Alemán siempre (no hay locale en pedido). Las facturas no se borran con `RetentionService` (conservación contable: pendiente del asesor). Entrega en Viena con franja fija 18:00–20:00 (`awg.shop.delivery-window-*`, `when.toHour`).
+- Facturas (2026-11-08, feedback del mercado): e-mail con Rechnung al pagar (Stripe o staff), al registrar depósito (muestra pagado, saldo y fecha/hora de entrega) y al cambiar a pagado o entregar; cada estado es un documento nuevo con número consecutivo (V12; antes V8 en esta rama) que referencia el anterior. Cola persistente, máximo 10 intentos SMTP. **No se emite ninguna factura mientras `awg.invoice.*` (nombre, dirección, nota fiscal) esté vacío o con `[placeholder]`**: en ese caso (el actual, porque el dueño no tiene empresa) se envía una «Zahlungsbestätigung» sin número ni datos fiscales, con asunto «Danke für deine Bestellung · Code …». `ShopConfigDto.confirmationEmail` dice si hay SMTP, y la página de gracias solo menciona el e-mail cuando es `true`. UID opcional. Alemán siempre (no hay locale en pedido). Las facturas no se borran con `RetentionService` (conservación contable: pendiente del asesor). Entrega en Viena con franja fija 18:00–20:00 (`awg.shop.delivery-window-*`, `when.toHour`).
 - Contraseñas iniciales del staff: mínimo 10 caracteres fuera de dev. Fotos JPEG/PNG se decodifican antes de guardarse.
-- Despliegue: `docker-compose.yml` + `docs/deploy.md`; nginx con cabeceras de seguridad, sin registrar enlaces `/form/` y con la IP real desde `CF-Connecting-IP`. **En producción desde 2026-11-06:** artwithgab.com (Cloudflare) → AWS EC2 t4g.small en Estocolmo con Caddy; `deploy/deploy.sh` para publicar y `deploy/status.sh` para revisar. Tienda (`SHOP_ENABLED`), Stripe y SMTP aún sin configurar en el servidor.
+- Despliegue: `docker-compose.yml` + `docs/deploy.md`; nginx con cabeceras de seguridad, sin registrar enlaces `/form/` y con la IP real desde `CF-Connecting-IP`. **En producción desde 2026-11-06:** artwithgab.com (Cloudflare) → AWS EC2 t4g.small en Estocolmo con Caddy; `deploy/deploy.sh` para publicar y `deploy/status.sh` para revisar. **v1.1 desplegada el 2026-11-07** (commit `21137b2`, migraciones hasta V11, backup previo `~/backups/pre-v1.1-final-20261107T1927.sql.gz`). `.env` es solo de root: `deploy.sh`/`status.sh` usan `sudo docker compose`. Pendiente tras el deploy, pospuesto por el dueño: los métodos de pago en el Dashboard, el evento `async_payment_failed` y la compra de prueba 4242 (`docs/checklist-lanzamiento.md`, «Al desplegar la v1.1»). El pago web completo no está verificado en producción.
 - Las auditorías usan Codex CLI (`codex exec -s read-only`) como revisor independiente además de subagentes.
 
 ## Tienda pública y formulario QR
@@ -125,6 +125,8 @@ Paquete `com.artwithgab.awg_tracking` (con guion bajo; no cambiarlo). Capas: `mo
 - Revisión por tarjetas con un único botón «… ändern» por tarjeta; la URL de checkout solo se acepta si es del mismo origen o de `https://checkout.stripe.com`. Página de gracias con línea de tiempo y `.ics` (Europe/Vienna).
 - Barra de acciones: `position: sticky` en CSS (`PublicForm.module.css`), abajo y del ancho de la tarjeta; al final del formulario se integra con ella. La reparación del foco (`lib/publicFormFocus.ts`, `lib/publicScroller.ts`) usa el documento como contenedor de scroll.
 - `/form/:token` (QR del puesto, móviles e iPad 820×1180/1180×820) comparte componentes con `/buy`: dos pantallas, resumen de errores con foco y, al guardar, redirección a `/track/CODE` con aviso. El iPad del puesto abre `?staff=1` y no guarda credenciales.
+- El único nombre editable es el nombre pagado del reverso, máximo 6 letras tras convertir a mayúsculas, sin truncar; también se guarda como `petName`. La API conserva ambos campos para datos antiguos. El campo independiente de mascota, los cuatro pasos, los subpasos móviles, las tabs antiguas y el botón de pausa de la vista previa de v1.1 están sustituidos por las decisiones del 2026-11-11 descritas arriba.
+- El handoff `docs/v1.1-public-mobile-handoff.md` conserva la matriz y la evidencia histórica de v1.1; no describe el layout público vigente ni certifica el merge actual.
 - Tokens de formulario (`api/formTokens.ts`): solo se guardan tras un envío correcto o la creación del checkout, como `{token, savedAt}` con caducidad de 45 días. El logout del staff borra `awg-form-token:*`.
 - Texto legal de personalizados: pendiente del asesor. No inventarlo.
 
@@ -133,13 +135,13 @@ Paquete `com.artwithgab.awg_tracking` (con guion bajo; no cambiarlo). Capas: `mo
 - Frontend: `npm run build`, `npm run lint` (con advertencias previas), `node --test tests/*.test.mjs`.
 - Capturas de `a11y-visual` regeneradas y revisadas a ojo el 2026-11-11 tras el rediseño (`buy.spec.ts-snapshots` está vacío). Suite del 2026-11-11: 462/470 antes de regenerar (solo fallaban esas capturas); backend `./mvnw test` en verde. Chromium de Playwright instalado el 2026-11-11.
 - Pantalla de carga pública (2026-11-11): `OrnamentLoader` usa las bolas con gato y perro del telón (`PetBauble.tsx`) y los 4 puntos; `variant="screen"` en el `RouteFallback` de `App.tsx`, `inline` dentro de las tarjetas.
-- E2E: `npx playwright test` en modo mock, puerto 5199 (`reuseExistingServer: false`; si el puerto queda ocupado, matar el Vite sobrante). Proyectos: mobile 360, tablet 768, desktop 1280, iPad vertical/horizontal (solo specs de form, pickup, journey y layout) y movimiento reducido. axe con wcag22aa en cada pantalla.
+- E2E: `npx playwright test` en modo mock, puerto 5199 (`reuseExistingServer: false`; si el puerto queda ocupado, matar el Vite sobrante). Proyectos: mobile 360, tablet 768, desktop 1280, iPad vertical/horizontal (solo specs de form, pickup, journey y layout) y movimiento reducido. También se conservan las matrices de teléfono de v1.1 y los proyectos staff 360×640/440×741; sus resultados históricos no certifican este merge. axe con wcag22aa en cada pantalla.
 - Capturas visuales (`a11y-visual.spec.ts-snapshots`, `maxDiffPixelRatio` 0,02): una captura antigua puede pasar por error. Cuando cambie la UI, borrarlas, regenerarlas y revisarlas a ojo una por una. No inventar tolerancias.
 - Codex no puede abrir puertos: Claude ejecuta Playwright y el navegador; Codex implementa o revisa.
 
 ## Estado y siguientes tareas
 
-Rama `feat/backend-domain` (PR #2 a `main`). Sprints 1–5 terminados con auditoría doble (`tasks/audit-final.md`). En el sprint 6 se hicieron:
+Rama de este worktree: `feat/backend-domain`; incorpora las funciones de `release/v1.1` que están en producción. El merge se prepara sin commit ni push. Sprints 1–5 terminados con auditoría doble (`tasks/audit-final.md`). En el sprint 6 se hicieron:
 - el rediseño UX de `/buy` y `/form`, con la recogida en mercado;
 - la capa de diseño del staff, con sus arreglos P0/P1;
 - el endurecimiento de seguridad: locking optimista `@Version` (V7), puerto de nginx solo en loopback, tokens con caducidad, build de producción solo HTTP y CORS con `Idempotency-Key`.
@@ -156,4 +158,61 @@ Staff (auditorías del 2026-11-05 `staff-ux-sale-orders-*` y `staff-ux-agenda-op
 - conflictos de día marcados en el editor de mercados;
 - diálogos con «Not yet» como única forma de cerrar sin actuar.
 
-Codex hizo la revisión cruzada (`tasks/audit-results/codex-review-staff-*.md`) y sus hallazgos están corregidos. Lo pendiente está en `tasks/todo.md`. E2E: 429 casos en verde; backend: 95 tests.
+Codex hizo la revisión cruzada (`tasks/audit-results/codex-review-staff-*.md`) y sus hallazgos están corregidos. Lo pendiente está en `tasks/todo.md`. Validación histórica previa a estos arreglos móviles: E2E 429 casos en verde; backend 95 tests. No certifica la nueva suite móvil.
+
+
+## v1.1 integrada y migraciones (2026-11-12)
+
+- Se conservan las migraciones de producción **V8__item_handover, V9__soft_cancel_orders, V10__pending_checkout_client y V11__painting_hours sin cambios**; ya están aplicadas. No se editan ni se reutilizan sus números. La migración local de facturas pasa de `V8__invoices.sql` a **`V12__invoices.sql`**; su aplicación en PostgreSQL y el envío SMTP real siguen pendientes.
+- Agenda mantiene la franja única de días, límite diario y edición con engranaje de horas/capacidad. Las horas de pintura (V11) son distintas de las de recogida; sugerencias y colocación manual respetan la ventana editada y las reservas existentes siguen visibles fuera de ella.
+- Entrega por ítem (V8), selección por lotes y deshacer por ítem; el pedido se entrega y empieza la caducidad del enlace al entregar el último ítem. Los pedidos antiguos entregados se rellenan por migración.
+- Cancelación suave (V9): conserva pedido y motivo opcional, devuelve stock elegible, excluye reservas, Track muestra cancelado y retención borra el motivo.
+- Límite de **2 checkouts pendientes por cliente**, identificado por hash de la IP que llega a `request.getRemoteAddr()`, y reserva de **15 minutos** (V10, `PENDING_CHECKOUT_LIMIT`). Las sesiones Stripe caducan o se reconcilian cada minuto. Mantener la IP real en el proxy; la compra Stripe completa y la integración del merge en producción no quedan verificadas por conservar estas funciones.
+- Staff conserva el overhaul, Sales, filtros, QR con polling y recibo de formulario descritos abajo; la UI pública conserva el editor de una página, fichas y correcciones Safari/píxel de esta rama. La verificación del merge se registra por separado de los checkpoints históricos.
+
+
+## Staff mobile overhaul (2026-11-06; implementación incorporada desde v1.1)
+
+- Funciones conservadas al integrar v1.1; los límites de verificación y resultados siguientes son históricos del 2026-11-06, no resultados del merge actual. Las migraciones V8–V11 ya están aplicadas en producción.
+- Agenda removes repeated date/select/Day/subtitle text. List and Calendar show each paint item's identity and order code, link to the order, and keep existing bookings visible when hours shrink. The day-specific gear opens autosaved hours, open/closed and maximum; warnings preserve bookings over the limit. V11 adds nullable painting-hour overrides; it does not change pickup hours.
+- Deliveries uses one cart per order, retaining every item's handoff date/time and per-item controls inside the cart. Filters select carts; other matching cart items remain visible but their controls are disabled outside the active filters. Batch defaults and route remaining counts respect those filters; existing confirmations, item undo and balance collection remain.
+- `/staff/sales` (More) lists latest sales with payment/checkout state, source, Vienna created date, search, Today/7 days/All and pagination. Authenticated `GET /api/orders` accepts `state/source/from/to/page/size/query`; existing code lookup remains. Mock/HTTP implement the same contract.
+- QR bug fixed: New sale previously never re-fetched its saved order. It now polls serially every 5 seconds, backs off to 30 seconds on failures, and shows **Form received**. Confirmed public submit replaces review with Track, focuses the saved notice and bypasses its blocking wipe. No remaining customer-save data-loss defect was reproduced from source; production symptom needs a real flow check.
+- AWG links to Agenda; More includes Sales. Staff summaries remove repeated service schedules, slot availability/durations and colour text beside swatches. Item production/handover groups are separated; dismiss buttons remain **Not yet**.
+- Los arreglos públicos de esta entrega se conservan solo cuando son compatibles con las decisiones públicas posteriores. Las capturas de la rama actual son la base y deberán regenerarse y revisarse; no se relajan tolerancias ni reglas axe.
+- Verified locally: HTTP build, lint (existing warnings), **50 Node tests**, **119 backend tests** with Byte Buddy. New `staff-phone-360x640` and `staff-phone-440x741` projects cover the mobile overhaul; QR/search/sales and existing staff specs are updated. Browser/E2E and Safari were not run. E2E standalone type checking still hits the existing axe/Playwright Page mismatch in `e2e/helpers.ts`.
+- Independent review by `gpt-6-sol` found mock hour parity and scoped/partial handover issues, all fixed and re-reviewed. Codex CLI audit could not initialize its app server in this sandbox (`Operation not permitted`); no CLI audit result is claimed. Findings, commands and remaining validation: `tasks/audit-results/staff-ux-mobile-2026-11-06.md`.
+
+## Full E2E repair (2026-11-06; historical checkpoint)
+
+Superseded baseline: the owner reports **681 E2E passed** before the staff phone polish below. The earlier failures and repair commands remain historical evidence.
+
+- **Partial, no commit:** Claude ran 681 cases: 639 passed, 40 failed, 2 skipped. This supersedes the earlier unrun-browser checkpoint above; the repaired suite has not been re-run. Every failing test, classification, fix and snapshot is recorded in `tasks/audit-results/e2e-repair-2026-11-06.md`.
+- Test fixes: optional Intl weekday comma in staff selectors, legacy form API patch survives same-document routing, QR backoff failure injected after mount with controlled clock, precise HelpTip geometry accounts for subpixel rounding. Three route-sweep failures were `ENOSPC`; no timeout or assertion was relaxed.
+- Product fixes: Track's reading surface remains opaque throughout entrance (immediate axe after QR save); Agenda's missing photo becomes an accessible swatch without a repeated colour word or empty placeholder; production filters select delivery items before retaining their whole cart and scope actions/default batch IDs.
+- Verified this pass: HTTP build, lint (existing warnings), 50 Node tests and E2E syntax checks. The existing axe/Playwright `Page` type mismatch remains. No Java edits/tests this pass; Claude's NUL guard, quarter-hour validation, SalesPage clamp and staged hotfixes retained.
+- Claude must re-run behavior, regenerate/review all design/delivery/details/review snapshots for mobile/tablet/desktop and run the full suite. Expected collection 683 with the new filter test on two staff phones. Screenshot tolerance and axe rules unchanged. Safari remains pending; V8–V11 were subsequently applied in production, while V12 and the merged deployment still need PostgreSQL validation.
+
+
+## Staff phone polish (2026-11-06)
+
+- Implemented locally, **partial until Claude runs Playwright and reviews fresh staff screenshots**. No commit; all previous changes retained. Incoming baseline from owner: 681 E2E passed; this pass does not certify a new green result.
+- Bottom tabs use equal columns and padding that outranks selected-button rules; compact visible labels Deliver/Sale retain accessible Deliveries/New sale names. Targets remain at least 44px; 56px large actions and Not yet dialogs unchanged.
+- Below 768px Deliveries and Sales disclose Filters (active count). Delivery day and sales search remain inline; filter semantics, URL params and desktop controls preserved. Inventory groups finishes under one accessible colour swatch, with separate saves/conflict handling; html/body use the staff canvas through the scroll extent.
+- New sale removes the redundant question heading. StaffText binds separators to the preceding word in handoff, search/sales, agenda, order/sale summaries, markets, painting days and painting metadata; Agenda status arrows stay attached.
+- `staff-mobile.spec.ts` adds navigation geometry at 320–440px, fully visible initial results at 360×640, disclosure/count/URL assertions, grouped-stock saves/background and rendered separator-line checks. Sales/staff-review selectors follow the disclosure and inventory grouping. Fresh screenshots change on staff routes; public snapshot files were not edited.
+- Local validation and the complete handoff are in `tasks/audit-results/staff-phone-polish-2026-11-06.md`. Browser/Safari and all new Playwright assertions remain for Claude.
+
+## Public form vertical rhythm (2026-11-07; checkpoint histórico)
+
+- Checkpoint anterior a las revisiones del 2026-11-11/12. Se preservan las reglas de ritmo y su evidencia; los subpasos, tabs y la pantalla separada de datos de ese handoff ya no son vigentes. La matriz y las capturas actuales deben seguir el flujo público de tres pantallas.
+- Public `/buy` and `/form` use existing tokens: label/control 8px (`space-2`), field/action gap 24px (`space-5`), section gap 32px (`space-6`), heading/body and card-list gap 16px (`space-4`). The divider is centred inside the 32px gap, superseding the old additive 57px rule in the design system.
+- Contact fields have no trailing margins; row parents own gaps and retain desktop pairs plus aligned postcode/city. `/buy` removes the duplicate Kontakt heading; QR retains its useful contact heading. The photo substep hides its empty choice wrapper; tabs/add wrap without extra toolbar padding; optional notes have no trailing inline baseline space.
+- Shared `ReviewProduct` places artwork, finish/reference photos and price in one top-aligned row in both reviews. Delivery groups and review/terms use parent gaps. Card-bottom padding cancellation and sticky action behaviour, payment wrapping, contrast and footer are preserved.
+- HTTP build, lint (existing warnings) and 50 Node tests pass. Playwright discovers 166 cases in layout/design-system/form; browser execution remains for Claude. New layout assertion measures the final details gap at 390×844 as 24 ±2px. Regenerate/review all 12 design/delivery/details/review × mobile/tablet/desktop snapshots without changing tolerance. Files and commands: `tasks/audit-results/public-form-rhythm-2026-11-07.md`.
+
+## Integración de release/v1.1 (2026-11-12)
+
+- Contenido de conflictos resuelto en el worktree de `feat/backend-domain`; se conservan la UI pública reciente y las funciones staff/backend de producción. V8–V11 son idénticas a `release/v1.1`; facturas movidas a V12 sin cambiar el SQL.
+- Verificación: backend 131 tests con Byte Buddy como agente de inicio (autoattach de Mockito bloqueado en sandbox); TypeScript/lint y 61 tests Node pasan. Sin ejecución de Playwright, PostgreSQL ni iPhone real.
+- **Parcial: staging pendiente** porque el sandbox bloquea `.git/index`. No se ha hecho commit, abort ni push. Resolución archivo por archivo, límites y comando de staging: `tasks/merge-release-v1.1-2026-11-12.md`.

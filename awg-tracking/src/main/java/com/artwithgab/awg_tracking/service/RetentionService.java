@@ -60,7 +60,7 @@ public class RetentionService {
             orderRepository.findByHandedOverAtBeforeAndAnonymizedAtIsNull(now.minus(Duration.ofDays(r.personalDataDays())))
                     .forEach(o -> ids.add(o.getId()));
             orderRepository.findStaleUnhandedBefore(today.minusDays(r.staleOrderDays())).stream()
-                    .filter(o -> !o.isUnconfirmedWeb())
+                    .filter(o -> o.isCancelled() || !o.isUnconfirmedWeb())
                     .forEach(o -> ids.add(o.getId()));
             return List.copyOf(ids);
         });
@@ -92,6 +92,8 @@ public class RetentionService {
             if (item.getNameInOrnament() != null) item.setNameInOrnament("");
         }
         order.setDeliveryAddress(null);
+        order.setCancellationReason(null);
+        order.setCheckoutClientHash(null);
         // Caller-provided retry key; not needed once the sale is long done.
         order.setIdempotencyKey(null);
         // The form token stays (it reveals nothing now): the old link answers FORM_EXPIRED.

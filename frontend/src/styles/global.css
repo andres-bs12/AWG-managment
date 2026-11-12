@@ -134,3 +134,5 @@ p {
 [data-staff-page] :is(a, button, label, input, select) { scroll-margin-block: calc(var(--size-staff-tabs) + var(--staff-actions-height) + var(--space-4)); }
 
 html:has([data-staff-page]) { scroll-padding-bottom: calc(var(--size-staff-tabs) + var(--staff-actions-height) + var(--space-4)); }
+
+html:has([data-staff-page]), body:has([data-staff-page]) { background: var(--staff-bg); }

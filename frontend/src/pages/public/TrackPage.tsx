@@ -31,6 +31,9 @@ export function TrackPage() {
   // Arriving from the QR form: confirm the save once, here where the order state is shown.
   const formSaved = !!(useLocation().state as { formSaved?: boolean } | null)?.formSaved
   const timers = useRef<number[]>([])
+  const savedNotice = useRef<HTMLParagraphElement>(null)
+
+  useEffect(() => { if (formSaved) savedNotice.current?.focus() }, [formSaved])
   const dialogOpener = useRef<HTMLButtonElement | null>(null)
 
   const [fetchPhase, setPhase] = useState<Phase>(codeParam ? 'checking' : 'idle')
@@ -64,6 +67,7 @@ export function TrackPage() {
         setLoaded(data)
         setError('')
         if (data.delivery.address) setAddr(data.delivery.address)
+        if (formSaved) { setPhase('done'); return }
         setPhase('loading')
         timers.current.push(
           window.setTimeout(() => {
@@ -92,7 +96,7 @@ export function TrackPage() {
       timers.current.forEach(window.clearTimeout)
       timers.current = []
     }
-  }, [codeParam, reloadKey, t, locale])
+  }, [codeParam, reloadKey, t, locale, formSaved])
 
   /** Without a code in the URL there is nothing to show, whatever a previous lookup left behind. */
   const phase: Phase = codeParam ? fetchPhase : 'idle'
@@ -122,7 +126,7 @@ export function TrackPage() {
   const hasFormToken = !!view && !!readFormToken(view.code)
   const status = view?.status ?? 'preparing'
   const statusLabel =
-    status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
+    status === 'cancelled' ? t('orderCancelled') : status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
   const stepIndex = status === 'delivered' ? 2 : status === 'ready' ? 1 : 0
   const steps = [t('stepPainting'), t('ready'), t('stepHandover')]
   /** Sleigh only after a hit — misses use the page recovery state without this animation. */
@@ -155,12 +159,12 @@ export function TrackPage() {
     <div className={styles.page}>
       {showWipe ? <SleighWipe label={t('sleigh')} leaving={phase === 'leaving'} /> : null}
       {/* The form was saved even if loading the order below fails: confirm it regardless. */}
-      {formSaved && <p className={styles.savedBanner} role="status">{t('formSavedBanner')}</p>}
+      {formSaved && <p ref={savedNotice} tabIndex={-1} className={styles.savedBanner} role="status">{t('formSavedBanner')}</p>}
 
       {view && phase === 'done' ? (
         <section className={styles.card} aria-live="polite">
           <div className={styles.art}>
-            {status === 'preparing' ? (
+            {status === 'cancelled' ? null : status === 'preparing' ? (
               <PaintingOrnament label={t('artPainting')} />
             ) : (
               <GiftBoxReady label={t('artReady')} />
@@ -170,14 +174,14 @@ export function TrackPage() {
           <div className={styles.details}>
             <span
               className={`${styles.chip} ${
-                status === 'preparing' ? styles.chipWork : status === 'delivered' ? styles.chipDone : styles.chipReady
+                status === 'cancelled' ? '' : status === 'preparing' ? styles.chipWork : status === 'delivered' ? styles.chipDone : styles.chipReady
               }`}
             >
               {statusLabel}
             </span>
             <h1 className={styles.title}>{view.customerName && view.customerName !== 'Walk-in' ? t('trackGreeting', { name: view.customerName }) : (locale === 'de' ? 'Deine Bestellung' : 'Your order')}</h1>
 
-            <ProgressSteps labels={steps} current={stepIndex} label={statusLabel} />
+            {status === 'cancelled' ? <p>{t('orderCancelledBody')}</p> : <ProgressSteps labels={steps} current={stepIndex} label={statusLabel} />}
 
             <dl className={styles.facts}>
               <div>
@@ -186,18 +190,18 @@ export function TrackPage() {
                   <Button variant="secondary" onClick={() => { void navigator.clipboard.writeText(view.code).then(() => setCopyMessage('copiedCode')).catch(() => setCopyMessage('copyFailed')) }}>{t('copyCode')}</Button>
                   <span role="status" className={styles.copyStatus}>{copyMessage && t(copyMessage)}</span></dd>
               </div>
-              <div>
+              {status !== 'cancelled' && <div>
                 <dt>{t('pickupWhen')}</dt>
                 <dd>
                   {whenLines[0]}
                   {whenLines[1] ? <span className={styles.whenExtra}>{whenLines[1]}</span> : null}
                 </dd>
-              </div>
+              </div>}
             </dl>
 
             <OrderReceipt items={view.items} total={view.total} paymentState={view.paymentState} />
 
-            {view.delivery.kind === 'vienna' ? (
+            {status !== 'cancelled' && view.delivery.kind === 'vienna' ? (
               <div className={styles.address}>
                 {!editing ? (
                   <>

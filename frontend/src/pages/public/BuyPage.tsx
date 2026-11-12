@@ -1,3 +1,4 @@
+import { paintedNameValid } from '../../lib/paintedName'
 import { PageHeader, PublicPage, PublicState, StickyActions } from '../../components/public/PublicForm'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import publicForm from '../../components/public/PublicForm.module.css'
@@ -193,7 +194,7 @@ export function BuyPage() {
       for (const item of draft.items) {
         if (!shopConfig.colors.some((option) => option.color === item.color && option.inStock)) found[`color-${item.uid}`] = 'shopChooseColor'
         if (!item.finish || (item.color && !shopConfig.colors.some(option => option.color === item.color && option.finish === item.finish && option.inStock))) found[`finish-${item.uid}`] = 'shopChooseFinish'
-        if (item.withName && !item.backName.trim()) found[`back-${item.uid}`] = 'shopBackNameRequired'
+        if (item.withName && !paintedNameValid(item.backName)) found[`back-${item.uid}`] = item.backName ? 'paintedNameTooLong' : 'shopBackNameRequired'
       }
     }
     if (currentStep === 1) for (const item of draft.items) {
@@ -218,7 +219,7 @@ export function BuyPage() {
   }
   function validateField(id: string) {
     const error = validate(3)[id]
-    setErrors(current => { const next = { ...current }; if (error) next[id] = error; else delete next[id]; return next })
+    setErrors(current => { const next = { ...current }; if (error) next[id] = error; else if (!current[id]?.startsWith('api:')) delete next[id]; return next })
     setValidFields(current => error ? current.filter(value => value !== id) : [...new Set([...current, id])])
     const field = ({ 'buy-name': 'customerName', 'buy-email': 'email', 'buy-phone': 'phone', 'buy-line1': 'line1', 'buy-postal': 'postalCode' } as Record<string, string>)[id]
     if (error && field) void api.metrics.track({ event: 'buy_validation_error', step: 'delivery', field, code: error === 'required' ? 'required' : 'invalid' }).catch(() => {})
@@ -293,7 +294,7 @@ export function BuyPage() {
       try { sessionStorage.setItem('awg-checkout-pending', result.orderCode) } catch { /* storage unavailable */ }
       window.location.assign(target.href)
     } catch (error) {
-      const problem = apiError(error, locale, t('shopCheckoutError')); const field = problem.field ?? ''; const match = field.match(/^items\[(\d+)\]\.(\w+)/); const item = match ? draft.items[Number(match[1])] : undefined; const itemFields: Record<string, [number, string]> = { petName: [1, 'pet'], photos: [1, 'photos'], color: [0, 'color'], finish: [0, 'finish'], backName: [0, 'back'], note: [1, 'note'] }; const simple: Record<string, [number, string]> = { customerName: [3, 'buy-name'], email: [3, 'buy-email'], phone: [3, 'buy-phone'], 'address.line1': [3, 'buy-line1'], 'address.line2': [3, 'buy-line2'], 'address.city': [3, 'buy-city'], address: [3, 'buy-line1'], 'address.postalCode': [3, 'buy-postal'], deliveryDate: [2, 'buy-date'], pickupTime: [2, 'buy-time'] }; const target = field === 'photos' && draft.items[0] ? [1, `photos-${draft.items[0].uid}`] as const : match && item && itemFields[match[2]] ? [itemFields[match[2]][0], `${itemFields[match[2]][1]}-${item.uid}`] as const : simple[field];
+      const problem = apiError(error, locale, t('shopCheckoutError')); const field = problem.field ?? ''; const match = field.match(/^items\[(\d+)\]\.(\w+)/); const item = match ? draft.items[Number(match[1])] : ['petName', 'backName', 'photos'].includes(field) ? draft.items[0] : undefined; const itemFields: Record<string, [number, string]> = { petName: [0, 'back'], photos: [1, 'photos'], color: [0, 'color'], finish: [0, 'finish'], backName: [0, 'back'], note: [1, 'note'] }; const simple: Record<string, [number, string]> = { customerName: [3, 'buy-name'], email: [3, 'buy-email'], phone: [3, 'buy-phone'], 'address.line1': [3, 'buy-line1'], 'address.line2': [3, 'buy-line2'], 'address.city': [3, 'buy-city'], address: [3, 'buy-line1'], 'address.postalCode': [3, 'buy-postal'], deliveryDate: [2, 'buy-date'], pickupTime: [2, 'buy-time'] }; const itemField = match?.[2] ?? field; const target = item && itemFields[itemField] && (itemField !== 'petName' || item.withName) ? [itemFields[itemField][0], `${itemFields[itemField][1]}-${item.uid}`] as const : simple[field];
       if (target) { go(target[0] < 2 ? 0 : 1); showErrors({ [target[1]]: (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string') ? `api:${error.code}` : 'shopFixErrors' }) } else setServerError(problem.text)
       busyRef.current = false; setBusy(false)
     }
@@ -310,6 +311,7 @@ export function BuyPage() {
     if (!showErrors(found)) { if (returnReview) { setReturnReview(false); go(2) } else go(1) }
   }
   function back() {
+    setReturnReview(false)
     if (step > 0) go(step - 1)
   }
   function selectItem(uid: string) {

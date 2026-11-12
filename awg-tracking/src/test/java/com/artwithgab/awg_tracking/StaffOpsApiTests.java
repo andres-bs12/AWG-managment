@@ -40,17 +40,36 @@ class StaffOpsApiTests extends ApiTestSupport {
     }
 
     @Test
-    void cancelDeletesTheOrderAndRestocks() throws Exception {
+    void cancelKeepsTheOrderAndRestocksOnce() throws Exception {
         String token = login();
         int before = inventory.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity();
         String id = saleOk(token, customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0));
         assertThat(inventory.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity()).isEqualTo(before - 1);
 
+        var original = mvc.perform(get("/api/orders/" + id).header("Authorization", bearer(token))).andReturn().getResponse().getContentAsString();
+        String code = com.jayway.jsonpath.JsonPath.read(original, "$.code");
+        mvc.perform(post("/api/orders/" + id + "/cancel").header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON).content(json(Map.of("reason", "Customer request")))).andExpect(status().isNoContent());
         mvc.perform(post("/api/orders/" + id + "/cancel").header("Authorization", bearer(token))).andExpect(status().isNoContent());
-        mvc.perform(get("/api/orders/" + id).header("Authorization", bearer(token))).andExpect(status().isNotFound());
+        mvc.perform(get("/api/orders/" + id).header("Authorization", bearer(token))).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED")).andExpect(jsonPath("$.cancellationReason").value("Customer request")).andExpect(jsonPath("$.cancelledAt").isNotEmpty());
+        mvc.perform(get("/api/track/" + code)).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("cancelled"));
+        mvc.perform(patch("/api/orders/" + id + "/handed-over").header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON).content(json(Map.of("handedOver", true)))).andExpect(status().isConflict());
         assertThat(inventory.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity()).isEqualTo(before);
         // The painting time is free again: the same slot can be booked.
         saleOk(token, customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0));
+    }
+
+    @Test
+    void paintingDayCanBeCreatedAndLoweredBelowExistingBookings() throws Exception {
+        String token = login();
+        saleOk(token, customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0));
+        mvc.perform(patch("/api/painting-days/" + TUE).header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("open", true, "maxPaintings", 0))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.booked").value(1))
+                .andExpect(jsonPath("$.maxPaintings").value(0));
+        mvc.perform(get("/api/painting-days").param("from", TUE).param("to", TUE)
+                .header("Authorization", bearer(token)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].booked").value(1))
+                .andExpect(jsonPath("$[0].maxPaintings").value(0));
     }
 
     @Test

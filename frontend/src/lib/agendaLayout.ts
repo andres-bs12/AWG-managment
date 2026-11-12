@@ -17,3 +17,11 @@ export function layoutAgendaSlots(slots: AgendaSlot[]) {
   flush()
   return result
 }
+
+/** Shrinking painting hours must never crop a booking that already exists. */
+export function agendaBounds(slots: AgendaSlot[], openHour: number, closeHour: number) {
+  return {
+    start: Math.floor(Math.min(openHour, ...slots.map(slot => slot.block.startHour))),
+    end: Math.max(closeHour, ...slots.map(slot => slot.block.endHour)),
+  }
+}

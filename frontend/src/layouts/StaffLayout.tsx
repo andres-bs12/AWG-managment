@@ -32,7 +32,7 @@ export function StaffLayout() {
   const onPaint = location.pathname.includes('/paint/')
   const selected = (path: string) => location.pathname.startsWith(path)
   // Pages reached through More keep a current tab, so the shell always shows where you are.
-  const inMore = ['/staff/inventory', '/staff/markets', '/staff/painting-days', '/staff/password'].some(selected)
+  const inMore = (location.pathname === '/staff/sales') || ['/staff/inventory', '/staff/markets', '/staff/painting-days', '/staff/password'].some(selected)
   useEffect(() => { rememberStaffHub(location.pathname + location.search); setMenuOpen(false) }, [location.pathname, location.search])
   useEffect(() => {
     let active = true
@@ -57,6 +57,7 @@ export function StaffLayout() {
     return () => document.removeEventListener('focusin', keepVisible)
   }, [])
   const more = <>
+    <ButtonLink to="/staff/sales" tone="staff" variant="ghost" selected={location.pathname === '/staff/sales'}>Sales</ButtonLink>
     <ButtonLink to="/staff/inventory" tone="staff" variant="ghost" selected={selected('/staff/inventory')}>Stock</ButtonLink>
     <ButtonLink to="/staff/markets" tone="staff" variant="ghost" selected={selected('/staff/markets')}>Markets</ButtonLink>
     <ButtonLink to="/staff/painting-days" tone="staff" variant="ghost" selected={selected('/staff/painting-days')}>Painting days</ButtonLink>
@@ -66,13 +67,13 @@ export function StaffLayout() {
   return <div data-staff-page className={`${styles.shell} ${onPaint ? styles.shellPaint : ''}`}>
     {!onPaint && <div className={styles.headerArea}>
       <header className={styles.bar}>
-        <p className={styles.brand}>AWG <span>{user?.name}</span></p>
+        <div className={styles.brand}><ButtonLink to="/staff/agenda" tone="staff" variant="ghost" aria-label="AWG · Agenda">AWG</ButtonLink><span>{user?.name}</span></div>
         <form className={styles.search} role="search" onSubmit={search}>
           <label className="visually-hidden" htmlFor="staff-search">Search orders</label>
           <input id="staff-search" type="search" placeholder="Code, name or phone" value={query} onChange={event => setQuery(event.target.value)} />
           <Button tone="staff" variant="secondary" type="submit">Search</Button>
         </form>
-        <ButtonLink to="/staff/attention" tone="staff" variant={attention ? 'secondary' : 'ghost'} selected={selected('/staff/attention')}>Needs attention{attention !== null ? ` (${attention})` : ''}</ButtonLink>
+        <ButtonLink to="/staff/attention" tone="staff" variant={attention ? 'secondary' : 'ghost'} selected={selected('/staff/attention')}>Needs attention{attention ? ` (${attention})` : ''}</ButtonLink>
         <nav className={styles.desktopNav} aria-label="Staff">
           <ButtonLink to="/staff/agenda" tone="staff" variant="ghost" selected={selected('/staff/agenda')}>Agenda</ButtonLink>
           <ButtonLink to="/staff/deliveries" tone="staff" variant="ghost" selected={selected('/staff/deliveries')}>Deliveries</ButtonLink>
@@ -84,7 +85,7 @@ export function StaffLayout() {
       <div id="staff-more" hidden={!menuOpen}>
         {menuOpen && <StaffDialog title="More staff tools" onClose={() => setMenuOpen(false)}>
           <nav className={styles.more} aria-label="More staff tools">{more}</nav>
-          <Button tone="staff" variant="secondary" onClick={() => setMenuOpen(false)}>Close menu</Button>
+          <Button tone="staff" variant="secondary" onClick={() => setMenuOpen(false)}>Not yet</Button>
         </StaffDialog>}
       </div>
     </div>}
@@ -92,8 +93,8 @@ export function StaffLayout() {
     {!onPaint && <div id="staff-actions-root" className={styles.actionsRoot} />}
     {!onPaint && <nav className={styles.bottomTabs} aria-label="Staff tabs">
       <ButtonLink to="/staff/agenda" tone="staff" variant="ghost" selected={selected('/staff/agenda')}>Agenda</ButtonLink>
-      <ButtonLink to="/staff/deliveries" tone="staff" variant="ghost" selected={selected('/staff/deliveries')}>Deliveries</ButtonLink>
-      <ButtonLink to="/staff/sales/new?fresh=1" tone="staff" variant="ghost" selected={selected('/staff/sales/new')}>New sale</ButtonLink>
+      <ButtonLink to="/staff/deliveries" tone="staff" variant="ghost" selected={selected('/staff/deliveries')} aria-label="Deliveries"><span>Deliver</span></ButtonLink>
+      <ButtonLink to="/staff/sales/new?fresh=1" tone="staff" variant="ghost" selected={selected('/staff/sales/new')} aria-label="New sale"><span>Sale</span></ButtonLink>
       <ButtonLink to="/staff/search" tone="staff" variant="ghost" selected={selected('/staff/search')}>Search</ButtonLink>
       <Button tone="staff" variant="ghost" data-selected={inMore ? 'true' : 'false'} aria-current={inMore ? 'page' : undefined} aria-expanded={menuOpen} aria-controls="staff-more" onClick={() => setMenuOpen(open => !open)}>More</Button>
     </nav>}

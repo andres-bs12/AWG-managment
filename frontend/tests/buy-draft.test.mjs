@@ -20,3 +20,29 @@ test('draft retains a valid variant without persisting photos or acceptance', ()
   assert.equal(saveBuyDraft(draft), true)
   assert.deepEqual(JSON.parse(saved).items[0].photos, [])
 })
+
+test('legacy drafts preserve stored lettering and optional pet names without restoring a screen index', () => {
+  saved = JSON.stringify({ items: [
+    { uid: 'one', color: 'red', finish: 'shiny', withName: true, petName: 'Charlotte', backName: 'CHARLO', photosNeedReload: true },
+    { uid: 'two', color: 'green', finish: 'matte', withName: true, petName: '', backName: 'MILO' },
+  ], buyStep: 2 })
+  const draft = loadBuyDraft()
+  assert.equal(draft.items[0].petName, 'Charlotte')
+  assert.equal(draft.items[0].backName, 'CHARLO')
+  assert.equal(draft.items[0].photosNeedReload, true)
+  assert.equal(draft.items[1].petName, '')
+  assert.equal(draft.items[1].backName, 'MILO')
+  assert.equal('buyStep' in draft, false)
+  saveBuyDraft({ ...draft, buyStep: 3 })
+  assert.equal('buyStep' in JSON.parse(saved), false)
+})
+
+test('saving an explicit empty name never restores previous lettering', () => {
+  saved = JSON.stringify({ items: [{ uid: 'one', withName: true, petName: 'L', backName: 'L' }] })
+  const draft = loadBuyDraft()
+  draft.items[0].petName = ''; draft.items[0].backName = ''
+  saveBuyDraft(draft)
+  assert.equal(JSON.parse(saved).items[0].petName, '')
+  assert.equal(JSON.parse(saved).items[0].backName, '')
+  assert.equal(loadBuyDraft().items[0].petName, '')
+})

@@ -28,3 +28,8 @@ test('search and attention return to the originating staff list', () => {
   assert.deepEqual(staffHubTarget('/staff/search?q=AWG'), { to: '/staff/search?q=AWG', label: 'Search orders' })
   assert.deepEqual(staffHubTarget('/staff/attention'), { to: '/staff/attention', label: 'Needs attention' })
 })
+
+test('sales detail returns to the same filters and page', () => {
+  const from = '/staff/sales?q=Luna&state=deposit&source=stall&period=week&page=2'
+  assert.deepEqual(staffHubTarget(from), { to: from, label: 'Sales' })
+})

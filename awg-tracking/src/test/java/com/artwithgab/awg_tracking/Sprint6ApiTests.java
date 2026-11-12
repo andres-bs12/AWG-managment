@@ -177,6 +177,29 @@ class Sprint6ApiTests extends ApiTestSupport {
     }
 
     @Test
+    void cancelledPendingOrdersStillReachRetention() throws Exception {
+        Order order = handedOverOrder(1);
+        tx.executeWithoutResult(s -> {
+            Order saved = orders.findById(order.getId()).orElseThrow();
+            saved.setStatus("CANCELLED");
+            saved.setCancelledAt(clock.instant());
+            saved.setCancellationReason("Personal reason");
+            saved.setHandedOver(false);
+            saved.setHandedOverAt(null);
+            saved.setSource(com.artwithgab.awg_tracking.enums.OrderSource.WEB);
+            saved.setCheckoutStatus(com.artwithgab.awg_tracking.enums.CheckoutStatus.PENDING);
+            saved.getOrderItems().forEach(i -> i.setHandoffDate(java.time.LocalDate.of(2024, 1, 1)));
+        });
+        retention.run();
+        tx.executeWithoutResult(s -> {
+            Order saved = orders.findById(order.getId()).orElseThrow();
+            assertThat(saved.getAnonymizedAt()).isNotNull();
+            assertThat(saved.getCancellationReason()).isNull();
+            assertThat(saved.getStatus()).isEqualTo("CANCELLED");
+        });
+    }
+
+    @Test
     void staffCannotSellColorsNoLongerOffered() throws Exception {
         String token = login();
         var item = customItem(false, null, null, null, "market", null, null);

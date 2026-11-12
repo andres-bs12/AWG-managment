@@ -8,5 +8,5 @@ import java.math.BigDecimal;
  */
 public record OrderSummaryDto(String id, String code, String customerName, String phone, String createdAt,
                               String paymentState, String checkoutStatus, BigDecimal total, int items,
-                              String nextHandoffDate, boolean handedOver) {
+                              String nextHandoffDate, boolean handedOver, String source, String status) {
 }

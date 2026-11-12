@@ -1,3 +1,4 @@
+import { StaffText } from '../../components/staff/StaffText'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
@@ -22,8 +23,8 @@ export function OrderLookupPage({ attention = false }: { attention?: boolean }) 
   const version = useStaffRefresh()
   useEffect(() => {
     let active = true
-    if (!attention && query.trim().length < 2) { setRows([]); setBusy(false); return }
-    setBusy(true); setError('')
+    if (!attention && query.trim().length < 2) { setRows([]); setBusy(false); setError(''); return }
+    setBusy(true); setError(''); setRows([])
     const timer = window.setTimeout(() => {
       void (attention ? api.orders.attention() : api.orders.search(query)).then(next => {
         if (active) setRows(next)
@@ -38,10 +39,10 @@ export function OrderLookupPage({ attention = false }: { attention?: boolean }) 
     {busy && <p role="status">Searching orders…</p>}
     {error && <div role="alert"><p>{error}</p><Button tone="staff" onClick={() => setRetry(n => n + 1)}>Retry</Button></div>}
     {!busy && !error && !rows.length && (attention || query.trim().length >= 2) && <p role="status">{attention ? 'No orders need attention.' : 'No matching orders.'}</p>}
-    <ul className={styles.list}>{rows.map(row => <li key={row.id}><Link className={styles.result} to={`/staff/orders/${row.id}`} state={{ from: attention ? '/staff/attention' : `/staff/search?${params}` }}>
-      <strong>{row.code} · {row.customerName || 'Customer pending'}</strong>
-      <span>{row.phone || 'Phone pending'} · {row.items} {row.items === 1 ? 'ornament' : 'ornaments'} · {formatEur(row.total, 'en')}</span>
-      <span>{row.checkoutStatus === 'review' ? 'Payment review — check Stripe' : row.checkoutStatus === 'pending' ? 'Waiting for online payment' : row.handedOver ? 'Handed over' : PAYMENT_LABEL[row.paymentState] ?? row.paymentState} · {row.nextHandoffDate ? `Handoff ${formatDateLabel(row.nextHandoffDate)}` : 'Handoff not scheduled'}</span>
+    <ul className={styles.list} aria-busy={busy}>{!busy && !error && rows.map(row => <li key={row.id}><Link className={styles.result} to={`/staff/orders/${row.id}`} state={{ from: attention ? '/staff/attention' : `/staff/search?${params}` }}>
+      <strong><StaffText>{`${row.code} · ${row.customerName || 'Customer pending'}`}</StaffText></strong>
+      <span><StaffText>{`${row.phone || 'Phone pending'} · ${row.items} ${row.items === 1 ? 'ornament' : 'ornaments'} · ${formatEur(row.total, 'en')}`}</StaffText></span>
+      <span><StaffText>{`${row.checkoutStatus === 'review' ? 'Payment review — check Stripe' : row.checkoutStatus === 'pending' ? 'Waiting for online payment' : row.handedOver ? 'Handed over' : PAYMENT_LABEL[row.paymentState] ?? row.paymentState} · ${row.nextHandoffDate ? `Handoff ${formatDateLabel(row.nextHandoffDate)}` : 'Handoff not scheduled'}`}</StaffText></span>
     </Link></li>)}</ul>
   </section>
 }

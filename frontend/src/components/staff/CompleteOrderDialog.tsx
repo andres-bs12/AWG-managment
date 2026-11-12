@@ -7,7 +7,7 @@ type Props = { orderCode: string; customerName: string; items: OrderItem[]; pend
 export function CompleteOrderDialog({ orderCode, customerName, items, pendingItemId, busy, onClose, onConfirm }: Props) {
   return <StaffDialog title="Complete order?" busy={busy} onClose={onClose}>
     <p>This is the last ornament in order {orderCode} ({customerName || 'Customer details pending'}). The customer will see the whole order as ready on Track. Check every ornament before continuing.</p>
-    {items.some(item => item.kind === 'custom' && (!item.formComplete || !item.petName || !item.photos.length)) && <p role="alert">Some custom ornaments are missing form details or photos.</p>}
+    {items.some(item => item.kind === 'custom' && (!item.formComplete || (item.withName && !item.backName) || !item.photos.length)) && <p role="alert">Some custom ornaments are missing form details or photos.</p>}
     <ul className={styles.list}>{items.map(item => {
       const ready = item.productionStatus === 'finished' || item.id === pendingItemId
       return <li key={item.id} className={styles.row} data-ready={ready}><strong>{item.petName || 'Ornament'}</strong><span>{ready ? 'Ready' : 'Pending'}</span></li>

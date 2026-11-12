@@ -1,4 +1,5 @@
 import { paymentSummary } from '../../lib/paymentSummary'
+import { filterSales } from '../../lib/sales'
 import { readFormToken, rememberFormToken } from '../formTokens'
 import type {
   InventoryItem, PaintingDay, ShopCheckoutInput,
@@ -118,6 +119,16 @@ export function getStoreVersion(): number {
 
 ensureDemoSeed()
 
+// The customer can submit the QR form in another tab while the staff screen stays open.
+if (typeof window !== 'undefined') window.addEventListener('storage', event => {
+  if (event.key !== STORAGE_KEY) return
+  const stored = readStored()
+  if (!stored) return
+  state = stored
+  version += 1
+  listeners.forEach(listener => listener())
+})
+
 export function resetStore() {
   try {
     for (const key of Object.keys(localStorage)) {
@@ -149,11 +160,17 @@ function dayByDate(date: string, marketId?: string): MarketDay | undefined {
   if (!rows.length) {
     const home = state.markets.find(m => m.kind === 'home')
     if (!home || (marketId && marketId !== home.id)) return undefined
-    return { id: `home-${date}`, marketId: home.id, date, openHour: 10, closeHour: 13, isToday: false }
+    return { id: `home-${date}`, marketId: home.id, date, openHour: 10, closeHour: [3, 5].includes(utcWeekday(date)) ? 12 : 13, isToday: false }
   }
   if (marketId) return rows[0]
   const rank = (day: MarketDay) => (state.markets.find((m) => m.id === day.marketId)?.kind === 'market' ? 0 : 1)
   return rows.slice().sort((a, b) => rank(a) - rank(b))[0]
+}
+
+function blocksForDate(date: string): TimeBlock[] {
+  const ids = new Set(state.marketDays.filter(day => day.date === date).map(day => day.id))
+  ids.add(`home-${date}`)
+  return state.blocks.filter(block => ids.has(block.marketDayId)).sort((a, b) => a.startHour - b.startHour)
 }
 
 function blocksForDay(dayId: string): TimeBlock[] {
@@ -187,11 +204,13 @@ export function paintingDay(date: string): PaintingDay {
   const settings = state.paintingDays?.[date] ?? { open: true, maxPaintings: 2 }
   const ids = new Set(state.marketDays.filter(day => day.date === date).map(day => day.id))
   const booked = state.blocks.filter(block => ids.has(block.marketDayId) && state.items.some(item => item.id === block.orderItemId && item.kind === 'custom')).length
-  return { date, ...settings, booked }
+  const day = dayByDate(date)
+  return { date, ...settings, booked, openHour: settings.openHour ?? day?.openHour ?? 10, closeHour: settings.closeHour ?? day?.closeHour ?? ([3, 5].includes(utcWeekday(date)) ? 12 : 13) }
 }
-export function updatePaintingDay(date: string, open: boolean, maxPaintings: number): PaintingDay {
+export function updatePaintingDay(date: string, open: boolean, maxPaintings: number, hours?: { openHour: number; closeHour: number }): PaintingDay {
   if (!Number.isInteger(maxPaintings) || maxPaintings < 0 || maxPaintings > 10) throw new Error('Maximum must be between 0 and 10.')
-  state.paintingDays ??= {}; state.paintingDays[date] = { open, maxPaintings }; emit(); return paintingDay(date)
+  if (hours && (!Number.isFinite(hours.openHour) || !Number.isFinite(hours.closeHour) || hours.openHour < 0 || hours.closeHour >= 24 || hours.openHour >= hours.closeHour || !Number.isInteger(hours.openHour * 4) || !Number.isInteger(hours.closeHour * 4))) throw new Error('Choose painting hours from 00:00 to 23:45 in 15-minute steps, with end after start.')
+  state.paintingDays ??= {}; state.paintingDays[date] = { ...state.paintingDays[date], open, maxPaintings, ...hours }; emit(); return paintingDay(date)
 }
 export function joinWaitlist(email: string) { const token = newUuid(); (state.waitlistTokens ??= {})[token] = { email: email.toLowerCase(), confirmed: false }; emit() }
 export function confirmWaitlist(token: string) { const entry = state.waitlistTokens?.[token]; if (!entry) throw Object.assign(new Error('Unknown token'), { status: 404 }); entry.confirmed = true; state.waitlist ??= []; if (!state.waitlist.includes(entry.email)) state.waitlist.push(entry.email); emit() }
@@ -220,10 +239,10 @@ export function findFreeSlot(
   }
   const floor =
     day.isToday && afterHour == null
-      ? Math.max(day.openHour, DEMO_NOW_HOUR)
-      : Math.max(day.openHour, afterHour ?? day.openHour)
+      ? Math.max(setting.openHour, DEMO_NOW_HOUR)
+      : Math.max(setting.openHour, afterHour ?? setting.openHour)
   const busy = [
-    ...blocksForDay(day.id).filter((block) => block.id !== ignoreBlockId),
+    ...blocksForDate(date).filter((block) => block.id !== ignoreBlockId),
     ...extraBusy.map((b, i) => ({
       id: `draft-${i}`,
       marketDayId: day.id,
@@ -233,7 +252,7 @@ export function findFreeSlot(
       status: 'not_started' as const,
     })),
   ].sort((a, b) => a.startHour - b.startHour)
-  const ceiling = Math.min(day.closeHour, beforeHour ?? day.closeHour)
+  const ceiling = Math.min(setting.closeHour, beforeHour ?? setting.closeHour)
   let cursor = floor
   const tryPlace = (start: number): CapacityResult | null => {
     const end = start + durationHours
@@ -285,19 +304,36 @@ export function mockChangePassword(currentPassword: string, newPassword: string)
   localStorage.setItem(PASSWORDS_KEY, JSON.stringify({ ...mockPasswords(), [account.id]: newPassword }))
 }
 
-export function cancelOrder(id: string) {
+export function cancelOrder(id: string, reason?: string) {
   const order = requireOrder(id)
-  if (order.handedOver) throw new Error('Cannot cancel an order that has been handed over.')
+  if (order.status === 'CANCELLED') return
+  if (reason && reason.length > 500) throw new Error('Reason must be 500 characters or fewer.')
+  if (order.handedOver || state.items.some(item => item.orderId === id && item.handedOver)) throw new Error('Cannot cancel an order with handed-over items.')
   const cancelled = state.items.filter(item => item.orderId === id)
   for (const item of cancelled) { if (item.kind === 'custom' && item.productionStatus !== 'not_started') continue; const stock = listInventory().find(row => row.kind === item.kind && (item.kind === 'finished' || (row.color === item.color && row.finish === (item.finish ?? 'shiny')))); if (stock) stock.quantity++ }
   const itemIds = new Set(cancelled.map(item => item.id))
   state.blocks = state.blocks.filter((block) => !block.orderItemId || !itemIds.has(block.orderItemId))
-  state.items = state.items.filter((item) => item.orderId !== id)
-  state.orders = state.orders.filter((entry) => entry.id !== id)
+  order.status = 'CANCELLED'
+  order.cancelledAt = new Date().toISOString()
+  order.cancellationReason = reason?.trim() || null
   emit()
 }
 
 export function createMockCheckout(input: ShopCheckoutInput) {
+  // The mock completes new checkouts immediately; pending entries can still exist in saved demo data.
+  const pending = state.orders.filter(order => order.source === 'web' && order.checkoutStatus === 'pending' && order.status !== 'CANCELLED')
+  for (const order of pending) {
+    if (Date.now() - Date.parse(order.createdAt) >= 15 * 60 * 1000) {
+      cancelOrder(order.id)
+      if (state.pendingCheckouts) delete state.pendingCheckouts[order.code]
+    }
+  }
+  const active = pending.filter(order => order.status !== 'CANCELLED')
+  const email = input.email.trim().toLowerCase()
+  if (active.filter(order => state.customers.find(customer => customer.id === order.customerId)?.email.trim().toLowerCase() === email).length >= 2
+      || active.filter(order => Boolean(state.pendingCheckouts?.[order.code])).length >= 2) {
+    throw Object.assign(new Error('Too many pending checkouts.'), { code: 'PENDING_CHECKOUT_LIMIT' })
+  }
   const inventory = listInventory()
   const counts = new Map<string, number>()
   for (const item of input.items) {
@@ -375,7 +411,7 @@ export function listMarketDays(marketId?: string) {
 
 function dayIsUsed(dayId: string): boolean {
   return (
-    state.items.some((item) => item.delivery.marketDayId === dayId) ||
+    state.items.some((item) => requireOrder(item.orderId).status !== 'CANCELLED' && item.delivery.marketDayId === dayId) ||
     state.blocks.some((block) => block.marketDayId === dayId)
   )
 }
@@ -390,7 +426,7 @@ function hoursConflict(dayId: string, date: string, openHour: number, closeHour:
     }
   }
   for (const item of state.items) {
-    if (item.delivery.marketDayId !== dayId) continue
+    if (requireOrder(item.orderId).status === 'CANCELLED' || item.delivery.marketDayId !== dayId) continue
     const hour = item.delivery.pickupHour
     if (hour == null) continue
     if (hour < openHour || hour >= closeHour) {
@@ -429,7 +465,7 @@ export function saveMarket(input: SaveMarketInput): { market: Market; days: Mark
 
   for (const day of input.days) {
     const alreadyStall = state.marketDays.some(row => row.date === day.date && row.marketId === input.id)
-    if (!alreadyStall && state.items.some(item => item.delivery.kind === 'vienna' && deliveryDateForItem(item) === day.date)) throw Object.assign(new Error(`${formatDateLabel(day.date)} has Vienna deliveries; move them first.`), { code: 'DAY_HAS_DELIVERIES', field: 'days' })
+    if (!alreadyStall && state.items.some(item => requireOrder(item.orderId).status !== 'CANCELLED' && item.delivery.kind === 'vienna' && deliveryDateForItem(item) === day.date)) throw Object.assign(new Error(`${formatDateLabel(day.date)} has Vienna deliveries; move them first.`), { code: 'DAY_HAS_DELIVERIES', field: 'days' })
   }
 
   const existing = input.id ? state.markets.find((row) => row.id === input.id) : undefined
@@ -517,7 +553,7 @@ export function deleteMarket(id: string): void {
   const market = state.markets.find((row) => row.id === id)
   if (!market || market.kind !== 'market') throw new Error('Market not found')
   const used = state.marketDays.find((day) => day.marketId === id && dayIsUsed(day.id))
-  if (used || state.items.some((item) => item.delivery.marketId === id)) {
+  if (used || state.items.some((item) => requireOrder(item.orderId).status !== 'CANCELLED' && item.delivery.marketId === id)) {
     throw new Error(
       used
         ? `${formatDateLabel(used.date)} has orders. This market cannot be deleted`
@@ -579,7 +615,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
   for (const item of state.items) {
     const order = state.orders.find((o) => o.id === item.orderId)
     const customer = order ? state.customers.find((c) => c.id === order.customerId) : null
-    if (!order || !customer) continue
+    if (!order || !customer || order.status === 'CANCELLED') continue
     if (order.checkoutStatus === 'pending' || order.checkoutStatus === 'review' || order.paymentReview) continue
     const title = item.petName || customer.name || 'Ornament'
     const photoUrl = item.photos[0]?.dataUrl
@@ -596,7 +632,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         backName: item.backName,
         title,
         productionStatus: item.productionStatus,
-        handedOver: Boolean(order.handedOver),
+        handedOver: item.handedOver ?? order.handedOver,
         deliveryKind: 'market',
         pickupHour: hour,
         methodLabel: 'Market pickup',
@@ -618,7 +654,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         backName: item.backName,
         title,
         productionStatus: item.productionStatus,
-        handedOver: Boolean(order.handedOver),
+        handedOver: item.handedOver ?? order.handedOver,
         deliveryKind: 'vienna',
         pickupHour: null,
         methodLabel: `Vienna · ${new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '')}`,
@@ -644,7 +680,7 @@ export function getAgendaDay(date: string): AgendaDay {
   return {
     marketDay,
     market,
-    slots: blocksForDay(marketDay.id).map(slotView).map(slot => slot.order?.checkoutStatus === 'pending' || slot.order?.checkoutStatus === 'review' || slot.order?.paymentReview ? { block: slot.block, held: true, order: null, item: null, customer: null } : slot),
+    slots: blocksForDate(marketDay.date).map(slotView).map(slot => slot.order?.checkoutStatus === 'pending' || slot.order?.checkoutStatus === 'review' || slot.order?.paymentReview ? { block: slot.block, held: true, order: null, item: null, customer: null } : slot),
     deliveries: deliveriesForDate(marketDay.date),
   }
 }
@@ -665,10 +701,11 @@ export function moveBlock(blockId: string, date: string, startHour: number) {
   const day = dayByDate(date)
   if (!day) throw new Error('No market day')
   const end = startHour + duration
-  if (startHour < day.openHour || end > day.closeHour) {
-    throw new Error('Outside market hours')
+  const hours = paintingDay(date)
+  if (startHour < hours.openHour || end > hours.closeHour) {
+    throw new Error('Outside painting hours')
   }
-  if (hasPaintOverlap(blocksForDay(day.id), startHour, end, blockId)) {
+  if (hasPaintOverlap(blocksForDate(date), startHour, end, blockId)) {
     throw new Error('That time overlaps another block')
   }
   if (day.isToday && startHour < DEMO_NOW_HOUR) {
@@ -787,11 +824,12 @@ export function createSale(input: CreateSaleInput): Order {
       }
       const md = dayByDate(row.paintDate, row.marketId) ?? dayByDate(row.paintDate)
       if (!md) throw new Error('Cannot place paint block: no market day')
-      const clashExisting = blocksForDay(md.id).some((b) =>
+      const clashExisting = blocksForDate(md.date).some((b) =>
         b.id !== moving?.id && hoursOverlap(row.paintStart!, row.paintEnd!, b.startHour, b.endHour),
       )
       const deliveryDay = state.marketDays.find((day) => day.id === row.marketDayId)
-      if (row.paintEnd <= row.paintStart || row.paintStart < md.openHour || row.paintEnd > md.closeHour ||
+      const hours = paintingDay(md.date)
+      if (row.paintEnd <= row.paintStart || row.paintStart < hours.openHour || row.paintEnd > hours.closeHour ||
         (md.isToday && row.paintStart < DEMO_NOW_HOUR) ||
         !deliveryDay || row.paintDate > deliveryDay.date ||
         (row.paintDate === deliveryDay.date && row.deliveryKind === 'market' && row.pickupHour != null && row.paintEnd > row.pickupHour) ||
@@ -859,6 +897,7 @@ export function createSale(input: CreateSaleInput): Order {
 
 export function setPaymentState(orderId: string, paymentState: PaymentState, method?: PaymentMethod | null, amountPaid?: number) {
   const order = requireOrder(orderId)
+  if (order.status === 'CANCELLED') throw new Error('This order is cancelled.')
   if (order.checkoutStatus === 'pending') throw Object.assign(new Error('Check this payment in Stripe first; Checkout is still pending.'), { code: 'PAYMENT_PENDING' })
   const amount = paymentState === 'paid' ? order.total : paymentState === 'unpaid' ? 0 : amountPaid ?? Math.round(order.total * 50) / 100
   if (!Number.isFinite(amount) || (paymentState === 'deposit' && (amount <= 0 || amount >= order.total))) throw new Error('Deposit must be greater than zero and less than the total.')
@@ -872,6 +911,7 @@ export function setPaymentState(orderId: string, paymentState: PaymentState, met
 
 export function recordPayment(orderId: string, amount: number, method: PaymentMethod): { order: Order; entry: PaymentEntry } {
   const order = requireOrder(orderId)
+  if (order.status === 'CANCELLED') throw new Error('This order is cancelled.')
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('Enter a payment amount')
   const paid = Math.round(amount * 100) / 100
   const entries = order.paymentEntries ?? []
@@ -894,6 +934,7 @@ export function recordPayment(orderId: string, amount: number, method: PaymentMe
 }
 
 export function setItemStatus(orderId: string, itemId: string, status: ProductionStatus) {
+  if (requireOrder(orderId).status === 'CANCELLED') throw new Error('This order is cancelled.')
   const item = state.items.find((i) => i.id === itemId && i.orderId === orderId)
   if (!item) throw new Error('Item not found')
   item.productionStatus = status
@@ -904,24 +945,32 @@ export function setItemStatus(orderId: string, itemId: string, status: Productio
     })
   const order = state.orders.find((o) => o.id === orderId)
   const siblings = state.items.filter((i) => i.orderId === orderId)
-  if (order && order.handedOver && !siblings.every((i) => i.productionStatus === 'finished')) {
+  if (order && status !== 'finished' && (item.handedOver ?? order.handedOver)) {
+    for (const sibling of siblings) sibling.handedOver ??= order.handedOver
+    item.handedOver = false
     order.handedOver = false
+    order.handedOverAt = undefined
   }
   emit()
 }
 
-export function setHandedOver(orderId: string, handedOver: boolean) {
+export function setHandedOver(orderId: string, handedOver: boolean, itemIds?: string[]) {
   const order = requireOrder(orderId)
+  if (order.status === 'CANCELLED') throw new Error('This order is cancelled.')
   const items = state.items.filter((i) => i.orderId === orderId)
-  if (handedOver && !items.every((i) => i.productionStatus === 'finished')) {
-    throw new Error('Finish all ornaments before marking handed over')
-  }
-  order.handedOver = handedOver
-  order.handedOverAt = handedOver ? new Date().toISOString() : undefined
+  const selected = itemIds ? items.filter(i => itemIds.includes(i.id)) : items
+  if (itemIds && (!itemIds.length || selected.length !== itemIds.length)) throw new Error('Select valid items from this order.')
+  if (handedOver && selected.some(i => i.productionStatus !== 'finished')) throw new Error('Finish all ornaments before marking handed over')
+  for (const item of items) item.handedOver ??= order.handedOver
+  for (const item of selected) item.handedOver = handedOver
+  const complete = items.length > 0 && items.every(i => i.handedOver)
+  if (complete !== order.handedOver) order.handedOverAt = complete ? new Date().toISOString() : undefined
+  order.handedOver = complete
   emit()
 }
 
 function trackStatusFor(order: Order, items: OrderItem[]): TrackView['status'] {
+  if (order.status === 'CANCELLED') return 'cancelled'
   if (order.handedOver) return 'delivered'
   if (items.every((i) => i.productionStatus === 'finished')) return 'ready'
   return 'preparing'
@@ -979,7 +1028,7 @@ export function getTrackByCode(code: string): TrackView {
 export function updateViennaAddress(code: string, address: Address): TrackView {
   const order = getOrderByCode(code)
   if (!order) throw new Error('Order not found')
-  if (readFormToken(order.code) !== order.formToken
+  if (order.status === 'CANCELLED' || readFormToken(order.code) !== order.formToken
     || (order.handedOver && order.handedOverAt && Date.now() - Date.parse(order.handedOverAt) >= 30 * 86400000)) {
     throw Object.assign(new Error('Open the link from your order form to change the address.'), { status: 403, code: 'FORBIDDEN' })
   }
@@ -995,7 +1044,7 @@ export function updateViennaAddress(code: string, address: Address): TrackView {
 
 export function getForm(token: string): CustomerFormView {
   const order = state.orders.find((o) => o.formToken === token)
-  if (!order) throw new Error('This form link is not valid.')
+  if (!order || order.status === 'CANCELLED') throw new Error('This form link is not valid.')
   if (order.handedOver && order.handedOverAt && Date.now() - Date.parse(order.handedOverAt) >= 30 * 86400000) throw Object.assign(new Error('Form expired.'), { code: 'FORM_EXPIRED', status: 404 })
   const customer = state.customers.find((c) => c.id === order.customerId)
   const items = state.items.filter((i) => i.orderId === order.id)
@@ -1031,7 +1080,7 @@ export function getForm(token: string): CustomerFormView {
 
 export function submitForm(token: string, payload: CustomerFormPayload): { orderCode: string } {
   const order = state.orders.find((o) => o.formToken === token)
-  if (!order) throw new Error('This form link is not valid.')
+  if (!order || order.status === 'CANCELLED') throw new Error('This form link is not valid.')
   if (order.handedOver && order.handedOverAt && Date.now() - Date.parse(order.handedOverAt) >= 30 * 86400000) throw Object.assign(new Error('Form expired.'), { code: 'FORM_EXPIRED', status: 404 })
   const customer = state.customers.find((c) => c.id === order.customerId)
   const items = state.items.filter((i) => i.orderId === order.id)
@@ -1135,8 +1184,11 @@ export function searchOrders(query: string): import('../../domain/types').OrderS
 function orderSummary(order: Order): import('../../domain/types').OrderSummary {
   const bundle = getOrderBundle(order.id)
   const dates = bundle.items.map(item => item.delivery.deliveryDate ?? state.marketDays.find(day => day.id === item.delivery.marketDayId)?.date).filter((date): date is string => Boolean(date)).sort()
-  return { id: order.id, code: order.code, customerName: bundle.customer.name, phone: bundle.customer.phone, createdAt: order.createdAt, paymentState: order.paymentState, checkoutStatus: order.checkoutStatus ?? (order.paymentReview ? 'review' : null), total: order.total, items: bundle.items.length, nextHandoffDate: dates[0] ?? null, handedOver: order.handedOver }
+  return { id: order.id, code: order.code, customerName: bundle.customer.name, phone: bundle.customer.phone, createdAt: order.createdAt, paymentState: order.paymentState, checkoutStatus: order.checkoutStatus ?? (order.paymentReview ? 'review' : null), total: order.total, items: bundle.items.length, nextHandoffDate: dates[0] ?? null, handedOver: order.handedOver, source: order.source ?? 'stall', status: order.status ?? 'ACTIVE' }
+}
+export function listSales(filters: import('../../domain/types').SalesFilters): import('../../domain/types').SalesPage {
+  return filterSales(state.orders.map(orderSummary), filters)
 }
 export function attentionOrders() {
-  return state.orders.filter(order => order.paymentReview || order.checkoutStatus === 'pending' || order.checkoutStatus === 'review').map(orderSummary)
+  return state.orders.filter(order => order.status !== 'CANCELLED' && (order.paymentReview || order.checkoutStatus === 'pending' || order.checkoutStatus === 'review')).map(orderSummary)
 }

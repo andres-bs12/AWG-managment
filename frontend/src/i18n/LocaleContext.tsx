@@ -6,6 +6,14 @@ type Dictionary = Record<string, string>
 
 const messages: Record<Locale, Dictionary> = {
   en: {
+    orderCancelled: 'Cancelled', orderCancelledBody: 'This order has been cancelled.',
+    formOrnaments: "Your ornament(s)",
+    formPaintedNameTooLong: "The name on the back must contain 1–6 letters. Please enter a shorter name.",
+    pausePreview: 'Pause preview animation',
+    resumePreview: 'Resume preview animation',
+    paintedPetName: "Your pet’s name (painted on the back)",
+    paintedNameTooLong: 'The name on the back must contain 1–6 letters. Shorten the name yourself or turn off the name option.',
+    deliveryWhen: 'When?',
     // Multi-ornament overview and per-ornament name choice (Task B).
     multiYourOrnaments: 'In your order',
     multiAddAnother: 'Add another ornament',
@@ -302,6 +310,14 @@ const messages: Record<Locale, Dictionary> = {
     shopThanksNoCode: 'We could not find your order code. Check the confirmation email from Stripe.',
   },
   de: {
+    orderCancelled: 'Storniert', orderCancelledBody: 'Diese Bestellung wurde storniert.',
+    formOrnaments: "Deine Kugel(n)",
+    formPaintedNameTooLong: "Der Name auf der Rückseite muss 1–6 Buchstaben haben. Bitte gib einen kürzeren Namen ein.",
+    pausePreview: 'Vorschau pausieren',
+    resumePreview: 'Vorschau fortsetzen',
+    paintedPetName: 'Tiername (auf der Rückseite)',
+    paintedNameTooLong: 'Der Name auf der Rückseite muss 1–6 Buchstaben haben. Bitte selbst kürzen oder die Namensoption ausschalten.',
+    deliveryWhen: 'Wann?',
     // Multi-ornament overview and per-ornament name choice (Task B).
     multiYourOrnaments: 'In deiner Bestellung',
     multiAddAnother: 'Weitere Kugel hinzufügen',

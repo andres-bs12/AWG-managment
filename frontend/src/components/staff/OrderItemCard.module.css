@@ -38,3 +38,9 @@
 .swatch[data-color='white'] { background: var(--ornament-white); }
 
 .title h3 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+
+.production { display: grid; gap: var(--space-3); padding-top: var(--space-4); border-top: var(--border-thin) solid var(--staff-line); }
+.production h4, .handover h4 { margin: 0; font-size: var(--type-staff-body-size); }
+.handover { display: grid; gap: var(--space-3); margin-top: var(--space-5); padding-top: var(--space-4); border-top: var(--border-thin) solid var(--staff-line); }
+.handover > div { display: grid; gap: var(--space-1); }
+.handover p { color: var(--staff-muted); font-size: var(--type-staff-meta-size); }

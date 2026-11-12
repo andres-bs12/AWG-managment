@@ -35,14 +35,36 @@ class FormTrackApiTests extends ApiTestSupport {
     }
 
     private MvcResult submit(Created c, MockMultipartFile... files) throws Exception {
+        return submitNamed(c, "bella", files);
+    }
+
+    private MvcResult submitNamed(Created c, String backName, MockMultipartFile... files) throws Exception {
         Map<String, Object> payload = Map.of(
                 "customerName", "Maria Muster", "phone", "+43 660 1234567", "email", "maria@example.com",
-                "items", List.of(Map.of("orderItemId", c.itemId(), "petName", "Bella", "backName", "bella",
+                "items", List.of(Map.of("orderItemId", c.itemId(), "petName", "Bella", "backName", backName,
                         "note", "Brown and white", "photos", List.of(Map.of("id", "p1", "name", "bella.jpg")))));
         var req = multipart("/api/forms/" + c.formToken())
                 .file(new MockMultipartFile("payload", "payload", "application/json", json(payload).getBytes()));
         for (MockMultipartFile f : files) req.file(f);
         return mvc.perform(withIp(req)).andReturn();
+    }
+
+    @Test
+    void rejectsLetteringThatExpandsBeyondSixOnUppercase() throws Exception {
+        Created c = customOrder(login(), "market", SAT, 14.0);
+        var res = submitNamed(c, "Straße", new MockMultipartFile("photo-p1", "bella.jpg", "image/jpeg", JPEG));
+        assertEquals(400, res.getResponse().getStatus());
+        assertEquals("VALIDATION", this.<String>read(res, "$.code"));
+        assertEquals("items[0].backName", this.<String>read(res, "$.field"));
+    }
+
+    @Test
+    void acceptsSixLettersAfterUppercaseExpansion() throws Exception {
+        Created c = customOrder(login(), "market", SAT, 14.0);
+        var res = submitNamed(c, "ßßß", new MockMultipartFile("photo-p1", "bella.jpg", "image/jpeg", JPEG));
+        assertEquals(200, res.getResponse().getStatus());
+        mvc.perform(withIp(get("/api/forms/" + c.formToken())))
+                .andExpect(jsonPath("$.items[0].backName").value("SSSSSS"));
     }
 
     @Test

@@ -58,18 +58,43 @@ class ShopApiTests extends ApiTestSupport {
     }
 
     private MvcResult checkout(String postal, String date, int customs) throws Exception {
+        return checkout(postal, date, customs, "eva@example.com", freshIp());
+    }
+
+    private MvcResult checkout(String postal, String date, int customs, String email, String ip) throws Exception {
+        return checkoutNamed(postal, date, customs, email, ip, "luna");
+    }
+
+    private MvcResult checkoutNamed(String postal, String date, int customs, String email, String ip, String backName) throws Exception {
         List<Map<String, Object>> items = new ArrayList<>();
         var req = multipart("/api/shop/checkout");
         for (int i = 0; i < customs; i++) {
             items.add(Map.of("kind", "custom", "withName", i == 0, "color", "red", "finish", "shiny", "petName", "Luna" + i,
-                    "backName", "luna", "photos", List.of(Map.of("id", "p" + i, "name", "luna.jpg"))));
+                    "backName", backName, "photos", List.of(Map.of("id", "p" + i, "name", "luna.jpg"))));
             req.file(new MockMultipartFile("photo-p" + i, "luna.jpg", "image/jpeg", JPEG));
         }
-        Map<String, Object> payload = Map.of("customerName", "Eva Gruber", "email", "eva@example.com", "phone", "+43 1 234",
+        Map<String, Object> payload = Map.of("customerName", "Eva Gruber", "email", email, "phone", "+43 1 234",
                 "address", Map.of("line1", "Neubaugasse 1", "city", "Wien", "postalCode", postal),
                 "deliveryDate", date, "acceptTerms", true, "items", items);
         req.file(new MockMultipartFile("payload", "", "application/json", json(payload).getBytes()));
-        return mvc.perform(withIp(req)).andReturn();
+        return mvc.perform(req.with(r -> { r.setRemoteAddr(ip); return r; })).andReturn();
+    }
+
+    @Test
+    void rejectsLetteringThatExpandsBeyondSixOnUppercase() throws Exception {
+        var res = checkoutNamed("1070", "2026-12-02", 1, "eva@example.com", freshIp(), "Straße");
+        assertThat(res.getResponse().getStatus()).isEqualTo(400);
+        assertThat(this.<String>read(res, "$.code")).isEqualTo("VALIDATION");
+        assertThat(this.<String>read(res, "$.field")).isEqualTo("items[0].backName");
+        org.mockito.Mockito.verify(stripe, org.mockito.Mockito.never()).createCheckoutSession(anyString(), anyString(), anyString(), anyList(), any());
+    }
+
+    @Test
+    void acceptsSixLettersAfterUppercaseExpansion() throws Exception {
+        var res = checkoutNamed("1070", "2026-12-02", 1, "eva@example.com", freshIp(), "ßßß");
+        assertThat(res.getResponse().getStatus()).isEqualTo(200);
+        String code = read(res, "$.orderCode");
+        assertThat(orderRepository.findByCodeIgnoreCase(code).orElseThrow().getOrderItems().getFirst().getNameInOrnament()).isEqualTo("SSSSSS");
     }
 
     private void webhook(String type, String paymentStatus, long amount) throws Exception {
@@ -255,10 +280,53 @@ class ShopApiTests extends ApiTestSupport {
         order.setCheckoutExpiresAt(java.time.Instant.parse("2026-01-01T00:00:00Z"));
         orderRepository.save(order);
         long cents = order.getTotal().movePointRight(2).longValueExact();
+        when(stripe.expireOrReconcile("cs_test_1")).thenReturn("complete");
         when(stripe.retrieveSession("cs_test_1")).thenReturn(objectMapper.readTree(json(Map.of(
                 "id", "cs_test_1", "status", "complete", "payment_status", "paid", "amount_total", cents, "currency", "eur"))));
         shopService.releaseExpired();
         assertThat(orderRepository.findByCodeIgnoreCase(code).orElseThrow().getPaymentState().name()).isEqualTo("PAID");
+    }
+
+
+    @Test
+    void pendingLimitsApplySeparatelyToNormalizedEmailAndClientIp() throws Exception {
+        when(stripe.createCheckoutSession(anyString(), anyString(), anyString(), anyList(), any()))
+                .thenAnswer(a -> new StripeClient.Session("cs_" + java.util.UUID.randomUUID().toString().replace("-", ""), "https://checkout.stripe.test/x"));
+        assertThat(checkout("1070", "2026-12-02", 1, "Eva@example.com", "10.9.1.1").getResponse().getStatus()).isEqualTo(200);
+        assertThat(checkout("1070", "2026-12-09", 1, "eva@example.com", "10.9.1.2").getResponse().getStatus()).isEqualTo(200);
+        var emailLimit = checkout("1070", "2026-12-16", 1, "EVA@example.com", "10.9.1.3");
+        assertThat(emailLimit.getResponse().getStatus()).isEqualTo(429);
+        assertThat(emailLimit.getResponse().getContentAsString()).contains("PENDING_CHECKOUT_LIMIT");
+        assertThat(checkout("1070", "2026-12-16", 1, "other@example.com", "10.9.1.1").getResponse().getStatus()).isEqualTo(200);
+        var ipLimit = checkout("1070", "2026-12-16", 1, "third@example.com", "10.9.1.1");
+        assertThat(ipLimit.getResponse().getStatus()).isEqualTo(429);
+        assertThat(ipLimit.getResponse().getContentAsString()).contains("PENDING_CHECKOUT_LIMIT");
+    }
+
+    @Test
+    void expiryClosesStripeAndReleasesStockAtApplicationDeadline() throws Exception {
+        int before = inventoryRepository.findAll().stream().filter(i -> i.getItemKind() == com.artwithgab.awg_tracking.enums.ItemKind.CUSTOM && i.getCustomColor() == com.artwithgab.awg_tracking.enums.CustomColor.RED && i.getCustomFinish() == com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).findFirst().orElseThrow().getQuantity();
+        String code = read(checkout("1070", "2026-12-02", 1), "$.orderCode");
+        var order = orderRepository.findByCodeIgnoreCase(code).orElseThrow();
+        assertThat(order.getCheckoutExpiresAt()).isEqualTo(java.time.Instant.parse("2026-11-24T08:15:00Z"));
+        org.mockito.Mockito.verify(stripe).createCheckoutSession(anyString(), anyString(), anyString(), anyList(), org.mockito.ArgumentMatchers.argThat(t -> !t.isBefore(java.time.Instant.parse("2026-11-24T08:30:00Z"))));
+        order.setCheckoutExpiresAt(java.time.Instant.parse("2026-11-24T07:59:59Z"));
+        orderRepository.saveAndFlush(order);
+        shopService.releaseExpired();
+        assertThat(orderRepository.findByCodeIgnoreCase(code)).isEmpty();
+        assertThat(inventoryRepository.findAll().stream().filter(i -> i.getItemKind() == com.artwithgab.awg_tracking.enums.ItemKind.CUSTOM && i.getCustomColor() == com.artwithgab.awg_tracking.enums.CustomColor.RED && i.getCustomFinish() == com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).findFirst().orElseThrow().getQuantity()).isEqualTo(before);
+        org.mockito.Mockito.verify(stripe).expireOrReconcile("cs_test_1");
+    }
+
+    @Test
+    void cleanupKeepsReservationWhenStripeCannotBeReconciled() throws Exception {
+        String code = read(checkout("1070", "2026-12-02", 1), "$.orderCode");
+        var order = orderRepository.findByCodeIgnoreCase(code).orElseThrow();
+        order.setCheckoutExpiresAt(java.time.Instant.parse("2026-11-24T07:59:59Z"));
+        orderRepository.saveAndFlush(order);
+        when(stripe.expireOrReconcile("cs_test_1")).thenThrow(new StripeClient.PaymentProviderException());
+        shopService.releaseExpired();
+        assertThat(orderRepository.findByCodeIgnoreCase(code).orElseThrow().getCheckoutStatus()).isEqualTo(com.artwithgab.awg_tracking.enums.CheckoutStatus.PENDING);
     }
 
     @Test

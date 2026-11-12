@@ -11,7 +11,7 @@
 .time { font-variant-numeric: tabular-nums; }
 .time > span, .body > span {  font-size: var(--type-staff-meta-size); }
 .body > strong, .body > span { overflow-wrap: anywhere; }
-.status { font-size: var(--type-staff-meta-size); font-weight: 700; }
+.status { font-size: var(--type-staff-meta-size); font-weight: 700; white-space: nowrap; }
 .status[data-status='not_started'],
 .status[data-status='delivered'] { font-weight: 600;  }
 .empty { padding: var(--space-5); background: var(--staff-surface); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius); color: var(--staff-muted); }

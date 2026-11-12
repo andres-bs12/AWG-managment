@@ -64,6 +64,7 @@ export type AgendaService = {
 }
 
 export type OrderService = {
+  listSales: (filters: import('../domain/types').SalesFilters) => Promise<import('../domain/types').SalesPage>
   search: (query: string) => Promise<import('../domain/types').OrderSummary[]>
   attention: () => Promise<import('../domain/types').OrderSummary[]>
   getOrder: (id: string) => Promise<Order>
@@ -75,14 +76,14 @@ export type OrderService = {
     blocks: import('../domain/types').TimeBlock[]
   }>
   createSale: (input: CreateSaleInput, idempotencyKey: string) => Promise<Order>
-  cancelOrder: (orderId: string) => Promise<void>
+  cancelOrder: (orderId: string, reason?: string) => Promise<void>
   setItemStatus: (
     orderId: string,
     itemId: string,
     status: import('../domain/types').ProductionStatus,
   ) => Promise<void>
   /** Mark (or undo) market pickup / Vienna handoff — Track becomes `delivered`. */
-  setHandedOver: (orderId: string, handedOver: boolean) => Promise<void>
+  setHandedOver: (orderId: string, handedOver: boolean, itemIds?: string[]) => Promise<void>
 }
 
 export type PaymentService = {
@@ -121,12 +122,12 @@ export type ShopService = {
   abandonCheckout: (code: string) => Promise<void>
 }
 
-export type BuyMetric = { event: 'buy_view' | 'buy_step' | 'buy_choice' | 'buy_photo_added' | 'buy_validation_error' | 'buy_pay_click' | 'buy_seq'; step?: 'design' | 'delivery' | 'review'; field?: string; code?: 'required' | 'invalid'; value?: string }
+export type BuyMetric = { event: 'buy_view' | 'buy_step' | 'buy_choice' | 'buy_photo_added' | 'buy_validation_error' | 'buy_pay_click' | 'buy_seq'; step?: 'design' | 'delivery' | 'details' | 'review'; field?: string; code?: 'required' | 'invalid'; value?: string }
 
 export type Api = {
   metrics: { track: (metric: BuyMetric) => Promise<void> }
   inventory: { list: () => Promise<InventoryItem[]>; update: (id: string, quantity: number, expectedQuantity?: number) => Promise<InventoryItem> }
-  paintingDays: { list: (from: string, to: string) => Promise<PaintingDay[]>; update: (date: string, open: boolean, maxPaintings: number) => Promise<PaintingDay> }
+  paintingDays: { list: (from: string, to: string) => Promise<PaintingDay[]>; update: (date: string, open: boolean, maxPaintings: number, hours?: { openHour: number; closeHour: number }) => Promise<PaintingDay> }
   auth: AuthService
   markets: MarketService
   agenda: AgendaService

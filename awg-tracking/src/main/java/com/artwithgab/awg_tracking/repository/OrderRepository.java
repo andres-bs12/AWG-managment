@@ -10,7 +10,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface OrderRepository extends JpaRepository<Order, UUID> {
+public interface OrderRepository extends JpaRepository<Order, UUID>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Order> {
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Order o where o.id = :id")
+    Optional<Order> findForHandover(@org.springframework.data.repository.query.Param("id") UUID id);
 
     @Query("select o from Order o join fetch o.customer where upper(o.code) = upper(:code)")
     Optional<Order> findByCodeIgnoreCase(String code);
@@ -31,12 +35,17 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     Optional<Order> findByIdempotencyKey(String idempotencyKey);
 
-    long countByCheckoutStatus(com.artwithgab.awg_tracking.enums.CheckoutStatus status);
+    long countByCheckoutStatusAndStatusNot(com.artwithgab.awg_tracking.enums.CheckoutStatus status, String orderStatus);
+
+    @Query("select count(o) from Order o where o.source = com.artwithgab.awg_tracking.enums.OrderSource.WEB and o.checkoutStatus = :status and o.status <> 'CANCELLED' and lower(trim(o.customer.email)) = :email")
+    long countPendingForEmail(CheckoutStatus status, String email);
+
+    long countByCheckoutStatusAndCheckoutClientHashAndStatusNot(CheckoutStatus status, String clientHash, String orderStatus);
 
     boolean existsByCode(String code);
 
     /** Web orders still waiting for Stripe after their checkout expired. */
-    List<Order> findByCheckoutStatusAndCheckoutExpiresAtBefore(CheckoutStatus status, Instant before);
+    List<Order> findByCheckoutStatusAndCheckoutExpiresAtBeforeAndStatusNot(CheckoutStatus status, Instant before, String orderStatus);
 
     Optional<Order> findByStripeSessionId(String sessionId);
 
@@ -48,6 +57,6 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
                        @org.springframework.data.repository.query.Param("digits") String digits,
                        org.springframework.data.domain.Pageable page);
 
-    @Query("select o from Order o join fetch o.customer where o.checkoutStatus in :statuses order by o.createdAt desc")
+    @Query("select o from Order o join fetch o.customer where o.status <> 'CANCELLED' and o.checkoutStatus in :statuses order by o.createdAt desc")
     List<Order> findByCheckoutStatusIn(@org.springframework.data.repository.query.Param("statuses") java.util.Collection<CheckoutStatus> statuses);
 }

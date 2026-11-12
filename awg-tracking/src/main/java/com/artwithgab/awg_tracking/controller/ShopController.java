@@ -81,7 +81,7 @@ public class ShopController {
             if (name.startsWith("photo-")) files.put(name, file);
         });
         if (files.size() > 60) throw new BadRequestException("Too many photos.");
-        return shopService.checkout(payload, files);
+        return shopService.checkout(payload, files, request.getRemoteAddr());
     }
 
     @PostMapping("/checkout/{code}/abandon")

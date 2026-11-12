@@ -24,6 +24,7 @@ public record OrderItemDto(
         ProductionStatus productionStatus,
         List<PhotoDto> photos,
         boolean formComplete,
+        boolean handedOver,
         DeliveryDto delivery
 ) {
 }

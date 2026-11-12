@@ -1,3 +1,4 @@
+import { StaffText } from '../../components/staff/StaffText'
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
@@ -8,6 +9,7 @@ import { InsetNote } from '../../components/public/PublicForm'
 import { HelpTip } from '../../components/ui/HelpTip'
 import { useStaffClock } from '../../lib/staffClock'
 import { useStaffRefresh } from '../../lib/useStaffRefresh'
+import { useOrderFormStatus } from '../../lib/useOrderFormStatus'
 import { QrCode } from '../../components/staff/QrCode'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
@@ -16,7 +18,7 @@ import { Field } from '../../components/ui/Field'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import type { AgendaDay, CapacityResult, Market, MarketDay, MoveSuggestion, OrnamentColor, PaymentMethod, PaymentState, InventoryItem, PaintingDay } from '../../domain/types'
 import { isMarketPickupWeekday, isViennaWeekday, paintDatesToTry } from '../../lib/calendar'
-import { formatDateLabel, formatHour, formatMinutes, hoursOverlap, minutesToHours, pickupHourOptions } from '../../lib/time'
+import { formatDateLabel, formatHour, hoursOverlap, minutesToHours, pickupHourOptions } from '../../lib/time'
 import { formatEur, itemCost, type Pricing } from '../../lib/money'
 import { OrderSummaryPanel } from './OrderSummaryPanel'
 import {
@@ -195,6 +197,7 @@ export function NewSalePage() {
   const phase = draft.phase
   const order = draft.order
   const formUrl = order ? `${window.location.origin}/form/${order.formToken}` : ''
+  const formStatus = useOrderFormStatus(order?.id, hasCustom && ['qr', 'payment', 'done'].includes(phase))
 
   const itemsRef = useRef(draft.items)
   useEffect(() => { itemsRef.current = draft.items }, [draft.items])
@@ -543,7 +546,7 @@ export function NewSalePage() {
       .catch(() => setChangeDate((current) => current && { state: 'unknown', formSent: false }))
   }
 
-  /** The order was created for one date; to pick another, delete it (paint time and stock come back) and plan again. */
+  /** The order was created for one date; cancel it (paint time and stock come back) and plan again. */
   async function cancelAndChangeDate() {
     if (!order || submitLock.current) return
     submitLock.current = true
@@ -553,9 +556,9 @@ export function NewSalePage() {
       try {
         await api.orders.cancelOrder(order.id)
       } catch (err) {
-        // The delete may have committed with the response lost: an order that no longer exists counts as cancelled.
+        // The cancellation may have committed even if the response was lost.
         const stillThere = await api.orders.getOrderByCode(order.code).catch(() => undefined)
-        if (stillThere !== null) throw err
+        if (stillThere !== null && stillThere?.status !== 'CANCELLED') throw err
       }
       saleKey.current = uid()
       setSuggestions({})
@@ -649,7 +652,7 @@ export function NewSalePage() {
 
       {leaveOpen && order && <StaffDialog title="Leave this sale?" onClose={() => setLeaveOpen(false)}>
         <p>{order.code} stays saved and unpaid, with its paint time reserved. Open it later from Search to show the QR or take payment.</p>
-        <Button tone="staff" variant="secondary" onClick={() => setLeaveOpen(false)}>Keep working</Button>
+        <Button tone="staff" variant="secondary" onClick={() => setLeaveOpen(false)}>Not yet</Button>
         <Button tone="staff" variant="secondary" onClick={() => { clearStoredDraft(); navigate(`/staff/orders/${order.id}`, { state: { from: '/staff/sales/new' } }) }}>Open order</Button>
         <Button tone="staff" onClick={() => { setLeaveOpen(false); startOver() }}>Start new sale</Button>
       </StaffDialog>}
@@ -680,7 +683,7 @@ export function NewSalePage() {
       </StaffDialog>}
       <div className={styles.workspace}>
         <div className={styles.main}>
-          <h2>{title[phase]}</h2>
+          {phase !== 'items' && <h2>{title[phase]}</h2>}
           {configError ? <div role="alert"><p>{configError}</p><Button tone="staff" variant="secondary" onClick={() => setConfigRetry(n => n + 1)}>Retry configuration</Button></div> : null}
           {error ? (
             <p className={styles.err} role="alert">
@@ -779,13 +782,19 @@ export function NewSalePage() {
             </>
           ) : null}
 
+          {order && hasCustom && ['qr', 'payment', 'done'].includes(phase) && <div className={styles.formStatus} data-received={formStatus.received || undefined}>
+            <p role="status">{formStatus.received ? `Form received${formStatus.customerName ? ` · ${formStatus.customerName}` : ''}` : 'Waiting for customer form'}</p>
+            {formStatus.received ? <ButtonLink to={`/staff/orders/${order.id}`} tone="staff" variant="ghost">View details</ButtonLink> : null}
+            {formStatus.error && <div role="alert"><p>{formStatus.error}</p><Button tone="staff" variant="secondary" onClick={formStatus.retry}>Check now</Button></div>}
+          </div>}
+
           {phase === 'qr' && order ? (
             <div className={styles.qrStep}>
               <div className={styles.qr}>
                 <QrCode value={formUrl} />
               </div>
               <div className={styles.qrSide}>
-                <p className={styles.lead}>The customer scans the code and adds photos, names and contact on their phone. You can take payment meanwhile.</p>
+                {!formStatus.received && <p className={styles.lead}>Scan to add photos and contact details. You can take payment meanwhile.</p>}
                 <StaffActions className={styles.actions} total={order?.total ?? (prices ? draftTotal(draft.items, prices) : null)}>
                   <Button tone="staff" size="lg" onClick={() => setPhase('payment')}>
                     Continue to payment
@@ -933,7 +942,7 @@ function ItemsStep({
             <article key={item.id} className={styles.card}>
               <div className={styles.cardHead}>
                 <h3>
-                  {itemLabel(item, index)} · {prices ? formatEur(itemCost(item.kind, item.withName, prices), 'en') : 'Price unavailable'}
+                  <StaffText>{`${itemLabel(item, index)} · ${prices ? formatEur(itemCost(item.kind, item.withName, prices), 'en') : 'Price unavailable'}`}</StaffText>
                 </h3>
                 <Button tone="staff" variant="ghost" onClick={() => onRemove(item.id)}>
                   Remove
@@ -1250,7 +1259,7 @@ function DeliveryCard({
           <span className={styles.calendarIcon} aria-hidden="true">▦</span>
           <span>
             <strong>{formatDateLabel(viennaDay.date)}</strong>
-            <small>Vienna delivery · no exact time</small>
+
           </span>
           <span className={styles.dateChevron} aria-hidden="true">{viennaPickerOpen ? '▲' : '▼'}</span>
         </button>
@@ -1261,7 +1270,7 @@ function DeliveryCard({
           <div className={styles.datePickerHead}>
             <div>
               <strong>Choose delivery day</strong>
-              <small>Vienna delivery · Wednesday or Friday · no exact time.</small>
+
             </div>
             <button type="button" className={styles.closePicker} onClick={() => setViennaPickerOpen(false)} aria-label="Close delivery day picker">
               ×
@@ -1288,7 +1297,7 @@ function DeliveryCard({
               choices={viennaDays.map((d) => ({
                 value: d.date,
                 title: formatDateLabel(d.date),
-                body: `No exact time · ${capacityLabel(d.date)}`,
+                body: capacityLabel(d.date),
               }))}
             />
           ) : (
@@ -1350,7 +1359,6 @@ function DeliveryCard({
             <p className={styles.planPrompt}>Choose the pickup hour to calculate a safe painting time.</p>
           ) : paintItems.length > 1 ? (
             <>
-              <p className={styles.planPrompt}>One session per ornament, any free time before pickup.</p>
               <ul className={styles.sessionList}>
                 {paintItems.map((row) => {
                   const rowSlot = slotLabel(row)
@@ -1358,10 +1366,10 @@ function DeliveryCard({
                   return (
                     <li key={row.id} data-state={rowSlot ? 'ok' : failed ? 'missing' : 'pending'}>
                       <div>
-                        <strong>{itemLabel(row, allItems.findIndex((entry) => entry.id === row.id))} · {formatMinutes(row.durationMinutes)}</strong>
+                        <strong>{itemLabel(row, allItems.findIndex((entry) => entry.id === row.id))}</strong>
                         <p>
                           {rowSlot
-                            ? <><span aria-hidden="true">✓ </span>{rowSlot}{row.slotLocked ? ' · chosen on agenda' : ''}</>
+                            ? <StaffText>{rowSlot}</StaffText>
                             : failed ? 'No free time before pickup' : 'Checking paint times…'}
                         </p>
                       </div>
@@ -1388,17 +1396,16 @@ function DeliveryCard({
             </p>
           ) : item.slotLocked && slot ? (
             <div className={styles.planSelected} role="status">
-              <strong><span aria-hidden="true">✓ </span>{item.plannedMove ? 'Change added to this sale' : 'Paint time selected'}</strong>
+              {item.plannedMove && <strong>Change added to this sale</strong>}
               {item.plannedMove ? <p>{item.plannedMove.orderCode} → {formatDateLabel(item.plannedMove.to.date)} · {formatHour(item.plannedMove.to.startHour)}–{formatHour(item.plannedMove.to.endHour)}</p> : null}
-              <p>This ornament · {slot}</p>
+              <strong><StaffText>{slot}</StaffText></strong>
               {item.plannedMove ? <small>Saved together with the order.</small> : null}
-              <button type="button" className={styles.textBtn} onClick={() => onChangeSlot(item)}>{item.plannedMove ? 'Undo change' : 'Choose another time'}</button>
+              <button type="button" className={styles.textBtn} onClick={() => onChangeSlot(item)}>{item.plannedMove ? 'Undo change' : 'Change'}</button>
             </div>
           ) : slot ? (
             <div className={styles.planSelected}>
-              <strong><span aria-hidden="true">✓ </span>Time available</strong>
-              <p>{slot}</p>
-              <button type="button" className={styles.textBtn} onClick={() => onPlace(item)}>Choose on agenda</button>
+              <strong><StaffText>{slot}</StaffText></strong>
+              <button type="button" className={styles.textBtn} onClick={() => onPlace(item)}>Change</button>
             </div>
           ) : (
             moveSuggestion ? (

@@ -32,7 +32,7 @@ public class FormService {
     private Order find(String token) {
         if (token == null || token.length() < 20 || token.length() > 100) throw new ResourceNotFoundException("This form link is not valid.");
         Order order = orderRepository.findByFormToken(token).orElseThrow(() -> new ResourceNotFoundException("This form link is not valid."));
-        if (formLinks.isExpired(order)) {
+        if (order.isCancelled() || formLinks.isExpired(order)) {
             throw new ResourceNotFoundException("This form link has expired.").code("FORM_EXPIRED");
         }
         return order;
@@ -119,7 +119,11 @@ public class FormService {
             item.setNote(row.note() == null ? "" : row.note().trim());
             if (item.isWithName()) {
                 String back = row.backName() == null ? "" : row.backName().trim().toUpperCase(Locale.ROOT);
-                item.setNameInOrnament(back.length() > 6 ? back.substring(0, 6) : back);
+                if (back.isEmpty() || back.codePointCount(0, back.length()) > 6) {
+                    throw new BadRequestException("Use 1–6 letters for the painted name.").code("VALIDATION")
+                            .field("items[" + payload.items().indexOf(row) + "].backName");
+                }
+                item.setNameInOrnament(back);
             }
             if (item.getItemKind() == ItemKind.CUSTOM && row.photos().isEmpty()) {
                 throw new BadRequestException("Add at least one photo for each ornament.");

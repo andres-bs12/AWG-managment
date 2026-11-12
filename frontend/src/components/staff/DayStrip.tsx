@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Button } from '../ui/Button'
 import styles from './DayStrip.module.css'
 
@@ -12,9 +12,10 @@ type Props = {
   value: string
   onChange: (date: string) => void
   today?: string
+  tools?: ReactNode
 }
 
-export function DayStrip({ days, value, onChange, today }: Props) {
+export function DayStrip({ days, value, onChange, today, tools }: Props) {
   const trackRef = useRef<HTMLDivElement>(null)
   const index = Math.max(0, days.findIndex((day) => day.value === value))
 
@@ -31,11 +32,8 @@ export function DayStrip({ days, value, onChange, today }: Props) {
   return (
     <div className={styles.strip}>
       <div className={styles.tools}>
-        <p className={styles.legend} id="agenda-day-label">Day</p>
         {today ? <Button tone="staff" variant="ghost" disabled={today === value} onClick={() => onChange(today)}>Today</Button> : null}
-        <select aria-label="Jump to date" value={value} onChange={event => onChange(event.target.value)}>
-          {days.map(day => <option key={day.value} value={day.value}>{new Date(`${day.value}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</option>)}
-        </select>
+        {tools}
       </div>
       <div className={styles.row}>
         <Button
@@ -52,7 +50,7 @@ export function DayStrip({ days, value, onChange, today }: Props) {
           ref={trackRef}
           className={styles.track}
           role="group"
-          aria-labelledby="agenda-day-label"
+          aria-label="Agenda day"
         >
           {days.map((day) => {
             const selected = day.value === value

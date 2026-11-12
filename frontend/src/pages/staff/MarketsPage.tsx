@@ -1,3 +1,4 @@
+import { StaffText } from '../../components/staff/StaffText'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
@@ -53,7 +54,6 @@ export function MarketsPage() {
       <div className={styles.head}>
         <div>
           <h1>Markets</h1>
-          <p className={styles.sub}>Stall seasons and the Friday–Sunday pickup days.</p>
         </div>
         <ButtonLink to="/staff/markets/new" tone="staff" variant="primary">
           New market
@@ -77,12 +77,12 @@ export function MarketsPage() {
               formatEur(market.totalCost, 'en'),
               seasonLabel(market),
               dayCountLabel(count),
-            ].join(' · ')
+            ]
             return (
               <li key={market.id}>
                 <Link className={styles.card} to={`/staff/markets/${market.id}`}>
                   <span className={styles.name}>{market.name}</span>
-                  <span className={styles.meta}>{meta}</span>
+                  <span className={styles.meta}><StaffText>{meta.slice(0, 2).join(' · ')}</StaffText></span><span className={styles.meta}><StaffText>{meta.slice(2).join(' · ')}</StaffText></span>
                 </Link>
               </li>
             )

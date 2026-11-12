@@ -8,8 +8,9 @@
 .main { max-width: var(--layout-staff-max); padding: var(--space-4) var(--space-4) calc(var(--size-staff-tabs) + var(--space-6) + env(safe-area-inset-bottom)); margin: 0 auto; min-width: 0; }
 .mainBleed { height: 100%; min-height: 0; }
 .shellPaint { height: 100dvh; overflow: hidden; }
-.bottomTabs { position: fixed; bottom: 0; inset-inline: 0; z-index: var(--z-staff-tabs); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-1); padding: var(--space-2) var(--space-2) calc(var(--space-2) + env(safe-area-inset-bottom)); background: var(--staff-surface); border-top: 1px solid var(--staff-line); }
-.bottomTabs > * { min-width: 0; padding-inline: var(--space-1); font-size: var(--type-staff-meta-size); text-align: center; white-space: nowrap; }
+.bottomTabs { position: fixed; bottom: 0; inset-inline: 0; z-index: var(--z-staff-tabs); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: var(--space-2) var(--space-1) calc(var(--space-2) + env(safe-area-inset-bottom)); background: var(--staff-surface); border-top: 1px solid var(--staff-line); }
+/* Outrank the shared selected/unselected button padding, without shrinking targets. */
+.bottomTabs > :is(a, button)[data-selected] { min-width: 0; min-height: var(--size-control-staff); padding-inline: var(--space-1); font-size: var(--type-staff-meta-size); text-align: center; white-space: nowrap; }
 .more { display: grid; gap: var(--space-2); }
 .more > * { justify-content: flex-start; }
 /* Logging out costs a password on the shared iPad: set it apart from navigation. */
@@ -30,3 +31,6 @@
   .bottomTabs { position: static; }
   .shellPaint { display: block; }
 }
+
+.brand { gap: var(--space-1); }
+.brand > a { padding-inline: var(--space-2); font-weight: 700; }

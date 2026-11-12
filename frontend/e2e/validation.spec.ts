@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { open, choose, pet, next, mobile, chooseFirstDate, photo } from './helpers'
+import { open, choose, pet, next, mobile, chooseFirstDate, photo, review } from './helpers'
 
 test('validation, focus and associated errors across steps', async ({ page }) => {
   await open(page); await next(page).click()
@@ -60,4 +60,32 @@ test('sold-out choices cannot be selected and explain why', async ({ page }) => 
   const soldOut = page.getByRole('radio', { name: /^Beige/, disabled: true })
   await expect(soldOut).toBeDisabled()
   await expect(soldOut.locator('..')).toContainText(/Ausverkauft|Sold out/i)
+})
+
+
+// v1.1 server-name errors still target the sole paid-name control in the current editor.
+for (const field of ['petName', 'backName']) test(`server ${field} rejection focuses the existing paid back-name field`, async ({ page }) => {
+  await open(page, 'en'); await choose(page)
+  await page.getByRole('radio', { name: /^Yes,/ }).check()
+  await page.locator('input[id^="back-"]').fill('Luna')
+  await pet(page)
+  await review(page); await page.locator('#buy-terms').check()
+  await page.evaluate(async field => {
+    const path = '/src/api/client.ts'; const { api } = await import(path)
+    api.shop.checkout = async () => { throw { status: 400, code: 'VALIDATION', field: `items[0].${field}` } }
+  }, field)
+  await page.locator('form button[type=submit]').click()
+  await expect(page.locator('input[id^="back-"]')).toBeFocused()
+  await expect(page.locator('[id^="back-"][id$="-error"]')).toBeVisible()
+  await expect(page.locator('input[id^="pet-"]')).toHaveCount(0)
+})
+
+test('paid lettering is checked after uppercase expansion before leaving design', async ({ page }) => {
+  await open(page, 'en'); await choose(page)
+  await page.getByRole('radio', { name: /^Yes,/ }).check()
+  await page.locator('input[id^="back-"]').fill('Straße')
+  await pet(page)
+  await next(page).click()
+  await expect(page.locator('input[id^="back-"]')).toBeFocused()
+  await expect(page.locator('[id^="back-"][id$="-error"]')).toContainText('1–6')
 })

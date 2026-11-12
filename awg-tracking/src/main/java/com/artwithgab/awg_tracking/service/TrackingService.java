@@ -47,7 +47,7 @@ public class TrackingService {
     @Transactional
     public TrackViewDto updateViennaAddress(String code, String formToken, AddressDto address) {
         Order order = find(code);
-        if (!ownsOrder(order, formToken) || formLinks.isExpired(order)) {
+        if (order.isCancelled() || !ownsOrder(order, formToken) || formLinks.isExpired(order)) {
             throw new ForbiddenException("Open the link from your order form to change the address.");
         }
         if (order.getOrderItems().stream().noneMatch(i -> i.getDeliveryKind() == DeliveryKind.DELIVERY)) {
@@ -90,7 +90,7 @@ public class TrackingService {
         CalendarIndex index = calendarService.snapshot();
         List<OrderItem> items = order.getOrderItems();
         OrderItem first = items.isEmpty() ? null : items.getFirst();
-        String status = order.isHandedOver() ? "delivered"
+        String status = order.isCancelled() ? "cancelled" : order.isHandedOver() ? "delivered"
                 : items.stream().allMatch(i -> i.getProductionStatus() == ProductionStatus.FINISHED) ? "ready" : "preparing";
         // Empty when unknown: the client shows a generic greeting in its own language.
         String name = order.getCustomer().publicName();

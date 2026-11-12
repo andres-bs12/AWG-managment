@@ -222,8 +222,8 @@ public class OrderService {
                 String movingId = moving == null ? null : moving.getId().toString();
                 boolean clashExisting = s.busyOn(md.getDate(), movingId).stream().anyMatch(b -> Hours.overlap(start, end, b.start(), b.end()));
                 boolean outside = end <= start
-                        || start < Hours.of(md.getOpenTime()) - Hours.EPS
-                        || end > Hours.of(md.getCloseTime()) + Hours.EPS
+                        || start < s.paintingOpenHour(md.getDate()) - Hours.EPS
+                        || end > s.paintingCloseHour(md.getDate()) + Hours.EPS
                         || md.getDate().isBefore(index.today())
                         || (index.isToday(md) && start < index.nowHour())
                         || (move != null && moveDestination.getId().equals(md.getId())
@@ -264,6 +264,7 @@ public class OrderService {
     @Transactional
     public OrderDto updatePaymentState(UUID orderId, PaymentState state, PaymentMethod method, BigDecimal amountPaid) {
         Order order = findOrderOrThrow(orderId);
+        requireActive(order);
         if (order.isAwaitingPayment()) throw new ConflictException("This web order is waiting for its online payment.").code("PAYMENT_PENDING");
         // Staff checked a mismatched Stripe payment by hand: recording a payment (paid or deposit) resolves the review.
         if (order.isPaymentReview()) {
@@ -293,21 +294,34 @@ public class OrderService {
     }
 
     @Transactional
-    public void setHandedOver(UUID orderId, boolean handedOver) {
-        Order order = findOrderOrThrow(orderId);
-        if (handedOver && order.getOrderItems().stream().anyMatch(i -> i.getProductionStatus() != ProductionStatus.FINISHED)) {
+    public void setHandedOver(UUID orderId, boolean handedOver, java.util.List<UUID> itemIds) {
+        Order order = orderRepository.findForHandover(orderId).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+        requireActive(order);
+        var items = order.getOrderItems();
+        var selected = itemIds == null ? items : items.stream().filter(i -> itemIds.contains(i.getId())).toList();
+        if (itemIds != null && (itemIds.isEmpty() || selected.size() != new java.util.HashSet<>(itemIds).size() || selected.size() != itemIds.size())) {
+            throw new BadRequestException("Select valid items from this order.");
+        }
+        if (handedOver && selected.stream().anyMatch(i -> i.getProductionStatus() != ProductionStatus.FINISHED)) {
             throw new ConflictException("Finish all ornaments before marking handed over");
         }
-        boolean changed = order.isHandedOver() != handedOver;
-        order.setHandedOver(handedOver);
-        if (changed) order.setHandedOverAt(handedOver ? clock.instant() : null);
-        if (changed && handedOver) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.HANDED_OVER));
+        selected.forEach(i -> i.setHandedOver(handedOver));
+        updateHandover(order);
+    }
+
+    private void updateHandover(Order order) {
+        boolean complete = !order.getOrderItems().isEmpty() && order.getOrderItems().stream().allMatch(OrderItem::isHandedOver);
+        boolean changed = order.isHandedOver() != complete;
+        order.setHandedOver(complete);
+        if (changed) order.setHandedOverAt(complete ? clock.instant() : null);
+        if (changed && complete) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.HANDED_OVER));
     }
 
     /** Changes one item's production status; un-finishing an item also undoes the handoff. */
     @Transactional
     public void setItemStatus(UUID orderId, UUID itemId, ProductionStatus status) {
-        Order order = findOrderOrThrow(orderId);
+        Order order = orderRepository.findForHandover(orderId).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+        requireActive(order);
         OrderItem item = order.getOrderItems().stream().filter(i -> i.getId().equals(itemId)).findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Item not found"));
         boolean wasFinished = item.getProductionStatus() == ProductionStatus.FINISHED;
@@ -315,23 +329,28 @@ public class OrderService {
         if (!wasFinished && status == ProductionStatus.FINISHED && order.getOrderItems().stream().allMatch(i -> i.getProductionStatus() == ProductionStatus.FINISHED)) {
             events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.ALL_FINISHED));
         }
-        if (order.isHandedOver() && order.getOrderItems().stream().anyMatch(i -> i.getProductionStatus() != ProductionStatus.FINISHED)) {
-            order.setHandedOver(false);
-            order.setHandedOverAt(null);
+        if (status != ProductionStatus.FINISHED && item.isHandedOver()) {
+            item.setHandedOver(false);
+            updateHandover(order);
         }
     }
 
     /**
-     * Staff cancellation: deletes the order, returns its stock and frees its painting time.
+     * Staff cancellation: retains the order, returns eligible stock and frees its painting time.
      * Card refunds for paid web orders are done by hand in Stripe.
      */
     @Transactional
-    public void cancelOrder(UUID orderId) {
+    public void cancelOrder(UUID orderId) { cancelOrder(orderId, null); }
+
+    @Transactional
+    public void cancelOrder(UUID orderId, String reason) {
         calendarService.lockSchedule();
-        Order order = findOrderOrThrow(orderId);
-        if (order.isHandedOver()) throw new ConflictException("This order was already handed over.");
+        Order order = orderRepository.findForHandover(orderId).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+        if (order.isCancelled()) return;
+        if (reason != null && reason.length() > 500) throw new BadRequestException("Reason must be 500 characters or fewer.").code("VALIDATION").field("reason");
+        if (order.isHandedOver() || order.getOrderItems().stream().anyMatch(OrderItem::isHandedOver)) throw new ConflictException("This order contains handed-over items.");
         if (order.isAwaitingPayment() && order.getStripeSessionId() != null) {
-            // Close the Stripe page first so the customer cannot pay an order that no longer exists.
+            // Close the Stripe page first so the customer cannot pay a cancelled order.
             if (stripe.expireOrReconcile(order.getStripeSessionId()).equals("complete")) {
                 throw new ConflictException("The customer just paid this order online. Refresh before cancelling.")
                         .code("PAYMENT_PENDING");
@@ -341,7 +360,17 @@ public class OrderService {
                     order.getCode(), order.getStripeSessionId());
         }
         events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.CANCELLED));
-        deleteAndRestock(order);
+        for (OrderItem item : order.getOrderItems()) {
+            boolean resellable = item.getItemKind() == ItemKind.GENERIC || item.getProductionStatus() == ProductionStatus.NOT_STARTED;
+            if (item.getInventory() != null && resellable) item.getInventory().setQuantity(item.getInventory().getQuantity() + 1);
+        }
+        order.setStatus("CANCELLED");
+        order.setCancelledAt(clock.instant());
+        order.setCancellationReason(reason == null || reason.isBlank() ? null : reason.trim());
+    }
+
+    private static void requireActive(Order order) {
+        if (order.isCancelled()) throw new ConflictException("This order is cancelled.");
     }
 
     /** Deletes an order with its photos, puts unpainted ornaments back in stock and drops an orphan customer. */
@@ -369,11 +398,57 @@ public class OrderService {
     public List<OrderSummaryDto> search(String query) {
         String q = query == null ? "" : query.trim();
         if (q.length() < 2) return List.of();
+        // PostgreSQL rejects NUL bytes in text parameters; such a query can never match anyway.
+        if (q.length() > 100 || q.indexOf('\0') >= 0) throw new BadRequestException("Search must contain at most 100 characters.").code("VALIDATION").field("query");
         String digits = q.replaceAll("\\D", "");
         // Without at least 3 digits the phone clause must not match everything. The sentinel holds no
         // digit, so it never occurs in a stripped phone number; PostgreSQL rejects NUL bytes in text.
         String phone = digits.length() >= 3 ? digits : "~no-phone~";
         return orderRepository.search(q, phone, org.springframework.data.domain.PageRequest.of(0, 20)).stream().map(OrderService::summary).toList();
+    }
+
+    /** Staff sales use Vienna calendar dates and bounded, deterministic database pagination. */
+    @Transactional(readOnly = true)
+    public SalesPageDto listSales(String state, String source, LocalDate from, LocalDate to, int page, int size, String query) {
+        Set<String> states = Set.of("unpaid", "deposit", "paid", "pending", "review");
+        if (state != null && !states.contains(state)) throw new BadRequestException("Choose a valid payment state.").code("VALIDATION").field("state");
+        if (source != null && !Set.of("stall", "web").contains(source)) throw new BadRequestException("Choose a valid sale source.").code("VALIDATION").field("source");
+        if (page < 0 || size < 1 || size > 50) throw new BadRequestException("Choose a valid sales page (1–50 orders).").code("VALIDATION").field("page");
+        if (from != null && to != null && from.isAfter(to)) throw new BadRequestException("From must be on or before To.").code("VALIDATION").field("from");
+        String q = query == null ? "" : query.trim();
+        if (q.length() > 100 || q.indexOf('\0') >= 0) throw new BadRequestException("Search must contain at most 100 characters.").code("VALIDATION").field("query");
+        org.springframework.data.jpa.domain.Specification<Order> filters = (root, criteria, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+            // Retention erases personal data; erased orders are not returned by staff search.
+            predicates.add(cb.isNull(root.get("anonymizedAt")));
+            if ("pending".equals(state) || "review".equals(state)) {
+                predicates.add(cb.equal(root.get("checkoutStatus"), CheckoutStatus.valueOf(state.toUpperCase(Locale.ROOT))));
+            } else if (state != null) {
+                predicates.add(cb.equal(root.get("paymentState"), PaymentState.valueOf(state.toUpperCase(Locale.ROOT))));
+                // Pending/review is the displayed payment state, rather than "unpaid".
+                predicates.add(cb.or(cb.isNull(root.get("checkoutStatus")), cb.equal(root.get("checkoutStatus"), CheckoutStatus.CONFIRMED)));
+            }
+            if ("web".equals(source)) predicates.add(cb.equal(root.get("source"), OrderSource.WEB));
+            if ("stall".equals(source)) predicates.add(cb.or(cb.isNull(root.get("source")), cb.equal(root.get("source"), OrderSource.STALL)));
+            var vienna = java.time.ZoneId.of("Europe/Vienna");
+            if (from != null) predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), from.atStartOfDay(vienna).toInstant()));
+            if (to != null) predicates.add(cb.lessThan(root.get("createdAt"), to.plusDays(1).atStartOfDay(vienna).toInstant()));
+            if (!q.isEmpty()) {
+                if (q.length() < 2) return cb.disjunction();
+                String pattern = "%" + q.toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+                var customer = root.join("customer");
+                var code = cb.like(cb.lower(root.get("code")), pattern, '\\');
+                var name = cb.like(cb.lower(customer.get("name")), pattern, '\\');
+                String digits = q.replaceAll("\\D", "");
+                jakarta.persistence.criteria.Expression<String> phone = customer.get("phone");
+                for (String mark : List.of(" ", "-", "/", "(", ")", "+", ".")) phone = cb.function("replace", String.class, phone, cb.literal(mark), cb.literal(""));
+                predicates.add(digits.length() >= 3 ? cb.or(code, name, cb.like(phone, "%" + digits + "%")) : cb.or(code, name));
+            }
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+        var result = orderRepository.findAll(filters, org.springframework.data.domain.PageRequest.of(page, size,
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt", "id")));
+        return new SalesPageDto(result.getContent().stream().map(OrderService::summary).toList(), page, size, result.getTotalElements(), result.getTotalPages());
     }
 
     /** Web orders staff must look at: still waiting for Stripe, or paid with a mismatching amount. */
@@ -389,7 +464,8 @@ public class OrderService {
         return new OrderSummaryDto(o.getId().toString(), o.getCode(), o.getCustomer() == null ? "" : o.getCustomer().getName(),
                 o.getCustomer() == null ? "" : o.getCustomer().getPhone(), o.getCreatedAt() == null ? null : o.getCreatedAt().toString(),
                 o.getPaymentState().name().toLowerCase(Locale.ROOT), o.getCheckoutStatus() == null ? null : o.getCheckoutStatus().name().toLowerCase(Locale.ROOT),
-                o.getTotal(), o.getOrderItems().size(), next, o.isHandedOver());
+                o.getTotal(), o.getOrderItems().size(), next, o.isHandedOver(),
+                o.getSource() == OrderSource.WEB ? "web" : "stall", o.getStatus());
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
