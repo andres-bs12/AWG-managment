@@ -3,6 +3,7 @@ import { formatEur } from '../../lib/money'
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import type { AgendaDay, AgendaDelivery, ProductionStatus } from '../../domain/types'
+import { customerLabel, handoverBlocker, ornamentLabel, viennaDistrict } from '../../lib/deliveryFacts'
 import styles from './DeliveryRow.module.css'
 
 export function prodLabel(status: ProductionStatus): string {
@@ -34,9 +35,11 @@ export function dayChipLabel(day: AgendaDay): string {
 type Props = {
   row: AgendaDelivery
   from: string
+  /** The balance belongs to the order: show it on its first row only, or it reads as owed twice. */
+  showBalance?: boolean
 }
 
-export function DeliveryRow({ row, from }: Props) {
+export function DeliveryRow({ row, from, showBalance = true }: Props) {
   const navigate = useNavigate()
   const [photoFailed, setPhotoFailed] = useState(false)
 
@@ -55,13 +58,13 @@ export function DeliveryRow({ row, from }: Props) {
       <span className={styles.dlvBody}>
         <strong>
           {row.source === 'web' ? <span className={styles.webTag}>Web</span> : null}
-          <StaffText>{`${row.orderCode} · ${row.title}`}</StaffText>
+          <StaffText>{`${row.orderCode} · ${ornamentLabel(row)}`}</StaffText>
         </strong>
-        <span><StaffText>{[row.customerName, row.finish, deliveryStatusLabel(row)].filter(Boolean).join(' · ')}</StaffText></span>
+        <span><StaffText>{[customerLabel(row.customerName), row.kind !== 'finished' && row.color ? `${row.color} ${row.finish ?? ''}`.trim() : null, handoverBlocker(row) ?? deliveryStatusLabel(row)].filter(Boolean).join(' · ')}</StaffText></span>
       </span>
       <span className={styles.dlvAside}>
-<span>{row.methodLabel}</span>
-        {row.remaining != null && row.remaining > 0 && <strong>Collect {formatEur(row.remaining, 'en')}</strong>}
+<span>{row.deliveryKind === 'vienna' ? [row.methodLabel, viennaDistrict(row.postalCode)].filter(Boolean).join(' · ') : row.methodLabel}</span>
+        {showBalance && row.remaining != null && row.remaining > 0 && <strong>{`${row.paymentState === 'deposit' ? 'Deposit paid' : 'Not paid'} · collect ${formatEur(row.remaining, 'en')}`}</strong>}
         {row.timeLabel ? <span className={styles.dlvTime}>{row.source === 'web' ? `Arrives ${row.timeLabel}` : row.timeLabel}</span> : null}
       </span>
     </button>

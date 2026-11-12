@@ -63,4 +63,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, org.springf
 
     @Query("select o from Order o join fetch o.customer where o.status <> 'CANCELLED' and o.checkoutStatus in :statuses order by o.createdAt desc")
     List<Order> findByCheckoutStatusIn(@org.springframework.data.repository.query.Param("statuses") java.util.Collection<CheckoutStatus> statuses);
+
+    /** Orders created in [from, to), with items, for the staff Statistics page. */
+    @Query("select distinct o from Order o left join fetch o.orderItems where o.createdAt >= :from and o.createdAt < :to")
+    List<Order> findCreatedBetween(@org.springframework.data.repository.query.Param("from") Instant from,
+                                   @org.springframework.data.repository.query.Param("to") Instant to);
 }

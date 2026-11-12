@@ -5,7 +5,7 @@ import type { BuyItem } from '../../../lib/buyDraft'
 import { useLocale } from '../../../i18n/LocaleContext'
 import styles from '../BuyPage.module.css'
 import type { BuyStepProps } from './shared'
-import { Field } from '../../../components/ui/Field'
+import { BackNameField } from '../../../components/public/BackNameField'
 import { formatEur } from '../../../lib/money'
 import { colorKeys } from './shared'
 
@@ -35,7 +35,7 @@ export function BuyItemsStep({ t, draft, config, patchItem, err, described, acti
             <span data-label={withName ? t('multiNameYes', { price: formatEur(config.nameExtra, locale) }) : t('multiNameNo')}>{withName ? t('multiNameYes', { price: formatEur(config.nameExtra, locale) }) : t('multiNameNo')}</span>
           </label>)}</div>
         </fieldset>
-        {item.withName && <div className={styles.nameDetails}><Field label={t('backNameField')} htmlFor={`back-${item.uid}`} hint={t('shopBackNameHint')} error={err(`back-${item.uid}`)}><input id={`back-${item.uid}`} value={item.backName} maxLength={6} aria-invalid={!!err(`back-${item.uid}`)} aria-describedby={described(`back-${item.uid}`, true)} onChange={event => patchItem(item.uid, { backName: event.target.value.replace(/[^\p{L}]/gu, '').slice(0, 6) })} /></Field></div>}
+        {item.withName && <div className={styles.nameDetails}><BackNameField id={`back-${item.uid}`} label={t('backNameField')} hint={t('shopBackNameHint')} value={item.backName} error={err(`back-${item.uid}`)} tooLongMessage={t('paintedNameTooLong')} describedBy={described(`back-${item.uid}`, true)} onChange={backName => patchItem(item.uid, { backName })} /></div>}
       </div></div>
     </div>)}
   </>

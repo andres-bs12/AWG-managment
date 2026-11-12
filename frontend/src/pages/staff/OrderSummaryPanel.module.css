@@ -23,17 +23,19 @@
   font-size: var(--type-staff-meta-size);
 }
 
+/* Dividers sit between rows and above the total only, so no line is left dangling at the end
+   of the card when the total is hidden on narrow screens. */
 .list {
   list-style: none;
-  margin: 0 0 var(--space-3);
+  margin: 0;
   padding: 0;
   display: grid;
   gap: var(--space-3);
 }
 
-.list li {
-  padding-bottom: var(--space-3);
-  border-bottom: var(--border-thin) solid var(--staff-line);
+.list li + li {
+  padding-top: var(--space-3);
+  border-top: var(--border-thin) solid var(--staff-line);
 }
 
 .row {
@@ -62,6 +64,8 @@
   align-items: center;
   font-size: var(--type-staff-h2-size);
   margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: var(--border-thin) solid var(--staff-line);
 }
 
 @media (max-width: 1023px) {

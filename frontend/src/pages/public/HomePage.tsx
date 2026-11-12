@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { api } from '../../api/client'
 import { CabinScene } from '../../components/public/CabinScene'
 import { Countdown } from '../../components/public/Countdown'
 import { TrackDialog } from '../../components/public/TrackDialog'
@@ -13,6 +14,9 @@ export function HomePage() {
   const { t } = useLocale()
   const navigate = useNavigate()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const staffDevice = useSearchParams()[0].get('staff') === '1'
+  // One anonymous page view per visit; the stall iPad (?staff=1) is not a visitor.
+  useEffect(() => { if (!staffDevice) void api.metrics.track({ event: 'home_view' }).catch(() => {}) }, [staffDevice])
 
   return (
     <div className={styles.hero}>

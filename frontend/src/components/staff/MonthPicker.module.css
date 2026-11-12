@@ -1,0 +1,69 @@
+/* Month calendar for the painting-day picker. Colours and spacing come from the staff tokens only. */
+
+.picker { display: grid; gap: var(--space-3); min-width: 0; }
+
+.header { display: grid; grid-template-columns: var(--touch) minmax(0, 1fr) var(--touch); align-items: center; gap: var(--space-2); }
+.title { margin: 0; font-size: var(--type-staff-h2-size); line-height: var(--type-staff-h2-line); font-weight: var(--type-staff-h2-weight); text-align: center; }
+
+.nav {
+  min-width: var(--touch);
+  min-height: var(--touch);
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--radius-control);
+  background: var(--staff-surface);
+  color: inherit;
+  font: inherit;
+  font-size: var(--type-staff-h2-size);
+  line-height: 1;
+  cursor: pointer;
+}
+.nav:disabled { color: var(--staff-muted); opacity: 0.5; cursor: default; }
+.nav:focus-visible, .day:focus-visible { outline: var(--border-control) solid var(--staff-selected); outline-offset: var(--border-control); }
+
+.weekdays, .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-1); }
+/* Phones: no column gap, so each of the seven cells keeps a 44px touch target at 360px. */
+@media (max-width: 479px) { .weekdays, .grid { column-gap: 0; } }
+.weekdays { color: var(--staff-muted); font-size: var(--type-staff-meta-size); line-height: var(--type-staff-meta-line); text-align: center; }
+
+.empty { min-height: var(--touch); }
+
+.day {
+  min-width: 0;
+  min-height: var(--touch);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0;
+  padding: var(--space-1) 0;
+  border: var(--border-thin) solid transparent;
+  border-radius: var(--radius-small);
+  background: var(--staff-surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.day:disabled { color: var(--staff-muted); opacity: 0.5; cursor: default; background: transparent; }
+
+.number { font-size: var(--type-staff-body-size); line-height: 1.2; font-weight: 400; font-variant-numeric: tabular-nums; }
+.day[data-today] .number { font-weight: 700; }
+
+/* Status line: one short word or booked/max. Kept small so it fits a 360px phone column. */
+.status { max-width: 100%; overflow: hidden; text-overflow: clip; white-space: nowrap; font-size: var(--type-caption-size); line-height: 1.2; color: var(--staff-muted); }
+.day[data-tone='full'] .status { color: var(--staff-warn); font-weight: 600; }
+.day[data-tone='closed'] .status { color: var(--staff-muted); }
+
+/* Selected day: the one staff selection treatment (C1). */
+.day[data-selected] { border-color: var(--color-selected); border-width: var(--border-control); background: var(--color-selected-surface); }
+.day[data-selected] .number { font-weight: 700; }
+
+/* Page layout for the Painting days screen (PaintingDaysPage): calendar first, editor below on phones, side by side from 1024px. */
+.workspace { display: grid; gap: var(--space-6); align-items: start; min-width: 0; }
+.panel { display: grid; gap: var(--space-4); min-width: 0; }
+.panel > h2 { margin: 0; font-size: var(--type-staff-h2-size); line-height: var(--type-staff-h2-line); font-weight: var(--type-staff-h2-weight); }
+
+@media (min-width: 1024px) {
+  .workspace { grid-template-columns: minmax(0, var(--layout-calendar-max)) minmax(0, 1fr); gap: var(--space-6); }
+}

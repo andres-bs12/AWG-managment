@@ -1,12 +1,14 @@
-import { mockPricing } from './pricing'
 import { forgetFormToken, rememberFormToken } from '../formTokens'
 import { validatePhoto } from '../../lib/photoValidation'
 import type { Api, BuyMetric } from '../contracts'
 import type { Photo } from '../../domain/types'
+import { aggregateStats, demoWebMetrics, type MetricRow } from '../../lib/stats'
+import { viennaDate } from '../../lib/sales'
+import { paymentSummary } from '../../lib/paymentSummary'
 import {
-  searchOrders, attentionOrders, listSales,
+  searchOrders, attentionOrders, listSales, statsSource,
   createMockCheckout, abandonMockCheckout,
-  listInventory, updateInventory, paintingDay, updatePaintingDay, joinWaitlist, confirmWaitlist, unsubscribeWaitlist,
+  currentPrices, updatePrices, listInventory, updateInventory, paintingDay, updatePaintingDay, joinWaitlist, confirmWaitlist, unsubscribeWaitlist,
   checkCapacity,
   cancelOrder,
   mockChangePassword,
@@ -41,6 +43,9 @@ declare global {
     __awgMetrics?: BuyMetric[]
   }
 }
+
+/** Dated copies of the anonymous metrics sent in this tab, for the mock Statistics page. */
+const metricLog: MetricRow[] = []
 
 function later<T>(fn: () => T, ms = 180): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -113,6 +118,7 @@ function nextPickupDays(itemCount: number) {
 const saleKeys = new Map<string, import('../../domain/types').Order>()
 
 export const mockApi: Api = {
+  prices: { get: () => later(() => currentPrices()), update: (input) => later(() => updatePrices(input)) },
   inventory: { list: () => later(() => listInventory().map(row => ({ ...row }))), update: (id, quantity, expectedQuantity) => later(() => updateInventory(id, quantity, expectedQuantity)) },
   paintingDays: { list: (from, to) => later(() => { const dates = []; const d = new Date(`${from}T12:00:00Z`); while (d.toISOString().slice(0, 10) <= to && dates.length < 62) { dates.push(paintingDay(d.toISOString().slice(0, 10))); d.setUTCDate(d.getUTCDate() + 1) } return dates }), update: (date, open, max, hours) => later(() => updatePaintingDay(date, open, max, hours)) },
   auth: {
@@ -180,8 +186,19 @@ export const mockApi: Api = {
   uploads: {
     toPhoto: (file) => fileToPhoto(file),
   },
+  stats: {
+    get: (from, to) => later(() => {
+      const { orders, items } = statsSource()
+      const today = viennaDate(new Date())
+      // A web order counts as paid in the funnel once its checkout is confirmed, as the webhook records it.
+      const paidWeb: MetricRow[] = orders.filter(order => order.source === 'web' && order.status !== 'CANCELLED' && (order.checkoutStatus ?? 'confirmed') === 'confirmed' && !order.paymentReview)
+        .map(order => ({ date: viennaDate(order.createdAt), event: 'buy_paid', count: 1 }))
+      return aggregateStats({ from, to, orders, items, metrics: [...demoWebMetrics(from, to, today), ...metricLog, ...paidWeb], viennaDay: viennaDate, received: order => paymentSummary(order).paid })
+    }),
+  },
   metrics: {
     track: async (metric) => {
+      metricLog.push({ ...metric, date: viennaDate(new Date()), count: 1 })
       if (import.meta.env.DEV || import.meta.env.MODE === 'test' || import.meta.env.MODE === 'mock') {
         // Preserve the whole payload so privacy tests also catch unexpected fields.
         (window.__awgMetrics ??= []).push(structuredClone(metric))
@@ -203,7 +220,7 @@ export const mockApi: Api = {
         // The demo shows the confirmation line; no e-mail is actually sent in mock mode.
         confirmationEmail: true,
         seasonOver: new Date() >= new Date('2026-12-25T00:00:00'),
-        ...mockPricing,
+        ...currentPrices(),
         deliveryFee: 0,
         maxItems: 10,
         colors: [

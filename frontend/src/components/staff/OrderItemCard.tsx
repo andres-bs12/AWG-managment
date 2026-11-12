@@ -5,6 +5,7 @@ import { ButtonLink } from '../ui/ButtonLink'
 import type { MarketDay, OrderItem, ProductionStatus, TimeBlock } from '../../domain/types'
 import { agendaSlotPath, handoffLabel, paintSlotLabel } from '../../lib/handoff'
 import { formatEur } from '../../lib/money'
+import { handoverBlocker } from '../../lib/deliveryFacts'
 import styles from './OrderItemCard.module.css'
 
 type Props = {
@@ -16,7 +17,7 @@ type Props = {
   busy: boolean
   /** Online payment not confirmed: painting is possible but not the next step. */
   held?: boolean
-  onHandover: () => void
+  onHandover?: () => void
   onStatus: (status: ProductionStatus) => void
 }
 
@@ -24,6 +25,8 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
   const title = item.petName || (item.kind === 'custom' ? 'Custom ornament' : 'Finished ornament')
   const photo = item.photos[0]
   const paintTo = `/staff/orders/${item.orderId}/paint/${item.id}`
+  const blocker = handoverBlocker({ kind: item.kind, productionStatus: item.productionStatus, handedOver: Boolean(item.handedOver),
+    waitingForCustomer: item.kind === 'custom' && (!item.photos.length || (item.withName && !item.backName)) })
   const status = item.productionStatus === 'finished' ? 'Ready' : item.productionStatus === 'in_progress' ? 'Painting' : 'To paint'
   return (
     <article className={styles.card} data-selected={selected} aria-label={title}>
@@ -42,7 +45,7 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
       {item.note ? <div className={styles.note}><strong>Painter’s note</strong><p>{item.note}</p></div> : null}
       <section className={styles.production} aria-label="Production"><h4>Production</h4>
       <div className={styles.actions}>
-        {photo ? <ButtonLink to={paintTo} state={navigationState} tone="staff" variant={item.productionStatus === 'finished' || held ? 'secondary' : 'primary'}>{item.productionStatus === 'finished' ? 'View reference' : 'Open painting'}</ButtonLink> : <span className={styles.waiting}>{item.kind === 'custom' ? 'Waiting for reference photos' : 'No reference photo'}</span>}
+        {held ? <span className={styles.waiting}>Painting starts once the online payment is confirmed</span> : photo ? <ButtonLink to={paintTo} state={navigationState} tone="staff" variant={item.productionStatus === 'finished' || held ? 'secondary' : 'primary'}>{item.productionStatus === 'finished' ? 'View reference' : 'Open painting'}</ButtonLink> : <span className={styles.waiting}>{item.kind === 'custom' ? 'Waiting for reference photos' : 'No reference photo'}</span>}
         {block ? <Link className={styles.schedule} to={agendaSlotPath(block, days)}><StaffText>{paintSlotLabel(block, days)}</StaffText></Link> : null}
       </div>
       <details className={styles.adjust}>
@@ -54,7 +57,9 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
       </section>
       <section className={styles.handover} aria-label="Handover">
         <div><h4>Handover</h4><p><StaffText>{handoffLabel(item, days)}</StaffText></p></div>
-        <Button tone="staff" variant="secondary" disabled={busy || held || (!item.handedOver && item.productionStatus !== 'finished')} onClick={onHandover}>{item.handedOver ? 'Undo handover' : 'Mark handed over'}</Button>
+        {!item.handedOver && blocker ? <p className={styles.blocked}>{`Can't hand over yet: ${blocker.toLowerCase()}.`}</p> : null}
+        {/* With one ornament the order panel owns the handover: one control, not two. */}
+        {onHandover ? <Button tone="staff" variant="secondary" disabled={busy || held || (!item.handedOver && item.productionStatus !== 'finished')} onClick={onHandover}>{item.handedOver ? 'Undo handover' : 'Hand over this one'}</Button> : null}
       </section>
     </article>
   )

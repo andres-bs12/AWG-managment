@@ -6,6 +6,10 @@
 .order:hover strong { text-decoration: underline; }
 .due { font-weight: 600; }
 .balance { color: var(--staff-warn); font-weight: 600; }
+.paid { color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
+/* Production and handover are two separate facts: one line each, with air between them. */
+.facts { display: grid; gap: var(--space-1); margin-top: var(--space-1); }
+.facts > [data-blocked] { color: var(--staff-warn); }
 .items { padding: 0; margin: 0; list-style: none; }
 .item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding-block: var(--space-4); border-top: var(--border-thin) solid var(--staff-line); }
 .identity { display: grid; gap: var(--space-1); min-width: 0; overflow-wrap: anywhere; }

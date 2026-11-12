@@ -35,6 +35,15 @@ const KIND_OPTIONS: { value: KindFilter; label: string }[] = [
   { value: 'vienna', label: 'Vienna' },
 ]
 
+/** Route order: Vienna postcode, falling back to the address line when no postcode is stored. */
+function routeKey(row: DatedDelivery): string {
+  return (row.postalCode || row.addressLabel || '').trim()
+}
+
+function byPostcode(a: DatedDelivery, b: DatedDelivery): number {
+  return routeKey(a).localeCompare(routeKey(b), 'en', { numeric: true })
+}
+
 function flattenDays(days: AgendaDay[]): DatedDelivery[] {
   return days.flatMap((day) =>
     day.deliveries.map((row) => ({
@@ -124,7 +133,8 @@ export function DeliveriesPage() {
   }, [dated, dayFilter, kindFilter, statusFilter, routeMode, includePast, todayDate])
 
   const grouped = useMemo(() => groupDeliveryOrders(filtered, dated), [filtered, dated])
-  const orders = stableOrder(grouped)
+  // The run follows the route, not the order of first sight. A postcode never changes on handover, so the list stays put.
+  const orders = routeMode ? [...grouped].sort(byPostcode) : stableOrder(grouped)
   const activeIds = new Set(filtered.map(item => item.itemId))
   const remainingCount = remainingDeliveries(orders, routeMode, activeIds)
 

@@ -23,7 +23,7 @@
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
 .schedule { display: inline-flex; align-items: center; min-height: var(--touch); color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
 .waiting { color: var(--staff-muted); }
-.adjust { margin-top: var(--space-3); border-top: var(--border-thin) solid var(--staff-line); }
+.adjust { border-top: var(--border-thin) solid var(--staff-line); }
 .adjust summary { cursor: pointer; min-height: var(--touch); padding: var(--space-3) 0; color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
 .statusOptions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 @media (max-width: 639px) {
@@ -39,8 +39,10 @@
 
 .title h3 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 
-.production { display: grid; gap: var(--space-3); padding-top: var(--space-4); border-top: var(--border-thin) solid var(--staff-line); }
+/* Production and handover are separate jobs: two tinted blocks with a clear gap, not one list split by hairlines. */
+.production { display: grid; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-small); background: var(--staff-bg); }
 .production h4, .handover h4 { margin: 0; font-size: var(--type-staff-body-size); }
-.handover { display: grid; gap: var(--space-3); margin-top: var(--space-5); padding-top: var(--space-4); border-top: var(--border-thin) solid var(--staff-line); }
+.handover { display: grid; gap: var(--space-3); margin-top: var(--space-4); padding: var(--space-4); border-radius: var(--radius-small); background: var(--staff-bg); }
+.blocked { color: var(--staff-warn); font-size: var(--type-staff-meta-size); font-weight: 600; }
 .handover > div { display: grid; gap: var(--space-1); }
 .handover p { color: var(--staff-muted); font-size: var(--type-staff-meta-size); }

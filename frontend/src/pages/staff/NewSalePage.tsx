@@ -41,6 +41,9 @@ import {
 } from './saleDraft'
 import styles from './NewSalePage.module.css'
 import { uid } from '../../lib/uid'
+import { upcomingWindows } from '../../lib/dateWindows'
+import { viennaClock } from '../../lib/viennaClock'
+import { finishForColor, firstAvailableCustom, remainingColor, remainingStock, stockLabel } from '../../lib/saleStock'
 
 const MIN_PAINT_MINUTES = 15
 const MAX_PAINT_MINUTES = 8 * 60
@@ -132,6 +135,9 @@ export function NewSalePage() {
   const [payState, setPayState] = useState<PaymentState>('paid')
   const [depositAmount, setDepositAmount] = useState('')
   const [paidNote, setPaidNote] = useState('')
+  // What this screen recorded, so the done screen can show the balance after a deposit.
+  const [paidAmount, setPaidAmount] = useState<number | null>(null)
+  const [doneQrOpen, setDoneQrOpen] = useState(false)
   const [finishedHandoff, setFinishedHandoff] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
   // null = closed. The order is re-read first: a paid order must not be deleted, and a sent form means a cancellation e-mail.
@@ -148,7 +154,7 @@ export function NewSalePage() {
     next.idempotencyKey = saleKey.current
     setDraft(next)
     if (params.has('fresh') || params.has('start') || params.has('placeItem')) {
-      setPayMethod(null); setPayState('paid'); setDepositAmount(''); setPaidNote(''); setCopied(false); setError('')
+      setPayMethod(null); setPayState('paid'); setDepositAmount(''); setPaidNote(''); setPaidAmount(null); setDoneQrOpen(false); setCopied(false); setError('')
       const cleaned = new URLSearchParams(params)
       for (const command of ['fresh', 'date', 'start', 'end', 'kind', 'placeItem']) cleaned.delete(command)
       consumedParams.current = cleaned.toString()
@@ -168,15 +174,34 @@ export function NewSalePage() {
       setMarkets(m); setDays(d); setAgendaDays(agenda)
       if (d.length) {
         setDraft(current => ({ ...current, items: current.items.map(item => fillDayRefs(item, d, m, config.seasonEnd)) }))
-        const from = [...d].sort((a, b) => a.date.localeCompare(b.date))[0].date
-        // The endpoint caps ranges at 62 days; staff season spans this window.
-        const to = d.map(day => day.date).sort().at(-1)!
-        const rules = await api.paintingDays.list(from, to)
+        // The endpoint caps ranges at 62 days: load only upcoming days, in API-sized ranges, so an
+        // old market day or a long season can no longer block the whole sale screen.
+        const ranges = upcomingWindows(d.map(day => day.date), viennaClock().date)
+        const rules = (await Promise.all(ranges.map(([from, to]) => api.paintingDays.list(from, to)))).flat()
         if (active) setPaintingDays(rules)
       }
-    }).catch(err => { if (active) setConfigError(err instanceof Error ? err.message : 'Could not load sale configuration.') })
+    }).catch(err => { if (active) setConfigError(err instanceof Error && err.message ? err.message : 'Check the connection.') })
     return () => { active = false }
   }, [version, configRetry])
+
+  // Stock arrives after a calendar or restored draft was built: move an unsellable colour/finish to the
+  // first combination still in stock, in item order, so the draft never starts on a sold-out base.
+  useEffect(() => {
+    if (!prices) return
+    setDraft(current => {
+      if (current.order || current.phase !== 'items') return current
+      let changed = false
+      const items: DraftItem[] = []
+      for (const item of current.items) {
+        if (item.kind === 'custom' && remainingStock(inventory, items, 'custom', item.color, item.finish) === 0) {
+          const combo = firstAvailableCustom(inventory, items)
+          if (combo) { changed = true; items.push({ ...item, ...combo }); continue }
+        }
+        items.push(item)
+      }
+      return changed ? { ...current, items } : current
+    })
+  }, [inventory, prices])
 
   useEffect(() => {
     if (draft.phase === 'done' || (!draft.items.length && !draft.placingItemId)) {
@@ -241,6 +266,7 @@ export function NewSalePage() {
         const handoff = item.delivery.pickupDate || currentDate
         if (!handoff) continue
         if (item.delivery.mode === 'market' && item.delivery.pickupHour == null) continue
+        if (item.delivery.mode === 'vienna' && !item.delivery.pickupDate) continue
         const dates = paintDatesToTry(handoff, currentDate).filter((date) => item.delivery.mode !== 'vienna' || date < handoff)
         let result: CapacityResult = {
           ok: false,
@@ -321,6 +347,21 @@ export function NewSalePage() {
     }
   }, [phase, suggestKey, hasCustom])
 
+  // A new step starts at its top: on phones the old scroll position hid the new heading.
+  const pageHeading = useRef<HTMLHeadingElement>(null)
+  const stepHeading = useRef<HTMLHeadingElement>(null)
+  const shownPhase = useRef(draft.phase)
+  useEffect(() => {
+    if (shownPhase.current === draft.phase) return
+    shownPhase.current = draft.phase
+    const heading = draft.phase === 'items' ? pageHeading.current : stepHeading.current
+    if (!heading) return
+    heading.focus({ preventScroll: true })
+    // The page top keeps the step indicator in view right above the new heading.
+    const top = pageHeading.current?.closest('section') ?? heading
+    top.scrollIntoView({ block: 'start' })
+  }, [draft.phase])
+
   function setPhase(next: SalePhase) {
     setError('')
     setDraft((current) => ({ ...current, phase: next }))
@@ -365,7 +406,9 @@ export function NewSalePage() {
   function addItem(kind: 'custom' | 'finished') {
     if (!draft.items.length && !draft.order) saleKey.current = uid()
     setDraft((current) => {
-      const next = kind === 'custom' ? makeCustom({ delivery: { mode: 'market', pickupDate: todayPaintingFull(paintingDays, today) ? undefined : today?.date } }) : makeFinished()
+      // A new custom ornament starts on the first combination still in stock (counting this draft).
+      const combo = kind === 'custom' ? firstAvailableCustom(inventory, current.items) : null
+      const next = kind === 'custom' ? makeCustom({ ...(combo ?? {}), delivery: { mode: 'market', pickupDate: todayPaintingFull(paintingDays, today) ? undefined : today?.date } }) : makeFinished()
       const items = [...current.items.map((item) => item.plannedMove ? { ...item, plannedMove: undefined, slotLocked: false, paintDate: undefined, paintStart: undefined, paintEnd: undefined } : item), fillDayRefs(next, days, markets, seasonEnd)]
       const mixedNow = items.some((i) => i.kind === 'custom') && items.some((i) => i.kind === 'finished')
       return { ...current, items, differentPickups: current.differentPickups || mixedNow }
@@ -401,8 +444,7 @@ export function NewSalePage() {
   }
 
   function setColor(item: DraftItem, color: OrnamentColor) {
-    const available = inventory.filter(row => row.kind === 'custom' && row.color === color && row.quantity > 0)
-    const finish = available.some(row => row.finish === item.finish) ? item.finish : available[0]?.finish ?? item.finish
+    const finish = finishForColor(inventory, draft.items, color, item.finish, item.id) as DraftItem['finish'] | null
     patchItem(item.id, { color, finish: finish ?? item.finish })
   }
 
@@ -453,6 +495,8 @@ export function NewSalePage() {
     setPayMethod(null)
     setPayState('paid')
     setPaidNote('')
+    setPaidAmount(null)
+    setDoneQrOpen(false)
     setDepositAmount('')
     setCopied(false)
     setError('')
@@ -490,8 +534,10 @@ export function NewSalePage() {
         if (!payMethod) throw new Error('Choose cash or card.')
         await api.payments.setPaymentState(created.id, state, payMethod, amount)
         setPaidNote(`${formatEur(amount, 'en')} received · ${payMethod === 'cash' ? 'cash' : 'card'}`)
+        setPaidAmount(amount)
       } else {
         setPaidNote('Not paid yet')
+        setPaidAmount(0)
       }
       if (handOver && draft.items.every(item => item.kind === 'finished' && item.delivery.mode === 'now')) await api.orders.setHandedOver(created.id, true)
       setFinishedHandoff(false)
@@ -533,6 +579,11 @@ export function NewSalePage() {
   }
 
   const appliedMove = draft.items.find((item) => item.plannedMove)?.plannedMove
+  const balanceDue = order && paidAmount != null ? Math.max(0, Math.round((order.total - paidAmount) * 100) / 100) : null
+
+  function copyFormLink() {
+    void navigator.clipboard.writeText(formUrl).then(() => setCopied(true)).catch(() => setError('Could not copy the link. Please select and copy it.'))
+  }
 
   function openChangeDate() {
     if (!order) return
@@ -596,6 +647,7 @@ export function NewSalePage() {
     try {
       if (state !== 'unpaid') await api.payments.setPaymentState(order.id, state, payMethod, amount)
       setPaidNote(state === 'unpaid' ? 'Not paid yet' : `${formatEur(amount, 'en')} received · ${payMethod === 'cash' ? 'cash' : 'card'}`)
+      setPaidAmount(state === 'unpaid' ? 0 : amount)
       setPhase('done')
     } catch (err) {
       setError(saleErrorMessage(err, 'Could not record payment'))
@@ -605,9 +657,10 @@ export function NewSalePage() {
     }
   }
 
+  const allVienna = hasCustom && draft.items.every((item) => item.kind !== 'custom' || item.delivery.mode === 'vienna')
   const title: Record<SalePhase, string> = {
     items: 'What are we selling?',
-    delivery: onlyFinished ? 'Hand over and pay' : 'Pickup and paint',
+    delivery: onlyFinished ? 'Hand over and pay' : allVienna ? 'Delivery and paint' : 'Pickup and paint',
     qr: 'Customer form',
     payment: 'Payment',
     done: 'Sale recorded',
@@ -618,7 +671,7 @@ export function NewSalePage() {
     ? ['Items']
     : onlyFinished
       ? ['Items', 'Hand over & pay']
-      : ['Items', 'Pickup', 'QR & payment']
+      : ['Items', allVienna ? 'Delivery' : 'Pickup', 'QR & payment']
 
   function stepOn(index: number) {
     if (!draft.items.length || phase === 'items') return index === 0
@@ -634,7 +687,7 @@ export function NewSalePage() {
     <section className={styles.page}>
       <div className={styles.head}>
         <div>
-          <h1>New sale</h1>
+          <h1 ref={pageHeading} tabIndex={-1} className={styles.focusHeading}>New sale</h1>
           <p className={styles.steps}>
             {stepLabels.map((label, index) => (
               <span key={label} data-on={stepOn(index) ? 'true' : 'false'} aria-current={stepOn(index) && phase !== 'done' ? 'step' : undefined}>
@@ -652,7 +705,6 @@ export function NewSalePage() {
 
       {leaveOpen && order && <StaffDialog title="Leave this sale?" onClose={() => setLeaveOpen(false)}>
         <p>{order.code} stays saved and unpaid, with its paint time reserved. Open it later from Search to show the QR or take payment.</p>
-        <Button tone="staff" variant="secondary" onClick={() => setLeaveOpen(false)}>Not yet</Button>
         <Button tone="staff" variant="secondary" onClick={() => { clearStoredDraft(); navigate(`/staff/orders/${order.id}`, { state: { from: '/staff/sales/new' } }) }}>Open order</Button>
         <Button tone="staff" onClick={() => { setLeaveOpen(false); startOver() }}>Start new sale</Button>
       </StaffDialog>}
@@ -669,7 +721,6 @@ export function NewSalePage() {
         {changeDate.state === 'paid'
           ? <Button tone="staff" onClick={() => { clearStoredDraft(); navigate(`/staff/orders/${order.id}`, { state: { from: '/staff/sales/new' } }) }}>Open order</Button>
           : <Button tone="staff" disabled={busy || changeDate.state === 'checking'} onClick={() => void cancelAndChangeDate()}>{busy ? 'Cancelling…' : 'Cancel order & choose new date'}</Button>}
-        <Button tone="staff" variant="ghost" disabled={busy} onClick={() => setChangeDate(null)}>Not yet</Button>
         {error && <p role="alert">{error}</p>}
       </StaffDialog>}
       {finishedHandoff && <StaffDialog title="Balance due" busy={busy} onClose={() => setFinishedHandoff(false)}>
@@ -678,13 +729,12 @@ export function NewSalePage() {
         <Button tone="staff" disabled={busy || !payMethod} onClick={() => void finishFinishedSale('paid')}>Mark paid &amp; hand over</Button>
         <Button tone="staff" variant="secondary" disabled={busy} onClick={() => void finishFinishedSale(payState, false)}>Save without handover</Button>
         <Button tone="staff" variant="ghost" disabled={busy} onClick={() => void finishFinishedSale(payState)}>Hand over with balance due</Button>
-        <Button tone="staff" variant="ghost" disabled={busy} onClick={() => setFinishedHandoff(false)}>Not yet</Button>
         {error && <p role="alert">{error}</p>}
       </StaffDialog>}
       <div className={styles.workspace}>
         <div className={styles.main}>
-          {phase !== 'items' && <h2>{title[phase]}</h2>}
-          {configError ? <div role="alert"><p>{configError}</p><Button tone="staff" variant="secondary" onClick={() => setConfigRetry(n => n + 1)}>Retry configuration</Button></div> : null}
+          {phase !== 'items' && <h2 ref={stepHeading} tabIndex={-1} className={styles.focusHeading}>{title[phase]}</h2>}
+          {configError ? <div role="alert"><p>Could not load prices, stock and calendar, so sales are paused. {configError}</p><Button tone="staff" variant="secondary" onClick={() => setConfigRetry(n => n + 1)}>Try again</Button></div> : null}
           {error ? (
             <p className={styles.err} role="alert">
               {error}
@@ -697,6 +747,7 @@ export function NewSalePage() {
               items={draft.items}
               prices={prices}
               inventory={inventory}
+              stockReady={Boolean(prices)}
               onAdd={addItem}
               onRemove={removeItem}
               onToggleName={toggleName}
@@ -705,7 +756,7 @@ export function NewSalePage() {
               onDuration={setDuration}
               onContinue={() => {
                 if (!draft.items.length) return
-                if (!prices || configError) { setError('Load server prices and stock first.'); return }
+                if (!prices || configError) { setError('Prices and stock are still loading. Wait a moment or tap Try again.'); return }
                 const shortage = draft.items.find(item => { const quantity = inventory.find(row => row.kind === item.kind && (item.kind === 'finished' || (row.color === item.color && row.finish === item.finish)))?.quantity ?? 0; const count = draft.items.filter(other => other.kind === item.kind && (item.kind === 'finished' || (other.color === item.color && other.finish === item.finish))).length; return count > quantity })
                 if (shortage) { setError(`Out of stock: ${shortage.kind === 'finished' ? 'finished ornaments' : `${shortage.finish} ${shortage.color} ornaments`}. Reduce the quantity or choose another combination.`); return }
                 setPhase('delivery')
@@ -758,7 +809,7 @@ export function NewSalePage() {
               })}
 
               {onlyFinished ? (
-                <div className={styles.card}>
+                <div className={`${styles.card} ${styles.payCard}`}>
                   <InsetNote><p>No customer form is needed for ready-made ornaments.</p></InsetNote>
                   <SalePaymentFields state={payState} onState={setPayState} method={payMethod} onMethod={setPayMethod} deposit={depositAmount} onDeposit={setDepositAmount} total={order?.total ?? (prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0) : 0)} />
 
@@ -782,74 +833,81 @@ export function NewSalePage() {
             </>
           ) : null}
 
-          {order && hasCustom && ['qr', 'payment', 'done'].includes(phase) && <div className={styles.formStatus} data-received={formStatus.received || undefined}>
-            <p role="status">{formStatus.received ? `Form received${formStatus.customerName ? ` · ${formStatus.customerName}` : ''}` : 'Waiting for customer form'}</p>
-            {formStatus.received ? <ButtonLink to={`/staff/orders/${order.id}`} tone="staff" variant="ghost">View details</ButtonLink> : null}
-            {formStatus.error && <div role="alert"><p>{formStatus.error}</p><Button tone="staff" variant="secondary" onClick={formStatus.retry}>Check now</Button></div>}
-          </div>}
+          {order && ['qr', 'payment', 'done'].includes(phase) ? (
+            // One parent owns the rhythm between the form status and the step below it.
+            <div className={styles.afterOrder}>
+              {hasCustom ? <div className={styles.formStatus} data-received={formStatus.received || undefined}>
+                <p role="status">{formStatus.received ? `Form received${formStatus.customerName ? ` · ${formStatus.customerName}` : ''}` : 'Waiting for customer form'}</p>
+                {formStatus.received ? <ButtonLink to={`/staff/orders/${order.id}`} tone="staff" variant="ghost">View details</ButtonLink> : null}
+                {formStatus.error && <div role="alert"><p>{formStatus.error}</p><Button tone="staff" variant="secondary" onClick={formStatus.retry}>Check now</Button></div>}
+              </div> : null}
 
-          {phase === 'qr' && order ? (
-            <div className={styles.qrStep}>
-              <div className={styles.qr}>
-                <QrCode value={formUrl} />
-              </div>
-              <div className={styles.qrSide}>
-                {!formStatus.received && <p className={styles.lead}>Scan to add photos and contact details. You can take payment meanwhile.</p>}
-                <StaffActions className={styles.actions} total={order?.total ?? (prices ? draftTotal(draft.items, prices) : null)}>
-                  <Button tone="staff" size="lg" onClick={() => setPhase('payment')}>
-                    Continue to payment
-                  </Button>
-                  <CustomerHandoff token={order.formToken} label="Fill on this device instead" />
-                  <Button tone="staff" variant="ghost" onClick={openChangeDate}>Change date</Button>
-                  <button
-                    type="button"
-                    className={styles.textBtn}
-                    onClick={() => {
-                      void navigator.clipboard.writeText(formUrl).then(() => setCopied(true)).catch(() => setError('Could not copy the link. Please select and copy it.'))
-                    }}
-                  >
-                    {copied ? 'Link copied' : 'Copy link to send'}
-                  </button>
-                </StaffActions>
-              </div>
-            </div>
-          ) : null}
-
-          {phase === 'payment' && order ? (
-            <div>
-              <SalePaymentFields state={payState} onState={setPayState} method={payMethod} onMethod={setPayMethod} deposit={depositAmount} onDeposit={setDepositAmount} total={order.total} />
-              {payState !== 'unpaid' && !payMethod ? <p>Choose cash or card to record a payment.</p> : null}
-              <StaffActions className={styles.actions} total={order?.total ?? (prices ? draftTotal(draft.items, prices) : null)}>
-                <Button tone="staff" size="lg" disabled={busy || (payState !== 'unpaid' && !payMethod) || (payState === 'deposit' && !validDeposit(depositAmount, order.total))} onClick={() => void recordPayment(payState)}>
-                  {busy ? 'Saving…' : payState === 'unpaid' ? 'Leave unpaid' : payState === 'deposit' ? `Mark deposit · ${formatEur(depositValue(depositAmount, order.total), 'en')}` : `Mark paid · ${formatEur(order.total, 'en')}`}
-                </Button>
-                {order.formToken ? <Button tone="staff" variant="secondary" disabled={busy} onClick={() => setPhase('qr')}>Show QR again</Button> : null}
-                {order.formToken ? <Button tone="staff" variant="ghost" disabled={busy} onClick={openChangeDate}>Change date</Button> : null}
-              </StaffActions>
-            </div>
-          ) : null}
-
-          {phase === 'done' && order ? (
-            <div>
-              <div className={styles.doneCard} role="status">
-                <span aria-hidden="true">✓</span>
-                <div>
-                  <strong>{order.code} · {formatEur(order.total, 'en')}</strong>
-                  {paidNote ? <p>{paidNote}</p> : null}
+              {phase === 'qr' ? (
+                <div className={styles.qrStep}>
+                  <div className={styles.qr}>
+                    <QrCode value={formUrl} />
+                  </div>
+                  <div className={styles.qrSide}>
+                    {!formStatus.received && <p className={styles.lead}>Scan to add photos and contact details. You can take payment meanwhile.</p>}
+                    <StaffActions className={styles.actions} total={order.total}>
+                      <Button tone="staff" size="lg" onClick={() => setPhase('payment')}>
+                        Continue to payment
+                      </Button>
+                      <CustomerHandoff token={order.formToken} label="Fill on this device instead" />
+                      <Button tone="staff" variant="ghost" onClick={() => copyFormLink()}>{copied ? 'Link copied' : 'Copy link to send'}</Button>
+                      <Button tone="staff" variant="ghost" onClick={openChangeDate}>Change date</Button>
+                    </StaffActions>
+                  </div>
                 </div>
-              </div>
-              <StaffActions className={styles.actions} total={!paidNote || payState !== 'deposit' ? order.total : order.total - depositValue(depositAmount, order.total)} totalLabel={!paidNote ? 'Total' : payState === 'paid' ? 'Total · paid' : 'Balance due'}>
-                <Button tone="staff" size="lg" onClick={startOver}>
-                  New sale
-                </Button>
-                <ButtonLink to={`/staff/orders/${order.id}`} state={{ from: '/staff/sales/new' }} tone="staff" variant="secondary">
-                  Open order
-                </ButtonLink>
-              </StaffActions>
+              ) : null}
+
+              {phase === 'payment' ? (
+                <div>
+                  <SalePaymentFields state={payState} onState={setPayState} method={payMethod} onMethod={setPayMethod} deposit={depositAmount} onDeposit={setDepositAmount} total={order.total} />
+                  {payState !== 'unpaid' && !payMethod ? <p>Choose cash or card to record a payment.</p> : null}
+                  <StaffActions className={styles.actions} total={order.total}>
+                    <Button tone="staff" size="lg" disabled={busy || (payState !== 'unpaid' && !payMethod) || (payState === 'deposit' && !validDeposit(depositAmount, order.total))} onClick={() => void recordPayment(payState)}>
+                      {busy ? 'Saving…' : payState === 'unpaid' ? 'Leave unpaid' : payState === 'deposit' ? (validDeposit(depositAmount, order.total) ? `Mark deposit · ${formatEur(depositValue(depositAmount, order.total), 'en')}` : 'Mark deposit') : `Mark paid · ${formatEur(order.total, 'en')}`}
+                    </Button>
+                    {order.formToken ? <Button tone="staff" variant="secondary" disabled={busy} onClick={() => setPhase('qr')}>Show QR again</Button> : null}
+                    {order.formToken ? <Button tone="staff" variant="ghost" disabled={busy} onClick={openChangeDate}>Change date</Button> : null}
+                  </StaffActions>
+                </div>
+              ) : null}
+
+              {phase === 'done' ? (
+                <div>
+                  <div className={styles.doneCard} role="status">
+                    <span aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+                    <div>
+                      <strong>{order.code} · {formatEur(order.total, 'en')}</strong>
+                      {paidNote ? <p>{paidNote}</p> : null}
+                      {paidAmount != null && paidAmount > 0 && balanceDue != null && balanceDue > 0 ? <p className={styles.balance}>Balance due · {formatEur(balanceDue, 'en')}</p> : null}
+                    </div>
+                  </div>
+                  {hasCustom && !formStatus.received ? (
+                    <div className={styles.doneQr}>
+                      <Button tone="staff" variant="secondary" aria-expanded={doneQrOpen} aria-controls="done-qr" onClick={() => setDoneQrOpen(open => !open)}>{doneQrOpen ? 'Hide QR' : 'Show QR'}</Button>
+                      {doneQrOpen ? <div id="done-qr" className={styles.doneQrBody}>
+                        <QrCode value={formUrl} />
+                        <Button tone="staff" variant="ghost" onClick={() => copyFormLink()}>{copied ? 'Link copied' : 'Copy link to send'}</Button>
+                      </div> : null}
+                    </div>
+                  ) : null}
+                  <StaffActions className={styles.actions} total={balanceDue != null && paidAmount != null ? balanceDue : order.total} totalLabel={paidAmount == null ? 'Total' : balanceDue === 0 ? 'Total · paid' : 'Balance due'}>
+                    <Button tone="staff" size="lg" onClick={startOver}>
+                      New sale
+                    </Button>
+                    <ButtonLink to={`/staff/orders/${order.id}`} state={{ from: '/staff/sales/new' }} tone="staff" variant="secondary">
+                      Open order
+                    </ButtonLink>
+                  </StaffActions>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
-        <OrderSummaryPanel prices={prices} items={draft.items} markets={markets} days={days} orderCode={order?.code} />
+        <OrderSummaryPanel prices={prices} items={draft.items} markets={markets} days={days} orderCode={order?.code} showHandoff={phase !== 'items'} />
       </div>
     </section>
   )
@@ -905,6 +963,7 @@ function ItemsStep({
   items,
   prices,
   inventory,
+  stockReady,
   onAdd,
   onRemove,
   onToggleName,
@@ -915,6 +974,7 @@ function ItemsStep({
 }: {
   prices: Pricing | null
   inventory: InventoryItem[]
+  stockReady: boolean
   items: DraftItem[]
   onAdd: (kind: 'custom' | 'finished') => void
   onRemove: (id: string) => void
@@ -924,16 +984,19 @@ function ItemsStep({
   onDuration: (item: DraftItem, preset: DurationPreset, customMinutes?: number) => void
   onContinue: () => void
 }) {
+  const finishedLeft = remainingStock(inventory, items, 'finished')
+  const finishedHint = stockReady ? `Finished stock: ${stockLabel(finishedLeft)}` : 'Checking stock…'
+  const customSoldOut = stockReady && !firstAvailableCustom(inventory, items)
   return (
     <>
       {items.length === 0 ? (
         // Empty sale: the two starting choices sit right under the question, with no €0.00 total.
         <div className={styles.startChoices}>
           <Button tone="staff" variant="choice" size="lg" onClick={() => onAdd('custom')}>
-            <span><strong>+ Add custom ornament</strong><small>Painted from the customer's photos</small></span>
+            <span><strong>+ Add custom ornament</strong><small>{customSoldOut ? 'Sold out · update Stock first' : "Painted from the customer's photos"}</small></span>
           </Button>
-          <Button tone="staff" variant="choice" size="lg" onClick={() => onAdd('finished')}>
-            <span><strong>+ Add finished product</strong><small>Finished stock: {stockLabel(inventory.find(row => row.kind === 'finished')?.quantity ?? 0)}</small></span>
+          <Button tone="staff" variant="choice" size="lg" disabled={stockReady && finishedLeft === 0} onClick={() => onAdd('finished')}>
+            <span><strong>+ Add finished product</strong><small>{finishedHint}</small></span>
           </Button>
         </div>
       ) : (
@@ -951,21 +1014,25 @@ function ItemsStep({
               {item.slotLocked && slotLabel(item) ? (
                 <p className={styles.lead}>Paint {slotLabel(item)} (from the board)</p>
               ) : null}
-              {item.kind === 'custom' ? (
-                <>
+              {item.kind === 'custom' ? (() => {
+                // Hints show what is left for this ornament after the other ornaments in the draft.
+                const comboLeft = stockReady ? remainingStock(inventory, items, 'custom', item.color, item.finish, item.id) : 1
+                const soldOut = comboLeft === 0 && !firstAvailableCustom(inventory, items, item.id)
+                return <>
                   <label className={styles.check}>
                     <input type="checkbox" aria-describedby={`name-hint-${item.id}`} checked={item.withName} onChange={() => onToggleName(item)} />
-                    {`Name on ornament · +${prices ? formatEur(prices.nameExtra, 'en') : 'price unavailable'}`}
+                    {`Name on the back · +${prices ? formatEur(prices.nameExtra, 'en') : 'price unavailable'}`}
                   </label>
                   <p className={styles.hint} id={`name-hint-${item.id}`}>The customer types the name in the form.</p>
+                  {soldOut ? <p className={styles.soldOut} role="status">Sold out: no unpainted bases left. Update Stock or remove this ornament.</p> : null}
                   <SegmentedControl
                     legend="Colour"
                     name={`colour-${item.id}`}
-                    value={item.color}
+                    value={soldOut ? null : item.color}
                     onChange={(color) => onColor(item, color)}
-                    options={(['red', 'green', 'beige'] as const).map(color => { const quantity = inventory.filter(row => row.kind === 'custom' && row.color === color).reduce((sum, row) => sum + row.quantity, 0); return { value: color, color, label: color[0].toUpperCase() + color.slice(1), hint: stockLabel(quantity), disabled: quantity === 0 } })}
+                    options={(['red', 'green', 'beige'] as const).map(color => { const left = remainingColor(inventory, items, color, item.id); return { value: color, color, label: color[0].toUpperCase() + color.slice(1), hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })}
                   />
-                  <SegmentedControl legend="Finish" help={<HelpTip label="Explain finishes">Shiny reflects light. Matte has no glossy reflection. Stock refers to unpainted bases.</HelpTip>} name={`finish-${item.id}`} value={item.finish ?? 'shiny'} onChange={finish => onFinish(item, finish)} options={(['shiny', 'matte'] as const).map(finish => { const quantity = inventory.find(row => row.kind === 'custom' && row.color === item.color && row.finish === finish)?.quantity ?? 0; return { value: finish, label: finish === 'shiny' ? 'Shiny' : 'Matte', hint: stockLabel(quantity), disabled: quantity === 0 } })} />
+                  <SegmentedControl legend="Finish" help={<HelpTip label="Explain finishes">Shiny reflects light. Matte has no glossy reflection. Stock refers to unpainted bases.</HelpTip>} name={`finish-${item.id}`} value={soldOut ? null : item.finish ?? 'shiny'} onChange={finish => onFinish(item, finish)} options={(['shiny', 'matte'] as const).map(finish => { const left = remainingStock(inventory, items, 'custom', item.color, finish, item.id); return { value: finish, label: finish === 'shiny' ? 'Shiny' : 'Matte', hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })} />
                   <SegmentedControl
                     legend="Paint time"
                     name={`duration-${item.id}`}
@@ -975,17 +1042,17 @@ function ItemsStep({
                   />
                   {item.durationPreset === 'custom' ? <CustomMinutesField item={item} onDuration={onDuration} /> : null}
                 </>
-              ) : null}
+              })() : null}
             </article>
           ))}
           <div className={styles.addRow}>
             <Button tone="staff" variant="secondary" onClick={() => onAdd('custom')}>
               + Add custom
             </Button>
-            <Button tone="staff" variant="secondary" onClick={() => onAdd('finished')}>
+            <Button tone="staff" variant="secondary" disabled={stockReady && finishedLeft === 0} onClick={() => onAdd('finished')}>
               + Add finished
             </Button>
-            <span className={styles.hint}>Finished stock: {stockLabel(inventory.find(row => row.kind === 'finished')?.quantity ?? 0)}</span>
+            <span className={styles.hint}>{finishedHint}</span>
           </div>
           <StaffActions className={styles.actions} total={prices ? draftTotal(items, prices) : null}>
             <Button tone="staff" size="lg" onClick={onContinue}>
@@ -1123,6 +1190,8 @@ function DeliveryCard({
     if (mode === 'vienna') {
       setDatePickerOpen(false)
       setViennaPickerOpen(true)
+      // The choice is the handoff itself: summary, hints and labels follow it before a day is picked.
+      if (item.delivery.mode !== 'vienna') onDelivery({ ...item.delivery, mode: 'vienna', pickupDate: undefined, marketDayId: undefined, marketId: undefined, pickupHour: null })
       return
     }
     if (mode === 'today' && todayIsMarket && !todayFull) {
@@ -1139,6 +1208,7 @@ function DeliveryCard({
     }
     setViennaPickerOpen(false)
     setDatePickerOpen(true)
+    if (item.delivery.mode !== 'market') onDelivery({ ...item.delivery, mode: 'market', pickupDate: undefined, marketDayId: undefined, marketId: today?.marketId, pickupHour: null })
   }
 
   const slot = slotLabel(item)
@@ -1176,7 +1246,7 @@ function DeliveryCard({
         />
       ) : (
         <SegmentedControl
-          legend="Pickup"
+          legend="Pickup or delivery"
           name={`when-${item.id}`}
           value={viennaPickerOpen ? 'vienna' : datePickerOpen ? 'another_day' : pickupWhen === 'now' ? 'today' : pickupWhen}
           onChange={(value) => setMode(value)}
@@ -1184,7 +1254,7 @@ function DeliveryCard({
         />
       )}
 
-      {todayFull ? (
+      {todayFull && item.delivery.mode !== 'vienna' ? (
         <p className={styles.hint} role="status">
           {todayFull.open ? `Today is full (${todayFull.booked}/${todayFull.maxPaintings} paintings booked).` : 'Painting is closed today.'} Automatic planning cannot add one: choose another market day, or place it on the board by hand.
         </p>
@@ -1198,12 +1268,12 @@ function DeliveryCard({
           aria-controls={`market-day-calendar-${item.id}`}
           onClick={() => setDatePickerOpen((open) => !open)}
         >
-          <span className={styles.calendarIcon} aria-hidden="true">▦</span>
+          <CalendarIcon />
           <span>
             <strong>{formatDateLabel(pickupDay.date)}</strong>
             <small>{capacityLabel(pickupDay.date)}</small>
           </span>
-          <span className={styles.dateChevron} aria-hidden="true">{datePickerOpen ? '▲' : '▼'}</span>
+          <ChevronIcon open={datePickerOpen} />
         </button>
       ) : null}
 
@@ -1215,7 +1285,7 @@ function DeliveryCard({
               <small>Painting bookings and daily limits are shown for each day.</small>
             </div>
             <button type="button" className={styles.closePicker} onClick={() => setDatePickerOpen(false)} aria-label="Close market day picker">
-              ×
+              <CloseIcon />
             </button>
           </div>
           {dayChoices.length ? (
@@ -1248,7 +1318,7 @@ function DeliveryCard({
         </div>
       ) : null}
 
-      {!datePickerOpen && item.delivery.mode === 'vienna' && viennaDay ? (
+      {!datePickerOpen && item.delivery.mode === 'vienna' && (viennaDay || !viennaPickerOpen) ? (
         <button
           type="button"
           className={styles.selectedDate}
@@ -1256,12 +1326,12 @@ function DeliveryCard({
           aria-controls={`delivery-day-calendar-${item.id}`}
           onClick={() => setViennaPickerOpen((open) => !open)}
         >
-          <span className={styles.calendarIcon} aria-hidden="true">▦</span>
+          <CalendarIcon />
           <span>
-            <strong>{formatDateLabel(viennaDay.date)}</strong>
-
+            <strong>{viennaDay ? formatDateLabel(viennaDay.date) : 'Choose delivery day'}</strong>
+            <small>Vienna delivery</small>
           </span>
-          <span className={styles.dateChevron} aria-hidden="true">{viennaPickerOpen ? '▲' : '▼'}</span>
+          <ChevronIcon open={viennaPickerOpen} />
         </button>
       ) : null}
 
@@ -1273,7 +1343,7 @@ function DeliveryCard({
 
             </div>
             <button type="button" className={styles.closePicker} onClick={() => setViennaPickerOpen(false)} aria-label="Close delivery day picker">
-              ×
+              <CloseIcon />
             </button>
           </div>
           {viennaDays.length ? (
@@ -1355,7 +1425,9 @@ function DeliveryCard({
       {showPaint && !datePickerOpen && !viennaPickerOpen ? (
         <div className={styles.slotBox}>
           <h4 className={styles.planTitle}>Painting plan</h4>
-          {item.delivery.mode === 'market' && item.delivery.pickupHour == null ? (
+          {item.delivery.mode === 'vienna' && !item.delivery.pickupDate ? (
+            <p className={styles.planPrompt}>Choose the delivery day to calculate a safe painting time.</p>
+          ) : item.delivery.mode === 'market' && item.delivery.pickupHour == null ? (
             <p className={styles.planPrompt}>Choose the pickup hour to calculate a safe painting time.</p>
           ) : paintItems.length > 1 ? (
             <>
@@ -1412,8 +1484,8 @@ function DeliveryCard({
               <div className={styles.moveSuggestion}>
                 <strong>No free time — one change makes room</strong>
                 <ol className={styles.moveSteps}>
-                  <li><span aria-hidden="true">↪</span><div><strong>Move {moveSuggestion.title} · {moveSuggestion.orderCode}</strong><p>{formatDateLabel(moveSuggestion.from.date)} · {formatHour(moveSuggestion.from.startHour)}–{formatHour(moveSuggestion.from.endHour)}</p><p>→ {formatDateLabel(moveSuggestion.to.date)} · {formatHour(moveSuggestion.to.startHour)}–{formatHour(moveSuggestion.to.endHour)}</p><small>Customer pickup stays the same.</small></div></li>
-                  <li><span aria-hidden="true">＋</span><div><strong>Paint this ornament in the freed time</strong><p>{formatDateLabel(moveSuggestion.freedSlot.date)} · {formatHour(moveSuggestion.freedSlot.startHour)}–{formatHour(moveSuggestion.freedSlot.endHour)}</p></div></li>
+                  <li><span aria-hidden="true" className={styles.stepIcon}><svg viewBox="0 0 24 24" focusable="false"><path d="M5 7h10a4 4 0 0 1 0 8H8m0 0l3-3m-3 3l3 3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></span><div><strong>Move {moveSuggestion.title} · {moveSuggestion.orderCode}</strong><p>{formatDateLabel(moveSuggestion.from.date)} · {formatHour(moveSuggestion.from.startHour)}–{formatHour(moveSuggestion.from.endHour)}</p><p>→ {formatDateLabel(moveSuggestion.to.date)} · {formatHour(moveSuggestion.to.startHour)}–{formatHour(moveSuggestion.to.endHour)}</p><small>Customer pickup stays the same.</small></div></li>
+                  <li><span aria-hidden="true" className={styles.stepIcon}><svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg></span><div><strong>Paint this ornament in the freed time</strong><p>{formatDateLabel(moveSuggestion.freedSlot.date)} · {formatHour(moveSuggestion.freedSlot.startHour)}–{formatHour(moveSuggestion.freedSlot.endHour)}</p></div></li>
                 </ol>
                 <Button tone="staff" onClick={() => onApplyMove(moveSuggestion)}>
                   Use this plan
@@ -1497,7 +1569,6 @@ function pickupHint(hour: number | null, preview: HourPreview | null, count: num
   return `Pickup ${formatHour(hour)} · paint ${paintSlotsLabel(plan.slots, pickupDate)}`
 }
 
-function stockLabel(quantity: number) { return quantity === 0 ? 'Sold out' : quantity === 1 ? 'Last one' : `${quantity} left` }
 function depositValue(text: string, total: number) { return text.trim() ? Number(text.replace(',', '.')) : Math.round(total * 50) / 100 }
 function validDeposit(text: string, total: number) { const amount = depositValue(text, total); return Number.isFinite(amount) && amount > 0 && amount < total }
 function SalePaymentFields({ state, onState, method, onMethod, deposit, onDeposit, total }: {
@@ -1508,4 +1579,17 @@ function SalePaymentFields({ state, onState, method, onMethod, deposit, onDeposi
     {state !== 'unpaid' && <SegmentedControl legend="Payment method" name="sale-payment-method" value={method} onChange={onMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} />}
     {state === 'deposit' && <Field label="Deposit received (€)" htmlFor="sale-deposit" hint={`Leave empty for 50% · ${formatEur(Math.round(total * 50) / 100, 'en')}`} error={validDeposit(deposit, total) ? undefined : 'Enter an amount greater than zero and less than the total.'}><input id="sale-deposit" inputMode="decimal" value={deposit} onChange={event => onDeposit(event.target.value)} /></Field>}
   </>
+}
+
+/** Inline icons: drawn, not text glyphs, so they align and scale with the control. */
+function CalendarIcon() {
+  return <span className={styles.calendarIcon} aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="4" y="5.5" width="16" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg></span>
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return <span className={styles.dateChevron} data-open={open || undefined} aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+}
+
+function CloseIcon() {
+  return <svg className={styles.closeIcon} viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" /></svg>
 }

@@ -17,7 +17,7 @@
 .steps {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
+  gap: var(--space-2) var(--space-3);
   color: var(--staff-muted);
 }
 
@@ -54,11 +54,32 @@
   margin-bottom: var(--space-2);
 }
 
+/* Payment card: the note sits one group step above the payment controls. */
+.payCard > :first-child {
+  margin-bottom: var(--space-4);
+}
+
+/* The card padding is the only space at its end. */
+.card > :last-child {
+  margin-bottom: 0;
+}
+
 .cardHead {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+/* The row owns the spacing, so the title centres exactly on Remove. */
+.cardHead h3 {
+  margin: 0;
+}
+
+/* A finished item's card holds only its header: equal padding above and below. */
+.cardHead:last-child {
+  margin-bottom: 0;
 }
 
 .actions {
@@ -156,8 +177,45 @@
   margin-top: var(--space-2);
 }
 
-.qrSide .textBtn {
-  justify-self: start;
+/* Form status and the step below it: the parent owns the 24px rhythm. */
+.afterOrder {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.afterOrder > * {
+  margin: 0;
+}
+
+.focusHeading:focus {
+  outline: none;
+}
+
+.focusHeading:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+  border-radius: var(--space-2);
+}
+
+.page {
+  scroll-margin-top: var(--space-4);
+}
+
+.doneCard .balance {
+  color: var(--staff-ink);
+  font-weight: 600;
+}
+
+.doneQr {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.doneQrBody {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
 }
 
 .doneCard {
@@ -179,7 +237,16 @@
   border-radius: 50%;
   background: var(--staff-btn);
   color: var(--staff-canvas-text);
-  font-weight: 800;
+}
+
+.doneCard > span svg,
+.calendarIcon svg,
+.dateChevron svg,
+.stepIcon svg,
+.closeIcon {
+  display: block;
+  width: var(--space-5);
+  height: var(--space-5);
 }
 
 .doneCard strong {
@@ -206,6 +273,10 @@
   font-weight: 600;
 }
 
+.slotBox:last-child {
+  padding-bottom: 0;
+}
+
 .slotHint {
   margin: 0 0 var(--space-2);
   font-weight: 600;
@@ -230,7 +301,7 @@
 .planSelected .textBtn { justify-self: start; }
 .moveSteps { list-style: none; padding: 0; margin: var(--space-2) 0; display: grid; gap: var(--space-3); }
 .moveSteps li { display: flex; gap: var(--space-3); padding: var(--space-3); border: var(--border-thin) solid var(--staff-line); border-radius: var(--space-2); background: var(--staff-surface); }
-.moveSteps li > span { font-size: var(--type-staff-h1-size); }
+.moveSteps li > span { flex: 0 0 auto; color: var(--staff-ink); }
 .moveSteps p { margin-top: var(--space-2); font-weight: 400; }
 .moveSteps small, .planSelected small { color: var(--staff-muted); font-weight: 400; }
 .sessionList { list-style: none; padding: 0; margin: var(--space-3) 0 0; display: grid; gap: var(--space-2); }
@@ -291,9 +362,11 @@
   cursor: pointer;
 }
 
-.selectedDate:hover {
-  border-color: var(--staff-ink);
-  background: var(--staff-bg);
+@media (hover: hover) {
+  .selectedDate:hover {
+    border-color: var(--staff-ink);
+    background: var(--staff-bg);
+  }
 }
 
 .selectedDate:focus-visible {
@@ -320,12 +393,17 @@
   border-radius: var(--space-2);
   background: var(--staff-ink);
   color: var(--staff-surface);
-  font-size: var(--type-staff-h2-size);
 }
 
 .dateChevron {
+  display: grid;
+  place-items: center;
   color: var(--staff-muted);
-  font-size: var(--type-staff-meta-size);
+  transition: transform var(--dur-change) var(--ease-enter);
+}
+
+.dateChevron[data-open] {
+  transform: rotate(180deg);
 }
 
 .datePicker {
@@ -361,17 +439,18 @@
   width: var(--size-control-staff);
   height: var(--size-control-staff);
   flex: 0 0 var(--size-control-staff);
+  padding: 0;
   border: var(--border-thin) solid var(--staff-line);
   border-radius: 50%;
   background: var(--staff-surface);
   color: var(--staff-ink);
-  font: inherit;
-  font-size: var(--type-staff-h2-size);
   cursor: pointer;
 }
 
-.closePicker:hover {
-  border-color: var(--staff-ink);
+@media (hover: hover) {
+  .closePicker:hover {
+    border-color: var(--staff-ink);
+  }
 }
 
 .closePicker:focus-visible {
@@ -388,6 +467,12 @@
 .hint {
   margin: 0;
   color: var(--staff-muted);
+}
+
+.soldOut {
+  margin: 0 0 var(--space-3);
+  color: var(--staff-danger);
+  font-weight: 600;
 }
 
 .startChoices {

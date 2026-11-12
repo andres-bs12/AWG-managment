@@ -7,6 +7,7 @@ import type { CustomerFormView, OrderItem } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
 import { apiError } from '../../lib/apiError'
 import { petNameFromBack } from '../../lib/petName'
+import { phoneValid } from '../../lib/phone'
 import { formatDateLabel, formatHour } from '../../lib/time'
 import { deliveryDatePhrase } from '../../lib/deliveryWindow'
 import { formDraftKey, restoreFormDraft, serializeFormDraft, type FormDraft, type FormItemDraft } from '../../lib/formDraft'
@@ -51,6 +52,8 @@ export function FormPage() {
 function CustomerForm({ token }: { token: string }) {
   const [searchParams] = useSearchParams()
   const staffHandoff = searchParams.get('staff') === '1'
+  // One anonymous page view per form link; the stall iPad (?staff=1) is not a visitor.
+  useEffect(() => { if (!staffHandoff) void api.metrics.track({ event: 'form_view' }).catch(() => {}) }, [staffHandoff])
   const { t, locale } = useLocale()
   const [view, setView] = useState<CustomerFormView | null>(null)
   const [loading, setLoading] = useState(true)
@@ -142,12 +145,13 @@ function CustomerForm({ token }: { token: string }) {
     for (const item of draft.items) {
       const named = formItems.find(source => source.id === item.orderItemId)?.withName
       if (named && !paintedNameValid(item.backName)) found[`back-${item.orderItemId}`] = item.backName ? 'formPaintedNameTooLong' : 'formNeedBackName'
-      if (!item.photos.length) found[`photos-${item.orderItemId}`] = 'needPhoto'
+      if (!item.photos.length) found[`photos-${item.orderItemId}`] = 'shopNeedPhotoShop'
     }
     if (!draft.customerName.trim()) found['form-name'] = 'formNeedName'
     if (!draft.email.trim()) found['form-email'] = 'formNeedEmail'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) found['form-email'] = 'invalidEmail'
     if (!draft.phone.trim()) found['form-phone'] = 'formNeedPhone'
+    else if (!phoneValid(draft.phone)) found['form-phone'] = 'phoneInvalid'
     if (view?.needsAddress) {
       if (!draft.address.line1.trim()) found['form-line1'] = 'formNeedStreet'
       if (!/^1(0[1-9]|1[0-9]|2[0-3])0$/.test(draft.address.postalCode.trim())) found['form-postal'] = 'shopPostalInvalid'
@@ -188,7 +192,8 @@ function CustomerForm({ token }: { token: string }) {
       }, { rememberToken: !staffHandoff })
       try { sessionStorage.removeItem(formDraftKey(token)) } catch { setStorageError(true) }
       // The Track page already shows the order state: go there and confirm the save once.
-      void navigate(`/track/${encodeURIComponent(result.orderCode)}`, { replace: true, state: { formSaved: true } })
+      // The stall iPad keeps ?staff=1 on Track too, so its redirect is not counted as a customer visit.
+      void navigate(`/track/${encodeURIComponent(result.orderCode)}${staffHandoff ? '?staff=1' : ''}`, { replace: true, state: { formSaved: true } })
     } catch (error) {
       const terminal = terminalFor(error)
       if (terminal) { setTerminal(terminal); setIssue(error); return }

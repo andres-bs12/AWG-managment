@@ -13,7 +13,8 @@
 .item { display: grid; gap: var(--space-5); min-width: 0; }
 .item h3 { margin: 0; font-family: var(--font-display); font-size: var(--type-h3-size); line-height: var(--type-h3-line); font-weight: var(--type-h3-weight); letter-spacing: var(--type-h3-tracking); }
 .editor { display: grid; gap: var(--space-6); min-width: 0; }
-.fields { display: grid; gap: var(--space-5); min-width: 0; }
+/* Fields keep their own height: beside the taller preview the column must not stretch its rows (dead gap). */
+.fields { display: grid; align-content: start; gap: var(--space-5); min-width: 0; }
 .fields > * { margin: 0; }
 .preview { width: min(100%, var(--size-preview-desktop)); justify-self: center; }
 .facts { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0; }
@@ -23,9 +24,6 @@
 .muted { text-wrap: pretty; margin: 0; color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
 .review { display: grid; gap: var(--space-4); }
 .review > section { margin: 0; }
-.reviewProduct { display: grid; grid-template-columns: var(--size-review-art) minmax(0, 1fr) max-content; gap: var(--space-3); align-items: center; }
-.reviewProduct p { margin: 0; overflow-wrap: anywhere; }
-.reviewPreview { width: var(--size-review-art); }
 .price { white-space: nowrap; font-variant-numeric: tabular-nums lining-nums; font-weight: var(--type-label-weight); }
 .edit { min-width: var(--touch); min-height: var(--touch); padding: var(--space-1); border: 0; border-radius: var(--radius-small); background: transparent; color: var(--color-text); font: inherit; font-weight: var(--type-button-weight); text-decoration: underline; text-underline-offset: var(--space-1); cursor: pointer; }
 .edit:focus-visible { outline: none; box-shadow: var(--focus); }
@@ -35,7 +33,7 @@
 .code { display: grid; gap: var(--space-3); padding: var(--space-4); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius-control); text-align: center; }
 .code strong { font-size: var(--type-h2-size); overflow-wrap: anywhere; user-select: all; }
 .form :is(input, textarea, button, summary, [tabindex]) { scroll-margin-block: var(--space-5); }
-@media (min-width: 1024px) { .editor { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); } }
+@media (min-width: 1024px) { .editor { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; } }
 
 /* Phones at the stall: a compact ornament keeps the first field on the same screen. */
 @media (max-width: 767px) { .preview svg { max-height: var(--size-preview-mobile); } }

@@ -90,7 +90,7 @@ export function SalesPage() {
       {!result.orders.length ? <p role="status">No sales match these filters.</p> : <ul className={styles.list} aria-label="Sales results">{result.orders.map(order => <li key={order.id}>
         <Link className={styles.sale} to={`/staff/orders/${order.id}`} state={{ from: `/staff/sales?${params}` }}>
           <div className={styles.row}><strong>{order.customerName || 'Customer pending'}</strong><strong className={styles.total}>{formatEur(order.total, 'en')}</strong></div>
-          <div className={styles.row}><span className={styles.code}>{order.code}</span><span className={styles.payment} data-warning={order.checkoutStatus === 'pending' || order.checkoutStatus === 'review' || undefined}>{salePaymentLabel(order)}</span></div>
+          <div className={styles.row}><span className={styles.code}>{order.code}</span><span className={styles.payment} data-warning={order.checkoutStatus === 'pending' || order.checkoutStatus === 'review' || undefined}>{salePaymentLabel(order, amount => formatEur(amount, 'en'))}</span></div>
           <span className={styles.meta}><StaffText>{`${order.source === 'web' ? 'Web' : 'Stall'} · ${formatDateLabel(viennaDate(order.createdAt))}${order.status === 'CANCELLED' ? ' · Cancelled' : ''}`}</StaffText></span>
         </Link>
       </li>)}</ul>}

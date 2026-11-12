@@ -1,6 +1,6 @@
 import type { OrnamentColor, PaymentState } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
-import { petNameFromBack } from '../../lib/petName'
+import { receiptTitle } from '../../lib/ornamentTitle'
 import { colorKeys } from '../../lib/ornamentPresentation'
 import styles from './OrderReceipt.module.css'
 
@@ -16,7 +16,7 @@ export function OrderReceipt({ items, total, paymentState }: { items: ReceiptIte
         {items.map((item, index) => (
           <li key={index}>
             <div>
-              <strong>{petNameFromBack(item.backName) || item.petName || t(item.kind === 'finished' || item.withName === false ? 'itemNotPersonalised' : 'ornamentN', { n: index + 1 })}</strong>
+              <strong>{receiptTitle(item, index, items.length, t)}</strong>
               <span className={styles.meta}>
                 {item.color ? <span className={styles.color}><i data-color={item.color} aria-hidden="true" />{t(colorKeys[item.color])}{item.color === 'grey' || item.color === 'white' ? ` (${t('legacyColour')})` : ''}</span> : item.kind === 'custom' ? <span>{t('colorUnknown')}</span> : null}
               </span>

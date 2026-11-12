@@ -11,9 +11,11 @@ test('mock search finds customer names, order codes and phone digits, then shows
   const search = page.getByRole('searchbox', { name: 'Code, customer name or phone', exact: true })
   await search.fill('sArAh')
   await expect(page.getByRole('link', { name: /AWG0100 · Sarah Müller/ })).toBeVisible()
+  // An exact order code with a single match opens that order directly.
   await search.fill('awg0103')
-  await expect(page.getByRole('link', { name: /AWG0103 · Anna Berger/ })).toBeVisible()
-  await expect(page.getByRole('link', { name: /AWG0100 · Sarah Müller/ })).toHaveCount(0)
+  await expect(page).toHaveURL(/\/staff\/orders\/ord-103$/)
+  await expect(page.getByRole('heading', { name: 'AWG0103', exact: true })).toBeVisible()
+  await page.goto('/staff/search')
   await search.fill('8821100')
   await expect(page.getByRole('link', { name: /AWG0101 · Thomas Weber/ })).toBeVisible()
   await search.fill('customer that does not exist')

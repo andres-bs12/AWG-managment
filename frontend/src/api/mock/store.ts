@@ -2,6 +2,7 @@ import { paymentSummary } from '../../lib/paymentSummary'
 import { filterSales } from '../../lib/sales'
 import { readFormToken, rememberFormToken } from '../formTokens'
 import type {
+  Prices, PricesUpdate,
   InventoryItem, PaintingDay, ShopCheckoutInput,
   Address,
   AgendaDay,
@@ -28,14 +29,15 @@ import type {
   TrackWhen,
 } from '../../domain/types'
 import { itemCost } from '../../lib/money'
-import { mockPricing } from './pricing'
+import { mockPricing, validatePriceInput } from './pricing'
 import { marketPickupDates, paintDatesToTry } from '../../lib/calendar'
 import { hasPaintOverlap } from '../../lib/slots'
 import { addUtcDays, formatDateLabel, formatHour, formatMinutes, hoursOverlap, utcWeekday } from '../../lib/time'
 import { createSeed, DEMO_NOW_HOUR, SEED_REVISION, STAFF_ACCOUNTS, STORAGE_KEY, type MockState } from './seed'
 import { uid as newUuid } from '../../lib/uid'
 
-let state: MockState = load()
+/** Prices live beside the seed data; absent in older saved demo data, which means the defaults at revision 0. */
+let state: MockState & { prices?: Prices } = load()
 let version = 0
 const listeners = new Set<() => void>()
 
@@ -178,6 +180,20 @@ function blocksForDay(dayId: string): TimeBlock[] {
     .filter((b) => b.marketDayId === dayId)
     .slice()
     .sort((a, b) => a.startHour - b.startHour)
+}
+
+export function currentPrices(): Prices {
+  return { ...(state.prices ?? { ...mockPricing, revision: 0 }) }
+}
+
+export function updatePrices(input: PricesUpdate): Prices {
+  const current = currentPrices()
+  if (input.expectedRevision !== current.revision) throw Object.assign(new Error('Someone else changed the prices. Reload and check them.'), { code: 'PRICES_CHANGED', status: 409 })
+  const problem = validatePriceInput(input)
+  if (problem) throw Object.assign(new Error(problem), { status: 400 })
+  state.prices = { customPrice: input.customPrice, finishedPrice: input.finishedPrice, nameExtra: input.nameExtra, revision: current.revision + 1 }
+  emit()
+  return currentPrices()
 }
 
 export function listInventory(): InventoryItem[] {
@@ -351,7 +367,7 @@ export function createMockCheckout(input: ShopCheckoutInput) {
   const items: OrderItem[] = input.items.map(item => ({
     id: uid('orn'), orderId, kind: 'custom', petName: item.petName ?? '', withName: item.withName,
     color: item.color ?? 'red', finish: item.finish, backName: item.backName ?? '', note: item.note ?? '',
-    cost: itemCost('custom', item.withName, mockPricing), productionStatus: 'not_started', photos: item.photos,
+    cost: itemCost('custom', item.withName, currentPrices()), productionStatus: 'not_started', photos: item.photos,
     formComplete: true, delivery: input.deliveryKind === 'market'
       ? { kind: 'market', marketDayId: state.marketDays.find(day => day.date === input.deliveryDate && state.markets.some(m => m.id === day.marketId && m.kind === 'market'))?.id, marketId: state.marketDays.find(day => day.date === input.deliveryDate)?.marketId, pickupHour: input.pickupTime ? Number(input.pickupTime.slice(0, 2)) + Number(input.pickupTime.slice(3)) / 60 : null }
       : { kind: 'vienna', address: input.address, deliveryDate: input.deliveryDate },
@@ -641,6 +657,9 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         addressLabel: null,
         photoUrl,
         source: order.source ?? 'stall',
+        kind: item.kind,
+        postalCode: null,
+        waitingForCustomer: item.kind === 'custom' && (!item.photos.length || (item.withName && !item.backName)),
       })
     } else if (item.delivery.kind === 'vienna') {
       if (!viennaBelongsToDate(item, date)) continue
@@ -663,6 +682,9 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         addressLabel: addressLabel(item.delivery.address),
         photoUrl,
         source: order.source ?? 'stall',
+        kind: item.kind,
+        postalCode: item.delivery.address?.postalCode ?? null,
+        waitingForCustomer: item.kind === 'custom' && (!item.photos.length || (item.withName && !item.backName)),
       })
     }
   }
@@ -670,7 +692,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
     if (a.deliveryKind !== b.deliveryKind) return a.deliveryKind === 'market' ? -1 : 1
     return (a.pickupHour ?? 99) - (b.pickupHour ?? 99)
   })
-  return rows.map(row => ({ ...row, remaining: paymentSummary(requireOrder(row.orderId)).remaining, paymentState: requireOrder(row.orderId).paymentState }))
+  return rows.map(row => { const order = requireOrder(row.orderId); const summary = paymentSummary(order); return { ...row, remaining: summary.remaining, paymentState: order.paymentState, total: order.total, amountPaid: summary.paid } })
 }
 
 export function getAgendaDay(date: string): AgendaDay {
@@ -791,7 +813,7 @@ export function createSale(input: CreateSaleInput): Order {
   for (const row of rows) {
     const itemId = uid('orn')
     const withName = row.kind === 'custom' && row.withName
-    const cost = itemCost(row.kind, withName, mockPricing)
+    const cost = itemCost(row.kind, withName, currentPrices())
     createdItems.push({
       id: itemId,
       orderId,
@@ -1184,7 +1206,11 @@ export function searchOrders(query: string): import('../../domain/types').OrderS
 function orderSummary(order: Order): import('../../domain/types').OrderSummary {
   const bundle = getOrderBundle(order.id)
   const dates = bundle.items.map(item => item.delivery.deliveryDate ?? state.marketDays.find(day => day.id === item.delivery.marketDayId)?.date).filter((date): date is string => Boolean(date)).sort()
-  return { id: order.id, code: order.code, customerName: bundle.customer.name, phone: bundle.customer.phone, createdAt: order.createdAt, paymentState: order.paymentState, checkoutStatus: order.checkoutStatus ?? (order.paymentReview ? 'review' : null), total: order.total, items: bundle.items.length, nextHandoffDate: dates[0] ?? null, handedOver: order.handedOver, source: order.source ?? 'stall', status: order.status ?? 'ACTIVE' }
+  return { id: order.id, code: order.code, customerName: bundle.customer.name, phone: bundle.customer.phone, createdAt: order.createdAt, paymentState: order.paymentState, checkoutStatus: order.checkoutStatus ?? (order.paymentReview ? 'review' : null), total: order.total, items: bundle.items.length, nextHandoffDate: dates[0] ?? null, handedOver: order.handedOver, source: order.source ?? 'stall', status: order.status ?? 'ACTIVE', amountPaid: paymentSummary(order).paid }
+}
+/** Read-only snapshot for the mock Statistics endpoint. */
+export function statsSource(): { orders: Order[]; items: import('../../domain/types').OrderItem[] } {
+  return { orders: state.orders, items: state.items }
 }
 export function listSales(filters: import('../../domain/types').SalesFilters): import('../../domain/types').SalesPage {
   return filterSales(state.orders.map(orderSummary), filters)

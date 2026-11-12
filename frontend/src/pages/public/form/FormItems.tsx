@@ -8,7 +8,7 @@ import { previewItem, colorKeys } from '../../../lib/ornamentPresentation'
 import { OrnamentPreview } from '../../../components/public/OrnamentPreview'
 import { PhotoTiles } from '../../../components/public/PhotoTiles'
 import { Card } from '../../../components/public/PublicForm'
-import { Field } from '../../../components/ui/Field'
+import { BackNameField } from '../../../components/public/BackNameField'
 import { HelpTip } from '../../../components/ui/HelpTip'
 import styles from '../FormPage.module.css'
 
@@ -46,7 +46,7 @@ export function FormItems({ items, draft, errors, photoErrors, patch, addFiles, 
         <div className={styles.editor}>
           <div className={styles.preview}><OrnamentPreview readOnly item={previewItem(source, item)} /></div>
           <div className={styles.fields}>
-            {source.withName && <Field label={t('backName')} htmlFor={`back-${id}`} hint={t('formBackNameHint')} error={errors[`back-${id}`]} announceError={false}><input id={`back-${id}`} maxLength={6} value={item.backName} onBlur={() => validate(`back-${id}`)} onChange={event => patch(id, { backName: event.target.value })} /></Field>}
+            {source.withName && <BackNameField id={`back-${id}`} label={t('backName')} hint={t('formBackNameHint')} value={item.backName} error={errors[`back-${id}`]} tooLongMessage={t('formPaintedNameTooLong')} announceError={false} onBlur={() => validate(`back-${id}`)} onChange={backName => patch(id, { backName })} />}
             <PhotoTiles uid={id} petName={item.petName} photos={item.photos} needsReload={item.photosNeedReload} error={errors[`photos-${id}`]} fileError={photoErrors[id]} announceErrors={false} onAdd={files => addFiles(id, files)} onRemove={photoId => patch(id, { photos: item.photos.filter(photo => photo.id !== photoId) })} />
             <OptionalNote id={`note-${id}`} value={item.note} onChange={note => patch(id, { note })} error={errors[`note-${id}`]} announceError={false} />
           </div>

@@ -1,6 +1,6 @@
 import { StaffText } from '../../components/staff/StaffText'
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { OrderSummary } from '../../domain/types'
 import { useStaffRefresh } from '../../lib/useStaffRefresh'
@@ -21,6 +21,14 @@ export function OrderLookupPage({ attention = false }: { attention?: boolean }) 
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
   const version = useStaffRefresh()
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (attention || busy || error) return
+    const code = query.trim().toUpperCase()
+    if (!/^AWG[A-Z0-9]{4,}$/.test(code)) return
+    const exact = rows.filter(row => row.code.toUpperCase() === code)
+    if (exact.length === 1) navigate(`/staff/orders/${exact[0].id}`, { replace: true, state: { from: `/staff/search?${params}` } })
+  }, [attention, busy, error, navigate, params, query, rows])
   useEffect(() => {
     let active = true
     if (!attention && query.trim().length < 2) { setRows([]); setBusy(false); setError(''); return }
@@ -35,7 +43,7 @@ export function OrderLookupPage({ attention = false }: { attention?: boolean }) 
   return <section className={styles.page}>
     <StaffBackLink to="/staff/agenda" label="Agenda" />
     <h1>{attention ? 'Needs attention' : 'Search orders'}</h1>
-    {attention ? <p>Online payments waiting for confirmation or requiring a review in Stripe. Pending checkouts hold painting time.</p> : <Field label="Code, customer name or phone" htmlFor="order-query" hint="Enter at least two characters; phone search needs three digits."><input id="order-query" type="search" autoComplete="off" value={query} onChange={event => setParams({ q: event.target.value }, { replace: true })} /></Field>}
+    {attention ? <div className={styles.explain}><p>Web shop orders whose payment is not settled yet. You only act on <strong>Payment review</strong>.</p><ul><li><strong>Waiting for online payment:</strong> the customer is on the Stripe page. Their painting time is held for 15 minutes, then released on its own. Nothing to do.</li><li><strong>Payment review:</strong> Stripe received a different amount than the order total. Check the payment in Stripe, then record it on the order.</li></ul></div> : <Field label="Code, customer name or phone" htmlFor="order-query" hint={rows.length ? undefined : 'Enter at least two characters; phone search needs three digits.'}><input id="order-query" type="search" autoComplete="off" value={query} onChange={event => setParams({ q: event.target.value }, { replace: true })} /></Field>}
     {busy && <p role="status">Searching orders…</p>}
     {error && <div role="alert"><p>{error}</p><Button tone="staff" onClick={() => setRetry(n => n + 1)}>Retry</Button></div>}
     {!busy && !error && !rows.length && (attention || query.trim().length >= 2) && <p role="status">{attention ? 'No orders need attention.' : 'No matching orders.'}</p>}

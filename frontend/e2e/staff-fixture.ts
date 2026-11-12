@@ -57,6 +57,7 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
   let logoutOffline = false
   let agendaStatus = 200
   let mutationError: { code: string; message: string } | null = null
+  const prices = { customPrice: config.customPrice, finishedPrice: config.finishedPrice, nameExtra: config.nameExtra, revision: 0 }
   const inventory = [...config.colors.map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, quantity: 3 })), { id: 'stock-finished', kind: 'finished', color: null, finish: null, quantity: 3 }]
   let allMarkets = [market, spareMarket, ...(options.mixedHandoff ? [{ ...market, id: 'market-home', name: 'Home', kind: 'home' as const }] : [])]
   let allDays = [marketDay, ...(options.mixedHandoff ? [{ ...marketDay, id: 'day-vienna', marketId: 'market-home', date: '2026-12-02', isToday: false }] : []), ...spareDays]
@@ -72,9 +73,10 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
       return currentItem && block?.marketDayId === selectedDay.id && parent.status !== 'CANCELLED' ? [{ block, order: parent, item: currentItem, customer: bundle(parent.id).customer }] : []
     })
     const held = options.held && selectedDay.id === marketDay.id ? [{ block: { id: 'web-checkout-hold', marketDayId: marketDay.id, orderItemId: null, startHour: 15, endHour: 16, status: 'not_started' as const }, order: null, item: null, customer: null, held: true }] : []
+    // The paid back name doubles as petName (v3.1), so rows are labelled by the same name as the order detail.
     const deliveries = [...records.values()].flatMap(parent => {
       const list = [items.get(parent.id)!, ...(parent.id === original.id && extraItem ? [extraItem] : [])]
-      return list.filter(currentItem => currentItem.delivery.marketDayId === selectedDay.id && parent.status !== 'CANCELLED').map(currentItem => ({ orderId: parent.id, orderCode: parent.code, itemId: currentItem.id, title: currentItem.petName || 'Custom ornament', customerName: 'Alex Review', color: currentItem.color, finish: currentItem.finish, productionStatus: currentItem.productionStatus, handedOver: currentItem.handedOver ?? parent.handedOver, deliveryKind: currentItem.delivery.kind, pickupHour: currentItem.delivery.pickupHour ?? null, methodLabel: currentItem.delivery.kind === 'vienna' ? 'Vienna' : market.name, timeLabel: currentItem.delivery.kind === 'market' && currentItem.delivery.pickupHour != null ? formatHour(currentItem.delivery.pickupHour) : null, phone: '+43 660 1234567', addressLabel: null, remaining: parent.total - (parent.amountPaid ?? 0), paymentState: parent.paymentState }))
+      return list.filter(currentItem => currentItem.delivery.marketDayId === selectedDay.id && parent.status !== 'CANCELLED').map(currentItem => ({ kind: currentItem.kind, backName: currentItem.backName || currentItem.petName, orderId: parent.id, orderCode: parent.code, itemId: currentItem.id, title: currentItem.petName || 'Custom ornament', customerName: 'Alex Review', color: currentItem.color, finish: currentItem.finish, productionStatus: currentItem.productionStatus, handedOver: currentItem.handedOver ?? parent.handedOver, deliveryKind: currentItem.delivery.kind, pickupHour: currentItem.delivery.pickupHour ?? null, methodLabel: currentItem.delivery.kind === 'vienna' ? 'Vienna' : market.name, timeLabel: currentItem.delivery.kind === 'market' && currentItem.delivery.pickupHour != null ? formatHour(currentItem.delivery.pickupHour) : null, phone: '+43 660 1234567', addressLabel: null, remaining: parent.total - (parent.amountPaid ?? 0), paymentState: parent.paymentState }))
     })
     return { marketDay: selectedDay, market: allMarkets.find(row => row.id === selectedDay.marketId) ?? market, slots: [...slots, ...held], deliveries }
   }
@@ -95,6 +97,7 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
     }
     if (path === '/api/shop/config') return json(route, config)
     if (path === '/api/inventory') return json(route, inventory)
+    if (path === '/api/prices' && method === 'GET') return json(route, prices)
     if (path === '/api/markets' && method === 'GET') return json(route, allMarkets)
     if (path === '/api/market-days') return json(route, allDays.filter(row => !url.searchParams.has('marketId') || row.marketId === url.searchParams.get('marketId')))
     if (path === '/api/painting-days') return json(route, paintingDays.filter(row => row.date >= (url.searchParams.get('from') ?? '') && row.date <= (url.searchParams.get('to') ?? '9999')))
@@ -137,6 +140,11 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
       const body = request.postData() ? request.postDataJSON() : null
       mutations.push({ path, body })
       if (mutationError) return json(route, mutationError, 409)
+      if (method === 'PUT' && path === '/api/prices') {
+        if (body.expectedRevision !== prices.revision) return json(route, { code: 'PRICES_CHANGED', message: 'Someone changed the prices meanwhile.' }, 409)
+        Object.assign(prices, { customPrice: body.customPrice, finishedPrice: body.finishedPrice, nameExtra: body.nameExtra, revision: prices.revision + 1 })
+        return json(route, prices)
+      }
       if (method === 'PATCH' && path.startsWith('/api/inventory/')) {
         const row = inventory.find(entry => entry.id === path.split('/').at(-1))!
         if (body.expectedQuantity !== row.quantity) return json(route, { code: 'STOCK_CHANGED', message: 'Stock changed.' }, 409)

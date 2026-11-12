@@ -11,7 +11,7 @@ export function ChangePasswordPage() {
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [fieldErrors, setFieldErrors] = useState<{ next?: string; confirm?: string }>({})
+  const [fieldErrors, setFieldErrors] = useState<{ current?: string; next?: string; confirm?: string }>({})
   const [success, setSuccess] = useState(false)
 
   async function submit(event: FormEvent) {
@@ -34,7 +34,12 @@ export function ChangePasswordPage() {
       await api.auth.changePassword(current, next)
       setCurrent(''); setNext(''); setConfirm(''); setSuccess(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not change password.')
+      const message = err instanceof Error ? err.message : 'Could not change password.'
+      // The server sends no error code for this case; its message is the only signal.
+      if (message === 'Current password is wrong.') {
+        setFieldErrors({ current: message })
+        document.getElementById('current-password')?.focus()
+      } else setError(message)
     } finally { setBusy(false) }
   }
 
@@ -44,7 +49,7 @@ export function ChangePasswordPage() {
     <form onSubmit={submit}>
       {error && <p className={styles.err} role="alert">{error}</p>}
       {success && <p role="status">Password changed</p>}
-      <Field label="Current password" htmlFor="current-password"><input id="current-password" type="password" autoComplete="current-password" required value={current} onChange={e => setCurrent(e.target.value)} /></Field>
+      <Field label="Current password" htmlFor="current-password" error={fieldErrors.current}><input id="current-password" type="password" autoComplete="current-password" required value={current} onChange={e => setCurrent(e.target.value)} /></Field>
       <Field label="New password" htmlFor="new-password" hint="10–72 characters, different from the current one." error={fieldErrors.next}><input id="new-password" type="password" autoComplete="new-password" required value={next} onChange={e => setNext(e.target.value)} /></Field>
       <Field label="Confirm new password" htmlFor="confirm-password" error={fieldErrors.confirm}><input id="confirm-password" type="password" autoComplete="new-password" required value={confirm} onChange={e => setConfirm(e.target.value)} /></Field>
       <Button type="submit" tone="staff" disabled={busy}>{busy ? 'Changing…' : 'Change password'}</Button>

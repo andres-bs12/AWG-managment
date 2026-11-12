@@ -87,6 +87,14 @@ Scripts disponibles en `frontend/package.json`: `dev`, `build`, `build:mock`, `l
 - `IntroCurtain.tsx`: fondo de cielo (no verde, para que Safari no deje las barras verdes), dos adornos con gato y perro que se balancean y 4 puntos de carga. Solo aparece al cargar entrando por `/`, dura entre 2 y 3,8 s y se salta con un toque o una tecla. Mientras se muestra, `html[data-intro='on']` pausa la entrada del Home.
 - Rendimiento: animaciones solo con `transform`/`opacity`. Las luces dentro de los SVG usan `steps()`, la noria y los aerogeneradores giran por pasos, y la hilera de árboles no se anima. Todo respeta `prefers-reduced-motion`.
 
+## v3.1 (2026-11-12, rama `release/v3.1`, sin desplegar)
+
+- **Precios editables** en Stock (`GET/PUT /api/prices`, revisión optimista 409 `PRICES_CHANGED`, toma `ScheduleLock`; sin fila se usan los `awg.pricing.*`). **V14__price_settings.sql**: tabla `price_setting` y `order_item.name_extra` (recargo cobrado; los ítems antiguos con nombre se fijan a 12,99). Las facturas usan el recargo guardado. Probada en PostgreSQL local.
+- **Statistics** (`/staff/stats`, More): `GET /api/stats?from&to` (máx. 400 días; excluye cancelados y pagos web sin confirmar) y visitas anónimas `home_view`/`track_view`/`form_view` (no desde `?staff=1`). En móvil, filtro Sales · Customers · Website.
+- **Staff:** diálogos con X/Escape/toque fuera (sin «Not yet»); diálogo de entrega con checklist y como mucho dos acciones; Deliveries con nombre/«Not personalised», distrito de Viena, línea de pago y motivo de bloqueo (`lib/deliveryFacts.ts`; DTO de agenda con `kind`, `postalCode`, `waitingForCustomer`, `total`, `amountPaid`); Painting days con calendario mensual; Agenda con «Add paint session» también en List; New sale sin color agotado por defecto, Viena coherente y saldo tras depósito; New sale ya no se bloquea por rangos de días de pintura > 62 (causa del «Load server prices and stock first»).
+- **Público:** P0 de Track corregido (Kugel personalizada sin nombre ≠ «Nicht personalisiert»), nombre solo en el título de la revisión, `BackNameField` compartido, teléfono 6–15 dígitos, recogida sin fila de envío, checkout sin la promesa de plazo de pintura.
+- Auditoría completa en `tasks/audit-results/staff-flows-2026-11-12.md`; revisión cruzada del backend nuevo por GLM-5.3 (3 P2 corregidos). Backend 171 tests; Node 92.
+
 ## Pre-release security fixes (2026-11-12)
 
 - Implemented H2, M1–M4, L2–L5 and L8 locally, with 162 backend tests passing (startup Byte Buddy agent; Java 25 runtime, compilation target 21). H1 checkout caps and the 15-minute expiry were already present after the merge and are preserved. No changes to `frontend/src`, no commit or staging. Detailed finding → file → test mapping and final test count: `tasks/security-review-fixes-2026-11-12.md`.
@@ -101,10 +109,10 @@ Paquete `com.artwithgab.awg_tracking` (con guion bajo; no cambiarlo). Capas: `mo
 
 - No hay entidad `TimeBlock`: el bloque es `OrderItem.paintStart/paintEnd`, su id es el del ítem. `marketDayId` se resuelve por fecha (gana el puesto).
 - Toda operación que reserva tiempo de pintura toma el lock de fila `ScheduleLock` (evita doble reserva y sobreventa de stock).
-- Los precios los calcula el servidor (`awg.pricing.*`).
+- Los precios los calcula el servidor: `price_setting` (editable en Stock) o, si no hay fila, `awg.pricing.*`.
 - Pedidos web `PENDING`/`REVIEW` ocupan horas y se muestran como reservas rayadas sin datos del cliente en Agenda; no aparecen como entregas hasta que se confirme el pago. Se encuentran en `/staff/attention`.
 - Arranque: `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev` (datos demo y usuarios demo: `gaby@artwithgab.com`/`gaby`, `andres@artwithgab.com`/`andres`). Tests: `./mvnw test` (107 tests; verificados el 2026-11-09 con Byte Buddy como `-javaagent` en el sandbox).
-- Esquema con Flyway (`db/migration/V1..V12`), `ddl-auto=validate`; los tests usan H2 sin Flyway. Un cambio de entidad necesita una migración nueva.
+- Esquema con Flyway (`db/migration/V1..V14`), `ddl-auto=validate`; los tests usan H2 sin Flyway. Un cambio de entidad necesita una migración nueva.
 - Errores `{status, message, code, field}` con códigos estables (`docs/sprint5-contract.md`); el front los traduce con `frontend/src/lib/apiError.ts`.
 - Ventas del staff idempotentes (`Idempotency-Key`). Pago Stripe con importe distinto → `checkoutStatus=REVIEW` (no se libera; el staff lo resuelve al anotar el pago). Cancelar/abandonar cierra la sesión de Stripe (`expireOrReconcile`).
 - Stock editable con `expectedQuantity` (409 `STOCK_CHANGED`), días de pintura (`PaintingDay`, máximo 2 por defecto), fin de temporada `awg.shop.season-end` (24-dic), lista de espera.
@@ -166,7 +174,7 @@ Staff (auditorías del 2026-11-05 `staff-ux-sale-orders-*` y `staff-ux-agenda-op
 - días de pintura con guardado automático;
 - agenda escalable con el tamaño del texto;
 - conflictos de día marcados en el editor de mercados;
-- diálogos con «Not yet» como única forma de cerrar sin actuar.
+- diálogos que se cierran con la X de la esquina, Escape o un toque fuera (v3.1 sustituye «Not yet»).
 
 Codex hizo la revisión cruzada (`tasks/audit-results/codex-review-staff-*.md`) y sus hallazgos están corregidos. Lo pendiente está en `tasks/todo.md`. Validación histórica previa a estos arreglos móviles: E2E 429 casos en verde; backend 95 tests. No certifica la nueva suite móvil.
 

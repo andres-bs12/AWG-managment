@@ -1,7 +1,8 @@
 import type { CustomerFormView } from '../../../domain/types'
 import type { FormDraft } from '../../../lib/formDraft'
 import { useLocale } from '../../../i18n/LocaleContext'
-import { ReviewCard, ReviewThumbs } from '../../../components/public/ReviewCard'
+import { ReviewCard, ReviewProduct } from '../../../components/public/ReviewCard'
+import { ornamentName, reviewTitle } from '../../../lib/ornamentTitle'
 import { OrnamentPreview } from '../../../components/public/OrnamentPreview'
 import { InsetNote } from '../../../components/public/PublicForm'
 import { formatEur } from '../../../lib/money'
@@ -16,18 +17,17 @@ export function FormReview({ view, draft, handoffs, edit }: { view: CustomerForm
     {items.map((source, index) => {
       const item = draft.items.find(row => row.orderItemId === source.id)
       const details = item ?? source
-      const title = `${items.length === 1 ? t('formOrnamentsOne') : t('ornamentN', { n: index + 1 })}${details.petName?.trim() ? `${items.length === 1 ? ' · ' : ' – '}${details.petName.trim()}` : ''}`
+      const named = { kind: source.kind, backName: source.withName ? details.backName : '', petName: details.petName }
+      const title = reviewTitle(named, index, items.length, t)
       // Colour and finish on one line; an order without either says so once, not twice.
       const look = [source.color && `${t(colorKeys[source.color])}${source.color === 'grey' || source.color === 'white' ? ` (${t('legacyColour')})` : ''}`, source.finish && t(source.finish === 'shiny' ? 'finishShiny' : 'finishMatte')].filter(Boolean).join(' · ') || t('formFinishUnknown')
+      // Same compact card as /buy: the name is the title only, the line below says whether it is painted on.
       return <ReviewCard key={source.id} title={title}
-        action={item ? { label: editLabel, ariaLabel: t('editOrnamentNamed', { name: details.petName?.trim() || title }), onClick: () => edit(source.withName ? `back-${source.id}` : `photos-${source.id}`) } : undefined}
-        rows={[
-          { label: t('reviewLook'), value: look },
-          { label: t('reviewBackName'), value: source.withName ? details.backName : t('multiNoName') },
-          ...(details.note ? [{ label: t('noteLabel'), value: details.note }] : []),
-        ]}>
-        <div className={styles.reviewProduct}><div className={styles.reviewPreview}><OrnamentPreview item={previewItem(source, item)} static /></div><p>{t(source.kind === 'finished' ? 'finishedOrnament' : 'customOrnament')}</p><span className={styles.price}>{formatEur(source.cost, locale)}</span></div>
-        {item && <ReviewThumbs photos={details.photos} alt={i => t('photoAlt', { n: i + 1, name: details.petName || t('yourPet') })} />}
+        action={item ? { label: editLabel, ariaLabel: t('editOrnamentNamed', { name: ornamentName(named) || title }), onClick: () => edit(source.withName ? `back-${source.id}` : `photos-${source.id}`) } : undefined}
+        rows={details.note ? [{ label: t('noteLabel'), value: details.note }] : []}>
+        <ReviewProduct art={<OrnamentPreview item={previewItem(source, item)} static />} price={formatEur(source.cost, locale)}
+          lines={[look, t(source.kind === 'finished' ? 'finishedOrnament' : source.withName ? 'reviewWithName' : 'multiNoName')]}
+          photos={item ? details.photos : []} photoAlt={i => t('photoAlt', { n: i + 1, name: ornamentName(named) || t('yourPet') })} />
       </ReviewCard>
     })}
     <ReviewCard title={t('reviewDetails')} action={{ label: editLabel, ariaLabel: t('editContactShort'), onClick: () => edit('form-name') }} rows={[

@@ -32,7 +32,7 @@ export function StaffLayout() {
   const onPaint = location.pathname.includes('/paint/')
   const selected = (path: string) => location.pathname.startsWith(path)
   // Pages reached through More keep a current tab, so the shell always shows where you are.
-  const inMore = (location.pathname === '/staff/sales') || ['/staff/inventory', '/staff/markets', '/staff/painting-days', '/staff/password'].some(selected)
+  const inMore = ['/staff/sales', '/staff/stats'].includes(location.pathname) || ['/staff/inventory', '/staff/markets', '/staff/painting-days', '/staff/password'].some(selected)
   useEffect(() => { rememberStaffHub(location.pathname + location.search); setMenuOpen(false) }, [location.pathname, location.search])
   useEffect(() => {
     let active = true
@@ -58,10 +58,11 @@ export function StaffLayout() {
   }, [])
   const more = <>
     <ButtonLink to="/staff/sales" tone="staff" variant="ghost" selected={location.pathname === '/staff/sales'}>Sales</ButtonLink>
+    <ButtonLink to="/staff/stats" tone="staff" variant="ghost" selected={location.pathname === '/staff/stats'}>Statistics</ButtonLink>
     <ButtonLink to="/staff/inventory" tone="staff" variant="ghost" selected={selected('/staff/inventory')}>Stock</ButtonLink>
     <ButtonLink to="/staff/markets" tone="staff" variant="ghost" selected={selected('/staff/markets')}>Markets</ButtonLink>
     <ButtonLink to="/staff/painting-days" tone="staff" variant="ghost" selected={selected('/staff/painting-days')}>Painting days</ButtonLink>
-    <ButtonLink to="/staff/password" tone="staff" variant="ghost">Change password</ButtonLink>
+    <ButtonLink to="/staff/password" tone="staff" variant="ghost" selected={selected('/staff/password')}>Change password</ButtonLink>
     <Button tone="staff" variant="ghost" onClick={() => void logout()}>Log out</Button>
   </>
   return <div data-staff-page className={`${styles.shell} ${onPaint ? styles.shellPaint : ''}`}>
@@ -85,7 +86,6 @@ export function StaffLayout() {
       <div id="staff-more" hidden={!menuOpen}>
         {menuOpen && <StaffDialog title="More staff tools" onClose={() => setMenuOpen(false)}>
           <nav className={styles.more} aria-label="More staff tools">{more}</nav>
-          <Button tone="staff" variant="secondary" onClick={() => setMenuOpen(false)}>Not yet</Button>
         </StaffDialog>}
       </div>
     </div>}

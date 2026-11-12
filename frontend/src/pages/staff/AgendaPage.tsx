@@ -217,6 +217,16 @@ export function AgendaPage() {
     setPreview(previewFrom(startHour, Math.min(startHour + 1, paintClose)))
   }
 
+  function switchView(option: 'list' | 'calendar') {
+    setView(option)
+    setArranging(false)
+    setMoveProposal(null)
+    setNewProposal(null)
+    const query = new URLSearchParams(params)
+    query.set('view', option)
+    setParams(query, { replace: true })
+  }
+
   function proposeNew(start: number, end: number) {
     const problem = newSlotProblem(start, end)
     if (problem) {
@@ -431,39 +441,34 @@ export function AgendaPage() {
       {paintingRule && paintingRule.date === date && paintingRule.booked > (paintingRule.open ? paintingRule.maxPaintings : 0) && <p className={styles.capacityWarning} role="status"><StaffText>{`Over painting limit · ${paintingRule.booked} booked. Review painting hours.`}</StaffText></p>}
       {paintingEditor && <StaffDialog title={`Painting hours · ${formatDateLabel(day.marketDay.date)}`} onClose={() => { setPaintingEditor(false); setRetry(value => value + 1) }}>
         {paintingRule && paintingRule.date === date ? <DayRow key={paintingRule.date} day={paintingRule} showDate={false} onSaved={saved => { setPaintingRule(saved); setRetry(value => value + 1) }} /> : paintingError ? <div role="alert"><p>{paintingError}</p><Button tone="staff" onClick={() => setRetry(value => value + 1)}>Retry</Button></div> : <p role="status">Loading painting hours…</p>}
-        <Button tone="staff" variant="secondary" onClick={() => { setPaintingEditor(false); setRetry(value => value + 1) }}>Not yet</Button>
       </StaffDialog>}
 
+      {/* Row 1: which view + jump to pickups. Row 2: what you can do. Same order and alignment on every width. */}
       <div className={styles.toolbar}>
-        {view === 'calendar' && <Button tone="staff" variant="secondary" onClick={() => {
+        <div className={styles.viewSwitch} role="group" aria-label="Agenda view">
+          {(['list', 'calendar'] as const).map(option => <Button key={option} tone="staff" variant="secondary" selected={view === option} disabled={Boolean(placeItem)} onClick={() => switchView(option)}>{option === 'list' ? 'List' : 'Calendar'}</Button>)}
+        </div>
+        {marketDeliveries.length || viennaDeliveries.length ? <a href="#agenda-pickups" className={styles.jump}>{marketDeliveries.length ? `${marketDeliveries.length} ${marketDeliveries.length === 1 ? 'pickup' : 'pickups'}` : `${viennaDeliveries.length} ${viennaDeliveries.length === 1 ? 'delivery' : 'deliveries'}`} ↓</a> : null}
+      </div>
+      {!placeItem ? <div className={styles.dayActions}>
+        <Button tone="staff" variant="secondary" onClick={() => {
+          // Adding needs the time grid: List switches to Calendar first, so phones (List by default) can add too.
+          if (view !== 'calendar') switchView('calendar')
           const earliest = day.marketDay.isToday ? Math.max(nowHour, paintOpen) : paintOpen
           for (let start = Math.ceil(earliest * 4) / 4; start + 1 <= paintClose; start += .25) {
             if (!newSlotProblem(start, start + 1)) { proposeNew(start, start + 1); return }
           }
           setMoveError('No free hour on this day. Choose another day or move a session.')
-        }}>+ Add paint session</Button>}
-
-        <div className={styles.viewSwitch} role="group" aria-label="Agenda view">
-          {(['list', 'calendar'] as const).map(option => <Button key={option} tone="staff" variant="secondary" selected={view === option} disabled={Boolean(placeItem)} onClick={() => {
-            setView(option)
-            setArranging(false)
-            setMoveProposal(null)
-            setNewProposal(null)
-            const query = new URLSearchParams(params)
-            query.set('view', option)
-            setParams(query, { replace: true })
-          }}>{option === 'list' ? 'List' : 'Calendar'}</Button>)}
-        </div>
-        {marketDeliveries.length || viennaDeliveries.length ? <a href="#agenda-pickups" className={styles.jump}>{marketDeliveries.length ? `${marketDeliveries.length} ${marketDeliveries.length === 1 ? 'pickup' : 'pickups'}` : `${viennaDeliveries.length} ${viennaDeliveries.length === 1 ? 'delivery' : 'deliveries'}`} ↓</a> : null}
-        {view === 'calendar' && !placeItem ? <Button tone="staff" variant="ghost" selected={arranging} onClick={() => { setArranging(!arranging); setMoveProposal(null); setNewProposal(null); setPreview(null); drag.current = null }}>{arranging ? 'Done moving' : 'Move sessions'}</Button> : null}
-      </div>
+        }}>Add paint session</Button>
+        {view === 'calendar' ? <Button tone="staff" variant="secondary" selected={arranging} onClick={() => { setArranging(!arranging); setMoveProposal(null); setNewProposal(null); setPreview(null); drag.current = null }}>{arranging ? 'Done moving' : 'Move sessions'}</Button> : null}
+      </div> : null}
       {view === 'calendar' ? (
         <p className={styles.createHint}>
           {placeItem
             ? 'Tap or drag free time to paint this ornament.'
             : arranging
               ? 'Drag an unstarted session to a new time.'
-              : 'Use + Add paint session, or hold and drag free time, to start a custom sale.'}
+              : 'Use Add paint session, or hold and drag free time, to start a custom sale.'}
         </p>
       ) : null}
 
@@ -482,9 +487,6 @@ export function AgendaPage() {
           </div>
           {moveError ? <p role="alert">{moveError}</p> : null}
           <div className={styles.moveActions}>
-            <Button tone="staff" variant="ghost" onClick={() => { setMoveProposal(null); setMoveError('') }} disabled={moving}>
-              Not yet
-            </Button>
             <Button tone="staff" onClick={confirmMove} disabled={moving}>
               {moving ? 'Saving…' : 'Save move'}
             </Button>
@@ -595,9 +597,6 @@ export function AgendaPage() {
               <Field label="Paint end" htmlFor="proposal-end"><input id="proposal-end" type="time" step="900" value={formatHour(newProposal.end)} onChange={event => setNewProposal({ ...newProposal, end: parseHour(event.target.value) })} /></Field>
               {moveError && <p role="alert">{moveError}</p>}
               <div className={styles.moveActions}>
-                <Button tone="staff" variant="ghost" onClick={() => setNewProposal(null)}>
-                  Not yet
-                </Button>
                 <Button tone="staff" onClick={startSaleFromProposal}>
                   {placeItem ? 'Use this time' : 'Start sale'}
                 </Button>
@@ -616,15 +615,15 @@ export function AgendaPage() {
           {marketDeliveries.length === 0 && viennaDeliveries.length === 0 ? (
             <p className={styles.sideMeta}>No deliveries for this day.</p>
           ) : null}
-          {marketDeliveries.map((row) => (
-            <DeliveryRow key={`${row.orderId}-${row.itemId}`} row={row} from={`/staff/agenda?${new URLSearchParams({ date: day.marketDay.date })}`} />
+          {marketDeliveries.map((row, index, all) => (
+            <DeliveryRow key={`${row.orderId}-${row.itemId}`} row={row} showBalance={all.findIndex(other => other.orderId === row.orderId) === index} from={`/staff/agenda?${new URLSearchParams({ date: day.marketDay.date })}`} />
           ))}
           {viennaDeliveries.length ? (
             <>
               <h3 className={styles.homeTitle}>Home deliveries</h3>
               <ButtonLink to={`/staff/deliveries?day=${date}&mode=route`} tone="staff">Open delivery run</ButtonLink>
-              {viennaDeliveries.map((row) => (
-                <DeliveryRow key={`${row.orderId}-${row.itemId}`} row={row} from={`/staff/agenda?${new URLSearchParams({ date: day.marketDay.date })}`} />
+              {viennaDeliveries.map((row, index, all) => (
+                <DeliveryRow key={`${row.orderId}-${row.itemId}`} row={row} showBalance={all.findIndex(other => other.orderId === row.orderId) === index} from={`/staff/agenda?${new URLSearchParams({ date: day.marketDay.date })}`} />
               ))}
             </>
           ) : null}

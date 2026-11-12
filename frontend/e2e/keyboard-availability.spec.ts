@@ -294,8 +294,10 @@ for (const locale of ['de', 'en'] as const) {
     await expect(page.locator('#buy-date-error')).toHaveCount(0)
     await next(page).click()
     await expect(page.locator('#buy-terms')).toBeChecked()
+    // The name appears once, in the card title; the body only says that a name is painted.
     await expect(page.locator('form')).toContainText('Luna')
-    await expect(page.locator('form')).toContainText('LUNA')
+    await expect(page.locator('form')).toContainText(locale === 'de' ? /Mit Namen \(\+€\s?12,99\)/ : /With name \(\+€\s?12\.99\)/)
+    await expect(page.locator('form')).not.toContainText('LUNA')
     // Inspect the in-memory photo and note by reopening their exact editor.
     await page.getByRole('button', { name: locale === 'de' ? 'Kugel Luna ändern' : 'Change ornament Luna', exact: true }).click()
     await expect(page.getByRole('img', { name: /^(Foto|Photo) 1 (von|of) Luna$/ })).toBeVisible()

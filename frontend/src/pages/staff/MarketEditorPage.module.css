@@ -54,6 +54,9 @@
 }
 
 .days {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
   margin-top: var(--space-1);
 }
 
@@ -64,7 +67,7 @@
 
 .dayList {
   list-style: none;
-  margin: var(--space-3) 0 0;
+  margin: 0;
   padding: 0;
 }
 
@@ -118,6 +121,8 @@
   align-items: flex-end;
   gap: var(--space-2);
 }
+
+.days > button { justify-self: start; }
 
 @media (max-width: 767px) {
   .day {

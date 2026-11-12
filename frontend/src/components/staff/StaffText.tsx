@@ -12,5 +12,6 @@ export function StaffText({ children }: { children: string }) {
   const parts = children.split(/ ([·→↗–]) /u)
   const pieces: string[] = []
   for (let index = 0; index < parts.length; index += 2) pieces.push(index + 1 < parts.length ? `${parts[index]} ${parts[index + 1]}` : parts[index])
-  return <>{pieces.map((piece, index) => <Fragment key={index}>{index > 0 && ' '}{piece.length <= KEEP_WHOLE ? <span className={styles.joined} data-staff-joined>{piece}</span> : piece}</Fragment>)}</>
+  // One wrapping span: inside a flex/grid parent, loose spaces between children would collapse ("Nov ·15:30").
+  return <span>{pieces.map((piece, index) => <Fragment key={index}>{index > 0 && ' '}{piece.length <= KEEP_WHOLE ? <span className={styles.joined} data-staff-joined>{piece}</span> : piece}</Fragment>)}</span>
 }

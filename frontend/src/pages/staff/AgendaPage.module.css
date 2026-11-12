@@ -360,8 +360,14 @@
 .moveMode summary { cursor: pointer; padding: var(--space-3) 0; min-height: var(--touch); }
 
 .grid[data-editing='true'] { touch-action: none; cursor: crosshair; }
-.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
-.viewSwitch { display: flex; gap: var(--space-1); }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
+/* View switch: two equal segments with the same gap as every other button group. */
+.viewSwitch { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.viewSwitch > * { justify-content: center; text-align: center; }
+/* Day actions: equal columns on phones (centred labels), natural width from tablet up. */
+.dayActions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-3); margin-bottom: var(--space-4); }
+.dayActions > * { justify-content: center; text-align: center; }
+@media (min-width: 640px) { .dayActions { display: flex; flex-wrap: wrap; } }
 .jump { min-height: var(--touch); display: inline-flex; align-items: center; margin-left: auto; color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
 .sideHead { flex-wrap: wrap; }
 .sideHead h2 { font-size: var(--type-staff-h2-size); }

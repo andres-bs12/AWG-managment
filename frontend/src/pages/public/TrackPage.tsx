@@ -2,7 +2,7 @@ import { apiError } from '../../lib/apiError'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import { OrderReceipt } from '../../components/public/OrderReceipt'
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { readFormToken } from '../../api/formTokens'
 import { GiftBoxReady } from '../../components/public/GiftBoxReady'
@@ -33,7 +33,10 @@ export function TrackPage() {
   const timers = useRef<number[]>([])
   const savedNotice = useRef<HTMLParagraphElement>(null)
 
-  useEffect(() => { if (formSaved) savedNotice.current?.focus() }, [formSaved])
+  const savedFocused = useRef(false)
+  const staffDevice = useSearchParams()[0].get('staff') === '1'
+  // One anonymous page view per visit; the stall iPad (?staff=1) is not a visitor.
+  useEffect(() => { if (!staffDevice) void api.metrics.track({ event: 'track_view' }).catch(() => {}) }, [staffDevice])
   const dialogOpener = useRef<HTMLButtonElement | null>(null)
 
   const [fetchPhase, setPhase] = useState<Phase>(codeParam ? 'checking' : 'idle')
@@ -102,6 +105,12 @@ export function TrackPage() {
   const phase: Phase = codeParam ? fetchPhase : 'idle'
   const view = codeParam ? loaded : null
   const error = codeParam ? fetchError : ''
+  // The confirmation lives inside the card, so it is focused once the card is on screen.
+  useEffect(() => {
+    if (!formSaved || phase !== 'done' || savedFocused.current) return
+    savedFocused.current = true
+    savedNotice.current?.focus()
+  }, [formSaved, phase])
 
   async function saveAddress() {
     if (!view || savingAddress) return
@@ -155,14 +164,16 @@ export function TrackPage() {
     if (whenLines.length === 0) whenLines.push(t('whenTbd'))
   }
 
+  // The form was saved even if loading the order fails: both cards confirm it, at the card's content width.
+  const savedBanner = formSaved ? <p ref={savedNotice} tabIndex={-1} className={styles.savedBanner} role="status">{t('formSavedBanner')}</p> : null
+
   return (
     <div className={styles.page}>
       {showWipe ? <SleighWipe label={t('sleigh')} leaving={phase === 'leaving'} /> : null}
-      {/* The form was saved even if loading the order below fails: confirm it regardless. */}
-      {formSaved && <p ref={savedNotice} tabIndex={-1} className={styles.savedBanner} role="status">{t('formSavedBanner')}</p>}
 
       {view && phase === 'done' ? (
         <section className={styles.card} aria-live="polite">
+          {savedBanner}
           <div className={styles.art}>
             {status === 'cancelled' ? null : status === 'preparing' ? (
               <PaintingOrnament label={t('artPainting')} />
@@ -259,6 +270,7 @@ export function TrackPage() {
 
       {!view && (!!codeParam || !dialogOpen) && phase !== 'checking' && phase !== 'loading' && phase !== 'leaving' ? (
         <section className={`${styles.card} ${error ? styles.emptyCard : ''}`}>
+          {savedBanner}
           {!error && <div className={styles.artSmall} aria-hidden="true">
             <PaintingOrnament label={t('artPainting')} />
           </div>}

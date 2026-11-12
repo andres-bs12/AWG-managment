@@ -18,6 +18,7 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class InvoiceRenderer {
     private final AwgProperties props;
+    private final PricingService pricingService;
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd.MM.uuuu");
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -69,7 +70,7 @@ public class InvoiceRenderer {
             if (item.getCustomColor() != null) b.append(" · ").append(color(item.getCustomColor(), en));
             if (item.getCustomFinish() != null) b.append(" · ").append(item.getCustomFinish() == CustomFinish.SHINY
                     ? (en ? "shiny" : "glänzend") : (en ? "matte" : "matt"));
-            BigDecimal extra = item.isWithName() ? props.pricing().nameExtra() : BigDecimal.ZERO;
+            BigDecimal extra = item.isWithName() ? pricingService.chargedNameExtra(item.getNameExtra()) : BigDecimal.ZERO;
             b.append(": ").append(money(item.getCost().subtract(extra), en)).append('\n');
             if (item.isWithName()) line(b, en ? "   Name surcharge" : "   Namenszuschlag", money(extra, en));
             line(b, en ? "   Item total" : "   Positionssumme", money(item.getCost(), en));

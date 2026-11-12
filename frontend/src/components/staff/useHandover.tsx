@@ -6,6 +6,9 @@ import { paymentSummary } from '../../lib/paymentSummary'
 import { Button } from '../ui/Button'
 import { SegmentedControl } from '../ui/SegmentedControl'
 import { StaffDialog } from './StaffDialog'
+import { StaffText } from './StaffText'
+import { customerLabel, handoverBlocker, ornamentLabel } from '../../lib/deliveryFacts'
+import styles from './CompleteOrderDialog.module.css'
 
 type Bundle = Awaited<ReturnType<typeof api.orders.getOrderBundle>>
 type Pending = { bundle: Bundle; target: boolean; itemId?: string }
@@ -51,23 +54,38 @@ export function useHandover(onChanged: (change: { orderId: string; code: string;
     finally { lock.current = false; setBusy(false) }
   }
   const eligible = pending?.bundle.items.filter(item => (item.handedOver ?? pending.bundle.order.handedOver) !== pending.target && (!pending.target || item.productionStatus === 'finished')) ?? []
-  const otherItems = pending?.itemId ? pending.bundle.items.filter(item => item.id !== pending.itemId && (item.handedOver ?? pending.bundle.order.handedOver) !== pending.target) ?? [] : []
   const balance = pending && pending.target ? paymentSummary(pending.bundle.order).remaining : 0
-  const dialog = pending ? <StaffDialog title={pending.target ? 'Confirm handover' : 'Undo handover'} busy={busy} onClose={dismiss} preventEscape>
-    <p>{pending.bundle.order.code}</p>
-    {pending.itemId && otherItems.length > 0 && <p>{otherItems.length} more {otherItems.length === 1 ? 'item' : 'items'} of this order {otherItems.length === 1 ? 'is' : 'are'} still {pending.target ? 'to hand over' : 'handed over'}.</p>}
-    <fieldset><legend>{pending.target ? 'Select ornaments to hand over' : 'Select ornaments to undo'}</legend>
-      {pending.bundle.items.map(item => {
+  const items = pending?.bundle.items ?? []
+  const label = (item: Bundle['items'][number]) => ornamentLabel({ kind: item.kind, backName: item.backName || item.petName })
+  const why = (item: Bundle['items'][number]) => (item.handedOver ?? pending?.bundle.order.handedOver)
+    ? (pending?.target ? 'Already handed over' : '')
+    : pending?.target ? (handoverBlocker({ kind: item.kind, productionStatus: item.productionStatus, handedOver: false,
+      waitingForCustomer: item.kind === 'custom' && (!item.photos.length || (item.withName && !item.backName)) }) ?? '') : 'Not handed over'
+  const count = selected.length
+  const noun = `${count} ${count === 1 ? 'ornament' : 'ornaments'}`
+  // One clear question, a checklist only when the order has several ornaments, and at most two actions.
+  const dialog = pending ? <StaffDialog title={pending.target ? 'Hand over' : 'Undo handover'} busy={busy} onClose={dismiss} preventEscape>
+    <p className={styles.lead}><StaffText>{`${pending.bundle.order.code} · ${customerLabel(pending.bundle.customer?.name)}`}</StaffText></p>
+    {items.length > 1 ? <fieldset className={styles.pick}><legend>{pending.target ? 'Which ornaments does the customer take now?' : 'Which handovers should be undone?'}</legend>
+      {items.map(item => {
         const available = eligible.some(row => row.id === item.id)
-        return <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minHeight: 'var(--touch-lg)' }}><input type="checkbox" checked={selected.includes(item.id)} disabled={busy || !available} onChange={event => setSelected(current => event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))} />{item.petName || (item.kind === 'custom' ? 'Custom ornament' : 'Finished ornament')}{!available ? ((item.handedOver ?? pending.bundle.order.handedOver) ? ' · Handed over' : (pending.target ? ' · Not ready' : ' · Not handed over')) : ''}</label>
+        return <label key={item.id} className={styles.pickRow} data-disabled={!available || undefined}>
+          <input type="checkbox" checked={selected.includes(item.id)} disabled={busy || !available} onChange={event => setSelected(current => event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))} />
+          <span><strong>{label(item)}</strong>{!available && why(item) ? <>{' '}<small>{why(item)}</small></> : null}</span>
+        </label>
       })}
-    </fieldset>
-    {balance > 0 && <><p>Balance due: {formatEur(balance, 'en')}.</p><SegmentedControl legend="Collection method" name="handover-method" value={method} onChange={setMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} /></>}
+    </fieldset> : <p>{pending.target ? `Hand ${label(items[0] ?? eligible[0])} to the customer?` : `Mark ${label(items[0] ?? eligible[0])} as not handed over?`}</p>}
+    {balance > 0 && <div className={styles.due}>
+      <p><strong>{`Still to pay: ${formatEur(balance, 'en')}`}</strong></p>
+      <SegmentedControl legend="Paid with" name="handover-method" value={method} onChange={setMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} />
+    </div>}
     {error && <p role="alert">{error}</p>}
-    {balance > 0 && <Button tone="staff" disabled={busy || !method || !selected.length} onClick={() => void perform(selected, true)}>Mark paid &amp; hand over</Button>}
-    <Button tone="staff" variant={balance > 0 ? 'ghost' : 'primary'} disabled={busy || !selected.length} onClick={() => void perform(selected)}>{balance > 0 ? 'Hand over with balance due' : 'Save'}</Button>
-    {pending.itemId && otherItems.length > 0 && <Button tone="staff" variant="secondary" disabled={busy} onClick={() => void perform([pending.itemId!])}>Only this one</Button>}
-    <Button tone="staff" variant="secondary" disabled={busy} onClick={dismiss}>Not yet</Button>
+    <div className={styles.actions}>
+      {balance > 0 && <Button tone="staff" variant="secondary" disabled={busy || !count} onClick={() => void perform(selected)}>Hand over, collect later</Button>}
+      {balance > 0
+        ? <Button tone="staff" disabled={busy || !method || !count} onClick={() => void perform(selected, true)}>{`Collect ${formatEur(balance, 'en')} & hand over`}</Button>
+        : <Button tone="staff" disabled={busy || !count} onClick={() => void perform(selected)}>{pending.target ? (items.length > 1 ? `Hand over ${noun}` : 'Hand over') : (items.length > 1 ? `Undo ${noun}` : 'Undo handover')}</Button>}
+    </div>
   </StaffDialog> : null
   return { request, busy, dialog }
 }

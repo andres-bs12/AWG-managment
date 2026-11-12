@@ -8,5 +8,7 @@ import java.math.BigDecimal;
  */
 public record OrderSummaryDto(String id, String code, String customerName, String phone, String createdAt,
                               String paymentState, String checkoutStatus, BigDecimal total, int items,
-                              String nextHandoffDate, boolean handedOver, String source, String status) {
+                              String nextHandoffDate, boolean handedOver, String source, String status,
+                              /** What was recorded as received, so lists can show the balance due. */
+                              BigDecimal amountPaid) {
 }

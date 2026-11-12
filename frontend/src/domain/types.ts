@@ -68,6 +68,8 @@ export type OrderSummary = {
   paymentState: PaymentState; checkoutStatus: CheckoutStatus | null; total: number
   items: number; nextHandoffDate: string | null; handedOver: boolean
   source?: 'stall' | 'web'; status?: 'ACTIVE' | 'CANCELLED'
+  /** Recorded as received; the balance due is total minus this. */
+  amountPaid?: number
 }
 
 export type SalesFilters = {
@@ -192,6 +194,14 @@ export type AgendaDelivery = {
   addressLabel: string | null
   photoUrl?: string
   source?: 'stall' | 'web'
+  /** custom = painted to order; finished = ready-made (handed over at once). */
+  kind?: ItemKind
+  /** Vienna delivery postcode; null for market pickups. */
+  postalCode?: string | null
+  /** Custom ornament still waiting for the customer's form or photos. */
+  waitingForCustomer?: boolean
+  total?: number
+  amountPaid?: number
 }
 
 export type AgendaDay = {
@@ -314,6 +324,9 @@ export type MoveSuggestion = {
 }
 
 export type InventoryItem = { id: string; kind: ItemKind; color: OrnamentColor | null; finish?: CustomFinish | null; quantity: number }
+/** Staff-editable prices in euros. `revision` 0 means the server defaults; it increments on every save. */
+export type Prices = { customPrice: number; finishedPrice: number; nameExtra: number; revision: number }
+export type PricesUpdate = Omit<Prices, 'revision'> & { expectedRevision: number }
 export type PaintingDay = { date: string; open: boolean; maxPaintings: number; booked: number; openHour: number; closeHour: number }
 
 export type ShopConfig = {
@@ -367,3 +380,27 @@ export type ShopCheckoutInput = {
 }
 
 export type ShopCheckoutResult = { orderCode: string; formToken: string; checkoutUrl: string }
+
+/** Staff Statistics (GET /api/stats). Vienna dates, both inclusive; money in EUR. */
+export type StatsFunnelStage = 'opened' | 'delivery' | 'review' | 'pay_click' | 'paid'
+export type Stats = {
+  from: string
+  to: string
+  /** Excludes cancelled orders and unpaid web checkouts (counted in `cancelled` / `checkoutsInProgress`). */
+  sales: {
+    orders: number; ornaments: number; custom: number; finished: number; withName: number
+    revenue: number; received: number; outstanding: number; averageOrder: number
+    cancelled: number; checkoutsInProgress: number
+  }
+  bySource: { source: 'stall' | 'web'; orders: number; ornaments: number; revenue: number }[]
+  daily: { date: string; orders: number; ornaments: number; revenue: number; visits: number }[]
+  colors: { color: string; finish: string; count: number }[]
+  delivery: { market: number; vienna: number }
+  /** Anonymous page loads; no cookies. */
+  web: {
+    homeViews: number; buyViews: number; trackViews: number; formViews: number
+    funnel: { stage: StatsFunnelStage; count: number }[]
+    validationErrors: { step: string; field: string; code: string; count: number }[]
+    nameOn: number; nameOff: number
+  }
+}

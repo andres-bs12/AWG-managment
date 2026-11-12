@@ -8,7 +8,7 @@
   padding: var(--space-2) var(--layout-gutter) var(--space-5);
 }
 
-.card, .savedBanner {
+.card {
   width: min(var(--layout-status-max), 100%);
   padding-inline: var(--space-5);
 }
@@ -111,24 +111,25 @@
 .another:hover { color: var(--color-text); }
 .openBtn { margin-top: var(--space-5); }
 
-/* Confirmation and card share one width and the same text insets. */
+/* Saved confirmation: the first row of the card, as wide as the card's content, 24px above the rest. */
 .savedBanner {
-  position: relative;
-  z-index: var(--z-content);
-  margin: var(--space-5) auto 0;
-  padding-block: var(--space-3);
+  grid-column: 1 / -1;
+  margin: 0 0 var(--space-5);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-control);
   background: var(--color-success-surface);
   color: var(--color-text);
   font-weight: var(--type-label-weight);
   text-wrap: pretty;
 }
+/* Focused once for screen readers after the save; it is not an interactive control. */
+.savedBanner:focus { outline: none; box-shadow: none; }
 .codeRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .copyStatus { flex-basis: 100%; color: var(--color-text-muted); font-size: var(--type-hint-size); }
 .copyStatus:empty { display: none; }
 
 @media (min-width: 1024px) {
-  .card, .savedBanner { width: min(var(--layout-form-max), 100%); padding-inline: var(--space-6); }
+  .card { width: min(var(--layout-form-max), 100%); padding-inline: var(--space-6); }
   .card { margin-block: auto; display: grid; grid-template-columns: var(--size-preview-desktop) minmax(0, 1fr); align-items: center; column-gap: var(--space-6); padding-block: var(--space-6); text-align: left; }
   .art, .artSmall { width: 100%; margin: 0; }
   .chip { justify-self: start; }

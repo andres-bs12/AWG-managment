@@ -174,12 +174,13 @@ export function slotLabel(item: DraftItem): string | null {
 export function deliveryLabel(item: DraftItem, markets: Market[], days: MarketDay[]): string {
   if (item.kind === 'finished' && item.delivery.mode === 'now') return 'Deliver now'
   if (item.delivery.mode === 'vienna') {
-    const date = item.delivery.pickupDate ? formatDateLabel(item.delivery.pickupDate) : null
-    return ['Vienna', date].filter(Boolean).join(' · ')
+    return item.delivery.pickupDate ? `Vienna delivery · ${formatDateLabel(item.delivery.pickupDate)}` : 'Vienna delivery · day not chosen'
   }
+  // No place or date until a pickup day is chosen.
+  if (!item.delivery.pickupDate) return 'Pickup · day not chosen'
   const day = days.find((d) => d.id === item.delivery.marketDayId) ?? days.find((d) => d.date === item.delivery.pickupDate)
   const market = markets.find((m) => m.id === (item.delivery.marketId ?? day?.marketId))
-  const date = day ? formatDateLabel(day.date) : item.delivery.pickupDate ? formatDateLabel(item.delivery.pickupDate) : 'Market day'
+  const date = formatDateLabel(day?.date ?? item.delivery.pickupDate)
   const hour = item.delivery.pickupHour != null ? formatHour(item.delivery.pickupHour) : null
   return [market?.name, date, hour].filter(Boolean).join(' · ')
 }

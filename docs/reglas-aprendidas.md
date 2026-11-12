@@ -9,11 +9,12 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 1. **Antes de tocar nada:** `git status`, leer `AGENTS.md`, este archivo y el contrato del componente en `docs/design-system.md`. No sobrescribir cambios locales ajenos.
 2. **Buscar todas las copias.** Un texto vive en `frontend/src/i18n/LocaleContext.tsx` en **EN y DE** (y a veces en staff, e-mails del backend o specs E2E). Al quitar o cambiar un texto: `grep` de la clave y del texto en ambos idiomas, quitar la clave, el JSX, el CSS que solo usaba ese elemento y actualizar la aserción E2E (que compruebe que ya no aparece).
 3. **Quitar un elemento cambia el espacio.** Al borrar un bloque, comprobar que el hueco entre sus vecinos sigue siendo el token correcto (el elemento borrado a veces aportaba el margen).
-4. **E2E en verde no es una revisión de UX.** Después de cualquier cambio público: capturas de cada pantalla afectada (directamente o por texto/componente compartido) a 360 y 1280 px, leídas una por una, antes de decir «listo».
-5. **Decir la verdad sobre lo verificado.** Si no se corrió Playwright, navegador, PostgreSQL, Stripe real o iPhone real, decirlo explícitamente. Nunca afirmar que se envió un e-mail, que un pago está confirmado o que una auditoría aprobó algo si no ocurrió.
-6. **Versiones:** cada versión nueva lleva número (`frontend/package.json` + etiqueta git `vX.Y.Z` al desplegar). Rama `release/vX.Y` en GitHub; **no desplegar a producción (artwithgab.com) sin orden explícita del dueño.** Subir a GitHub sí está permitido cuando lo pide.
-7. **Auditoría cruzada:** nunca revisa el mismo LLM que escribió el código. Opus planifica y verifica; el reparto está en `docs/agent-routing.md`.
-8. Código, comentarios e identificadores en inglés; respuestas al dueño en español latinoamericano.
+4. **Revisión proporcional al cambio (dueño, 2026-11-12).** No repasar todo el proyecto por un cambio pequeño: un texto quitado se verifica con build/lint, la prueba que lo cubre y las capturas de esa pantalla. La revisión amplia (todas las pantallas, suite E2E completa, auditoría cruzada) se hace cuando el cambio toca componentes compartidos, flujos, backend o seguridad, y **siempre antes de desplegar**. El agente decide el alcance y lo dice en el resumen.
+5. **E2E en verde no es una revisión de UX.** Después de cualquier cambio público: capturas de cada pantalla afectada (directamente o por texto/componente compartido) a 360 y 1280 px, leídas una por una, antes de decir «listo».
+6. **Decir la verdad sobre lo verificado.** Si no se corrió Playwright, navegador, PostgreSQL, Stripe real o iPhone real, decirlo explícitamente. Nunca afirmar que se envió un e-mail, que un pago está confirmado o que una auditoría aprobó algo si no ocurrió.
+7. **Versiones:** cada versión nueva lleva número (`frontend/package.json` + etiqueta git `vX.Y.Z` al desplegar). Rama `release/vX.Y` en GitHub; **no desplegar a producción (artwithgab.com) sin orden explícita del dueño.** Subir a GitHub sí está permitido cuando lo pide.
+8. **Auditoría cruzada:** nunca revisa el mismo LLM que escribió el código. Opus planifica y verifica; el reparto está en `docs/agent-routing.md`.
+9. Código, comentarios e identificadores en inglés; respuestas al dueño en español latinoamericano.
 
 ## 1. Textos (copy) — lo que el dueño más corrige
 
@@ -34,6 +35,8 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 - **Sin huecos muertos:** ningún `min-height` (columnas sticky de alto de pantalla) debe estirar una fila y dejar espacio antes de las acciones. Medir el hueco a 360/768/1280.
 - **Padding simétrico** y ópticamente centrado; chips de un grupo con la misma altura.
 - **Objetivos táctiles ≥ 44 px**, controles 48 px, botones grandes de staff 56 px. La «x» de quitar foto no tapa la foto: glifo pequeño en la esquina con área de 44 px que sobresale.
+- **Ningún texto se sale de su tarjeta** (dueño, 2026-11-12, Statistics): toda celda de texto lleva `min-width: 0` y `overflow-wrap: anywhere`, y las pruebas comparan el ancho del texto con el de su contenedor a 320/360/390/1280 px. Nada de pistas largas dentro de tiles estrechos: van en una línea aparte o en un (?).
+- **Páginas densas en móvil se filtran, no se apilan:** si una pantalla pasa de unas dos pantallas de teléfono, agrupar con un filtro segmentado (p. ej. Sales · Customers · Website) y mostrar todo junto solo desde 1024 px. Tiles de una fila con la misma altura.
 - **Medir, no mirar:** `getBoundingClientRect` y estilos computados en el navegador.
 
 ## 3. Color y selección
@@ -86,7 +89,7 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 
 ## 7. Staff
 
-- Inglés, formato de dinero inglés, botones grandes de 56 px, «Not yet» como único verbo para cerrar sin actuar, sin texto repetido (fecha/subtítulo/colores junto a muestras).
+- Inglés, formato de dinero inglés, botones grandes de 56 px, diálogos con una **X arriba a la derecha** (44 px), Escape y toque fuera para cerrar sin actuar; ya no hay botón «Not yet» (dueño, 2026-11-12: le hacía perder tiempo), sin texto repetido (fecha/subtítulo/colores junto a muestras).
 - Separadores (·) nunca empiezan una línea (`StaffText`). Hover solo en dispositivos con hover.
 - Lo que el staff guarda se guarda solo (autoguardado) y avisa de conflictos (`STOCK_CHANGED`, `@Version`).
 
@@ -94,4 +97,6 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 
 Añadir aquí, con fecha, cada corrección nueva del dueño hasta integrarla en la sección de arriba.
 
+- 2026-11-12 (v3.1): Statistics en móvil: texto que se salía de los tiles y página demasiado larga → filtro por secciones y resumen compacto (§2).
+- 2026-11-12 (v3.1): diálogos de staff se cierran con X, Escape o toque fuera; «Not yet» eliminado.
 - 2026-11-12 (v3.1): quitar del checkout la promesa de plazo de pintura tras el pago (EN y DE). Regla general en §1.

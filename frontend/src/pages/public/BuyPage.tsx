@@ -15,8 +15,8 @@ import { useLocale } from '../../i18n/LocaleContext'
 import { loadBuyDraft, newItem, saveBuyDraft, type BuyDraft, type BuyItem } from '../../lib/buyDraft'
 import { apiError } from '../../lib/apiError'
 import { keepFormFocusVisible } from '../../lib/publicFormFocus'
-import { formatEur } from '../../lib/money'
 import { petNameFromBack } from '../../lib/petName'
+import { phoneValid } from '../../lib/phone'
 import styles from './BuyPage.module.css'
 import { MAX_PHOTOS, pickupTimes } from './buy/shared'
 import { OrnamentOverview } from '../../components/public/OrnamentOverview'
@@ -25,9 +25,12 @@ import { BuyPetStep } from './buy/BuyPetStep'
 import { BuyDateStep } from './buy/BuyDateStep'
 import { BuyContactStep } from './buy/BuyContactStep'
 import { BuyReviewStep } from './buy/BuyReviewStep'
+import { CartRows } from './buy/CartRows'
 
 const VIENNA_POSTAL = /^1(0[1-9]|1[0-9]|2[0-3])0$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+/** Contact errors that mean "left empty" (metrics report them as required, the rest as invalid). */
+const MISSING = new Set(['formNeedName', 'formNeedEmail', 'formNeedPhone', 'formNeedStreet'])
 
 export function BuyPage() {
   const { t, locale } = useLocale()
@@ -207,11 +210,12 @@ export function BuyPage() {
       else if (!pickupTimes(day).includes(draft.pickupTime)) found['buy-time'] = 'shopNeedPickupTime'
     }
     if (currentStep === 3) {
-      if (!draft.customerName.trim()) found['buy-name'] = 'required'
-      if (!draft.email.trim()) found['buy-email'] = 'required'
+      if (!draft.customerName.trim()) found['buy-name'] = 'formNeedName'
+      if (!draft.email.trim()) found['buy-email'] = 'formNeedEmail'
       else if (!EMAIL.test(draft.email.trim())) found['buy-email'] = 'invalidEmail'
-      if (!draft.phone.trim()) found['buy-phone'] = 'required'
-      if (draft.deliveryKind === 'vienna' && !draft.line1.trim()) found['buy-line1'] = 'required'
+      if (!draft.phone.trim()) found['buy-phone'] = 'formNeedPhone'
+      else if (!phoneValid(draft.phone)) found['buy-phone'] = 'phoneInvalid'
+      if (draft.deliveryKind === 'vienna' && !draft.line1.trim()) found['buy-line1'] = 'formNeedStreet'
       if (draft.deliveryKind === 'vienna' && !VIENNA_POSTAL.test(draft.postalCode.trim())) found['buy-postal'] = 'shopPostalInvalid'
     }
     if (currentStep === 4 && !draft.acceptTerms) found['buy-terms'] = 'shopNeedTerms'
@@ -222,7 +226,7 @@ export function BuyPage() {
     setErrors(current => { const next = { ...current }; if (error) next[id] = error; else if (!current[id]?.startsWith('api:')) delete next[id]; return next })
     setValidFields(current => error ? current.filter(value => value !== id) : [...new Set([...current, id])])
     const field = ({ 'buy-name': 'customerName', 'buy-email': 'email', 'buy-phone': 'phone', 'buy-line1': 'line1', 'buy-postal': 'postalCode' } as Record<string, string>)[id]
-    if (error && field) void api.metrics.track({ event: 'buy_validation_error', step: 'delivery', field, code: error === 'required' ? 'required' : 'invalid' }).catch(() => {})
+    if (error && field) void api.metrics.track({ event: 'buy_validation_error', step: 'delivery', field, code: MISSING.has(error) ? 'required' : 'invalid' }).catch(() => {})
   }
   /** First problem = first unfinished ornament, in the order its fields are asked. */
   function firstError(found: Record<string, string>) {
@@ -397,7 +401,7 @@ export function BuyPage() {
       {step === 1 && <><BuyDateStep {...stepProps} /><div className={styles.deliveryContact}><BuyContactStep {...stepProps} withAddress={!pickup} validateField={validateField} validFields={validFields} /></div></>}
       {step === 2 && <BuyReviewStep {...stepProps} go={(index, uid, _sub, field) => { pendingErrorFocus.current = field ?? null; if (uid) setActiveUid(uid); setChangedSection(uid ?? (index === 3 ? 'contact' : 'delivery')); setReturnReview(true); go(index < 2 ? 0 : 1) }} itemsTotal={itemsTotal} deliveryFee={deliveryFee} total={total} changed={changedSection} />}
     </section>
-    <aside hidden={step !== 1} className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><dl aria-live="polite"><div><dt>{t(draft.items.length > 1 ? 'shopItemsTotal' : 'shopItemOne')} ({draft.items.length})</dt><dd>{formatEur(itemsTotal, locale)}</dd></div><div><dt>{t('shopDeliveryFee')}</dt><dd>{deliveryFee ? formatEur(deliveryFee, locale) : t('shopFree')}</dd></div><div className={styles.cartTotal}><dt>{t('shopTotal')}</dt><dd>{formatEur(total, locale)}</dd></div></dl></aside>
+    <aside hidden={step !== 1} className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><CartRows t={t} count={draft.items.length} itemsTotal={itemsTotal} deliveryFee={deliveryFee} total={total} pickup={pickup} live /></aside>
     <StickyActions className={styles.actions} inFlow={step === 2}><div className={styles.mobileTotal} hidden={step === 2}><span>{t('shopTotal')}</span><strong data-buy-total><AnimatedPrice value={total} locale={locale} /></strong></div>{step === 1 && <Button variant="secondary" disabled={busy} onClick={back}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 2 ? busy ? t('shopPaying') : t('shopPayStripe') : t('continue')}</Button>{step === 2 && <small className={styles.stripeLine}>{t('secureStripe')}</small>}{/* Review: paying comes first in reading order (phones stack the buttons); wider screens put Back on the left with CSS order. */}{step === 2 && <Button variant="secondary" className={styles.reviewBack} disabled={busy} onClick={back}>{t('back')}</Button>}</StickyActions>
   </form>
 }

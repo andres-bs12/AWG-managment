@@ -198,7 +198,7 @@ test('staff-marked form stays non-persistent through reload and submission on th
   expect(await page.evaluate(() => localStorage.getItem('awg-form-token:AWG0103'))).toBeNull()
   await next(page).click(); await axe(page)
   await next(page).click()
-  await expect(page).toHaveURL(/\/track\/AWG0103$/)
+  await expect(page).toHaveURL(/\/track\/AWG0103\?staff=1$/)
   await expect(page.getByRole('status').filter({ hasText: 'Thank you! Your details are saved.' })).toBeVisible()
   expect(await page.evaluate(() => ({ stored: localStorage.getItem('awg-form-token:AWG0103'), draft: sessionStorage.getItem('awg-form-draft:frm-abs103') }))).toEqual({ stored: null, draft: null })
   await page.locator('section[aria-live]').evaluate(card => Promise.all(card.getAnimations().map(animation => animation.finished)))
@@ -367,8 +367,9 @@ test('review cards are compact: one Ändern per card, colour and finish on one l
   // Each review card has at most one button: its single Ändern next to the title.
   for (const card of await page.locator('section[class*="card"]').all()) expect(await card.getByRole('button').count()).toBeLessThanOrEqual(1)
   await expect(page.getByRole('button', { name: /ändern/ })).toHaveCount(2)
-  // Colour and finish share one row ("Rot · Glänzend"), never two rows.
-  await expect(page.getByText('Farbe & Oberfläche', { exact: true })).toHaveCount(1)
+  // Same compact product line as /buy: colour and finish on one unlabelled line ("Rot · Glänzend"), never two rows.
+  await expect(page.getByText(/^(Rot|Grün|Beige) · (Glänzend|Matt)$/)).toHaveCount(1)
+  await expect(page.getByText('Farbe & Oberfläche', { exact: true })).toHaveCount(0)
   await expect(page.locator('dt').filter({ hasText: /^(Farbe|Oberfläche)$/ })).toHaveCount(0)
   await expect(page.getByText(/Fotos deines Tiers/)).toHaveCount(0)
   await axe(page); await noOverflow(page)

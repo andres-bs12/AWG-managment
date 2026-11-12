@@ -21,7 +21,7 @@ for (const [width, height] of [[360, 640], [440, 741]]) {
     if (!await page.getByLabel('Payment', { exact: true }).isVisible()) await page.getByRole('button', { name: /^Filters/ }).click()
     await page.getByLabel('Payment', { exact: true }).selectOption('deposit')
     await expect(results.getByRole('link')).toHaveCount(2)
-    await expect(results).toContainText('Deposit paid')
+    await expect(results).toContainText(/Deposit · €\d+\.\d\d due/)
     if (!await page.getByLabel('Payment', { exact: true }).isVisible()) await page.getByRole('button', { name: /^Filters/ }).click()
     await page.getByLabel('Payment', { exact: true }).selectOption('')
     await page.getByLabel('Source', { exact: true }).selectOption('web')

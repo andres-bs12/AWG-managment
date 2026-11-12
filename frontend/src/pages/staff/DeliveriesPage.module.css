@@ -52,12 +52,12 @@
 }
 
 .empty {
-  margin: var(--space-2) 0 0;
+  margin: 0;
   font-size: var(--type-staff-body-size);
 }
 
 .dayFilters { grid-column: 1 / -1; min-width: 0; }
-.dayFilters fieldset > div { flex-wrap: nowrap; overflow-x: auto; padding: var(--space-2); }
+.dayFilters fieldset > div { flex-wrap: wrap; padding: var(--space-2); }
 .dayFilters label { flex: 0 0 auto; }
 .past { display: flex; align-items: center; gap: var(--space-2); margin-block: var(--space-3); }
 .past input { width: var(--size-check); height: var(--size-check); accent-color: var(--staff-btn); }
@@ -81,19 +81,20 @@
   gap: var(--space-3);
 }
 
-.panel { background: transparent; border: 0; padding: 0; }
-.filters { padding: var(--space-4); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius); background: var(--staff-surface); gap: var(--space-5); }
+.panel { display: grid; gap: var(--space-4); min-width: 0; background: transparent; border: 0; padding: 0; }
+/* The live-region line stays in the DOM while empty but must not take a gap slot. */
+.panel > p:empty { display: none; }
+.filters { margin: 0; padding: var(--space-4); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius); background: var(--staff-surface); gap: var(--space-5); }
 .filters > * { min-width: 0; }
-.group { display: grid; gap: var(--space-3); margin-top: var(--space-6); }
+.group { display: grid; gap: var(--space-3); margin-top: 0; }
 .group h2 { margin-bottom: var(--space-1); font-size: var(--type-staff-h2-size); }
 .quickDay { display: grid; gap: var(--space-1); font-size: var(--type-staff-meta-size); font-weight: 600; }
 .quickDay select { width: 100%; min-width: 0; padding: var(--space-2); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control); background: var(--staff-surface); color: var(--staff-ink); }
 @media (min-width: 768px) { .quickDay { display: none; } }
 @media (max-width: 767px) {
   .dayFilters { display: none; }
-  .filters { margin-bottom: 0; gap: var(--space-3); }
+  .filters { gap: var(--space-3); }
   .past { margin: 0; }
-  .group { margin-top: var(--space-4); }
   .head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); justify-content: space-between; }
   .head h1 { margin: 0; }
 }

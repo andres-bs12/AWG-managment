@@ -5,9 +5,14 @@ export function viennaDate(value: string | Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Vienna', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value))
 }
 
-export function salePaymentLabel(order: Pick<OrderSummary, 'checkoutStatus' | 'paymentState'>): string {
+export function salePaymentLabel(order: Pick<OrderSummary, 'checkoutStatus' | 'paymentState'> & Partial<Pick<OrderSummary, 'total' | 'amountPaid'>>, format?: (amount: number) => string): string {
   if (order.checkoutStatus === 'pending') return 'Checkout pending'
   if (order.checkoutStatus === 'review') return 'Payment review'
+  // A deposit says what is still due, so staff know what to collect without opening the order.
+  if (order.paymentState === 'deposit' && format && order.total != null && order.amountPaid != null) {
+    const due = Math.max(0, Math.round((order.total - order.amountPaid) * 100) / 100)
+    if (due > 0) return `Deposit · ${format(due)} due`
+  }
   return { unpaid: 'Unpaid', deposit: 'Deposit paid', paid: 'Paid' }[order.paymentState]
 }
 

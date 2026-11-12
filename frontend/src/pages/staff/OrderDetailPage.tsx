@@ -165,13 +165,13 @@ function OrderDetail({ id }: { id: string }) {
         </span>
       </h2>
       <section aria-labelledby="order-items" className={styles.items}>
-        {items.map(item => <OrderItemCard key={item.id} item={{ ...item, handedOver: item.handedOver ?? order.handedOver }} onHandover={() => { void handover.request(id, !(item.handedOver ?? order.handedOver), item.id) }} block={blocks.find(block => block.orderItemId === item.id)} days={days} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />)}
+        {items.map(item => <OrderItemCard key={item.id} item={{ ...item, handedOver: item.handedOver ?? order.handedOver }} onHandover={items.length > 1 ? () => { void handover.request(id, !(item.handedOver ?? order.handedOver), item.id) } : undefined} block={blocks.find(block => block.orderItemId === item.id)} days={days} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />)}
       </section>
       <aside className={styles.support} aria-label="Order management">
         <section className={styles.panel} aria-labelledby="handoff-heading">
           <h2 id="handoff-heading">{deliveryItem ? 'Delivery' : 'Pickup'}</h2>
           {order.handedOver ? <p className={styles.muted}>{deliveryItem ? 'Delivered to the customer.' : 'Picked up at the stall.'}</p> : <p className={styles.muted}>{allFinished ? (deliveryItem ? 'Ready to deliver.' : 'Ready for pickup.') : `${items.filter(item => item.productionStatus !== 'finished').length} still to finish.`}</p>}
-          {paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished && !order.handedOver ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || (!order.handedOver && !allFinished)} onClick={() => { void handover.request(id, !order.handedOver) }}>{order.handedOver ? (deliveryItem ? 'Undo delivery' : 'Undo pickup') : (deliveryItem ? 'Mark delivered' : 'Mark picked up')}</Button>}
+          {paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished && !order.handedOver ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || (!order.handedOver && !allFinished)} onClick={() => { void handover.request(id, !order.handedOver) }}>{order.handedOver ? 'Undo handover' : (deliveryItem ? 'Mark delivered' : 'Mark picked up')}</Button>}
         </section>
         <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method, amount) => runAction(() => api.payments.setPaymentState(id, state, method, amount), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} />
         <details className={styles.panel}>
@@ -205,7 +205,6 @@ function CancelOrderDialog({ busy, order, items, onClose, onConfirm }: { busy: b
     <p>{items.length} {items.length === 1 ? 'ornament' : 'ornaments'} are cancelled. Only unpainted bases and eligible finished stock return to inventory.</p>
     {painted.length > 0 && <p>Painting already started: {painted.map(item => item.petName || `${item.color} ${item.finish} ornament`).join(', ')}. These bases will not be restocked.</p>}
     <label htmlFor="cancel-reason">Reason (optional)</label><textarea id="cancel-reason" maxLength={500} value={reason} onChange={event => setReason(event.target.value)} disabled={busy} />
-    <Button tone="staff" variant="secondary" disabled={busy} onClick={onClose}>Not yet</Button>
     <Button tone="staff" variant="danger" disabled={busy} onClick={() => onConfirm(reason)}>{busy ? 'Cancelling…' : 'Cancel order'}</Button>
   </StaffDialog>
 }

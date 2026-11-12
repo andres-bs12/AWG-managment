@@ -75,7 +75,7 @@ public class ShopService {
 
     @Transactional(readOnly = true)
     public ShopConfigDto config() {
-        var p = props.pricing();
+        var p = pricingService.current();
         List<ShopColorOptionDto> colors = inventoryRepository.findByItemKind(ItemKind.CUSTOM).stream()
                 .filter(inv -> inv.getCustomColor() != null && inv.getCustomColor().isOffered() && inv.getCustomFinish() != null)
                 .sorted(Comparator.comparing((Inventory inv) -> inv.getCustomColor().ordinal())
@@ -84,7 +84,7 @@ public class ShopService {
                 .toList();
         LocalDate end = seasonEnd();
         LocalDate from = props.shop().deliveriesFrom();
-        return new ShopConfigDto(isOpen(), p.custom(), p.finished(), p.nameExtra(), fee(), MAX_ITEMS, colors,
+        return new ShopConfigDto(isOpen(), p.customPrice(), p.finishedPrice(), p.nameExtra(), fee(), MAX_ITEMS, colors,
                 end.toString(), LocalDate.now(clock.withZone(java.time.ZoneId.of(props.zone()))).isAfter(end),
                 from == null ? null : from.toString(), props.shop().deliveryWindowStart().toString(),
                 props.shop().deliveryWindowEnd().toString(), mailConfigured());
@@ -410,6 +410,7 @@ public class ShopService {
             item.setCustomColor(custom ? row.color() : null);
             item.setCustomFinish(custom ? row.finish() : null);
             item.setCost(pricingService.itemCost(row.kind(), withName));
+            item.setNameExtra(pricingService.nameExtraFor(row.kind(), withName));
             item.setProductionStatus(custom ? ProductionStatus.NOT_STARTED : ProductionStatus.FINISHED);
             item.setPosition(position++);
             item.setDeliveryKind(pickup ? DeliveryKind.MARKET : DeliveryKind.DELIVERY);

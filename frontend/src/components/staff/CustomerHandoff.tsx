@@ -11,7 +11,6 @@ export function CustomerHandoff({ token, label = 'Open customer form' }: { token
     <Button tone="staff" variant="secondary" onClick={() => setOpen(true)}>{label}</Button>
     {open && <StaffDialog title="Hand iPad to customer?" onClose={() => setOpen(false)}>
       <p>This signs staff out before opening the customer form. Going back cannot open staff tools. Sign in again when the iPad is returned. The order is already saved.</p>
-      <Button tone="staff" variant="secondary" onClick={() => setOpen(false)}>Not yet</Button>
       <Button tone="staff" onClick={() => { void logout(); window.location.replace(`/form/${encodeURIComponent(token)}?staff=1`) }}>Sign out & open form</Button>
     </StaffDialog>}
   </>

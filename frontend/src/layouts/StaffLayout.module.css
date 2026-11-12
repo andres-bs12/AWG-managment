@@ -13,6 +13,10 @@
 .bottomTabs > :is(a, button)[data-selected] { min-width: 0; min-height: var(--size-control-staff); padding-inline: var(--space-1); font-size: var(--type-staff-meta-size); text-align: center; white-space: nowrap; }
 .more { display: grid; gap: var(--space-2); }
 .more > * { justify-content: flex-start; }
+/* The menu's text starts at the dialog title's edge: the item's own padding moves into a negative margin. */
+.more > :is(a, button)[data-selected] { margin-inline: calc(-1 * var(--space-3)); padding-inline: var(--space-3); }
+/* Keep the 2px selection border inside the same inset, so the selected label stays on the title edge. */
+.more > :is(a, button)[data-selected='true'] { padding-inline: calc(var(--space-3) - var(--border-control)); }
 /* Logging out costs a password on the shared iPad: set it apart from navigation. */
 .more > :last-child { margin-top: var(--space-3); border-top: var(--border-thin) solid var(--staff-line); border-radius: 0; color: var(--staff-danger); }
 .session { min-height: 100dvh; display: grid; align-content: center; justify-items: center; gap: var(--space-4); padding: var(--space-5); background: var(--staff-bg); color: var(--staff-ink); }

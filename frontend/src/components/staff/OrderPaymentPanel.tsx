@@ -54,7 +54,6 @@ export function OrderPaymentPanel({ order, busy, onSetState }: Props) {
     {error && <p role="alert">{error}</p>}
     {confirming && <StaffDialog title="Correct payment?" busy={busy} onClose={() => setConfirming(null)}>
       <p>Change the recorded payment of {order.code} to <strong>{confirming}{confirming === 'deposit' ? ` · ${formatEur(amount, 'en')}` : ''}</strong>. This replaces the recorded amount.</p>
-      <Button tone="staff" variant="secondary" disabled={busy} onClick={() => setConfirming(null)}>Not yet</Button>
       <Button tone="staff" disabled={busy} onClick={confirmCorrection}>Correct to {confirming}</Button>
     </StaffDialog>}
   </section>

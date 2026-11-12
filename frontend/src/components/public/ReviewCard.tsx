@@ -17,8 +17,29 @@ export function ReviewCard({ title, rows, children, action, changed = false }: {
   </section>
 }
 
-/** Reference photo thumbnails; no heading, the pictures speak for themselves. */
-export function ReviewThumbs({ photos, alt }: { photos: { id: string; dataUrl: string }[]; alt: (index: number) => string }) {
-  if (!photos.length) return null
-  return <div className={styles.thumbs}>{photos.map((photo, index) => <img key={photo.id} src={photo.dataUrl} alt={alt(index)} />)}</div>
+type ReviewPhoto = { id: string; dataUrl: string }
+
+/**
+ * One ornament in a review card, the same in /buy and /form: art on the left, then the main line
+ * beside its price, the smaller details under both (full width, so a price detail never wraps), and
+ * the reference photos under the text instead of on an orphan row of their own.
+ */
+export function ReviewProduct({ art, lines, price, photos = [], photoAlt }: { art: ReactNode; lines: ReactNode[]; price: string; photos?: ReviewPhoto[]; photoAlt: (index: number) => string }) {
+  const [main, ...details] = lines
+  return <div className={styles.product}>
+    <div className={styles.art}>{art}</div>
+    <div className={styles.body}>
+      <div className={styles.top}>
+        <p className={styles.main}>{main}</p>
+        <strong className={styles.price}>{price}</strong>
+        {details.map((line, index) => <p key={index} className={styles.detail}>{line}</p>)}
+      </div>
+      {photos.length > 0 && <div className={styles.photos}>{photos.map((photo, index) => <img key={photo.id} src={photo.dataUrl} alt={photoAlt(index)} />)}</div>}
+    </div>
+  </div>
+}
+
+/** A price detail such as "(+ € 12,99)" that must never break across lines. */
+export function NoWrap({ children }: { children: ReactNode }) {
+  return <span className={styles.nowrap}>{children}</span>
 }

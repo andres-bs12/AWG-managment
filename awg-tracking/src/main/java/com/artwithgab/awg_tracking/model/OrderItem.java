@@ -113,6 +113,9 @@ public class OrderItem {
 
     /** Customer paid for the name on the ornament (+€12.99). No refund if it is removed. */
     private boolean withName;
+    /** Name surcharge charged at sale time; null for items sold before prices became editable. */
+    @Column(precision = 10, scale = 2)
+    private java.math.BigDecimal nameExtra;
     /** Text painted on the back (max 6 characters, upper case). */
     private String nameInOrnament;
     private String petName;

@@ -37,6 +37,11 @@
 .stockCard:has(> h2 > .swatch) > :not(h2) { grid-column: 2; }
 .stockCard:has(> h2 > .swatch) > h2 + * { border-top: 0; padding-top: 0; }
 .stockCard:has(> h2 > .swatch) > :not(h2) + :not(h2) { margin-top: var(--space-3); }
+/* Finished ornaments: the heading spans the card and its row sits in the same column as the Shiny/Matte rows. */
+.stockCard.finishedCard { grid-template-columns: var(--size-swatch) minmax(0, 1fr); }
+.finishedCard > h2 { grid-column: 1 / -1; }
+.finishedCard > :not(h2) { grid-column: 2; }
+.finishedCard > h2 + * { border-top: 0; padding-top: 0; }
 .stockRow { border-top: var(--border-thin) solid var(--staff-line); padding-top: var(--space-3); display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2) var(--space-3); }
 .stockRow .name h3 { margin: 0; font-size: var(--type-staff-body-size); }
 .stockRow .error, .stockRow .conflict { grid-column: 1 / -1; }
@@ -50,3 +55,21 @@
 .hours label { display: grid; gap: var(--space-2); min-width: 0; font-size: var(--type-staff-meta-size); font-weight: 600; }
 .hours input { min-width: 0; width: 100%; padding: var(--space-2); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control); background: var(--staff-surface); color: var(--staff-ink); }
 .toggle { min-height: var(--touch-lg); }
+
+/* Prices card: label to control 8px, field to field 24px, every value from a spacing token. */
+.hint { margin: 0; font-size: var(--type-staff-meta-size); color: var(--staff-muted); }
+.priceFields { display: grid; gap: var(--space-5); }
+.priceField { display: grid; gap: var(--space-2); min-width: 0; }
+.priceField label { font-size: var(--type-staff-meta-size); font-weight: 600; }
+.euroBox { display: inline-flex; align-items: center; gap: var(--space-2); justify-self: start; min-height: var(--size-control); padding-inline: var(--space-3); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control); background: var(--staff-surface); color: var(--staff-ink); }
+.euroBox input { width: 8ch; min-height: var(--size-control); padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-variant-numeric: tabular-nums; }
+.euroBox input[aria-invalid='true'] { color: var(--color-error); }
+.euroBox:has(input[aria-invalid='true']) { border-color: var(--color-error); }
+.fieldError { margin: 0; font-size: var(--type-staff-meta-size); color: var(--color-error); }
+.priceActions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.priceStatus { margin: 0; font-size: var(--type-staff-meta-size); color: var(--staff-muted); }
+
+/* Stock flags: sold out is unmistakable (red), the last bottle is a warning (amber). */
+.flag { margin: 0; justify-self: start; width: fit-content; padding: var(--space-1) var(--space-2); border: var(--border-thin) solid transparent; border-radius: var(--radius-small); font-weight: 600; }
+.name .soldOut { color: var(--color-error); background: var(--color-error-surface); border-color: var(--color-error); }
+.name .lowStock { color: var(--color-warning); background: var(--color-warning-surface); border-color: var(--color-warning); }

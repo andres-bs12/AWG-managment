@@ -145,7 +145,11 @@ public class AgendaService {
                     hour == null ? null : Hours.format(hour),
                     customer.getPhone(),
                     market ? null : addressLabel(order),
-                    photoUrl, order.getTotal().subtract(order.getAmountPaid()).max(java.math.BigDecimal.ZERO), order.getPaymentState(), order.getSource()));
+                    photoUrl, order.getTotal().subtract(order.getAmountPaid()).max(java.math.BigDecimal.ZERO), order.getPaymentState(), order.getSource(),
+                    item.getItemKind(),
+                    market || order.getDeliveryAddress() == null ? null : ViewMapper.nz(order.getDeliveryAddress().getPostalCode()),
+                    item.getItemKind() == com.artwithgab.awg_tracking.enums.ItemKind.CUSTOM && (item.getPhotos().isEmpty() || (item.isWithName() && ViewMapper.nz(item.getNameInOrnament()).isBlank())),
+                    order.getTotal(), order.getAmountPaid()));
         }
         rows.sort(Comparator.<AgendaDeliveryDto>comparingInt(r -> r.deliveryKind() == DeliveryKind.MARKET ? 0 : 1)
                 .thenComparingDouble(r -> r.pickupHour() == null ? 99 : r.pickupHour()));

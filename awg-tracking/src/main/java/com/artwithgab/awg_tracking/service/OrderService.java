@@ -162,6 +162,7 @@ public class OrderService {
             item.setCustomColor(custom ? (row.color() == null ? CustomColor.RED : row.color()) : null);
             item.setCustomFinish(custom ? (row.finish() == null ? com.artwithgab.awg_tracking.enums.CustomFinish.SHINY : row.finish()) : null);
             item.setCost(pricingService.itemCost(row.kind(), withName));
+            item.setNameExtra(pricingService.nameExtraFor(row.kind(), withName));
             item.setProductionStatus(custom ? ProductionStatus.NOT_STARTED : ProductionStatus.FINISHED);
             item.setSoldOnDay(soldOn);
             item.setPosition(position++);
@@ -465,7 +466,8 @@ public class OrderService {
                 o.getCustomer() == null ? "" : o.getCustomer().getPhone(), o.getCreatedAt() == null ? null : o.getCreatedAt().toString(),
                 o.getPaymentState().name().toLowerCase(Locale.ROOT), o.getCheckoutStatus() == null ? null : o.getCheckoutStatus().name().toLowerCase(Locale.ROOT),
                 o.getTotal(), o.getOrderItems().size(), next, o.isHandedOver(),
-                o.getSource() == OrderSource.WEB ? "web" : "stall", o.getStatus());
+                o.getSource() == OrderSource.WEB ? "web" : "stall", o.getStatus(),
+                o.getAmountPaid() == null ? BigDecimal.ZERO : o.getAmountPaid());
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────

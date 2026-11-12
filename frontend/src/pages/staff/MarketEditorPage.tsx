@@ -427,7 +427,6 @@ function MarketEditor() {
       </form>
       {deleting && <StaffDialog title={deleting === 'market' ? 'Delete market?' : 'Remove day?'} busy={busy} onClose={() => setDeleting(null)}>
         <p>{deleting === 'market' ? 'This permanently deletes the market and all its unused days. Unsaved edits will be discarded.' : `Remove ${formatDateLabel(deleting.date)} from this draft? The day is deleted only when you Save.`}</p>
-        <Button tone="staff" variant="secondary" disabled={busy} onClick={() => setDeleting(null)}>Not yet</Button>
         <Button tone="staff" variant="danger" disabled={busy} onClick={() => { if (deleting === 'market') void onDeleteMarket(); else stageDeleteDay(deleting) }}>{deleting === 'market' ? (busy ? 'Deleting…' : 'Delete market') : 'Remove day from draft'}</Button>
       </StaffDialog>}
     </section>
