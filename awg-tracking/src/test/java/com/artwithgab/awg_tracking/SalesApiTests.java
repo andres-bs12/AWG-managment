@@ -28,7 +28,8 @@ class SalesApiTests extends ApiTestSupport {
         customer.setPhone(phone);
         customers.save(customer);
         var order = new Order();
-        order.setCode("AWG" + UUID.randomUUID().toString().substring(0, 6).toUpperCase());
+        // Like real codes, test codes never contain 0, so the "60" no-match query stays deterministic.
+        order.setCode("AWG" + UUID.randomUUID().toString().substring(0, 6).toUpperCase().replace('0', 'Z'));
         order.setFormToken(UUID.randomUUID().toString());
         order.setCustomer(customer);
         order.setCreatedAt(Instant.parse(createdAt));
