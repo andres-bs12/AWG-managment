@@ -3,19 +3,18 @@ import assert from 'node:assert/strict'
 import { keepFormFocusVisible } from '../src/lib/publicFormFocus.ts'
 
 // Model viewport geometry only; browser sticky layout and Tab order are covered in E2E.
-function repair({ field, bar, preview, overlay, viewport, inActions = false, active = true }) {
+function repair({ field, preview, overlay, viewport, active = true }) {
   class Element {
     tabIndex = 0
     constructor(rect) { this.rect = { left: 16, right: 344, ...rect } }
     getBoundingClientRect() { return this.rect }
-    contains(target) { return this === target || (this === actions && inActions) }
+    contains(target) { return this === target }
     querySelector() { return this === artwork ? content : null }
   }
   const target = new Element(field)
-  const actions = bar && new Element(bar)
   const artwork = preview && new Element(preview)
   const content = overlay && new Element(overlay)
-  const form = { querySelector: selector => selector === '[data-public-sticky]' ? artwork : actions }
+  const form = { querySelector: selector => selector === '[data-public-sticky]' ? artwork : null }
   const scrolls = []
   const globals = {
     HTMLElement: Element,
@@ -37,8 +36,8 @@ function repair({ field, bar, preview, overlay, viewport, inActions = false, act
   return scrolls
 }
 
-test('scrolls the document until the entire focused field clears the sticky actions and focus gap', () => {
-  assert.deepEqual(repair({ field: { top: 572, bottom: 620 }, bar: { top: 550, bottom: 640 } }), [{ top: 78, behavior: 'instant' }])
+test('scrolls the document until the entire focused field clears the viewport bottom and focus gap', () => {
+  assert.deepEqual(repair({ field: { top: 590, bottom: 638 } }), [{ top: 6, behavior: 'instant' }])
 })
 
 test('reveals a field below the sticky preview without treating a desktop side column as an obstruction', () => {
@@ -51,10 +50,10 @@ test('clears the editor overlay even though its sticky anchor occupies zero heig
 })
 
 test('repairs focus against the panned visual viewport when a keyboard reduces the reading area', () => {
-  assert.deepEqual(repair({ field: { top: 402, bottom: 450 }, viewport: { offsetTop: 100, height: 320 }, bar: { top: 800, bottom: 880 } }), [{ top: 38, behavior: 'instant' }])
+  assert.deepEqual(repair({ field: { top: 402, bottom: 450 }, viewport: { offsetTop: 100, height: 320 } }), [{ top: 38, behavior: 'instant' }])
 })
 
-test('does not scroll an already visible action or a field that has lost focus', () => {
-  assert.deepEqual(repair({ field: { top: 576, bottom: 624 }, bar: { top: 550, bottom: 640 }, inActions: true }), [])
-  assert.deepEqual(repair({ field: { top: 572, bottom: 620 }, bar: { top: 550, bottom: 640 }, active: false }), [])
+test('does not scroll a visible field or a field that has lost focus', () => {
+  assert.deepEqual(repair({ field: { top: 524, bottom: 572 } }), [])
+  assert.deepEqual(repair({ field: { top: 590, bottom: 638 }, active: false }), [])
 })

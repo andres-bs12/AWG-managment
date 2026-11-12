@@ -141,9 +141,8 @@
   --layout-home-reserve: 500px;
   --layout-home-short-reserve: 420px;
   --layout-header-height: var(--space-8);
-  /* Runtime measurements for document focus clearance on public forms. */
+  /* Focus clearance under the sticky multi-ornament editor bar (set on /buy, phones and tablets). */
   --public-sticky-top: 0px;
-  --public-actions-height: 0px;
   --measure-prose: 65ch;
   --measure-hint: 52ch;
   --measure-heading: 28ch;

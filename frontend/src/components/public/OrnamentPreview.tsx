@@ -66,7 +66,9 @@ export function OrnamentPreview({ item, static: isStatic = false, side: chosenSi
         </svg>
       </div>
     </div>
-    {!isStatic && item.withName && item.backName && <SegmentedControl tone="public" hideLegend legend={t('previewSide')} name={sideName} value={showBack ? 'back' : 'front'} options={[{ value: 'front', label: t('previewFront') }, { value: 'back', label: t('previewBack') }]} onChange={value => { setSide(value); onSideChange?.(value) }} />}
+    {/* The side choice needs a name, but its row is reserved as soon as the name option is on: inserting
+        it on the first typed letter pushed the name field down and Safari re-centred the caret (owner, 2026-11-12). */}
+    {!isStatic && item.withName && <div className={styles.sideSlot} data-reserved={item.backName ? undefined : true}><SegmentedControl tone="public" hideLegend legend={t('previewSide')} name={sideName} value={showBack ? 'back' : 'front'} options={[{ value: 'front', label: t('previewFront') }, { value: 'back', label: t('previewBack') }]} onChange={value => { setSide(value); onSideChange?.(value) }} /></div>}
     {/* Each sentence stays whole: on narrow screens the line breaks between them, never mid-sentence. */}
     {!isStatic && <p className={styles.disclaimer}>{(t('previewDisclaimer').match(/[^.]+\.?/g) ?? []).map(part => part.trim()).filter(Boolean).map((sentence, index) => <span key={index}>{index > 0 ? ' ' : ''}<span className={styles.sentence}>{sentence}</span></span>)}</p>}
   </div>

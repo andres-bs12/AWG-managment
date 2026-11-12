@@ -57,22 +57,19 @@ export async function expectDocumentScroll(page: Page) {
   })).toBe(true)
 }
 
-export async function expectActionClearance(page: Page, mode = mobile(page) ? 'sticky' : 'flow') {
+/** The action row is in normal flow at the card's end on every viewport, and focus stays visible. */
+export async function expectActionClearance(page: Page) {
   await expectDocumentScroll(page)
-  await expect.poll(() => page.locator('[data-sticky-actions]').evaluate((bar, expected) => {
+  await expect.poll(() => page.locator('[data-public-actions]').evaluate(bar => {
+    const card = bar.closest('[data-public-page]')!.getBoundingClientRect()
     const actions = bar.getBoundingClientRect()
     const viewport = window.visualViewport
     const top = viewport?.offsetTop ?? 0
     const bottom = top + (viewport?.height ?? innerHeight)
     const active = document.activeElement
     const rect = active?.getBoundingClientRect()
-    const visibleFocus = !active || active === document.body || !rect || (
-      rect.top >= top && rect.bottom <= bottom
-      && (bar.contains(active) || rect.right <= actions.left || rect.left >= actions.right
-        || rect.bottom <= actions.top || rect.top >= actions.bottom))
-    if (expected === 'flow') return getComputedStyle(bar).position === 'static' && visibleFocus
-    // Sticky stays in flow even at the card end; only its corners/shadow change there.
-    const inside = actions.left >= 0 && actions.right <= innerWidth && actions.bottom <= bottom + 0.5
-    return getComputedStyle(bar).position === 'sticky' && inside && visibleFocus
-  }, mode)).toBe(true)
+    const visibleFocus = !active || active === document.body || !rect || (rect.top >= top && rect.bottom <= bottom)
+    const atCardEnd = actions.left >= card.left - 0.5 && actions.right <= card.right + 0.5 && actions.bottom <= card.bottom + 0.5
+    return getComputedStyle(bar).position === 'static' && atCardEnd && visibleFocus
+  })).toBe(true)
 }

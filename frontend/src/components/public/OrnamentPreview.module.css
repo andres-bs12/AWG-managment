@@ -35,6 +35,8 @@
 /* Front/Back: native radios with the C1 selection (2px green boundary + tint + weight 600).
    Preview → control 12px; control → disclaimer 8px. Padding = 16px inset - border width, so the
    1px -> 2px selected border never changes the size. */
+/* Hidden from sight, focus and assistive tech until a name exists; the row keeps its height. */
+.sideSlot[data-reserved] { visibility: hidden; }
 .sentence { display: inline-block; }
 .disclaimer { margin: var(--space-2) 0 0; font-size: var(--fs-small); color: var(--color-text-muted); }
 

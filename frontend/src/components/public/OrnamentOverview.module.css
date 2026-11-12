@@ -18,7 +18,9 @@ button.tile, .add { cursor: pointer; transition: transform var(--dur-press) var(
 }
 .tile[data-static] { border-color: var(--color-border); }
 .art { display: block; width: var(--touch-lg); pointer-events: none; }
-.name { display: grid; max-width: 100%; max-height: calc(2 * var(--type-body-size) * var(--type-label-line)); overflow: hidden; white-space: normal; overflow-wrap: anywhere; text-wrap: balance; font-size: var(--type-body-size); line-height: var(--type-label-line); }
+/* Always two lines tall: a typed name replacing "Kugel 2" must not change the row height and move
+   the name field while typing (owner, 2026-11-12). */
+.name { display: grid; align-content: center; max-width: 100%; min-height: calc(2 * var(--type-body-size) * var(--type-label-line)); max-height: calc(2 * var(--type-body-size) * var(--type-label-line)); overflow: hidden; white-space: normal; overflow-wrap: anywhere; text-wrap: balance; font-size: var(--type-body-size); line-height: var(--type-label-line); }
 /* Overlap the bold duplicate so wrapping reserves both width and height before selection. */
 .name > span, .name::after { grid-area: 1 / 1; }
 .name::after { content: attr(data-label); visibility: hidden; font-weight: var(--type-label-weight); }

@@ -2,7 +2,7 @@ import { test, expect, type Locator, type Page } from '@playwright/test'
 import { choose, chooseFirstDate, next, open, photo } from './helpers'
 
 // Scroll-geometry checks are timing-sensitive: this file runs its tests in order even with
-// fullyParallel, so sibling pages do not compete for the CPU while sticky bars settle.
+// fullyParallel, so sibling pages do not compete for the CPU while scroll positions settle.
 test.describe.configure({ mode: 'default' })
 
 /** Check actual geometry, including overflow ancestors; visibility alone misses clipped buttons. */
@@ -38,27 +38,50 @@ async function documentLayout(page: Page) {
   }))
   expect(clipped).toEqual([])
 }
+/** The action row is never sticky: it is the card's last row, reached by scrolling, never clipped. */
 async function actions(page: Page) {
-  const bar = page.locator('[data-sticky-actions]')
-  await expect(bar).toHaveAttribute('data-relaxed-actions', /^(true|false)$/)
-  // Reading room and keyboard/zoom determine relaxation; a short viewport alone does not.
-  if (await bar.getAttribute('data-relaxed-actions') === 'true') {
-    await expect(bar).toHaveCSS('position', 'static')
-    await bar.scrollIntoViewIfNeeded()
-  } else await expect(bar).toHaveCSS('position', 'sticky')
+  const bar = page.locator('[data-public-actions]')
+  await expect(bar).toHaveCSS('position', 'static')
+  await bar.scrollIntoViewIfNeeded()
   await insideViewport(bar)
   await insideViewport(page.locator('form button[type=submit]'))
+  expect(await bar.evaluate(node => node.getBoundingClientRect().bottom <= node.closest('[data-public-page]')!.getBoundingClientRect().bottom + 0.5)).toBe(true)
   await documentLayout(page)
 }
 async function scrollCard(page: Page) {
   // Geometry must hold during ordinary finger scrolling, with no focused control to repair it.
   await page.evaluate(() => (document.activeElement as HTMLElement)?.blur())
   for (const fraction of [0, 0.35, 0.7, 1]) {
-    await page.evaluate(fraction => {
+    const start = await page.evaluate(fraction => {
       const card = document.querySelector('[data-public-page]')!
       window.scrollTo(0, Math.max(0, card.getBoundingClientRect().top + scrollY + card.clientHeight * fraction - innerHeight))
+      return document.querySelector('[data-public-actions]')!.getBoundingClientRect().top + scrollY
     }, fraction)
-    await actions(page)
+    // The bar keeps its document position however far the page is scrolled.
+    expect(await page.evaluate(() => document.querySelector('[data-public-actions]')!.getBoundingClientRect().top + scrollY)).toBeCloseTo(start, 0)
+    await expect(page.locator('[data-public-actions]')).toHaveCSS('position', 'static')
+    await documentLayout(page)
+  }
+  await actions(page)
+}
+/** Record the scroll position and the field's top for every typed letter, after the focus scroll settled. */
+async function typeAndTrack(page: Page, field: Locator, letters: string) {
+  // Start with the field low on the screen, where a keyboard would cover it.
+  await field.evaluate(node => window.scrollTo(0, Math.max(0, node.getBoundingClientRect().top + scrollY - innerHeight + node.getBoundingClientRect().height + 8)))
+  await field.tap()
+  await expect(field).toBeFocused()
+  const sample = () => field.evaluate(node => new Promise<[number, number]>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve([window.scrollY, node.getBoundingClientRect().top])))))
+  let settled = await sample()
+  await expect.poll(async () => { const previous = settled; settled = await sample(); return previous[0] === settled[0] && previous[1] === settled[1] }).toBe(true)
+  const positions: [number, number][] = []
+  for (const letter of letters) {
+    await page.keyboard.type(letter)
+    positions.push(await sample())
+  }
+  await expect(field).toHaveValue(new RegExp(`^${letters}$`, 'i'))
+  for (const [scroll, top] of positions) {
+    expect(Math.abs(scroll - settled[0])).toBeLessThanOrEqual(1)
+    expect(Math.abs(top - settled[1])).toBeLessThanOrEqual(1)
   }
 }
 async function fillContact(page: Page) {
@@ -287,19 +310,35 @@ test('server field rejections reopen the shared delivery/contact screen and focu
   }
 })
 
-test('short landscape keeps actions reachable while radio focus preserves reading-room behavior', async ({ page }) => {
+test('short landscape keeps the in-flow actions reachable while focus moves through the design', async ({ page }) => {
   await page.setViewportSize({ width: 844, height: 390 })
   await open(page, 'en')
-  const bar = page.locator('[data-sticky-actions]')
-  await expect(bar).toHaveAttribute('data-relaxed-actions', /^(true|false)$/)
-  const position = await bar.evaluate(node => getComputedStyle(node).position)
-  expect(['static', 'sticky']).toContain(position)
+  const bar = page.locator('[data-public-actions]')
+  await expect(bar).toHaveCSS('position', 'static')
   await page.getByRole('radio', { name: 'Red', exact: true }).focus()
-  await expect(bar).toHaveCSS('position', position)
+  await expect(bar).toHaveCSS('position', 'static')
   await choose(page)
   await nameOption(page).focus()
-  await expect(bar).toHaveCSS('position', position)
+  await expect(bar).toHaveCSS('position', 'static')
   await nameOption(page).check()
   await expect(page.locator('input[id^="back-"]')).toBeVisible()
   await actions(page)
+})
+
+test('typing the back name keeps the page still (/buy, one and two ornaments, and /form)', async ({ page }) => {
+  await open(page, 'en')
+  await choose(page)
+  await nameOption(page).check()
+  await typeAndTrack(page, page.locator('input[id^="back-"]'), 'luna')
+  await page.locator('input[type=file]').setInputFiles(photo)
+  await expect(page.getByRole('img', { name: /^Photo 1 of Luna$/ })).toBeVisible()
+  // With two ornaments the picker tiles and the sticky editor strip show the name as it is typed.
+  await page.locator('#buy-add').click()
+  await choose(page)
+  await nameOption(page).check()
+  await typeAndTrack(page, page.locator('input[id^="back-"]'), 'milo')
+  await page.goto('/form/frm-wait')
+  await expect(page.locator('#form-heading')).toBeVisible()
+  await page.locator('input[id^="back-"]').first().fill('')
+  await typeAndTrack(page, page.locator('input[id^="back-"]').first(), 'otto')
 })

@@ -82,36 +82,27 @@ for (const locale of ['de', 'en'] as const) {
   })
 }
 
-test('the mobile action bar spans the card and merges with its end', async ({ page }) => {
-  test.skip(!mobile(page), 'The bar sticks below 1024px only.')
+test('the mobile action bar stays in flow at the card end and spans it', async ({ page }) => {
+  test.skip(!mobile(page), 'The full-width docked row is the phone and tablet layout.')
   await open(page); await choose(page); await pet(page); await next(page).click()
-  const bar = page.locator('[data-sticky-actions]')
   const geometry = () => page.evaluate(() => {
     const card = document.querySelector('[data-public-page]')!.getBoundingClientRect()
-    const actions = document.querySelector<HTMLElement>('[data-sticky-actions]')!
+    const actions = document.querySelector<HTMLElement>('[data-public-actions]')!
     const box = actions.getBoundingClientRect()
     const css = getComputedStyle(actions)
-    return { stuck: actions.dataset.stuck === 'true', cardLeft: card.left, cardRight: card.right, cardBottom: card.bottom, left: box.left, right: box.right, bottom: box.bottom, top: box.top, shadow: css.boxShadow, radius: [css.borderTopLeftRadius, css.borderBottomLeftRadius] }
+    return { position: css.position, cardLeft: card.left, cardRight: card.right, cardBottom: card.bottom, left: box.left, right: box.right, bottom: box.bottom, shadow: css.boxShadow, radius: [css.borderTopLeftRadius, css.borderBottomLeftRadius] }
   })
   await page.locator(':focus').evaluateAll(nodes => nodes.forEach(node => (node as HTMLElement).blur()))
-  await page.evaluate(() => window.scrollTo(0, 0))
-  await expect.poll(async () => (await geometry()).stuck).toBe(false)
-  let box = await geometry()
-  expect([box.left, box.right]).toEqual([box.cardLeft, box.cardRight])
-  // While floating the bar sits one --space-2 above the screen edge with every corner rounded,
-  // so iOS Safari keeps its bottom toolbar glass.
-  const float = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('[data-public-page]')!).getPropertyValue('--space-2')))
-  expect(float).toBeGreaterThan(0)
-  expect(box.bottom).toBe(page.viewportSize()!.height - float)
-  expect(box.radius[1]).not.toBe('0px')
-  await expectActionClearance(page)
-  await page.evaluate(() => window.scrollTo(0, document.scrollingElement!.scrollHeight))
-  await expect(bar).toHaveAttribute('data-stuck', 'true')
-  box = await geometry()
-  expect([box.left, box.right, box.bottom]).toEqual([box.cardLeft, box.cardRight, box.cardBottom])
-  expect(box.shadow).toBe('none')
-  expect(box.radius[0]).toBe('0px')
-  expect(box.radius[1]).not.toBe('0px')
+  for (const top of [0, Number.MAX_SAFE_INTEGER]) {
+    await page.evaluate(value => window.scrollTo(0, value), top)
+    const box = await geometry()
+    // Wherever the page is scrolled, the bar never floats: it is the card's bottom row.
+    expect(box.position).toBe('static')
+    expect([box.left, box.right, box.bottom]).toEqual([box.cardLeft, box.cardRight, box.cardBottom])
+    expect(box.shadow).toBe('none')
+    expect(box.radius[0]).toBe('0px')
+    expect(box.radius[1]).not.toBe('0px')
+  }
   await expectActionClearance(page)
   await axe(page)
 })

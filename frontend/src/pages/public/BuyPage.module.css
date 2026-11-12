@@ -754,6 +754,7 @@ form.shop > .actions { margin-top: var(--space-5); }
 .deliveryContact { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--snow-2); }
 @media (max-width: 1023px) {
   .step :is(input, textarea, button, summary, fieldset) { scroll-margin-block: var(--space-4); }
+  .shop:has([data-public-sticky]) { --public-sticky-top: var(--size-editor-bar); }
   .design :is(input, textarea, button, summary) { scroll-margin-top: calc(var(--public-sticky-top) + var(--space-4)); }
 }
 @media (min-width: 1024px) {
@@ -909,16 +910,13 @@ form.shop > .actions { margin-top: var(--space-5); }
   .editorBarContent { position: absolute; top: 0; inset-inline: 0; height: var(--size-editor-bar); padding: var(--space-2) var(--space-4); background: var(--color-surface); border-bottom: var(--border-thin) solid var(--color-border); }
   .editorBarContent .editorHeading { font-family: var(--font-sans); font-size: var(--type-body-size); line-height: var(--type-label-line); font-weight: var(--type-label-weight); }
   /* Keep the duplicate h3 accessible without painting it until the anchor sticks. */
-  .editorBar:not([data-stuck='true']) .editorBarContent,
-  [data-relaxed-preview='true'] .editorBarContent { clip-path: inset(50%); pointer-events: none; }
+  .editorBar:not([data-stuck='true']) .editorBarContent { clip-path: inset(50%); pointer-events: none; }
   .itemPanel:has(> .editorBar) { row-gap: 0; }
   .itemPanel:has(> .editorBar) > .petGroup { margin-top: var(--space-6); }
   /* On iOS 26 the page is visible behind the status bar: the stuck bar continues upwards. */
   .editorBar[data-stuck='true'] .editorBarContent::before { content: ''; position: absolute; bottom: 100%; left: 0; right: 0; height: var(--space-10); background: var(--color-surface); }
   .editorArt { display: block; }
   .editorArt svg { width: auto; height: var(--touch); }
-  [data-relaxed-preview='true'] .editorBar { position: static; }
-  [data-relaxed-preview='true'] .editorBarContent::before { content: none; }
 }
 @media (min-width: 768px) and (max-width: 1023px) {
   .editorBar { margin-inline: calc(-1 * var(--space-5)); }
