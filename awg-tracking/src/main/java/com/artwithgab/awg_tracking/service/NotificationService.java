@@ -21,11 +21,16 @@ public class NotificationService {
     private final ObjectProvider<JavaMailSender> sender;
     private final AwgProperties properties;
     private final InvoiceService invoices;
+    private final com.artwithgab.awg_tracking.security.RateLimiter limiter;
     @Value("${spring.mail.host:}") private String host;
 
     @Async("notificationExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onOrderNotification(OrderNotification event) {
+        boolean publicEdit = event.kind() == OrderNotification.Kind.ADDRESS_CHANGED || event.kind() == OrderNotification.Kind.FORM_SUBMITTED;
+        // Both edit kinds share one budget; changing endpoint must not double the mail allowance.
+        if (publicEdit && !limiter.tryAcquire("order-edit-mail", event.orderId() == null ? event.code() : event.orderId(),
+                1, java.time.Duration.ofMinutes(15))) return;
         String link = properties.shop().publicBaseUrl().replaceAll("/+$", "") + "/track/" + URLEncoder.encode(event.code(), StandardCharsets.UTF_8);
         String subject = "ArtWithGab: " + event.kind().owner + " - " + event.code();
         String ownerBody = "Order: " + event.code() + "\nCustomer: " + event.customerName() + "\nEmail: " + event.customerEmail()
@@ -36,9 +41,10 @@ public class NotificationService {
                         : "\nStaff: " + properties.shop().publicBaseUrl().replaceAll("/+$", "") + "/staff/orders/" + event.orderId());
         send(properties.mail().ownerEmail(), subject, ownerBody);
         boolean ownerOnly = event.kind() == OrderNotification.Kind.FORM_SUBMITTED || event.kind() == OrderNotification.Kind.PAYMENT_REVIEW;
-        if (!ownerOnly) {
-            String body = greeting("Hallo", event.customerName()) + event.kind().german + ".\nBestellung: " + event.code()
-                    + "\nGesamt: " + event.total() + " EUR · Bezahlt: " + event.amountPaid() + " EUR\nVerfolge deine Bestellung: " + link + "\n\nVielen Dank!\nArtWithGab\n\n---\n\n" + greeting("Hello", event.customerName()) + event.kind().english + ".\nOrder: " + event.code() + "\nTotal: " + event.total() + " EUR · Paid: " + event.amountPaid() + " EUR\nTrack your order: " + link + "\n\nThank you!\nArtWithGab";
+        if (!ownerOnly && !event.unconfirmedWeb()) {
+            String name = publicEdit ? "" : event.customerName();
+            String body = greeting("Hallo", name) + event.kind().german + ".\nBestellung: " + event.code()
+                    + "\nGesamt: " + event.total() + " EUR · Bezahlt: " + event.amountPaid() + " EUR\nVerfolge deine Bestellung: " + link + "\n\nVielen Dank!\nArtWithGab\n\n---\n\n" + greeting("Hello", name) + event.kind().english + ".\nOrder: " + event.code() + "\nTotal: " + event.total() + " EUR · Paid: " + event.amountPaid() + " EUR\nTrack your order: " + link + "\n\nThank you!\nArtWithGab";
             send(event.customerEmail(), subject, body);
         }
     }
@@ -67,7 +73,7 @@ public class NotificationService {
             mail.send(message);
             return true;
         } catch (Exception e) {
-            log.warn("Could not send invoice e-mail: {}", invoice.getNumber(), e);
+            logMailFailure(e);
             return false;
         }
     }
@@ -111,8 +117,26 @@ public class NotificationService {
             message.setText(body);
             mail.send(message);
         } catch (Exception e) {
-            log.warn("Could not send e-mail: {}", subject, e);
+            logMailFailure(e);
         }
+    }
+
+    /** SMTP messages and throwable traces can contain recipients, server replies and message bodies. */
+    private static void logMailFailure(Exception failure) {
+        int smtpCode = 0;
+        java.util.Set<Throwable> visited = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        java.util.Deque<Throwable> pending = new java.util.ArrayDeque<>();
+        pending.add(failure);
+        while (!pending.isEmpty() && visited.size() < 32) {
+            Throwable current = pending.removeFirst();
+            if (!visited.add(current)) continue;
+            if (current instanceof org.eclipse.angus.mail.smtp.SMTPAddressFailedException smtp) smtpCode = smtp.getReturnCode();
+            if (current instanceof org.eclipse.angus.mail.smtp.SMTPSendFailedException smtp) smtpCode = smtp.getReturnCode();
+            if (current.getCause() != null) pending.add(current.getCause());
+            if (current instanceof jakarta.mail.MessagingException mail && mail.getNextException() != null) pending.add(mail.getNextException());
+            if (current instanceof org.springframework.mail.MailSendException mail) pending.addAll(java.util.List.of(mail.getMessageExceptions()));
+        }
+        log.warn("Mail delivery failed: exception={} smtpCode={}", failure.getClass().getSimpleName(), smtpCode);
     }
 
     private static String greeting(String hello, String name) {

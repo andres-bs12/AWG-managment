@@ -1,6 +1,6 @@
 # Contexto del proyecto — ArtWithGab (AWG)
 
-**Actualizado:** 2026-11-12 (integración de release/v1.1 en feat/backend-domain; facturas V12 y UI pública actual)
+**Actualizado:** 2026-11-12 (v3: release/v1.1 integrada, seguridad pre-release, V12/V13, E2E 715 en verde)
 **Propósito de este archivo:** memoria persistente para el dueño del proyecto y los agentes que trabajen en este repositorio.
 
 ## Instrucción de mantenimiento
@@ -85,6 +85,14 @@ Scripts disponibles en `frontend/package.json`: `dev`, `build`, `build:mock`, `l
 - `CabinScene.tsx` es plano, con `viewBox` `0 0 420 332` y el suelo en y=324. `FlatFolk.tsx` tiene los personajes, `FlatTown.tsx` las casas y los árboles, y `PetFaces.tsx` las caras de gato y perro, compartidas por `PaintingOrnament` y la intro.
 - `IntroCurtain.tsx`: fondo de cielo (no verde, para que Safari no deje las barras verdes), dos adornos con gato y perro que se balancean y 4 puntos de carga. Solo aparece al cargar entrando por `/`, dura entre 2 y 3,8 s y se salta con un toque o una tecla. Mientras se muestra, `html[data-intro='on']` pausa la entrada del Home.
 - Rendimiento: animaciones solo con `transform`/`opacity`. Las luces dentro de los SVG usan `steps()`, la noria y los aerogeneradores giran por pasos, y la hilera de árboles no se anima. Todo respeta `prefers-reduced-motion`.
+
+## Pre-release security fixes (2026-11-12)
+
+- Implemented H2, M1–M4, L2–L5 and L8 locally, with 162 backend tests passing (startup Byte Buddy agent; Java 25 runtime, compilation target 21). H1 checkout caps and the 15-minute expiry were already present after the merge and are preserved. No changes to `frontend/src`, no commit or staging. Detailed finding → file → test mapping and final test count: `tasks/security-review-fixes-2026-11-12.md`.
+- PENDING/REVIEW web orders reject public address/form writes with 409 `PAYMENT_PENDING`, and receive no customer notification mail. Address/form notifications share one event/order/15 minutes with neutral edit greetings. Waitlist mail budgets: 3/client/hour, 30 global/hour, 200 global/day, including resends; exhaustion is checked before subscriber lookup. Budgets are in memory for one backend instance.
+- IPv6 limiter clients share /64; login failures are account+client scoped (account-wide 200/minute warns only). After 300 Track misses/hour, all lookups reject before querying until the window expires to stop enumeration. Limiter cleanup runs at most once/minute. Abandon checks the token before the schedule lock and returns 204 for missing/unauthorized orders. SMTP logs contain only exception class and numeric status.
+- nginx now defaults to 64 KiB; only exact checkout and forms uploads allow 60 MiB. Webhook checks headers before bounded body reads (256 KiB application limit). JVM heap is capped at 70% of container RAM and exits on OOM; frontend base stays `nginx:1.27-alpine` (L8 pending: `docker pull nginx:1.30-alpine` hangs from this machine; retry before the next release). The 60 MiB limits were raised to 64 MB/64m (Spring + nginx) after GLM's audit; `/api/metrics/buy` also has a 600/min global cap.
+- New **V13__metrics_lock.sql** reserves row 2 for metrics, independent from scheduling row 1; V8–V12 are unchanged. Applying V13 to PostgreSQL, building/running containers, real SMTP/Stripe checks and the owner's Cloudflare Track rule (`docs/deploy.md`) remain pending. Independent cross-model audit attempts (Vibe/GLM and Antigravity/Gemini) failed at initialization under this sandbox; no audit approval is claimed.
 
 ## Backend actual
 
@@ -215,4 +223,4 @@ Superseded baseline: the owner reports **681 E2E passed** before the staff phone
 
 - Contenido de conflictos resuelto en el worktree de `feat/backend-domain`; se conservan la UI pública reciente y las funciones staff/backend de producción. V8–V11 son idénticas a `release/v1.1`; facturas movidas a V12 sin cambiar el SQL.
 - Verificación: backend 131 tests con Byte Buddy como agente de inicio (autoattach de Mockito bloqueado en sandbox); TypeScript/lint y 61 tests Node pasan. Sin ejecución de Playwright, PostgreSQL ni iPhone real.
-- **Parcial: staging pendiente** porque el sandbox bloquea `.git/index`. No se ha hecho commit, abort ni push. Resolución archivo por archivo, límites y comando de staging: `tasks/merge-release-v1.1-2026-11-12.md`.
+- Merge commit `b008af1`; detalle en `tasks/merge-release-v1.1-2026-11-12.md`. Tras el merge y la seguridad: backend en verde, Postgres local con V1–V13 aplicadas y arranque OK, E2E completa 715 passed / 2 skipped (WebKit instalado; se arregló el host de `TrackDialog`), build/lint/61 Node en verde. Etiqueta `v3.0`.

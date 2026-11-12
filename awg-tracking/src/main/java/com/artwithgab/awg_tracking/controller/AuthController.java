@@ -12,12 +12,14 @@ import com.artwithgab.awg_tracking.service.ViewMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -29,15 +31,18 @@ public class AuthController {
     @PostMapping("/staff/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest body, HttpServletRequest request) {
         rateLimiter.check("login", request.getRemoteAddr(), 10);
-        // Per-account cap on failed guesses as well: rotating client addresses (e.g. IPv6 ranges)
-        // must not multiply the attempts against one staff account. One-minute window only, so an
-        // attacker can delay but never lock out a staff member for longer.
+        // Bind failed guesses to both account and client, so remote attackers cannot lock out staff.
         String account = body.email().trim().toLowerCase(java.util.Locale.ROOT);
-        rateLimiter.requireBelow("login-failed", account, 20);
+        String failureBucket = "login-failed|" + account;
+        rateLimiter.requireBelow(failureBucket, request.getRemoteAddr(), 20);
         try {
             return authService.login(body.email(), body.password());
         } catch (UnauthorizedException e) {
-            rateLimiter.record("login-failed", account);
+            rateLimiter.record(failureBucket, request.getRemoteAddr());
+            if (rateLimiter.record("login-failed-account", account) == 200) {
+                // Avoid account identifiers in logs; this is an alert, never an account lockout.
+                log.warn("Staff account failed-login warning threshold reached (200/minute).");
+            }
             throw e;
         }
     }

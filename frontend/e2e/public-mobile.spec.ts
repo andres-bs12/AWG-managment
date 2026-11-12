@@ -176,11 +176,12 @@ for (const locale of ['de', 'en'] as const) {
     await page.addInitScript(lang => localStorage.setItem('awg-locale', lang), locale)
     for (const route of ['/buy/thanks', '/track', '/track/AWG0000', '/form/invalid', '/impressum', '/agb', '/datenschutz', '/waitlist/confirm', '/waitlist/unsubscribe']) {
       await page.goto(route)
-      await expect(page.locator('main h1').first()).toBeVisible()
+      // A bare /track opens the code dialog first; the page card appears once it is dismissed.
       if (route === '/track') {
         await expect(page.getByRole('dialog')).toBeVisible()
-        await page.getByRole('dialog').press('Escape')
+        await page.getByRole('dialog').getByRole('textbox').press('Escape')
       }
+      await expect(page.locator('main h1').first()).toBeVisible()
       await documentLayout(page)
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
       await insideViewport(page.locator('footer a[href="/datenschutz"]'))

@@ -50,6 +50,9 @@ public class TrackingService {
         if (order.isCancelled() || !ownsOrder(order, formToken) || formLinks.isExpired(order)) {
             throw new ForbiddenException("Open the link from your order form to change the address.");
         }
+        if (order.isUnconfirmedWeb()) {
+            throw new ConflictException("Payment must be confirmed before changing the order.").code("PAYMENT_PENDING");
+        }
         if (order.getOrderItems().stream().noneMatch(i -> i.getDeliveryKind() == DeliveryKind.DELIVERY)) {
             throw new BadRequestException("This order is not delivered in Vienna");
         }

@@ -6,6 +6,7 @@ import com.artwithgab.awg_tracking.dto.form.CustomerFormViewDto;
 import com.artwithgab.awg_tracking.dto.form.SubmitFormResponse;
 import com.artwithgab.awg_tracking.dto.tracking.TrackViewDto;
 import com.artwithgab.awg_tracking.exception.BadRequestException;
+import com.artwithgab.awg_tracking.exception.ResourceNotFoundException;
 import com.artwithgab.awg_tracking.security.RateLimiter;
 import com.artwithgab.awg_tracking.service.FormService;
 import com.artwithgab.awg_tracking.service.PhotoStorageService;
@@ -48,7 +49,15 @@ public class PublicController {
     @GetMapping("/track/{code}")
     public TrackViewDto track(@PathVariable String code, HttpServletRequest request) {
         rateLimiter.check("track", request.getRemoteAddr(), 30);
-        return trackingService.getByCode(code, request.getHeader(FORM_TOKEN_HEADER));
+        // Stop every lookup once exhausted, so response status cannot remain an existence oracle.
+        rateLimiter.requireBelow("track-not-found", "global", 300, Duration.ofHours(1));
+        try {
+            return trackingService.getByCode(code, request.getHeader(FORM_TOKEN_HEADER));
+        } catch (ResourceNotFoundException missing) {
+            // Only actual misses consume this budget; account for concurrent in-flight failures too.
+            rateLimiter.check("track-not-found", "global", 300, Duration.ofHours(1));
+            throw missing;
+        }
     }
 
     @PatchMapping("/track/{code}/address")

@@ -94,7 +94,7 @@ public class ShopController {
     @PostMapping("/waitlist")
     public ResponseEntity<Void> waitlist(@Valid @RequestBody com.artwithgab.awg_tracking.dto.shop.WaitlistRequest body, HttpServletRequest request) {
         rateLimiter.check("shop-waitlist", request.getRemoteAddr(), 5);
-        shopService.joinWaitlist(body.email(), body.locale());
+        shopService.joinWaitlist(body.email(), body.locale(), request.getRemoteAddr());
         return ResponseEntity.noContent().build();
     }
 
@@ -112,9 +112,16 @@ public class ShopController {
         return ResponseEntity.noContent().build();
     }
 
-    /** Stripe calls this. The signature is verified with STRIPE_WEBHOOK_SECRET before anything is read. */
+    /** Bound the raw bytes before parsing or signature verification, including chunked requests. */
     @PostMapping("/stripe/webhook")
-    public ResponseEntity<Void> webhook(@RequestBody String payload, @RequestHeader(value = "Stripe-Signature", required = false) String signature) {
+    public ResponseEntity<Void> webhook(HttpServletRequest request) throws java.io.IOException {
+        String signature = request.getHeader("Stripe-Signature");
+        if (signature == null || signature.isBlank()) return ResponseEntity.badRequest().build();
+        int maxBytes = 256 * 1024;
+        if (request.getContentLengthLong() > maxBytes) throw new com.artwithgab.awg_tracking.exception.PayloadTooLargeException();
+        byte[] bytes = request.getInputStream().readNBytes(maxBytes + 1);
+        if (bytes.length > maxBytes) throw new com.artwithgab.awg_tracking.exception.PayloadTooLargeException();
+        String payload = new String(bytes, StandardCharsets.UTF_8);
         if (!stripe.verifySignature(payload, signature)) return ResponseEntity.badRequest().build();
         shopService.handleEvent(objectMapper.readTree(payload));
         return ResponseEntity.ok().build();

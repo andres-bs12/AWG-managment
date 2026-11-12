@@ -87,6 +87,13 @@ Every brief says: files/area, what done looks like, and "do not edit" for audits
 
 | 2026-11-12 | Merge production v1.1 into backend-domain (backend/migrations, docs, services and mobile E2E split) | Codex session subagents | B | Implementations integrated; backend 131 green with startup Byte Buddy agent, frontend tsc/lint and 61 Node green. Old optional-name/JSON/header/test seams corrected. Worktree resolved; index staging blocked by sandbox. No independent cross-LLM audit or browser verification claimed. |
 
+| 2026-11-12 | Security implementation: M3/M4/L4 and rate-limit tests | Codex session subagent (inherited model) | A | IPv6 prefix and Track enumeration regressions reproduced before fixes; duration/CAS cleanup, account+client login failures and global pre-lookup Track gate implemented. Focused tests passed; parent verified the full suite (see security fix report). This is implementation, not cross-family audit. |
+| 2026-11-12 | Read-only security cross-review attempt | GLM-5.3 via Vibe | — | Blocked before review: app-server initialization closed. No findings or approval produced. |
+| 2026-11-12 | Read-only security cross-review fallback (diff supplied, no tools requested) | Gemini 3.8 Flash via Antigravity | — | Blocked before review: localhost bind denied by sandbox; log/crash writes also denied. No findings or approval produced. |
+
+| 2026-11-12 | Read-only security audit of the fixes (rerun launched directly in background) | GLM-5.3 via Vibe | A | All fixes verified by reading; 2 real lows (6×10 MB photos exceed 60 MiB request cap; no global cap on public metrics) fixed by Opus. First run produced nothing because it was launched with `&` + pgrep wait. |
+| 2026-11-12 | Post-merge E2E repair (install WebKit, fix stale specs, regenerate snapshots) | Opus subagent | A | Found a real bug (TrackDialog host attached to the loading screen); 715 passed / 2 skipped. |
+
 ## Routing changes
 
 | Date | Change | Reason |

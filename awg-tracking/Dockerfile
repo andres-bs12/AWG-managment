@@ -15,4 +15,4 @@ ENV UPLOADS_DIR=/data/uploads
 VOLUME ["/data/uploads"]
 USER awg
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/app.jar"]

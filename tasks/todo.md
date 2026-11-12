@@ -7,6 +7,9 @@
 
 ## Hecho
 
+- [x] 2026-11-12 · Seguridad pre-release: H2, M1–M4, L2–L5 y L8 implementados; H1 ya existía y se conserva. **Terminado localmente: 162 tests backend pasan con Byte Buddy**, sin commit/staging ni cambios en `frontend/src`. V13 separa el lock de métricas del de Agenda. Matriz de archivos/pruebas y límites: `tasks/security-review-fixes-2026-11-12.md`.
+- [ ] Antes de publicar esos fixes: auditoría independiente fuera del sandbox (Vibe y Antigravity no iniciaron aquí), aplicar V13 en PostgreSQL, reconstruir/verificar contenedores y configurar la regla Cloudflare de `docs/deploy.md`. Las pruebas reales SMTP/Stripe siguen pendientes.
+
 - [x] 2026-11-12 · Integración de las funciones de producción `release/v1.1` en `feat/backend-domain`: límites/horas de Agenda, entrega por ítem, cancelación suave, límite de 2 checkouts por IP y reservas de 15 minutos, Sales/QR y overhaul staff. V8–V11 se conservan sin cambios (ya aplicadas en producción); facturas pasan a `V12__invoices.sql`. Se mantiene la UI pública actual (tres pantallas, editor sin subpasos, fichas, sin campo de mascota y correcciones Safari). Los resultados del merge se registran aparte; sin commit ni push.
 
 - [x] 2026-11-12 · Public UI review follow-up: implemented findings 1–3 and 5–11; finding 4 and ContactFields were already fixed and left untouched. TypeScript/lint pass (existing warnings; 26 staff CSS contracts), plus 5 focus tests. Browser verification remains pending; no Playwright. See `tasks/public-ui-review-fixes-2026-11-12.md`.
@@ -73,7 +76,7 @@
 - [ ] **Futuro — avisos inteligentes con agentes**, cuando todo esté en producción.
 - [ ] Pendientes menores de la auditoría (UI): contraste medido en todas las pantallas, bloques de error con reintento homogéneos, revisión completa de diálogos y etiquetas accesibles.
 
-- [ ] Sprint 6 /buy Task 2: verificar visualmente y con teclado en 360 px y escritorio, probar Stripe real (éxito, demora y cancelación), aplicar V6 en PostgreSQL y revisar la contención del lock de agenda usado por métricas. Falta auditoría cruzada; las pruebas automáticas no sustituyen estas verificaciones.
+- [ ] Sprint 6 /buy Task 2: verificar visualmente y con teclado en 360 px y escritorio, probar Stripe real (éxito, demora y cancelación), verificar V6 en PostgreSQL y aplicar V13 (las métricas ya usan un lock separado; la concurrencia está cubierta por tests). Falta auditoría cruzada; las pruebas automáticas no sustituyen estas verificaciones.
 - [ ] Sprint 6 /buy Task 3: ejecutar y corregir la suite Playwright fuera del sandbox, revisar y generar capturas de referencia, completar los casos y mediciones pendientes detallados en `docs/ux-validation.md`, y realizar la prueba moderada.
 - [ ] Task 5A: Claude debe ejecutar los nueve casos escritos de `e2e/success.spec.ts` en 360/768/1280 px (pago, espera, calendario, SEQ, cancelación y privacidad). No ejecutados aquí; revisar también el conflicto previo de tipos Playwright/axe en `helpers.ts:45`. El mock ya expone métricas en memoria para probar privacidad sin omitir casos.
 - [ ] Task 5B: Claude debe ejecutar los siete casos escritos de `e2e/keyboard-availability.spec.ts`: teclado completo de escritorio, Tab/Shift+Tab sin controles ocultos ni solapados, fecha agotada y opciones agotadas DE/EN, fallo de red al reconsultar. Verificar los arreglos de foco, Enter y recuperación de calendario a 360/768/1280 px. Build y lint pasan; Playwright no se ejecutó por instrucción del dueño. Persiste el conflicto previo de tipos Playwright/axe en `helpers.ts:45`.

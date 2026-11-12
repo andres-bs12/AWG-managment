@@ -56,15 +56,13 @@ class AuthApiTests extends ApiTestSupport {
     }
 
     @Test
-    void twentyFailedLoginsForOneAccountBlockItEvenFromNewAddresses() throws Exception {
+    void failedLoginsFromOtherClientsDoNotLockOutAnAccount() throws Exception {
         // A separate account so the other tests' Gaby logins stay unaffected.
         Map<String, String> body = Map.of("email", "Rotating@ArtWithGab.com", "password", "wrong");
-        for (int i = 1; i <= 20; i++) {
+        for (int i = 1; i <= 21; i++) {
             mvc.perform(withIp(post("/api/staff/login")).contentType(MediaType.APPLICATION_JSON).content(json(body)))
                     .andExpect(status().isUnauthorized());
         }
-        mvc.perform(withIp(post("/api/staff/login")).contentType(MediaType.APPLICATION_JSON).content(json(body)))
-                .andExpect(status().isTooManyRequests());
         mvc.perform(withIp(post("/api/staff/login")).contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "gaby@artwithgab.com", "password", PASSWORD))))
                 .andExpect(status().isOk());

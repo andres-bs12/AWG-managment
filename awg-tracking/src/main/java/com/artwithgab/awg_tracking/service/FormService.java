@@ -73,7 +73,7 @@ public class FormService {
 
     /** The customer may change the form until painting starts and the order is not handed over. */
     private static boolean isEditable(Order order) {
-        return !order.isHandedOver() && order.getOrderItems().stream()
+        return !order.isUnconfirmedWeb() && !order.isHandedOver() && order.getOrderItems().stream()
                 .noneMatch(i -> i.getItemKind() == ItemKind.CUSTOM && i.getProductionStatus() != ProductionStatus.NOT_STARTED);
     }
 
@@ -85,6 +85,9 @@ public class FormService {
     @Transactional
     public SubmitFormResponse submit(String token, CustomerFormRequest payload, Map<String, MultipartFile> files) {
         Order order = find(token);
+        if (order.isUnconfirmedWeb()) {
+            throw new ConflictException("Payment must be confirmed before changing the order.").code("PAYMENT_PENDING");
+        }
         if (!isEditable(order)) {
             throw new ConflictException("Painting has already started. Contact us to change the details.").code("FORM_LOCKED");
         }

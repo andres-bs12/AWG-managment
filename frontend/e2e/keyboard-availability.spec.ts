@@ -10,9 +10,13 @@ async function expectVisibleFocus(page: Page) {
   await expect(focused).toBeVisible()
   await expect(focused).toBeInViewport({ ratio: 1 })
   await expect.poll(() => focused.evaluate(node => {
-    const style = getComputedStyle(node)
-    const ring = (style.outlineStyle !== 'none' && style.outlineStyle !== 'hidden' && parseFloat(style.outlineWidth) > 0)
-      || style.boxShadow !== 'none'
+    // The public help trigger draws its ring on the inner glyph, inside the full touch target.
+    const hasRing = (element: Element) => {
+      const style = getComputedStyle(element)
+      return (style.outlineStyle !== 'none' && style.outlineStyle !== 'hidden' && parseFloat(style.outlineWidth) > 0)
+        || style.boxShadow !== 'none'
+    }
+    const ring = hasRing(node) || [...node.querySelectorAll('*')].some(hasRing)
     const rect = node.getBoundingClientRect()
     let visible = node !== document.body && rect.width > 1 && rect.height > 1
     for (let ancestor: Element | null = node; ancestor; ancestor = ancestor.parentElement) {

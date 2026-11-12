@@ -40,10 +40,12 @@ public class Bootstrap implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (!lockRepository.existsById(ScheduleLock.ID)) {
-            ScheduleLock lock = new ScheduleLock();
-            lock.setId(ScheduleLock.ID);
-            lockRepository.save(lock);
+        for (long id : new long[]{ScheduleLock.ID, ScheduleLock.METRICS_ID}) {
+            if (!lockRepository.existsById(id)) {
+                ScheduleLock lock = new ScheduleLock();
+                lock.setId(id);
+                lockRepository.save(lock);
+            }
         }
         if (!invoiceCounterRepository.existsById(InvoiceCounter.ID)) {
             invoiceCounterRepository.save(new InvoiceCounter());

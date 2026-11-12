@@ -14,6 +14,8 @@ public class BuyMetricsController {
     private final RateLimiter limiter;
     @PostMapping public ResponseEntity<Void> record(@RequestBody BuyMetricsService.Input input, HttpServletRequest request) {
         limiter.check("buy-metrics", request.getRemoteAddr(), 60);
+        // Global ceiling: rotating clients must not be able to queue writes on the metrics lock.
+        limiter.check("buy-metrics-global", "all", 600);
         metrics.record(input);
         return ResponseEntity.noContent().build();
     }

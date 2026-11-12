@@ -67,6 +67,7 @@ public class ShopService {
     private final com.artwithgab.awg_tracking.repository.WaitlistRepository waitlistRepository;
     private final Clock clock;
     private final BuyMetricsService buyMetrics;
+    private final WaitlistQuota waitlistQuota;
 
     public boolean isOpen() {
         return props.shop().enabled() && stripe.isConfigured();
@@ -106,13 +107,17 @@ public class ShopService {
      */
     @Transactional
     public void abandon(String code, String formToken) {
+        if (formToken == null || formToken.isBlank()) return;
+        String normalizedCode = code == null ? "" : code.trim();
+        String expected = orderRepository.findFormTokenByCode(normalizedCode).orElse("");
+        if (expected.isEmpty() || !java.security.MessageDigest.isEqual(
+                expected.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                formToken.getBytes(java.nio.charset.StandardCharsets.UTF_8))) return;
         calendarService.lockSchedule();
-        Optional<Order> found = orderRepository.findByCodeIgnoreCase(code == null ? "" : code.trim());
+        Optional<Order> found = orderRepository.findByCodeIgnoreCase(normalizedCode);
         if (found.isEmpty()) return;
         Order order = found.get();
-        if (!TrackingService.ownsOrder(order, formToken)) {
-            throw new com.artwithgab.awg_tracking.exception.ForbiddenException("This checkout belongs to another browser.");
-        }
+        if (!TrackingService.ownsOrder(order, formToken)) return;
         if (order.isCancelled() || !order.isAwaitingPayment()) return;
         // Paid meanwhile: keep it; the webhook (or the cleanup job) confirms it.
         if (order.getStripeSessionId() != null && stripe.expireOrReconcile(order.getStripeSessionId()).equals("complete")) return;
@@ -125,7 +130,8 @@ public class ShopService {
      * is the same in every case, so it does not reveal who is on the list.
      */
     @Transactional
-    public void joinWaitlist(String email, String locale) {
+    public void joinWaitlist(String email, String locale, String clientIp) {
+        waitlistQuota.requireAvailable(clientIp);
         String normalized = email.trim().toLowerCase(Locale.ROOT);
         String lang = "en".equals(locale) ? "en" : "de";
         var existing = waitlistRepository.findByEmail(normalized);
@@ -134,11 +140,13 @@ public class ShopService {
             Instant now = clock.instant();
             // Cooldown per address, so repeated sign-ups cannot flood someone's inbox.
             if (entry.getConfirmedAt() == null && (entry.getLastSentAt() == null || entry.getLastSentAt().isBefore(now.minusSeconds(3600)))) {
+                waitlistQuota.acquire(clientIp);
                 entry.setLastSentAt(now);
                 events.publishEvent(new WaitlistConfirmation(entry.getEmail(), lang, entry.getToken()));
             }
             return;
         }
+        waitlistQuota.acquire(clientIp);
         var entry = new com.artwithgab.awg_tracking.model.WaitlistEntry();
         entry.setEmail(normalized);
         entry.setLocale(lang);

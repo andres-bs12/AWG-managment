@@ -212,9 +212,9 @@ class ShopApiTests extends ApiTestSupport {
         String code = read(res, "$.orderCode");
         String formToken = read(res, "$.formToken");
         // Without the token (or with another one) nothing happens.
-        mvc.perform(withIp(post("/api/shop/checkout/" + code + "/abandon"))).andExpect(status().isForbidden());
+        mvc.perform(withIp(post("/api/shop/checkout/" + code + "/abandon"))).andExpect(status().isNoContent());
         mvc.perform(withIp(post("/api/shop/checkout/" + code + "/abandon")).header("X-Form-Token", "wrong-token-wrong-token"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNoContent());
         assertThat(orderRepository.findByCodeIgnoreCase(code)).isPresent();
 
         mvc.perform(withIp(post("/api/shop/checkout/" + code + "/abandon")).header("X-Form-Token", formToken))
@@ -362,9 +362,42 @@ class ShopApiTests extends ApiTestSupport {
         MvcResult res = checkout("1070", "2026-12-02", 1);
         String code = read(res, "$.orderCode");
         String token = read(res, "$.formToken");
+        var order = orderRepository.findByCodeIgnoreCase(code).orElseThrow();
+        webhook("checkout.session.completed", "paid", order.getTotal().movePointRight(2).longValueExact());
         mvc.perform(withIp(patch("/api/track/" + code + "/address")).header("X-Form-Token", token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("line1", "Hauptplatz 1", "city", "Linz", "postalCode", "4020"))))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void pendingAndReviewWebOrdersRejectPublicWritesWithStableCode() throws Exception {
+        MvcResult res = checkout("1070", "2026-12-02", 1);
+        String code = read(res, "$.orderCode");
+        String token = read(res, "$.formToken");
+        var order = orderRepository.findByCodeIgnoreCase(code).orElseThrow();
+        String originalName = order.getCustomer().getName();
+        for (var state : List.of(com.artwithgab.awg_tracking.enums.CheckoutStatus.PENDING, com.artwithgab.awg_tracking.enums.CheckoutStatus.REVIEW)) {
+            order.setCheckoutStatus(state);
+            mvc.perform(withIp(patch("/api/track/" + code + "/address")).header("X-Form-Token", token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(Map.of("line1", "New address 1", "city", "Wien", "postalCode", "1010"))))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PAYMENT_PENDING"));
+            var payload = Map.of("customerName", "Changed Name", "phone", "+43 660 1234567", "email", "changed@example.com",
+                    "items", List.of(Map.of("orderItemId", order.getOrderItems().getFirst().getId(), "petName", "", "backName", "LUNA",
+                            "photos", List.of(Map.of("id", "p1", "name", "photo.jpg")))));
+            mvc.perform(withIp(multipart("/api/forms/" + token)).file(new MockMultipartFile("payload", "payload", "application/json", json(payload).getBytes())))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PAYMENT_PENDING"));
+            mvc.perform(withIp(get("/api/forms/" + token))).andExpect(status().isOk()).andExpect(jsonPath("$.editable").value(false));
+            assertThat(order.getCustomer().getName()).isEqualTo(originalName);
+        }
+    }
+
+    @Test
+    void oversizedWebhookReturnsStableTooLargeCode() throws Exception {
+        mvc.perform(post("/api/shop/stripe/webhook").header("Stripe-Signature", "signature")
+                        .contentType(MediaType.APPLICATION_JSON).content(new byte[256 * 1024 + 1]))
+                .andExpect(status().isPayloadTooLarge()).andExpect(jsonPath("$.code").value("TOO_LARGE"));
+        org.mockito.Mockito.verify(stripe, org.mockito.Mockito.never()).verifySignature(anyString(), any());
     }
 }

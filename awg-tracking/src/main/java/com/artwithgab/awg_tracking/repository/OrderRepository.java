@@ -19,6 +19,10 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, org.springf
     @Query("select o from Order o join fetch o.customer where upper(o.code) = upper(:code)")
     Optional<Order> findByCodeIgnoreCase(String code);
 
+    /** Scalar ownership check avoids caching an order before waiting for the schedule lock. */
+    @Query("select o.formToken from Order o where upper(o.code) = upper(:code)")
+    Optional<String> findFormTokenByCode(String code);
+
     @Query("select o from Order o join fetch o.customer where o.formToken = :formToken")
     Optional<Order> findByFormToken(String formToken);
 

@@ -1,5 +1,5 @@
 import { apiError } from '../../lib/apiError'
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type RefObject } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/client'
 import { Button } from '../ui/Button'
@@ -30,6 +30,11 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error, lookup
   const [code, setCode] = useState(initialCode)
   const [localError, setLocalError] = useState('')
   const [busy, setBusy] = useState(false)
+  // Resolve the portal host after commit: during the first render after a lazy route loads, the
+  // Suspense fallback (which also carries data-public-shell) is still in the DOM and is removed on
+  // commit, which would leave the dialog inside a detached node on a direct visit to /track.
+  const [host, setHost] = useState<Element | null>(null)
+  useLayoutEffect(() => { setHost(document.querySelector('[data-public-shell]') ?? document.body) }, [])
 
   useEffect(() => {
     restoreRef.current = openerRef?.current ?? document.activeElement as HTMLElement | null
@@ -87,6 +92,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error, lookup
 
   const shownError = localError || error || ''
 
+  if (!host) return null
   return createPortal(
     <div className={styles.overlay} onKeyDown={onKeyDown}>
       <button
@@ -168,6 +174,6 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error, lookup
         </form>
       </div>
     </div>,
-    document.querySelector('[data-public-shell]') ?? document.body,
+    host,
   )
 }

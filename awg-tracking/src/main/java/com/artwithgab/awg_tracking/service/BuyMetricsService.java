@@ -18,7 +18,7 @@ public class BuyMetricsService {
     private static final Set<String> FIELDS = Set.of("", "color", "finish", "name", "photos", "date", "delivery", "pickupTime", "customerName", "email", "phone", "line1", "postalCode", "terms");
     private static final Set<String> VALUES = Set.of("", "red", "green", "beige", "shiny", "matte", "on", "off", "vienna", "market", "1", "2", "3", "4", "5", "6", "7", "required", "invalid");
     private final BuyMetricRepository repository;
-    private final CalendarService calendar;
+    private final com.artwithgab.awg_tracking.repository.ScheduleLockRepository locks;
     private final Clock clock;
     public record Input(String event, String step, String field, String code, String value) {}
     private String clean(String s) { return s == null ? "" : s; }
@@ -34,8 +34,8 @@ public class BuyMetricsService {
     @Transactional
     public void paid() { increment("buy_paid", "", "", ""); }
     private void increment(String event, String step, String field, String value) {
-        // Reuse the existing database lock to serialize creation and increments across instances.
-        calendar.lockSchedule();
+        // Serialize creation and increments across instances without locking the painting schedule.
+        locks.lockById(com.artwithgab.awg_tracking.model.ScheduleLock.METRICS_ID).orElseThrow();
         LocalDate date = LocalDate.now(clock);
         BuyMetric metric = repository.findByDateAndEventAndStepAndFieldAndValue(date, event, step, field, value).orElseGet(BuyMetric::new);
         metric.setDate(date); metric.setEvent(event); metric.setStep(step); metric.setField(field); metric.setValue(value); metric.setCount(metric.getCount() + 1);

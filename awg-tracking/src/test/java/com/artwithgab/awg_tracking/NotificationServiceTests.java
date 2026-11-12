@@ -110,10 +110,10 @@ class NotificationServiceTests {
         when(shop.publicBaseUrl()).thenReturn("https://example.com");
         when(properties.mail()).thenReturn(new AwgProperties.Mail("shop@example.com", "owner@example.com"));
         var invoiceDelivery = mock(com.artwithgab.awg_tracking.service.InvoiceService.class);
-        NotificationService service = new NotificationService(provider, properties, invoiceDelivery);
+        NotificationService service = new NotificationService(provider, properties, invoiceDelivery, new com.artwithgab.awg_tracking.security.RateLimiter(java.time.Clock.systemUTC()));
         ReflectionTestUtils.setField(service, "host", "");
         service.onOrderNotification(new OrderNotification(OrderNotification.Kind.CANCELLED, "AWG1234", "Customer", "customer@example.com",
-                BigDecimal.TEN, BigDecimal.ZERO, "UNPAID", "", "", null));
+                BigDecimal.TEN, BigDecimal.ZERO, "UNPAID", "", "", null, false));
         var invoice = new com.artwithgab.awg_tracking.model.Invoice();
         invoice.setNumber(1L);
         invoice.setRecipient("customer@example.com");

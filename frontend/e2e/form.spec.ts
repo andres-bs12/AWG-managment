@@ -261,6 +261,9 @@ test('completes the QR form by keyboard with visible, unobscured focus', async (
   await axe(page); await noOverflow(page)
   await tabTo(page, next(page)); await page.keyboard.press('Space')
   await expect(page.getByRole('status').filter({ hasText: 'Danke! Deine Angaben sind gespeichert.' })).toBeVisible()
+  // After a QR save Track shows the order without the sleigh wipe; let the card's fade-in finish
+  // so axe measures the final colours rather than a half-transparent card.
+  await page.locator('main section').first().evaluate(node => Promise.all(node.getAnimations().map(animation => animation.finished)))
   await axe(page)
 })
 
