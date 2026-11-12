@@ -81,10 +81,10 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 - **Probar todas las páginas públicas** a 320×480, 360×640, 375×553, 393×659, 412×780, 440×741, 768×1024, iPad 820×1180/1180×820 y 1280×800. CTAs completamente visibles, nada recortado, sin scroll horizontal.
 - **Playwright/WebKit no emula el safe-area del iPhone** (`env(safe-area-inset-bottom)` es 0 allí, ~34 px en un iPhone real). Cualquier padding con safe-area se quita cuando el elemento no está en el borde (p. ej. barra acoplada al final de la tarjeta).
 - **Barras de Safari iOS 26:** las capas fijas a pantalla completa van con z-index negativo (`WinterBackdrop` −2, `Snowfield` −1) dentro de `.shell` con `isolation: isolate`. No subir esos z-index, no pintar fondos en capas fijas que toquen el borde, no usar franjas fijas/sticky para teñir (Safari las vuelve opacas, probado y revertido). Scroll del documento, no de un contenedor.
-- **Barra de acciones:** sticky solo en pasos de edición; en revisión/pago va en el flujo al final (una pila alta de pagar/Stripe/atrás tapaba el resumen). Al final del scroll se integra con la tarjeta: mismo ancho, esquinas a ras, nunca «píldora dentro de píldora». En móvil flota 8 px sobre el borde.
+- **Barra de acciones fija en su sitio (dueño, 2026-11-12):** nunca sticky ni flotante en ningún tamaño; va en el flujo como última fila de la tarjeta (mismo ancho, esquinas a ras) y se alcanza con scroll. No volver a medir `visualViewport` para recolocarla.
+- **Nada cambia de altura encima de un campo mientras se escribe (dueño, 2026-11-12):** si un control aparece con la primera letra (p. ej. Vorne/Hinten de la vista previa) o un texto cambia de líneas (fichas «Kugel 2» → nombre), el campo baja y Safari recentra el cursor (salto). Reservar el espacio (`visibility: hidden`, alturas fijas de 2 líneas). La spec `public-mobile` «typing the back name keeps the page still» lo mide.
 - **Hover solo para punteros finos** (`@media (hover: hover)`): en iPad/iPhone el hover se queda pegado tras tocar.
 - `crypto.randomUUID` no existe en HTTP plano por LAN en iPhone: usar el fallback `uid()`.
-- Las capturas de página completa congelan la barra sticky a mitad de página y simulan un hueco falso: el spec visual la pone en flujo durante la captura.
 - Las capturas visuales antiguas pueden pasar por error: cuando cambia la UI, borrarlas, regenerarlas y revisarlas a ojo. No subir tolerancias ni relajar reglas axe.
 
 ## 5. Estructura de la tienda y del formulario (decisiones vigentes)

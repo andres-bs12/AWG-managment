@@ -28,7 +28,7 @@ test('visible controls have 44px touch targets', async ({ page }) => {
   expect(failures).toEqual([])
 })
 
-test('document scrolling and sticky actions survive resize, short viewports and QR navigation', async ({ page }) => {
+test('document scrolling and in-flow actions survive resize, short viewports and QR navigation', async ({ page }) => {
   await open(page); await choose(page); await pet(page); await next(page).click()
   await expectActionClearance(page)
   await page.setViewportSize({ width: 360, height: 640 })
@@ -47,7 +47,7 @@ test('document scrolling and sticky actions survive resize, short viewports and 
     await axe(page)
   }
   await page.setViewportSize({ width: 360, height: 240 })
-  await expectActionClearance(page, 'flow')
+  await expectActionClearance(page)
   await page.setViewportSize({ width: 768, height: 1024 })
   await expectActionClearance(page)
   await page.setViewportSize({ width: 1280, height: 900 })
@@ -57,7 +57,8 @@ test('document scrolling and sticky actions survive resize, short viewports and 
   await page.locator('header a').first().click()
   await expect(page).toHaveURL('/')
   await expectDocumentScroll(page)
-  expect(await page.evaluate(() => document.documentElement.style.getPropertyValue('--public-actions-height'))).toBe('')
+  // No floating bar means no bottom scroll clearance reserved for one.
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBottom)).toBe('auto')
   await page.goto('/form/frm-wait')
   await expect(page.locator('#form-heading')).toBeVisible()
   await expectActionClearance(page)
@@ -99,7 +100,7 @@ test('Home fits the small document viewport with both actions above its safe bot
 })
 
 for (const route of ['/buy', '/form/frm-wait']) {
-  test(`Tab and Shift+Tab keep every focused field above the sticky bar (${route})`, async ({ page }) => {
+  test(`Tab and Shift+Tab keep every focused field inside the viewport (${route})`, async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 640 })
     await open(page)
     if (route === '/buy') { await choose(page); await pet(page); await next(page).click() }
@@ -109,7 +110,7 @@ for (const route of ['/buy', '/form/frm-wait']) {
     expect(count).toBeGreaterThan(0)
     await fields.first().focus()
     // Stop at form boundaries, avoiding the browser chrome's own keyboard focus.
-    const last = page.locator('[data-sticky-actions] button').last()
+    const last = page.locator('[data-public-actions] button').last()
     for (const [key, boundary] of [['Tab', last], ['Shift+Tab', fields.first()]] as const) {
       let reached = false
       for (let index = 0; index < 80; index++) {

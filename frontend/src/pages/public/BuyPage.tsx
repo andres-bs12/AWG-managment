@@ -1,5 +1,5 @@
 import { paintedNameValid } from '../../lib/paintedName'
-import { PageHeader, PublicPage, PublicState, StickyActions } from '../../components/public/PublicForm'
+import { PageHeader, PublicPage, PublicState, FormActions } from '../../components/public/PublicForm'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import publicForm from '../../components/public/PublicForm.module.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -406,6 +406,6 @@ export function BuyPage() {
       {step === 2 && <BuyReviewStep {...stepProps} go={(index, uid, _sub, field) => { pendingErrorFocus.current = field ?? null; if (uid) setActiveUid(uid); setChangedSection(uid ?? (index === 3 ? 'contact' : 'delivery')); setReturnReview(true); go(index < 2 ? 0 : 1) }} itemsTotal={itemsTotal} deliveryFee={deliveryFee} total={total} changed={changedSection} />}
     </section>
     <aside hidden={step !== 1} className={styles.cart} aria-label={t('shopCart')}><h2>{t('shopCart')}</h2><CartRows t={t} count={draft.items.length} itemsTotal={itemsTotal} deliveryFee={deliveryFee} total={total} pickup={pickup} live /></aside>
-    <StickyActions className={styles.actions} inFlow={step === 2}><div className={styles.mobileTotal} hidden={step === 2}><span>{t('shopTotal')}</span><strong data-buy-total><AnimatedPrice value={total} locale={locale} /></strong></div>{step === 1 && <Button variant="secondary" disabled={busy} onClick={back}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 2 ? busy ? t('shopPaying') : t('shopPayStripe') : t('continue')}</Button>{step === 2 && <small className={styles.stripeLine}>{t('secureStripe')}</small>}{/* Review: paying comes first in reading order (phones stack the buttons); wider screens put Back on the left with CSS order. */}{step === 2 && <Button variant="secondary" className={styles.reviewBack} disabled={busy} onClick={back}>{t('back')}</Button>}</StickyActions>
+    <FormActions className={styles.actions}><div className={styles.mobileTotal} hidden={step === 2}><span>{t('shopTotal')}</span><strong data-buy-total><AnimatedPrice value={total} locale={locale} /></strong></div>{step === 1 && <Button variant="secondary" disabled={busy} onClick={back}>{t('back')}</Button>}<Button type="submit" size="lg" disabled={busy} aria-busy={busy}>{step === 2 ? busy ? t('shopPaying') : t('shopPayStripe') : t('continue')}</Button>{step === 2 && <small className={styles.stripeLine}>{t('secureStripe')}</small>}{/* Review: paying comes first in reading order (phones stack the buttons); wider screens put Back on the left with CSS order. */}{step === 2 && <Button variant="secondary" className={styles.reviewBack} disabled={busy} onClick={back}>{t('back')}</Button>}</FormActions>
   </form>
 }

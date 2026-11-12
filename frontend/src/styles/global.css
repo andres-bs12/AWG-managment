@@ -50,10 +50,6 @@ html:has([data-public-shell]) {
   overscroll-behavior-y: none;
 }
 
-html:has([data-public-shell]) {
-  scroll-padding-bottom: calc(var(--public-actions-height, 0px) + var(--space-4));
-}
-
 img {
   max-width: 100%;
   display: block;

@@ -11,7 +11,7 @@ import { phoneValid } from '../../lib/phone'
 import { formatDateLabel, formatHour } from '../../lib/time'
 import { deliveryDatePhrase } from '../../lib/deliveryWindow'
 import { formDraftKey, restoreFormDraft, serializeFormDraft, type FormDraft, type FormItemDraft } from '../../lib/formDraft'
-import { PublicPage, PageHeader, PublicState, ErrorSummary, StickyActions } from '../../components/public/PublicForm'
+import { PublicPage, PageHeader, PublicState, ErrorSummary, FormActions } from '../../components/public/PublicForm'
 import shell from '../../components/public/PublicForm.module.css'
 import { ContactFields, type ContactValues } from '../../components/public/ContactFields'
 import { OrnamentLoader } from '../../components/public/OrnamentLoader'
@@ -233,10 +233,10 @@ function CustomerForm({ token }: { token: string }) {
         <div className={styles.contact}><ContactFields prefix="form" values={{ ...draft, ...draft.address, line2: draft.address.line2 ?? '' }} onChange={patchContact} error={id => displayedErrors[id]} onBlur={validateField} withAddress={view.needsAddress} announceErrors={false} validFields={validFields} deliveryPhone={view.needsAddress} /></div>
       </div> : <FormReview view={view} draft={draft} handoffs={handoffs} edit={edit} />}
     </section>
-    <StickyActions className={step === 'review' ? styles.reviewActions : ''} inFlow={step === 'review'}>
+    <FormActions className={step === 'review' ? styles.reviewActions : ''}>
       {/* Keep blur validation from moving the button before a mouse click submits. */}
       <Button type="submit" size="lg" disabled={sending || reading > 0} aria-busy={sending || reading > 0} onMouseDown={event => event.preventDefault()}>{reading ? t('photoReading') : sending ? t('formSending') : step === 'details' ? t('continue') : t('send')}</Button>
       {step === 'review' && <Button className={styles.back} variant="secondary" size="lg" disabled={sending} onClick={() => { setErrors({}); focusRequest.current = 'form-heading'; setStep('details') }}>{t('back')}</Button>}
-    </StickyActions>
+    </FormActions>
   </form>
 }

@@ -1,7 +1,6 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 import { useLocale } from '../../i18n/LocaleContext'
 import styles from './PublicForm.module.css'
-import { usePublicActions } from './usePublicActions'
 
 export function PublicPage({ className = '', variant = 'form', ...props }: HTMLAttributes<HTMLDivElement> & { variant?: 'form' | 'status' }) {
   return <div {...props} data-public-page className={`${styles.page} ${variant === 'status' ? styles.state : ''} ${className}`} />
@@ -10,9 +9,9 @@ export function PageHeader({ title, children }: { title: string; children?: Reac
   return <header className={styles.header}><h1>{title}</h1>{children && <div className={styles.lead}>{children}</div>}</header>
 }
 export function InsetNote({ children, tone }: { children: ReactNode; tone?: 'warning' }) { return <div className={styles.inset} data-tone={tone}>{children}</div> }
-export function StickyActions({ children, className = '', inFlow = false }: { children: ReactNode; className?: string; inFlow?: boolean }) {
-  const { ref, endRef } = usePublicActions(inFlow)
-  return <><div ref={ref} data-sticky-actions className={`${styles.actions} ${className}`}>{children}</div><span ref={endRef} className={styles.actionsEnd} aria-hidden="true" /></>
+/** The form's action row: in normal flow at the end of the card on every viewport (owner, 2026-11-12). */
+export function FormActions({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <div data-public-actions className={`${styles.actions} ${className}`}>{children}</div>
 }
 export function Card({ children }: { children: ReactNode }) { return <section className={styles.card}>{children}</section> }
 export function PublicState({ title, children, error = false }: { title: string; children: ReactNode; error?: boolean }) {

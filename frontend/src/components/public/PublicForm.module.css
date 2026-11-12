@@ -21,23 +21,12 @@
 .errorSummary a { color: inherit; overflow-wrap: anywhere; }
 .errorSummary a:focus-visible { outline: none; box-shadow: var(--focus); }
 @media (min-width: 768px) { .page, .card { padding: var(--space-5); } }
-/* Absolute marker: no extra row or gap in grid-based QR forms. */
-.actionsEnd { position: absolute; bottom: 0; left: 0; width: 100%; height: var(--border-thin); pointer-events: none; }
 @media (max-width: 1023px) {
-  /* A single in-flow bottom row. While stuck it floats 8px above the screen edge with all corners
-     rounded: iOS 26 Safari paints its toolbar solid with the colour of anything sticky that
-     touches the edge, and floating keeps the toolbar glass. Flush at its natural card edge. */
-  .actions { position: sticky; bottom: var(--space-2); z-index: var(--z-sticky); margin: var(--space-5) calc(-1 * var(--space-4)) calc(-1 * var(--space-4)); padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom)); border-top: var(--border-thin) solid transparent; border-radius: var(--radius-panel); background: var(--color-surface); box-shadow: var(--shadow-1); }
-  .actions[data-stuck='true'], .actions[data-relaxed-actions='true'] { border-top-color: var(--color-border); border-radius: 0 0 var(--radius-panel) var(--radius-panel); box-shadow: none; }
-  .actions[data-relaxed-actions='true'] { position: static; }
-  /* Docked at the card end the bar is not at the screen edge: no safe-area padding, so the space
-     under the buttons matches the space above them (an iPhone home-indicator inset added ~34px). */
-  .actions:is([data-stuck='true'], [data-relaxed-actions='true']) { padding-bottom: var(--space-3); }
-  .page[data-relaxed-preview='true'] [data-public-sticky] { position: static; }
+  /* Docked footer row at the card's natural end, full card width. */
+  .actions { margin: var(--space-5) calc(-1 * var(--space-4)) calc(-1 * var(--space-4)); padding: var(--space-3) var(--space-4); border-top: var(--border-thin) solid var(--color-border); border-radius: 0 0 var(--radius-panel) var(--radius-panel); background: var(--color-surface); }
 }
 @media (min-width: 768px) and (max-width: 1023px) {
-  .actions { margin-inline: calc(-1 * var(--space-5)); margin-bottom: calc(-1 * var(--space-5)); padding: var(--space-4) var(--space-5) max(var(--space-3), env(safe-area-inset-bottom)); }
-  .actions:is([data-stuck='true'], [data-relaxed-actions='true']) { padding-bottom: var(--space-4); }
+  .actions { margin-inline: calc(-1 * var(--space-5)); margin-bottom: calc(-1 * var(--space-5)); padding: var(--space-4) var(--space-5); }
 }
 .page :is(button, a[data-selected]) { transition: transform var(--dur-press) var(--ease-press); }
 .page :is(button, a[data-selected]):active:not(:disabled):not([aria-disabled='true']) { transform: scale(var(--motion-press-scale)); }
