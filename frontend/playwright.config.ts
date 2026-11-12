@@ -6,6 +6,10 @@ const workers = process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : proces
 
 export default defineConfig({
   workers,
+  // Tests inside one file run side by side too; each test gets its own page and mock storage.
+  fullyParallel: true,
+  // CI retries once; a test that only passes on retry is listed as flaky in the report, not hidden.
+  retries: process.env.CI ? 1 : 0,
   testDir: './e2e',
   timeout: 30_000,
   expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.02, animations: 'disabled' } },

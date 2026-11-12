@@ -35,6 +35,7 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 6. **Capturas visuales** (`a11y-visual`) se regeneran y revisan **una vez**, al final de la versión.
 7. **Commit y push de respaldo** al terminar cada bloque grande (en la rama `release/vX.Y`), sin desplegar.
 8. Plantilla de encargo: `docs/agent-routing.md` → «Plantilla de encargo».
+9. **Después de cada push, vigilar el CI hasta su resultado:** `scripts/ci-wait.sh` en segundo plano (sale con error si el run falla o no aparece). Una lista vacía de `gh run list` es un error que se investiga, nunca «todavía no corrió». No se dice «subido» ni se cierra el turno sin informar el resultado del CI; si falla, se corrige en el mismo turno. (Dueño, 2026-11-12: el E2E falló en GitHub y nadie se enteró.)
 
 ## 1. Textos (copy) — lo que el dueño más corrige
 
@@ -120,3 +121,4 @@ Añadir aquí, con fecha, cada corrección nueva del dueño hasta integrarla en 
 - 2026-11-12 (v3.1): Statistics en móvil: texto que se salía de los tiles y página demasiado larga → filtro por secciones y resumen compacto (§2).
 - 2026-11-12 (v3.1): diálogos de staff se cierran con X, Escape o toque fuera; «Not yet» eliminado.
 - 2026-11-12 (v3.1): quitar del checkout la promesa de plazo de pintura tras el pago (EN y DE). Regla general en §1.
+- 2026-11-12 (v3.1): el CI falló tras un push (runner Ubuntu 26.04) y no se detectó porque `gh run list` vacío se tomó como «no empezó». Regla 9 de §0.1 y `scripts/ci-wait.sh`.
