@@ -34,7 +34,6 @@ import {
   setHandedOver,
   setPaymentState,
   submitForm,
-  updateViennaAddress,
 } from './store'
 
 declare global {
@@ -173,7 +172,6 @@ export const mockApi: Api = {
   },
   tracking: {
     getByCode: (code) => later(() => getTrackByCode(code), 420),
-    updateViennaAddress: (code, address) => later(() => updateViennaAddress(code, address)),
   },
   forms: {
     getForm: (token) => later(() => getForm(token)),

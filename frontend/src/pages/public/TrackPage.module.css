@@ -90,11 +90,25 @@
 .whenExtra { display: block; margin-top: var(--space-1); color: var(--color-text-muted); font-size: var(--type-hint-size); font-weight: var(--type-label-weight); text-wrap: pretty; }
 .code { font-family: var(--font-sans); font-size: var(--type-h3-size); font-weight: var(--type-h3-weight); overflow-wrap: anywhere; user-select: all; }
 
-.address { margin-top: var(--space-6); padding-top: var(--space-5); border-top: var(--border-thin) solid var(--color-border); text-align: left; }
-.addressFields { display: grid; gap: var(--space-5); }
-.address p { text-wrap: pretty; }
-.saved { margin-bottom: var(--space-3); color: var(--color-success); font-size: var(--type-hint-size); font-weight: var(--type-label-weight); }
-.addressError { color: var(--color-error); }
+/* Contact on Instagram: one quiet, full-width row after the receipt. */
+.instagram {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch);
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-thin) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-weight: var(--type-label-weight);
+  text-align: left;
+  text-decoration: none;
+}
+.instagram span { min-width: 0; overflow-wrap: anywhere; text-wrap: pretty; }
+.instagramIcon { flex: none; width: var(--space-5); height: var(--space-5); }
+@media (hover: hover) { .instagram:hover { border-color: var(--color-control-border); text-decoration: underline; } }
 .actions { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-3); }
 
 .another {

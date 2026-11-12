@@ -4,18 +4,17 @@ import { OrderReceipt } from '../../components/public/OrderReceipt'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
-import { readFormToken } from '../../api/formTokens'
+import { InstagramIcon, INSTAGRAM_URL } from '../../components/public/InstagramLink'
 import { GiftBoxReady } from '../../components/public/GiftBoxReady'
 import { PaintingOrnament } from '../../components/public/PaintingOrnament'
 import { SleighWipe } from '../../components/public/SleighWipe'
 import { TrackDialog } from '../../components/public/TrackDialog'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
-import { Field } from '../../components/ui/Field'
 import { useLocale } from '../../i18n/LocaleContext'
 import { formatDateLabel, formatHour } from '../../lib/time'
 import { deliveryDatePhrase } from '../../lib/deliveryWindow'
-import type { Address, TrackView } from '../../domain/types'
+import type { TrackView } from '../../domain/types'
 import styles from './TrackPage.module.css'
 
 /** Wipe only runs after a code resolves — keep it readable even when the API is instant. */
@@ -44,13 +43,7 @@ export function TrackPage() {
   const [loaded, setLoaded] = useState<TrackView | null>(null)
   const [fetchError, setError] = useState('')
   const [dialogOpen, setDialogOpen] = useState(!codeParam)
-  const [addr, setAddr] = useState<Address>({ line1: '', city: 'Vienna', postalCode: '' })
-  const [editing, setEditing] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [copyMessage, setCopyMessage] = useState('')
-  const [savingAddress, setSavingAddress] = useState(false)
-  const [addressError, setAddressError] = useState('')
-  const [addressField, setAddressField] = useState('')
 
   useEffect(() => {
     if (!codeParam) return
@@ -60,8 +53,6 @@ export function TrackPage() {
     setDialogOpen(false)
     setLoaded(null)
     setError('')
-    setEditing(false)
-    setSaved(false)
 
     api.tracking
       .getByCode(codeParam)
@@ -69,7 +60,6 @@ export function TrackPage() {
         if (cancelled) return
         setLoaded(data)
         setError('')
-        if (data.delivery.address) setAddr(data.delivery.address)
         if (formSaved) { setPhase('done'); return }
         setPhase('loading')
         timers.current.push(
@@ -112,27 +102,6 @@ export function TrackPage() {
     savedNotice.current?.focus()
   }, [formSaved, phase])
 
-  async function saveAddress() {
-    if (!view || savingAddress) return
-    setSavingAddress(true)
-    setAddressError('')
-    setAddressField('')
-    try {
-      const next = await api.tracking.updateViennaAddress(view.code, addr)
-      setLoaded(next)
-      setEditing(false)
-      setSaved(true)
-    } catch (err) {
-      const problem = apiError(err, locale, t('addressSaveError'))
-      const field = problem.field?.replace(/^address\./, '') ?? ''
-      setAddressField(['line1', 'line2', 'postalCode', 'city'].includes(field) ? field : '')
-      setAddressError(problem.text)
-    } finally {
-      setSavingAddress(false)
-    }
-  }
-
-  const hasFormToken = !!view && !!readFormToken(view.code)
   const status = view?.status ?? 'preparing'
   const statusLabel =
     status === 'cancelled' ? t('orderCancelled') : status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
@@ -212,49 +181,10 @@ export function TrackPage() {
 
             <OrderReceipt items={view.items} total={view.total} paymentState={view.paymentState} />
 
-            {status !== 'cancelled' && view.delivery.kind === 'vienna' ? (
-              <div className={styles.address}>
-                {!editing ? (
-                  <>
-                    {saved ? <p className={styles.saved}>{t('addressSaved')}</p> : null}
-                    {hasFormToken ? <Button variant="secondary" fullWidth onClick={() => setEditing(true)}>
-                      {t('editAddress')}
-                    </Button> : <p>{locale === 'de' ? 'Öffne deinen persönlichen Formularlink, um die Lieferadresse zu ändern.' : 'Open your personal form link to change the delivery address.'}</p>}
-                  </>
-                ) : (
-                  <div className={styles.addressFields}>
-                    <Field label={t('street')} htmlFor="line1" error={addressField === 'line1' ? addressError : undefined}>
-                      <input
-                        id="line1"
-                        value={addr.line1}
-                        onChange={(e) => setAddr({ ...addr, line1: e.target.value })}
-                      />
-                    </Field>
-                    <Field label={t('extra')} htmlFor="line2" error={addressField === 'line2' ? addressError : undefined}>
-                      <input
-                        id="line2"
-                        value={addr.line2 ?? ''}
-                        onChange={(e) => setAddr({ ...addr, line2: e.target.value })}
-                      />
-                    </Field>
-                    <Field label={t('postal')} htmlFor="postal" error={addressField === 'postalCode' ? addressError : undefined}>
-                      <input
-                        id="postal"
-                        value={addr.postalCode}
-                        onChange={(e) => setAddr({ ...addr, postalCode: e.target.value })}
-                      />
-                    </Field>
-                    <Field label={t('city')} htmlFor="city" error={addressField === 'city' ? addressError : undefined}>
-                      <input id="city" value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} />
-                    </Field>
-                    {addressError && !addressField ? <p role="alert" className={styles.addressError}>{addressError}</p> : null}
-                    <Button fullWidth disabled={savingAddress} onClick={() => void saveAddress()}>
-                      {savingAddress ? t('saving') : t('saveAddress')}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ) : null}
+            <a className={styles.instagram} href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer">
+              <InstagramIcon className={styles.instagramIcon} />
+              <span>{t('trackInstagram')}</span>
+            </a>
 
             <div className={styles.actions}>
               <ButtonLink to="/" variant="secondary">

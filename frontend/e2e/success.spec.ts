@@ -310,8 +310,10 @@ test('HTTP checkout stores a dated token only on success and restores customer T
   await expect(page.getByRole('heading', { name: 'Danke für deine Bestellung!' })).toBeVisible()
   expect(tokenHeaders).toContain('checkout-customer-token')
   await page.getByRole('link', { name: 'Bestellung verfolgen', exact: true }).click()
-  await page.getByRole('button', { name: 'Lieferadresse ändern', exact: true }).click()
-  await expect(page.locator('#line1')).toHaveValue('Hauptstraße 1')
+  // Track shows the order but no longer offers to change the delivery address.
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Lieferadresse ändern', exact: true })).toHaveCount(0)
+  await expect(page.locator('#line1')).toHaveCount(0)
   // Re-import the adapter after document reload: it must read the same dated record.
   await page.reload()
   const owner = await page.evaluate(async orderCode => {

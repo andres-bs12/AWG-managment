@@ -4,7 +4,6 @@ import { readFormToken, rememberFormToken } from '../formTokens'
 import type {
   Prices, PricesUpdate,
   InventoryItem, PaintingDay, ShopCheckoutInput,
-  Address,
   AgendaDay,
   AgendaDelivery,
   AgendaSlot,
@@ -1045,23 +1044,6 @@ export function getTrackByCode(code: string): TrackView {
     delivery: first ? { ...first.delivery, address: owner ? first.delivery.address : undefined } : { kind: 'market' },
     when,
   }
-}
-
-export function updateViennaAddress(code: string, address: Address): TrackView {
-  const order = getOrderByCode(code)
-  if (!order) throw new Error('Order not found')
-  if (order.status === 'CANCELLED' || readFormToken(order.code) !== order.formToken
-    || (order.handedOver && order.handedOverAt && Date.now() - Date.parse(order.handedOverAt) >= 30 * 86400000)) {
-    throw Object.assign(new Error('Open the link from your order form to change the address.'), { status: 403, code: 'FORBIDDEN' })
-  }
-  if (order.handedOver) throw Object.assign(new Error('This order was already delivered'), { status: 409, code: 'CONFLICT' })
-  state.items
-    .filter((i) => i.orderId === order.id && i.delivery.kind === 'vienna')
-    .forEach((i) => {
-      i.delivery = { ...i.delivery, address }
-    })
-  emit()
-  return getTrackByCode(code)
 }
 
 export function getForm(token: string): CustomerFormView {

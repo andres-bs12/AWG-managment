@@ -1,5 +1,6 @@
 import { useLayoutEffect, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
+import { InstagramIcon, INSTAGRAM_URL } from '../components/public/InstagramLink'
 import { IntroCurtain } from '../components/public/IntroCurtain'
 import { Snowfield } from '../components/public/Snowfield'
 import { WinterBackdrop } from '../components/public/WinterBackdrop'
@@ -76,12 +77,8 @@ export function PublicLayout() {
           <Link to="/agb">{t('terms')}</Link>
           <Link to="/datenschutz">{t('privacy')}</Link>
         </nav>
-        <a className={styles.social} href="https://www.instagram.com/art_withgab_" rel="noreferrer" target="_blank">
-          <svg className={styles.socialIcon} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <rect x="3.2" y="3.2" width="17.6" height="17.6" rx="5.2" fill="none" stroke="currentColor" strokeWidth="1.9" />
-            <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" strokeWidth="1.9" />
-            <circle cx="17.1" cy="6.9" r="1.3" fill="currentColor" />
-          </svg>
+        <a className={styles.social} href={INSTAGRAM_URL} rel="noreferrer" target="_blank">
+          <InstagramIcon className={styles.socialIcon} />
           <span className={styles.socialLabel}>{t('instagram')}</span>
         </a>
       </footer>
