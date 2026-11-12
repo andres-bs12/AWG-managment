@@ -271,13 +271,6 @@ export const httpApi: Api = {
   tracking: {
     getByCode: (code) =>
       request<TrackView>(`/api/track/${enc(code)}`, { headers: formTokenHeader(code) }),
-    updateViennaAddress: (code, address) => {
-      const init = jsonInit('PATCH', address)
-      return request<TrackView>(`/api/track/${enc(code)}/address`, {
-        ...init,
-        headers: { ...(init.headers as Record<string, string>), ...formTokenHeader(code) },
-      })
-    },
   },
   forms: {
     getForm: async (token) => fixForm(await request<CustomerFormView>(`/api/forms/${enc(token)}`)),

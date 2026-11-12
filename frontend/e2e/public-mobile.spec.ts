@@ -178,7 +178,7 @@ for (const locale of ['de', 'en'] as const) {
 
   test(`public route sweep has document scrolling and reachable footer (${locale})`, async ({ page }) => {
     await page.addInitScript(lang => localStorage.setItem('awg-locale', lang), locale)
-    for (const route of ['/buy/thanks', '/track', '/track/AWG0000', '/form/invalid', '/impressum', '/agb', '/datenschutz', '/waitlist/confirm', '/waitlist/unsubscribe']) {
+    for (const route of ['/buy/thanks', '/track', '/track/AWG0000', '/track/AWG0103', '/form/invalid', '/impressum', '/agb', '/datenschutz', '/waitlist/confirm', '/waitlist/unsubscribe']) {
       await page.goto(route)
       // A bare /track opens the code dialog first; the page card appears once it is dismissed.
       if (route === '/track') {

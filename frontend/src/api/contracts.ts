@@ -1,6 +1,5 @@
 import type {
   InventoryItem, PaintingDay, Prices, PricesUpdate,
-  Address,
   AgendaDay,
   CapacityResult,
   CreateSaleInput,
@@ -97,7 +96,6 @@ export type PaymentService = {
 
 export type TrackingService = {
   getByCode: (code: string) => Promise<TrackView>
-  updateViennaAddress: (code: string, address: Address) => Promise<TrackView>
 }
 
 export type FormService = {

@@ -134,17 +134,16 @@ for (const transport of ['http', 'mock'] as const) {
         ? route.fulfill({ json: view })
         : failed ? route.fulfill({ status: 400, json: { code: 'VALIDATION', message: 'Check the form.' } })
           : route.fulfill({ json: { orderCode: view.orderCode } }))
-      await page.route(new RegExp(`/api/track/${view.orderCode}(?:/address)?$`), route => {
+      await page.route(new RegExp(`/api/track/${view.orderCode}$`), route => {
         const supplied = route.request().headers()['x-form-token']
         headers.push(supplied)
-        if (route.request().method() === 'PATCH' && supplied !== view.token) return route.fulfill({ status: 403, json: { code: 'FORBIDDEN' } })
-        return route.fulfill({ json: { code: view.orderCode, customerName: supplied === view.token ? 'Alex' : '', items: [], delivery: { kind: 'vienna', address: supplied === view.token ? route.request().method() === 'PATCH' ? route.request().postDataJSON() : view.address : null } } })
+        return route.fulfill({ json: { code: view.orderCode, customerName: supplied === view.token ? 'Alex' : '', items: [], delivery: { kind: 'vienna', address: supplied === view.token ? view.address : null } } })
       })
       await page.evaluate(async () => {
         const clientPath = '/src/api/client.ts', httpPath = '/src/api/http/services.ts'
         const { api } = await import(clientPath); const { httpApi } = await import(httpPath)
         api.forms.getForm = httpApi.forms.getForm; api.forms.submitForm = httpApi.forms.submitForm
-        api.tracking.getByCode = httpApi.tracking.getByCode; api.tracking.updateViennaAddress = httpApi.tracking.updateViennaAddress
+        api.tracking.getByCode = httpApi.tracking.getByCode
       })
     }
     const inspect = () => page.evaluate(async ({ formToken, code }) => {
@@ -171,22 +170,11 @@ for (const transport of ['http', 'mock'] as const) {
     expect(JSON.parse(saved.stored!)).toEqual({ token: view.token, savedAt: Date.parse('2026-11-05T12:00:00Z') })
     expect(saved.track.customerName).toBe('Alex')
     expect(saved.track.delivery.address).toEqual(view.address)
-    const changed = { ...view.address!, line1: 'Updated Street 2' }
-    const updated = await page.evaluate(async ({ code, address }) => {
-      const path = '/src/api/client.ts'; const { api } = await import(path)
-      return api.tracking.updateViennaAddress(code, address)
-    }, { code: view.orderCode, address: changed })
-    expect(updated.delivery.address).toEqual(changed)
     await page.clock.setFixedTime(new Date('2026-12-20T12:00:00Z'))
     const expired = await inspect()
     expect(expired.track.delivery.address ?? null).toBeNull()
     expect(expired.track.customerName).toBe('')
     expect(await page.evaluate(code => localStorage.getItem(`awg-form-token:${code}`), view.orderCode)).toBeNull()
-    const rejected = await page.evaluate(async ({ code, address }) => {
-      const path = '/src/api/client.ts'; const { api } = await import(path)
-      try { await api.tracking.updateViennaAddress(code, address); return false } catch { return true }
-    }, { code: view.orderCode, address: changed })
-    expect(rejected).toBe(true)
     if (transport === 'http') { expect(headers).toContain(view.token); expect(headers.at(-1)).toBeUndefined() }
   })
 }
