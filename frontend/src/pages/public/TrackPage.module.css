@@ -1,291 +1,101 @@
 .page {
   position: relative;
-  z-index: 2;
+  z-index: var(--z-header);
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 16px 24px;
+  padding: var(--space-2) var(--layout-gutter) var(--space-5);
+}
+
+.card, .savedBanner {
+  width: min(var(--layout-status-max), 100%);
+  padding-inline: var(--space-5);
 }
 
 .card {
-  width: min(460px, 100%);
-  margin: 12px auto 0;
-  padding: 20px 20px 24px;
-  border-radius: var(--public-card-radius);
-  background: var(--public-surface);
-  color: var(--public-ink);
-  box-shadow: var(--public-card-shadow);
+  margin: var(--space-3) auto 0;
+  padding-block: var(--space-5);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-1);
   text-align: center;
-  animation: cardIn 0.5s var(--pop-ease) both;
+  animation: cardIn var(--dur-enter) var(--ease-enter) both;
 }
 
-.art {
-  margin: 0 auto 10px;
-}
-
-.artSmall {
-  width: min(190px, 52vw);
-  margin: 0 auto 8px;
-}
+.art { margin: 0 auto var(--space-3); }
+.artSmall { width: min(var(--size-preview-tablet), 52vw); margin: 0 auto var(--space-2); }
+.details { min-width: 0; }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-pill);
-  font-size: var(--fs-small);
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-size: var(--type-hint-size);
+  font-weight: var(--type-label-weight);
 }
 
 .chip::before {
   content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-circle);
   background: currentColor;
-  animation: blink 1.8s ease-in-out infinite;
 }
 
-.chipWork {
-  background: rgba(224, 168, 60, 0.18);
-  color: #8a5b12;
-}
-
-.chipReady {
-  background: rgba(47, 174, 106, 0.18);
-  color: var(--green-deep);
-}
-
-.chipDone {
-  background: rgba(47, 110, 174, 0.14);
-  color: #1f4f7a;
-}
-
-.chipDone::before {
-  animation: none;
-}
+.chipWork { background: var(--color-warning-surface); color: var(--color-warning); }
+.chipReady, .chipDone { background: var(--color-success-surface); color: var(--color-success); }
 
 .title {
-  margin-top: 10px;
+  margin-top: var(--space-3);
   font-family: var(--font-display);
-  font-size: clamp(1.35rem, 5.4vw, 1.8rem);
-  font-weight: 700;
-  line-height: 1.15;
+  font-size: var(--type-h1-size);
+  font-weight: var(--type-h1-weight);
+  line-height: var(--type-h1-line);
+  text-wrap: balance;
 }
 
 .sub {
-  margin: 8px auto 0;
-  max-width: 36ch;
-  color: var(--public-muted);
-  font-size: var(--fs-small);
-}
-
-/**
- * Reading order at a glance: done steps are muted grey with a tick, the current step is the only
- * green (and the only bold) one, and everything ahead is a hollow outline.
- */
-.steps {
-  --progress: 0%;
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin: 20px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.steps::before,
-.steps::after {
-  content: '';
-  position: absolute;
-  top: 9px;
-  left: 16.6%;
-  height: 4px;
-  border-radius: 4px;
-}
-
-.steps::before {
-  right: 16.6%;
-  background: #e4eaf2;
-}
-
-/** The travelled part of the rail: grey like the past steps, so only "now" pops. */
-.steps::after {
-  width: calc((100% - 33.2%) * var(--progress) / 100%);
-  background: #c2cddb;
-}
-
-.steps li {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 7px;
-}
-
-.stepDot {
-  position: relative;
-  z-index: 1;
-  width: 21px;
-  height: 21px;
-  border-radius: 50%;
-  background: #fff;
-  border: 3px solid #d7e0ea;
-  box-shadow: 0 0 0 3px #fff;
-}
-
-.steps li[data-state='past'] .stepDot {
-  background: #c2cddb;
-  border-color: #c2cddb;
-}
-
-/** A white tick marks the steps already behind you. */
-.steps li[data-state='past'] .stepDot::after {
-  content: '';
-  position: absolute;
-  left: 4px;
-  top: 5px;
-  width: 6px;
-  height: 3px;
-  border-left: 2px solid #fff;
-  border-bottom: 2px solid #fff;
-  transform: rotate(-45deg);
-}
-
-.steps li[data-state='now'] .stepDot {
-  background: var(--green-bright);
-  border-color: var(--green-deep);
-  box-shadow: 0 0 0 3px #fff, 0 0 0 6px rgba(47, 174, 106, 0.22);
-  animation: pop 2.4s ease-in-out infinite;
-}
-
-.stepLabel {
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1.25;
-  color: #93a1b3;
-}
-
-.steps li[data-state='past'] .stepLabel {
-  color: #93a1b3;
-}
-
-.steps li[data-state='now'] .stepLabel {
-  color: var(--green-deep);
-  font-weight: 800;
+  margin: var(--space-2) auto 0;
+  max-width: var(--measure-hint);
+  color: var(--color-text-muted);
+  font-size: var(--type-body-size);
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 
 .facts {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
-  margin: 20px 0 0;
-  padding: 14px;
-  border-radius: 16px;
-  background: #f2f7fd;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 0;
+  padding: var(--space-4);
+  border: var(--border-thin) solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
   text-align: left;
 }
 
 .facts dt {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--public-muted);
+  font-size: var(--type-hint-size);
+  font-weight: var(--type-label-weight);
+  color: var(--color-text-muted);
 }
 
-.facts dd {
-  margin: 2px 0 0;
-  font-weight: 650;
-}
+.facts dd { margin: var(--space-1) 0 0; font-weight: var(--type-label-weight); }
+.facts > div + div { padding-top: var(--space-3); border-top: var(--border-thin) solid var(--color-border); }
+.whenExtra { display: block; margin-top: var(--space-1); color: var(--color-text-muted); font-size: var(--type-hint-size); font-weight: var(--type-label-weight); text-wrap: pretty; }
+.code { font-family: var(--font-sans); font-size: var(--type-h3-size); font-weight: var(--type-h3-weight); overflow-wrap: anywhere; user-select: all; }
 
-.whenExtra {
-  display: block;
-  margin-top: 2px;
-  color: var(--public-muted);
-  font-size: var(--fs-small);
-  font-weight: 600;
-}
-
-.code {
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-
-.includes {
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid #dfe7f1;
-  text-align: left;
-}
-
-.includesTitle {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--public-muted);
-}
-
-.items {
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-  text-align: left;
-}
-
-.items li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 0;
-  border-bottom: 1px solid #edf2f8;
-  font-weight: 650;
-}
-
-.items li:last-child {
-  border-bottom: 0;
-}
-
-.itemDot {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 32% 30%, #ff8d82, var(--berry));
-}
-
-.address {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px dashed #d7e1ec;
-  text-align: left;
-}
-
-.saved {
-  margin-bottom: 10px;
-  color: var(--green-deep);
-  font-size: var(--fs-small);
-  font-weight: 650;
-}
-
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 18px;
-}
-
-.homeBtn {
-  font-family: var(--font-display);
-  font-weight: 700;
-}
+.address { margin-top: var(--space-6); padding-top: var(--space-5); border-top: var(--border-thin) solid var(--color-border); text-align: left; }
+.addressFields { display: grid; gap: var(--space-5); }
+.address p { text-wrap: pretty; }
+.saved { margin-bottom: var(--space-3); color: var(--color-success); font-size: var(--type-hint-size); font-weight: var(--type-label-weight); }
+.addressError { color: var(--color-error); }
+.actions { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-3); }
 
 .another {
   width: 100%;
@@ -293,113 +103,44 @@
   border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--public-muted);
-  font-weight: 650;
+  color: var(--color-text-muted);
+  font-weight: var(--type-button-weight);
   text-decoration: underline;
-  text-decoration-color: #c9d3e0;
+  text-decoration-color: var(--color-control-border);
 }
+.another:hover { color: var(--color-text); }
+.openBtn { margin-top: var(--space-5); }
 
-.another:hover {
-  color: var(--public-ink);
+/* Confirmation and card share one width and the same text insets. */
+.savedBanner {
+  position: relative;
+  z-index: var(--z-content);
+  margin: var(--space-5) auto 0;
+  padding-block: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-success-surface);
+  color: var(--color-text);
+  font-weight: var(--type-label-weight);
+  text-wrap: pretty;
 }
+.codeRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.copyStatus { flex-basis: 100%; color: var(--color-text-muted); font-size: var(--type-hint-size); }
+.copyStatus:empty { display: none; }
 
-.openBtn {
-  margin-top: 18px;
-  background: linear-gradient(180deg, var(--green-bright) 0%, var(--green) 62%, var(--green-deep) 100%);
-  box-shadow: 0 10px 24px rgba(12, 74, 48, 0.32);
-}
-
-@media (min-width: 520px) {
-  .facts {
-    grid-template-columns: auto 1fr;
-    gap: 10px 20px;
-  }
-
-  .stepLabel {
-    font-size: 0.8rem;
-  }
-}
-
-/** Wide screens: illustration on the left, order details on the right. */
-@media (min-width: 860px) {
-  .card {
-    width: min(780px, 100%);
-    /** auto margins centre the card without clipping it when it is taller than the viewport */
-    margin-block: auto;
-    display: grid;
-    grid-template-columns: 290px minmax(0, 1fr);
-    align-items: center;
-    column-gap: 32px;
-    padding: 30px 32px;
-    text-align: left;
-  }
-
-  .art,
-  .artSmall {
-    width: 100%;
-    margin: 0;
-  }
-
-  .chip {
-    justify-self: start;
-  }
-
-  .title {
-    margin-top: 6px;
-  }
-
-  .sub {
-    margin-left: 0;
-    margin-right: 0;
-  }
-
-  .actions {
-    flex-direction: row;
-    align-items: center;
-    gap: 14px;
-  }
-
-  .another {
-    width: auto;
-    padding: 0 4px;
-  }
+@media (min-width: 1024px) {
+  .card, .savedBanner { width: min(var(--layout-form-max), 100%); padding-inline: var(--space-6); }
+  .card { margin-block: auto; display: grid; grid-template-columns: var(--size-preview-desktop) minmax(0, 1fr); align-items: center; column-gap: var(--space-6); padding-block: var(--space-6); text-align: left; }
+  .art, .artSmall { width: 100%; margin: 0; }
+  .chip { justify-self: start; }
+  .title { margin-top: var(--space-2); }
+  .sub { margin-inline: 0; }
+  .actions { flex-direction: row; align-items: center; gap: var(--space-4); }
+  .another { width: auto; padding: 0 var(--space-1); }
+  .emptyCard { display: block; max-width: var(--layout-status-max); }
 }
 
 @keyframes cardIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(var(--space-5)); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
-@keyframes blink {
-  0%,
-  100% {
-    opacity: 0.4;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-@keyframes pop {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.22);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .card,
-  .chip::before,
-  .steps li[data-state='now'] .stepDot {
-    animation: none;
-  }
-}
+@media (prefers-reduced-motion: reduce) { .card { animation: none; } }

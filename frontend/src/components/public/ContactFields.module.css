@@ -1,0 +1,27 @@
+.section { min-width: 0; margin: 0; padding: 0; border: 0; }
+.title { float: left; width: 100%; margin: 0 0 var(--space-4); padding: 0; font-family: var(--font-display); font-size: var(--type-h3-size); line-height: var(--type-h3-line); font-weight: var(--type-h3-weight); letter-spacing: var(--type-h3-tracking); }
+.title + * { clear: both; }
+.section + .section { margin-top: var(--space-6); padding-top: var(--space-5); border-top: var(--border-thin) solid var(--color-border); }
+.grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); column-gap: var(--space-4); row-gap: 0; }
+.grid > * { grid-column: span 6; }
+/* Fields are subgrids spanning label/hint/control/error rows, so a parent row-gap would also open
+   inside every field (label → input 32px). Space rows with a bottom margin instead; the last child
+   (always alone on its row) has none, so a section ends exactly at its last control or error. */
+.section .grid > :is(.half, .wide, .narrow):not(:last-child) { margin-bottom: var(--space-5); }
+.locality { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); column-gap: var(--space-4); row-gap: 0; }
+.locality > .postal { grid-column: 1; width: var(--layout-postcode-max); max-width: 100%; min-width: 0; }
+.locality > .city { grid-column: 2; }
+.city { display: grid; grid-row: span 4; grid-template-rows: subgrid; }
+.cityLabel { grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; align-self: end; gap: 0 var(--space-1); }
+.cityLabel strong { font-weight: var(--type-label-weight); line-height: var(--type-label-line); }
+.cityValue { grid-row: 3; display: flex; align-items: center; min-height: var(--size-control); margin-top: var(--space-2); padding: var(--space-2) var(--space-1); font-size: var(--type-body-size); }
+.error { grid-column: 1 / -1; margin: var(--space-2) 0 0; color: var(--color-error); font-size: var(--type-hint-size); line-height: var(--type-hint-line); font-weight: var(--type-label-weight); }
+@media (min-width: 768px) { .grid > .half { grid-column: span 3; } .grid > .wide { grid-column: span 4; } .grid > .narrow { grid-column: span 2; } }
+@media (min-width: 768px) { .locality { grid-template-columns: max-content minmax(0, 1fr); } }
+
+.grid :global([data-field-control]) { position: relative; }
+.grid input[data-valid='true'] { padding-inline-end: var(--space-7); }
+.grid :global([data-field-control]):has(input[data-valid='true'])::after { content: ''; position: absolute; inset-inline-end: var(--space-4); top: 50%; width: var(--space-2); height: var(--space-4); border-inline-end: var(--border-control) solid var(--color-success); border-bottom: var(--border-control) solid var(--color-success); transform: translateY(-50%) rotate(45deg); pointer-events: none; }
+/* The (?) keeps its 44px target but must not make the "Ort" row taller than the "Postleitzahl"
+   label beside it: negative block margins equal to the overflow keep both labels on one line. */
+.cityLabel button { margin-block: calc((var(--type-label-line) * 1em - var(--touch)) / 2); }

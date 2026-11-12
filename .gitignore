@@ -1,3 +1,19 @@
 .DS_Store
 *.zip
 .cursor/
+
+# Local photo uploads
+awg-tracking/data/
+tasks/.agent-heartbeat
+
+# Environment files with secrets (examples stay tracked)
+.env
+.env.*
+!.env.deploy.example
+!.env.example
+!frontend/.env.example
+
+# Database/upload backups contain personal data; never commit them.
+*.dump
+awg-uploads*.tar.gz
+awg-backups/

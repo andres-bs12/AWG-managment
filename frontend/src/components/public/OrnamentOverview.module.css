@@ -1,0 +1,38 @@
+/* Side-by-side ornament picker: one tile per ornament, C1 selection, dashed tile = add. */
+.overview { display: grid; gap: var(--space-2); min-width: 0; }
+.overview h3 { margin: 0; font: var(--type-label-weight) var(--type-label-size)/var(--type-label-line) var(--font-sans); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--space-9) + var(--space-2)), 1fr)); gap: var(--space-3); list-style: none; margin: 0; padding: 0; }
+.tiles > li { position: relative; display: grid; min-width: 0; }
+.tile, .add {
+  position: relative;
+  display: grid; justify-items: center; align-content: start; gap: var(--space-1); min-width: 0; min-height: var(--touch-lg);
+  padding: calc(var(--space-3) - var(--border-thin)) calc(var(--space-2) - var(--border-thin));
+  border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control);
+  background: var(--color-surface-raised); color: var(--color-text);
+  font: var(--type-body-weight) var(--type-hint-size)/var(--type-hint-line) var(--font-sans); text-align: center;
+}
+button.tile, .add { cursor: pointer; transition: transform var(--dur-press) var(--ease-press); }
+.tile[data-selected='true'] {
+  padding: calc(var(--space-3) - var(--border-control)) calc(var(--space-2) - var(--border-control));
+  border: var(--border-control) solid var(--color-selected); background: var(--color-selected-surface);
+}
+.tile[data-static] { border-color: var(--color-border); }
+.art { display: block; width: var(--touch-lg); pointer-events: none; }
+.name { display: grid; max-width: 100%; max-height: calc(2 * var(--type-body-size) * var(--type-label-line)); overflow: hidden; white-space: normal; overflow-wrap: anywhere; text-wrap: balance; font-size: var(--type-body-size); line-height: var(--type-label-line); }
+/* Overlap the bold duplicate so wrapping reserves both width and height before selection. */
+.name > span, .name::after { grid-area: 1 / 1; }
+.name::after { content: attr(data-label); visibility: hidden; font-weight: var(--type-label-weight); }
+.tile[data-selected='true'] .name { font-weight: var(--type-label-weight); }
+.price { color: var(--color-text-muted); white-space: nowrap; font-variant-numeric: tabular-nums lining-nums; }
+/* Dashed boundary = "add", the same language as the photo + tile. */
+.add { align-content: center; border-style: dashed; font-size: var(--type-body-size); font-weight: var(--type-button-weight); }
+.plus { font-size: var(--type-h2-size); line-height: 1; }
+.add:disabled { color: var(--color-disabled-text); background: var(--color-disabled-surface); cursor: not-allowed; }
+.limit { margin: 0; color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
+.overview button:focus-visible { outline: none; box-shadow: var(--focus); }
+@media (hover: hover) { button.tile:hover:not([data-selected='true']), .add:hover:not(:disabled) { background: var(--color-selection-hover); } }
+@media (prefers-reduced-motion: reduce) { .overview button { transition: none; } .overview button:active { transform: none; } }
+/* Remove: a small glyph in the free corner beside the cap, inside a full 44px target. */
+.remove { position: absolute; top: 0; right: 0; display: grid; place-items: start end; width: var(--touch); height: var(--touch); padding: var(--space-2); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-text); cursor: pointer; }
+.remove svg { box-sizing: content-box; width: var(--size-icon-sm); height: var(--size-icon-sm); padding: var(--space-1); border-radius: var(--radius-circle); background: var(--color-surface-raised); }
+@media (hover: hover) { .remove:hover { color: var(--color-error); } }

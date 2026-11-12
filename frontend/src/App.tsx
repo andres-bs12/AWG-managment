@@ -1,30 +1,60 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { OrnamentLoader } from './components/public/OrnamentLoader'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { LocaleProvider } from './i18n/LocaleContext'
 import { PublicLayout } from './layouts/PublicLayout'
 import { StaffGuard, StaffLayout } from './layouts/StaffLayout'
-import { BuyPlaceholderPage } from './pages/public/BuyPlaceholderPage'
-import { FormPage } from './pages/public/FormPage'
+const WaitlistPage = lazy(() => import('./pages/public/WaitlistPage').then(module => ({ default: module.WaitlistPage })))
+const BuyPage = lazy(() => import('./pages/public/BuyPage').then(module => ({ default: module.BuyPage })))
+const BuyThanksPage = lazy(() => import('./pages/public/BuyThanksPage').then(module => ({ default: module.BuyThanksPage })))
+const FormPage = lazy(() => import('./pages/public/FormPage').then(module => ({ default: module.FormPage })))
 import { HomePage } from './pages/public/HomePage'
-import { TrackPage } from './pages/public/TrackPage'
-import { AgendaPage } from './pages/staff/AgendaPage'
-import { DeliveriesPage } from './pages/staff/DeliveriesPage'
-import { LoginPage } from './pages/staff/LoginPage'
-import { MarketEditorPage } from './pages/staff/MarketEditorPage'
-import { MarketsPage } from './pages/staff/MarketsPage'
-import { NewSalePage } from './pages/staff/NewSalePage'
-import { OrderDetailPage } from './pages/staff/OrderDetailPage'
-import { PaintPage } from './pages/staff/PaintPage'
+const TrackPage = lazy(() => import('./pages/public/TrackPage').then(module => ({ default: module.TrackPage })))
+const InventoryPage = lazy(() => import('./pages/staff/InventoryPage').then(module => ({ default: module.InventoryPage })))
+const PaintingDaysPage = lazy(() => import('./pages/staff/PaintingDaysPage').then(module => ({ default: module.PaintingDaysPage })))
+const AgendaPage = lazy(() => import('./pages/staff/AgendaPage').then(module => ({ default: module.AgendaPage })))
+const DeliveriesPage = lazy(() => import('./pages/staff/DeliveriesPage').then(module => ({ default: module.DeliveriesPage })))
+const LoginPage = lazy(() => import('./pages/staff/LoginPage').then(module => ({ default: module.LoginPage })))
+const MarketEditorPage = lazy(() => import('./pages/staff/MarketEditorPage').then(module => ({ default: module.MarketEditorPage })))
+const MarketsPage = lazy(() => import('./pages/staff/MarketsPage').then(module => ({ default: module.MarketsPage })))
+const NewSalePage = lazy(() => import('./pages/staff/NewSalePage').then(module => ({ default: module.NewSalePage })))
+const SalesPage = lazy(() => import('./pages/staff/SalesPage').then(module => ({ default: module.SalesPage })))
+const OrderDetailPage = lazy(() => import('./pages/staff/OrderDetailPage').then(module => ({ default: module.OrderDetailPage })))
+const PaintPage = lazy(() => import('./pages/staff/PaintPage').then(module => ({ default: module.PaintPage })))
+
+const OrderLookupPage = lazy(() => import('./pages/staff/OrderLookupPage').then(module => ({ default: module.OrderLookupPage })))
+const ChangePasswordPage = lazy(() => import('./pages/staff/ChangePasswordPage').then(module => ({ default: module.ChangePasswordPage })))
+const LegalPage = lazy(() => import('./pages/public/LegalPage').then(module => ({ default: module.LegalPage })))
+
+// The guide import and route are removed from production builds by Vite.
+const DesignGuide = import.meta.env.DEV ? lazy(() => import('./pages/dev/DesignGuide').then(module => ({ default: module.DesignGuide }))) : null
+
+/** Public routes wait on the sky scene (data-public-shell switches the html/body background); staff on its own surface. */
+function RouteFallback() {
+  const { pathname } = useLocation()
+  return pathname.startsWith('/staff') ? <p role="status" style={{ minHeight: '100vh', margin: 0, padding: 'var(--space-5)', background: 'var(--staff-bg)', color: 'var(--staff-ink)' }}>Loading…</p> : <div data-public-shell><OrnamentLoader variant="screen" /></div>
+}
 
 export default function App() {
+  if (import.meta.env.DEV && DesignGuide && window.location.pathname === '/dev/design') {
+    return <LocaleProvider><BrowserRouter><Suspense fallback={<OrnamentLoader variant="screen" />}><Routes><Route path="/dev/design" element={<DesignGuide />} /></Routes></Suspense></BrowserRouter></LocaleProvider>
+  }
   return (
     <LocaleProvider>
       <AuthProvider>
         <BrowserRouter>
+          <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route element={<PublicLayout />}>
               <Route path="/" element={<HomePage />} />
-              <Route path="/buy" element={<BuyPlaceholderPage />} />
+              <Route path="/impressum" element={<LegalPage title="impressum" />} />
+              <Route path="/agb" element={<LegalPage title="terms" />} />
+              <Route path="/datenschutz" element={<LegalPage title="privacy" />} />
+              <Route path="/waitlist/confirm" element={<WaitlistPage />} />
+              <Route path="/waitlist/unsubscribe" element={<WaitlistPage />} />
+              <Route path="/buy" element={<BuyPage />} />
+              <Route path="/buy/thanks" element={<BuyThanksPage />} />
               <Route path="/track" element={<TrackPage />} />
               <Route path="/track/:code" element={<TrackPage />} />
               <Route path="/form/:token" element={<FormPage />} />
@@ -32,12 +62,18 @@ export default function App() {
             <Route path="/staff/login" element={<LoginPage />} />
             <Route element={<StaffGuard />}>
               <Route element={<StaffLayout />}>
+                <Route path="/staff/search" element={<OrderLookupPage />} />
+                <Route path="/staff/attention" element={<OrderLookupPage attention />} />
+                <Route path="/staff/password" element={<ChangePasswordPage />} />
+                <Route path="/staff/inventory" element={<InventoryPage />} />
+                <Route path="/staff/painting-days" element={<PaintingDaysPage />} />
                 <Route path="/staff/agenda" element={<AgendaPage />} />
                 <Route path="/staff/deliveries" element={<DeliveriesPage />} />
                 <Route path="/staff/markets" element={<MarketsPage />} />
                 <Route path="/staff/markets/new" element={<MarketEditorPage />} />
                 <Route path="/staff/markets/:id" element={<MarketEditorPage />} />
                 <Route path="/staff/sales/new" element={<NewSalePage />} />
+                <Route path="/staff/sales" element={<SalesPage />} />
                 <Route path="/staff/orders/:id" element={<OrderDetailPage />} />
                 <Route path="/staff/orders/:id/paint/:itemId" element={<PaintPage />} />
               </Route>
@@ -45,6 +81,7 @@ export default function App() {
             <Route path="/staff" element={<Navigate to="/staff/agenda" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </AuthProvider>
     </LocaleProvider>

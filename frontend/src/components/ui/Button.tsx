@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import styles from './Button.module.css'
+import publicStyles from './Button.module.css'
+import staffStyles from './StaffButton.module.css'
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'choice'
@@ -21,6 +22,7 @@ export function Button({
   type = 'button',
   ...rest
 }: Props) {
+  const styles = tone === 'staff' ? staffStyles : publicStyles
   const cls = [
     styles.btn,
     styles[variant],

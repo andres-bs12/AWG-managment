@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${DB_USERNAME:?Set DB_USERNAME in .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    build: ./awg-tracking
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      DB_USERNAME: ${DB_USERNAME:?Set DB_USERNAME in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      # Only needed to create the accounts; blank them in .env after the first password change.
+      STAFF_GABY_PASSWORD: ${STAFF_GABY_PASSWORD:-}
+      STAFF_ANDRES_PASSWORD: ${STAFF_ANDRES_PASSWORD:-}
+      SHOP_ENABLED: ${SHOP_ENABLED:-false}
+      SHOP_DELIVERIES_FROM: ${SHOP_DELIVERIES_FROM:-2026-11-30}
+      SHOP_SEASON_END: ${SHOP_SEASON_END:-2026-12-24}
+      DELIVERY_WINDOW_START: ${DELIVERY_WINDOW_START:-18:00}
+      DELIVERY_WINDOW_END: ${DELIVERY_WINDOW_END:-20:00}
+      INVOICE_BUSINESS_NAME: ${INVOICE_BUSINESS_NAME:-[Firmenname]}
+      INVOICE_ADDRESS: ${INVOICE_ADDRESS:-[Firmenadresse]}
+      INVOICE_UID: ${INVOICE_UID:-}
+      INVOICE_TAX_NOTE: ${INVOICE_TAX_NOTE:-[Steuerhinweis laut Beratung, ggf. Kleinunternehmerregelung]}
+      INVOICE_IBAN: ${INVOICE_IBAN:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set PUBLIC_BASE_URL in .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env}
+      UPLOADS_DIR: /data/uploads
+      # Behind nginx: trust X-Forwarded-* from the internal proxy so rate limits see the real client IP.
+      FORWARD_HEADERS: native
+      # E-mail notifications (owner + customer); nothing is sent while MAIL_HOST is empty.
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      OWNER_EMAIL: ${OWNER_EMAIL:-}
+    volumes:
+      - uploads_data:/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # No curl in the JRE image: plain HTTP over bash /dev/tcp.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /api/health HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging: *logging
+
+  frontend:
+    build: ./frontend
+    ports:
+      # Loopback only: the TLS proxy on the host is the single public entry point.
+      - "127.0.0.1:8081:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging: *logging
+
+volumes:
+  postgres_data:
+  uploads_data:

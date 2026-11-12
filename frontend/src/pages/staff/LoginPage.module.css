@@ -1,10 +1,10 @@
 .card {
-  max-width: 420px;
+  max-width: var(--layout-calendar-max);
   margin: 0 auto;
-  padding: 28px 24px;
+  padding: var(--space-6) var(--space-5);
   background: var(--staff-surface);
-  border-radius: 16px;
-  border: 1px solid var(--staff-line);
+  border-radius: var(--space-4);
+  border: var(--border-thin) solid var(--staff-line);
 }
 
 .page {
@@ -12,26 +12,26 @@
   background: var(--staff-bg);
   color: var(--staff-ink);
   font-family: var(--font-staff);
-  padding: 48px 16px;
+  padding: var(--space-7) var(--space-4);
 }
 
 .card h1 {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .hint {
   color: var(--staff-muted);
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
 }
 
 .err {
   color: var(--staff-danger);
-  font-weight: 650;
-  margin-bottom: 12px;
+  font-weight: 600;
+  margin-bottom: var(--space-3);
 }
 
 .accounts {
-  font-size: var(--fs-small);
+  font-size: var(--type-staff-meta-size);
   color: var(--staff-muted);
-  margin-top: 16px;
+  margin-top: var(--space-4);
 }

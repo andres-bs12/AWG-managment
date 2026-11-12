@@ -1,13 +1,13 @@
 .shell {
-  min-height: 100%;
-  height: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
   position: relative;
-  /** Never clip: if a short window cannot fit the scene, let it scroll instead of hiding CTAs. */
-  overflow-x: hidden;
-  overflow-y: auto;
-  background: var(--sky-top);
+  /* Clip sideways without creating a scroll container for sticky descendants. */
+  overflow-x: clip;
+  /* Keeps the negative z-index scenery (backdrop, snow) above the body background. */
+  isolation: isolate;
   color: var(--snow);
 }
 
@@ -30,7 +30,7 @@
 .brand {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  min-height: 44px;
   padding: 0 4px;
   border-radius: var(--radius-pill);
   font-family: var(--font-display);
@@ -57,7 +57,7 @@
   align-items: center;
   justify-content: center;
   width: 44px;
-  height: 36px;
+  height: 44px;
   padding: 0;
   border: 1.5px solid transparent;
   border-radius: var(--radius-pill);
@@ -106,7 +106,7 @@
   gap: 10px;
   padding: 4px 16px 8px;
   text-align: center;
-  color: var(--public-muted);
+  color: #3f4c60;
   font-size: var(--fs-small);
 }
 
@@ -115,7 +115,7 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .social {
@@ -150,11 +150,12 @@
   .footer {
     gap: 6px;
     padding: 0 10px 4px;
-    font-size: 0.72rem;
+    font-size: var(--type-hint-size);
   }
 
   .social {
-    min-height: 30px;
+    min-width: 44px;
+    min-height: 44px;
     padding: 0 6px;
   }
 
@@ -180,3 +181,17 @@
 .footer { flex-wrap: wrap; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); margin-top: auto; }
 .note { white-space: normal; overflow: visible; }
 .social { min-height: var(--touch); }
+
+.legal { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.legal a { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; justify-content: center; color: var(--public-ink); font-weight: 700; }
+
+/*
+ * iOS 26 Safari shows the page through its glass bottom toolbar. A document that ends at the
+ * small viewport has nothing under that toolbar, and Safari fills the gap with the html
+ * background (sky blue) under the snow. So a short page is as tall as the LARGE viewport: its
+ * snow continues under the toolbar and the footer is the last thing in it. Long pages are not
+ * affected, so there is never empty space after the footer (an extra spacer row was tried on
+ * 2026-11-11 and left a large blank area). Do not tint the toolbar with a fixed/sticky strip
+ * either: Safari then paints it solid instead of glass.
+ */
+.shell { min-height: 100lvh; }

@@ -1,8 +1,10 @@
+import { apiError } from '../../lib/apiError'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import { OrderReceipt } from '../../components/public/OrderReceipt'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
+import { readFormToken } from '../../api/formTokens'
 import { GiftBoxReady } from '../../components/public/GiftBoxReady'
 import { PaintingOrnament } from '../../components/public/PaintingOrnament'
 import { SleighWipe } from '../../components/public/SleighWipe'
@@ -12,6 +14,7 @@ import { ButtonLink } from '../../components/ui/ButtonLink'
 import { Field } from '../../components/ui/Field'
 import { useLocale } from '../../i18n/LocaleContext'
 import { formatDateLabel, formatHour } from '../../lib/time'
+import { deliveryDatePhrase } from '../../lib/deliveryWindow'
 import type { Address, TrackView } from '../../domain/types'
 import styles from './TrackPage.module.css'
 
@@ -25,7 +28,13 @@ export function TrackPage() {
   const { t, locale } = useLocale()
   const { code: codeParam } = useParams()
   const navigate = useNavigate()
+  // Arriving from the QR form: confirm the save once, here where the order state is shown.
+  const formSaved = !!(useLocation().state as { formSaved?: boolean } | null)?.formSaved
   const timers = useRef<number[]>([])
+  const savedNotice = useRef<HTMLParagraphElement>(null)
+
+  useEffect(() => { if (formSaved) savedNotice.current?.focus() }, [formSaved])
+  const dialogOpener = useRef<HTMLButtonElement | null>(null)
 
   const [fetchPhase, setPhase] = useState<Phase>(codeParam ? 'checking' : 'idle')
   const [reloadKey, setReloadKey] = useState(0)
@@ -35,12 +44,17 @@ export function TrackPage() {
   const [addr, setAddr] = useState<Address>({ line1: '', city: 'Vienna', postalCode: '' })
   const [editing, setEditing] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [copyMessage, setCopyMessage] = useState('')
+  const [savingAddress, setSavingAddress] = useState(false)
+  const [addressError, setAddressError] = useState('')
+  const [addressField, setAddressField] = useState('')
 
   useEffect(() => {
     if (!codeParam) return
 
     let cancelled = false
     setPhase('checking')
+    setDialogOpen(false)
     setLoaded(null)
     setError('')
     setEditing(false)
@@ -53,6 +67,7 @@ export function TrackPage() {
         setLoaded(data)
         setError('')
         if (data.delivery.address) setAddr(data.delivery.address)
+        if (formSaved) { setPhase('done'); return }
         setPhase('loading')
         timers.current.push(
           window.setTimeout(() => {
@@ -66,12 +81,14 @@ export function TrackPage() {
           }, MIN_WIPE_MS),
         )
       })
-      .catch((err: Error) => {
+      .catch((err) => {
         if (cancelled) return
         setLoaded(null)
-        setError(err.message || t('trackNotFound'))
+        // Name the code that was looked up, so a typo is easy to spot.
+        const notFound = !(err && typeof err === 'object' && 'code' in err) || (err as { code?: string }).code === 'ORDER_NOT_FOUND'
+        setError(notFound ? t('trackMissBody', { code: codeParam.toUpperCase() }) : apiError(err, locale, t('trackNotFound')).text)
         setPhase('done')
-        setDialogOpen(true)
+        setDialogOpen(false)
       })
 
     return () => {
@@ -79,7 +96,7 @@ export function TrackPage() {
       timers.current.forEach(window.clearTimeout)
       timers.current = []
     }
-  }, [codeParam, reloadKey, t])
+  }, [codeParam, reloadKey, t, locale, formSaved])
 
   /** Without a code in the URL there is nothing to show, whatever a previous lookup left behind. */
   const phase: Phase = codeParam ? fetchPhase : 'idle'
@@ -87,20 +104,32 @@ export function TrackPage() {
   const error = codeParam ? fetchError : ''
 
   async function saveAddress() {
-    if (!view) return
-    const next = await api.tracking.updateViennaAddress(view.code, addr)
-    setLoaded(next)
-    setEditing(false)
-    setSaved(true)
+    if (!view || savingAddress) return
+    setSavingAddress(true)
+    setAddressError('')
+    setAddressField('')
+    try {
+      const next = await api.tracking.updateViennaAddress(view.code, addr)
+      setLoaded(next)
+      setEditing(false)
+      setSaved(true)
+    } catch (err) {
+      const problem = apiError(err, locale, t('addressSaveError'))
+      const field = problem.field?.replace(/^address\./, '') ?? ''
+      setAddressField(['line1', 'line2', 'postalCode', 'city'].includes(field) ? field : '')
+      setAddressError(problem.text)
+    } finally {
+      setSavingAddress(false)
+    }
   }
 
+  const hasFormToken = !!view && !!readFormToken(view.code)
   const status = view?.status ?? 'preparing'
-  const homeDelivery = view?.delivery.kind === 'vienna'
   const statusLabel =
-    status === 'delivered' ? t('delivered') : status === 'ready' ? (homeDelivery ? t('outForDelivery') : t('ready')) : t('preparing')
+    status === 'cancelled' ? t('orderCancelled') : status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
   const stepIndex = status === 'delivered' ? 2 : status === 'ready' ? 1 : 0
-  const steps = [t('stepPainting'), homeDelivery ? t('outForDelivery') : t('stepReady'), t('stepHandover')]
-  /** Sleigh only after a hit — misses stay in the dialog without this animation. */
+  const steps = [t('stepPainting'), t('ready'), t('stepHandover')]
+  /** Sleigh only after a hit — misses use the page recovery state without this animation. */
   const showWipe = phase === 'loading' || phase === 'leaving'
 
   /** Two short lines: the slot the customer picked, then how long the stall is still around. */
@@ -108,7 +137,9 @@ export function TrackPage() {
   if (view) {
     const when = view.when
     if (when.kind === 'vienna') {
+      // What on the first line, when on the second.
       whenLines.push(t('whenVienna'))
+      if (when.date) whenLines.push(deliveryDatePhrase(when.date, locale))
     } else if (when.kind === 'market') {
       const head = [
         when.date ? formatDateLabel(when.date, locale === 'de' ? 'de-AT' : 'en-GB') : null,
@@ -127,11 +158,13 @@ export function TrackPage() {
   return (
     <div className={styles.page}>
       {showWipe ? <SleighWipe label={t('sleigh')} leaving={phase === 'leaving'} /> : null}
+      {/* The form was saved even if loading the order below fails: confirm it regardless. */}
+      {formSaved && <p ref={savedNotice} tabIndex={-1} className={styles.savedBanner} role="status">{t('formSavedBanner')}</p>}
 
       {view && phase === 'done' ? (
         <section className={styles.card} aria-live="polite">
           <div className={styles.art}>
-            {status === 'preparing' ? (
+            {status === 'cancelled' ? null : status === 'preparing' ? (
               <PaintingOrnament label={t('artPainting')} />
             ) : (
               <GiftBoxReady label={t('artReady')} />
@@ -141,68 +174,71 @@ export function TrackPage() {
           <div className={styles.details}>
             <span
               className={`${styles.chip} ${
-                status === 'preparing' ? styles.chipWork : status === 'delivered' ? styles.chipDone : styles.chipReady
+                status === 'cancelled' ? '' : status === 'preparing' ? styles.chipWork : status === 'delivered' ? styles.chipDone : styles.chipReady
               }`}
             >
               {statusLabel}
             </span>
-            <h1 className={styles.title}>{t('trackGreeting', { name: view.customerName })}</h1>
+            <h1 className={styles.title}>{view.customerName && view.customerName !== 'Walk-in' ? t('trackGreeting', { name: view.customerName }) : (locale === 'de' ? 'Deine Bestellung' : 'Your order')}</h1>
 
-            <ProgressSteps labels={steps} current={stepIndex} label={statusLabel} />
+            {status === 'cancelled' ? <p>{t('orderCancelledBody')}</p> : <ProgressSteps labels={steps} current={stepIndex} label={statusLabel} />}
 
             <dl className={styles.facts}>
               <div>
                 <dt>{t('trackCode')}</dt>
-                <dd className={styles.code}>{view.code}</dd>
+                <dd className={styles.codeRow}><span className={styles.code}>{view.code}</span>
+                  <Button variant="secondary" onClick={() => { void navigator.clipboard.writeText(view.code).then(() => setCopyMessage('copiedCode')).catch(() => setCopyMessage('copyFailed')) }}>{t('copyCode')}</Button>
+                  <span role="status" className={styles.copyStatus}>{copyMessage && t(copyMessage)}</span></dd>
               </div>
-              <div>
+              {status !== 'cancelled' && <div>
                 <dt>{t('pickupWhen')}</dt>
                 <dd>
                   {whenLines[0]}
                   {whenLines[1] ? <span className={styles.whenExtra}>{whenLines[1]}</span> : null}
                 </dd>
-              </div>
+              </div>}
             </dl>
 
             <OrderReceipt items={view.items} total={view.total} paymentState={view.paymentState} />
 
-            {view.delivery.kind === 'vienna' ? (
+            {status !== 'cancelled' && view.delivery.kind === 'vienna' ? (
               <div className={styles.address}>
                 {!editing ? (
                   <>
                     {saved ? <p className={styles.saved}>{t('addressSaved')}</p> : null}
-                    <Button variant="secondary" fullWidth onClick={() => setEditing(true)}>
+                    {hasFormToken ? <Button variant="secondary" fullWidth onClick={() => setEditing(true)}>
                       {t('editAddress')}
-                    </Button>
+                    </Button> : <p>{locale === 'de' ? 'Öffne deinen persönlichen Formularlink, um die Lieferadresse zu ändern.' : 'Open your personal form link to change the delivery address.'}</p>}
                   </>
                 ) : (
-                  <div>
-                    <Field label={t('street')} htmlFor="line1">
+                  <div className={styles.addressFields}>
+                    <Field label={t('street')} htmlFor="line1" error={addressField === 'line1' ? addressError : undefined}>
                       <input
                         id="line1"
                         value={addr.line1}
                         onChange={(e) => setAddr({ ...addr, line1: e.target.value })}
                       />
                     </Field>
-                    <Field label={t('extra')} htmlFor="line2">
+                    <Field label={t('extra')} htmlFor="line2" error={addressField === 'line2' ? addressError : undefined}>
                       <input
                         id="line2"
                         value={addr.line2 ?? ''}
                         onChange={(e) => setAddr({ ...addr, line2: e.target.value })}
                       />
                     </Field>
-                    <Field label={t('postal')} htmlFor="postal">
+                    <Field label={t('postal')} htmlFor="postal" error={addressField === 'postalCode' ? addressError : undefined}>
                       <input
                         id="postal"
                         value={addr.postalCode}
                         onChange={(e) => setAddr({ ...addr, postalCode: e.target.value })}
                       />
                     </Field>
-                    <Field label={t('city')} htmlFor="city">
+                    <Field label={t('city')} htmlFor="city" error={addressField === 'city' ? addressError : undefined}>
                       <input id="city" value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} />
                     </Field>
-                    <Button fullWidth onClick={() => void saveAddress()}>
-                      {t('saveAddress')}
+                    {addressError && !addressField ? <p role="alert" className={styles.addressError}>{addressError}</p> : null}
+                    <Button fullWidth disabled={savingAddress} onClick={() => void saveAddress()}>
+                      {savingAddress ? t('saving') : t('saveAddress')}
                     </Button>
                   </div>
                 )}
@@ -210,10 +246,10 @@ export function TrackPage() {
             ) : null}
 
             <div className={styles.actions}>
-              <ButtonLink to="/" variant="secondary" className={styles.homeBtn}>
+              <ButtonLink to="/" variant="secondary">
                 {t('backHome')}
               </ButtonLink>
-              <button type="button" className={styles.another} onClick={() => setDialogOpen(true)}>
+              <button type="button" className={styles.another} onClick={event => { dialogOpener.current = event.currentTarget; setDialogOpen(true) }}>
                 {t('trackAnother')}
               </button>
             </div>
@@ -221,19 +257,19 @@ export function TrackPage() {
         </section>
       ) : null}
 
-      {!view && phase !== 'checking' && phase !== 'loading' && phase !== 'leaving' ? (
-        <section className={styles.card}>
-          <div className={styles.artSmall} aria-hidden="true">
+      {!view && (!!codeParam || !dialogOpen) && phase !== 'checking' && phase !== 'loading' && phase !== 'leaving' ? (
+        <section className={`${styles.card} ${error ? styles.emptyCard : ''}`}>
+          {!error && <div className={styles.artSmall} aria-hidden="true">
             <PaintingOrnament label={t('artPainting')} />
-          </div>
+          </div>}
           <div className={styles.details}>
             <h1 className={styles.title}>{error ? t('trackMissTitle') : t('trackTitle')}</h1>
             <p className={styles.sub}>{error || t('trackLead')}</p>
-            <Button size="lg" fullWidth className={styles.openBtn} onClick={() => setDialogOpen(true)}>
-              {t('trackOpen')}
+            <Button size="lg" fullWidth className={styles.openBtn} onClick={event => { dialogOpener.current = event.currentTarget; setDialogOpen(true) }}>
+              {t(error ? 'trackAnother' : 'trackOpen')}
             </Button>
             <div className={styles.actions}>
-              <ButtonLink to="/" variant="secondary" className={styles.homeBtn}>
+              <ButtonLink to="/" variant="secondary">
                 {t('backHome')}
               </ButtonLink>
             </div>
@@ -243,9 +279,9 @@ export function TrackPage() {
 
       {dialogOpen ? (
         <TrackDialog
+          openerRef={dialogOpener}
           onClose={() => setDialogOpen(false)}
           initialCode={codeParam ?? ''}
-          error={error}
           onSubmit={(next) => {
             setDialogOpen(false)
             setError('')

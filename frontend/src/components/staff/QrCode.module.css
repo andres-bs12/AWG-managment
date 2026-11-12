@@ -1,21 +1,21 @@
 .img {
   display: block;
-  background: #fff;
-  border: 1px solid var(--staff-line);
-  border-radius: 12px;
-  padding: 8px;
+  background: var(--staff-surface);
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--space-3);
+  padding: var(--space-2);
 }
 
 .placeholder {
-  background: #fff;
-  border: 1px dashed var(--staff-line);
-  border-radius: 12px;
+  background: var(--staff-surface);
+  border: var(--border-thin) dashed var(--staff-line);
+  border-radius: var(--space-3);
 }
 
 .expand { border: 0; padding: 0; background: transparent; color: var(--staff-muted); text-align: center; }
-.expand span { display: block; padding: var(--space-2); font-size: var(--fs-small); }
-.dialog { border: 0; border-radius: var(--radius); padding: var(--space-5); width: min(560px, 94vw); max-height: 90dvh; color: var(--staff-ink); }
-.dialog::backdrop { background: #101a33b8; }
+.expand span { display: block; padding: var(--space-2); font-size: var(--type-staff-meta-size); }
+.dialog { background: var(--staff-surface); border: 0; border-radius: var(--radius); padding: var(--space-5); width: min(var(--size-staff-qr-large), 94vw); max-height: 90dvh; color: var(--staff-ink); }
+.dialog::backdrop { background: var(--color-overlay); }
 .dialog img { width: 100%; height: auto; }
-.dialog h2 { font-size: var(--fs-h2); text-align: center; }
-.close { display: block; margin-left: auto; min-height: var(--touch); padding: 0 var(--space-4); border: 1px solid var(--staff-line); border-radius: var(--radius); background: white; }
+.dialog h2 { font-size: var(--type-staff-h2-size); text-align: center; }
+.close { display: block; margin-left: auto; min-height: var(--touch); padding: 0 var(--space-4); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius); background: var(--staff-surface); }

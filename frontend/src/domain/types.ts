@@ -2,12 +2,13 @@
 
 export type PaymentState = 'unpaid' | 'deposit' | 'paid'
 export type PaymentMethod = 'cash' | 'card'
-export type OrnamentColor = 'red' | 'grey'
+export type OrnamentColor = 'red' | 'grey' | 'green' | 'white' | 'beige'
+export type CustomFinish = 'shiny' | 'matte'
 export type ItemKind = 'custom' | 'finished'
 export type ProductionStatus = 'not_started' | 'in_progress' | 'finished'
 export type DeliveryKind = 'market' | 'vienna'
 export type MarketKind = 'market' | 'home'
-export type TrackStatus = 'preparing' | 'ready' | 'delivered'
+export type TrackStatus = 'preparing' | 'ready' | 'delivered' | 'cancelled'
 
 export type StaffUser = {
   id: string
@@ -42,10 +43,12 @@ export type OrderItem = {
   petName: string
   withName: boolean
   color?: OrnamentColor
+  finish?: CustomFinish
   backName: string
   note: string
   cost: number
   productionStatus: ProductionStatus
+  handedOver?: boolean
   photos: Photo[]
   formComplete: boolean
   delivery: {
@@ -53,11 +56,38 @@ export type OrderItem = {
     marketId?: string
     marketDayId?: string
     pickupHour?: number | null
+    deliveryDate?: string
     address?: Address | null
   }
 }
 
+export type CheckoutStatus = 'pending' | 'review' | 'confirmed'
+
+export type OrderSummary = {
+  id: string; code: string; customerName: string; phone: string; createdAt: string
+  paymentState: PaymentState; checkoutStatus: CheckoutStatus | null; total: number
+  items: number; nextHandoffDate: string | null; handedOver: boolean
+  source?: 'stall' | 'web'; status?: 'ACTIVE' | 'CANCELLED'
+}
+
+export type SalesFilters = {
+  state?: PaymentState | 'pending' | 'review'
+  source?: 'stall' | 'web'
+  from?: string
+  to?: string
+  query?: string
+  page?: number
+  size?: number
+}
+export type SalesPage = { orders: OrderSummary[]; page: number; size: number; totalElements: number; totalPages: number }
+
 export type Order = {
+  status?: 'ACTIVE' | 'CANCELLED'
+  cancelledAt?: string | null
+  cancellationReason?: string | null
+  checkoutStatus?: CheckoutStatus | null
+  source?: 'web' | 'stall'
+
   id: string
   customerId: string
   code: string
@@ -66,10 +96,13 @@ export type Order = {
   paymentState: PaymentState
   paymentMethod: PaymentMethod | null
   total: number
+  amountPaid?: number
   createdAt: string
   itemIds: string[]
   /** True once staff marks market pickup / Vienna handoff as done. Drives Track `delivered`. */
   handedOver: boolean
+  handedOverAt?: string
+  paymentReview?: boolean
   /** Append-only payment entries. Older records may not have this field yet. */
   paymentEntries?: PaymentEntry[]
   /** Previously recorded amount from legacy orders without individual receipts. */
@@ -130,6 +163,8 @@ export type TimeBlock = {
 }
 
 export type AgendaSlot = {
+  held?: boolean
+  holdUntil?: string | null
   block: TimeBlock
   order: Order | null
   item: OrderItem | null
@@ -137,8 +172,11 @@ export type AgendaSlot = {
 }
 
 export type AgendaDelivery = {
+  remaining?: number
+  paymentState?: PaymentState
   customerName?: string
   color?: OrnamentColor
+  finish?: CustomFinish
   backName?: string
   orderId: string
   orderCode: string
@@ -153,6 +191,7 @@ export type AgendaDelivery = {
   phone: string
   addressLabel: string | null
   photoUrl?: string
+  source?: 'stall' | 'web'
 }
 
 export type AgendaDay = {
@@ -164,6 +203,7 @@ export type AgendaDay = {
 
 export type TrackItemView = {
   color?: OrnamentColor
+  finish?: CustomFinish
   cost?: number
   petName: string
   kind: ItemKind
@@ -180,8 +220,10 @@ export type TrackWhen = {
   kind: 'market' | 'vienna' | 'unknown'
   /** ISO date of the handoff day, when known. */
   date: string | null
-  /** Decimal hour the customer can collect from. */
+  /** Decimal hour for pickup or the start of the Vienna delivery window. */
   fromHour: number | null
+  /** End of the Vienna delivery window; absent/null for market pickup. */
+  toHour?: number | null
   marketName: string | null
   /** Decimal hour the stall packs up that day. */
   untilHour: number | null
@@ -199,6 +241,9 @@ export type TrackView = {
 }
 
 export type CustomerFormView = {
+  needsAddress: boolean
+  address: Address | null
+  editable: boolean
   handoffs?: TrackWhen[]
   total?: number
   paymentState?: PaymentState
@@ -220,6 +265,7 @@ export type ItemFormPayload = {
 }
 
 export type CustomerFormPayload = {
+  address?: Address
   customerName: string
   phone: string
   email: string
@@ -230,6 +276,7 @@ export type CreateSaleItemInput = {
   kind: ItemKind
   withName: boolean
   color?: OrnamentColor
+  finish?: CustomFinish
   paintDate?: string
   paintStart?: number
   paintEnd?: number
@@ -265,3 +312,58 @@ export type MoveSuggestion = {
   to: { date: string; startHour: number; endHour: number }
   freedSlot: { date: string; startHour: number; endHour: number }
 }
+
+export type InventoryItem = { id: string; kind: ItemKind; color: OrnamentColor | null; finish?: CustomFinish | null; quantity: number }
+export type PaintingDay = { date: string; open: boolean; maxPaintings: number; booked: number; openHour: number; closeHour: number }
+
+export type ShopConfig = {
+  /** Europe/Vienna wall-clock times (HH:mm). Optional with older servers. */
+  deliveryWindowStart?: string
+  deliveryWindowEnd?: string
+  /** True when the server sends the order confirmation e-mail; the thanks page only promises it then. */
+  confirmationEmail?: boolean
+  seasonEnd: string
+  deliveriesFrom: string | null
+  seasonOver: boolean
+  enabled: boolean
+  customPrice: number
+  finishedPrice: number
+  nameExtra: number
+  deliveryFee: number
+  maxItems: number
+  colors: ShopColorOption[]
+}
+
+export type ShopColorOption = { color: OrnamentColor; finish: CustomFinish; inStock: boolean }
+
+export type ShopDeliveryDate = { date: string; weekday: string }
+
+/** A stall day the customer can pick a web order up at (painting happens before it). */
+export type ShopPickupDay = { date: string; weekday: string; marketName: string; stall?: number | null; openTime: string; closeTime: string }
+
+export type ShopItemInput = {
+  kind: 'custom'
+  withName: boolean
+  color?: OrnamentColor
+  finish?: CustomFinish
+  petName?: string
+  backName?: string
+  note?: string
+  photos: Photo[]
+}
+
+export type ShopCheckoutInput = {
+  customerName: string
+  email: string
+  phone: string
+  /** Required for Vienna delivery; omitted for market pickup. */
+  address?: Address
+  deliveryDate: string
+  deliveryKind?: DeliveryKind
+  /** Arrival time at the stall ('HH:mm'), market pickup only. */
+  pickupTime?: string
+  acceptTerms: boolean
+  items: ShopItemInput[]
+}
+
+export type ShopCheckoutResult = { orderCode: string; formToken: string; checkoutUrl: string }

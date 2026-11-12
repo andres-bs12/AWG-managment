@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { CabinScene } from '../../components/public/CabinScene'
 import { Countdown } from '../../components/public/Countdown'
 import { TrackDialog } from '../../components/public/TrackDialog'
+import { VillageStreet } from '../../components/public/VillageStreet'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
 import { useLocale } from '../../i18n/LocaleContext'
@@ -23,20 +24,22 @@ export function HomePage() {
         </div>
       </div>
 
-      <div className={styles.scene}>
-        <CabinScene title={t('sceneAlt')} />
+      {/* sky → stall on its street → clear snow for the buttons: one ground line for everything */}
+      <div className={styles.stage}>
+        <div className={styles.scene}>
+          <CabinScene title={t('sceneAlt')} />
+        </div>
+        <VillageStreet />
       </div>
 
       <div className={styles.ctas}>
-        <Button size="lg" fullWidth className={styles.trackBtn} onClick={() => setDialogOpen(true)}>
-          <span className={styles.btnIcon} aria-hidden="true">
-            ✦
-          </span>
-          {t('trackCta')}
-        </Button>
-        <ButtonLink to="/buy" size="lg" fullWidth variant="secondary" className={styles.buyBtn}>
+        {/* One primary action (order), tracking is secondary. Text only: the scene is the illustration. */}
+        <ButtonLink to="/buy" size="lg" fullWidth>
           {t('buyCta')}
         </ButtonLink>
+        <Button variant="secondary" size="lg" fullWidth onClick={() => setDialogOpen(true)}>
+          {t('trackCta')}
+        </Button>
       </div>
 
       {dialogOpen ? (

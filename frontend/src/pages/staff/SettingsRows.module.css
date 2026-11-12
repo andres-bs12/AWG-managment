@@ -1,0 +1,52 @@
+.page { max-width: var(--layout-form-max); margin: 0 auto; display: grid; gap: var(--space-4); }
+.list { display: grid; gap: var(--space-3); margin-block: var(--space-4); }
+.row { background: var(--staff-surface); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius-control); padding: var(--space-4); display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.name { flex: 1 1 var(--size-staff-name); display: grid; gap: var(--space-2); min-width: 0; overflow-wrap: anywhere; }
+.name p { font-size: var(--type-staff-meta-size); color: var(--staff-muted); }
+.stepper { display: flex; align-items: end; gap: var(--space-2); min-width: 0; }
+.stepper > div { margin: 0; width: var(--layout-postcode-max); }
+.stepper input { text-align: center; }
+.stepper button { min-width: var(--size-control-staff); }
+.error { color: var(--color-error); flex-basis: 100%; margin: 0; }
+.conflict, .range { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.conflict { flex-basis: 100%; }
+
+.dayRow { background: var(--staff-surface); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius-control); padding: var(--space-3); display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: 'name toggle stepper' 'state state state'; align-items: center; gap: var(--space-2) var(--space-3); }
+.dayRow .name { grid-area: name; gap: var(--space-1); }
+.dayRow .toggle { grid-area: toggle; }
+.dayRow .stepper { grid-area: stepper; }
+.stockRow .stepper label, .dayRow .stepper label { position: absolute; width: var(--border-thin); height: var(--border-thin); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.dayRow .stepper, .stockRow .stepper { align-items: center; }
+.dayRow .stepper > div, .stockRow .stepper > div { width: var(--size-staff-quantity); margin: 0; }
+.stockRow .stepper input, .dayRow .stepper input { min-height: var(--size-control-staff); height: var(--size-control-staff); }
+/* The label is visually hidden here, so the control sits level with the − and + buttons. */
+.dayRow .stepper [data-field-control], .stockRow .stepper [data-field-control] { margin-top: 0; }
+.saveState { grid-area: state; margin: 0; font-size: var(--type-staff-meta-size); color: var(--staff-muted); }
+.saveState:empty { display: none; }
+.dayRow .error { grid-column: 1 / -1; }
+.name p[data-over] { color: var(--staff-warn); font-weight: 600; }
+.toggle input { width: var(--size-check); height: var(--size-check); accent-color: var(--staff-btn); }
+@media (max-width: 639px) { .dayRow { grid-template-columns: auto auto; justify-content: space-between; grid-template-areas: 'name name' 'toggle stepper' 'state state'; } }
+
+.stockCard { background: var(--staff-surface); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius-control); padding: var(--space-3); display: grid; gap: var(--space-3); }
+.stockCard > h2 { display: flex; align-items: center; min-height: var(--size-swatch); margin: 0; }
+/* A colour card's heading is only its swatch: a column beside its Shiny/Matte rows, never a lone
+   header line. Rows space themselves so the swatch's spare implicit rows add no empty gaps. */
+.stockCard:has(> h2 > .swatch) { grid-template-columns: auto minmax(0, 1fr); gap: 0 var(--space-3); }
+.stockCard:has(> h2 > .swatch) > h2 { grid-column: 1; grid-row: 1 / span 8; align-self: start; min-height: var(--type-staff-body-size); }
+.stockCard:has(> h2 > .swatch) > :not(h2) { grid-column: 2; }
+.stockCard:has(> h2 > .swatch) > h2 + * { border-top: 0; padding-top: 0; }
+.stockCard:has(> h2 > .swatch) > :not(h2) + :not(h2) { margin-top: var(--space-3); }
+.stockRow { border-top: var(--border-thin) solid var(--staff-line); padding-top: var(--space-3); display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2) var(--space-3); }
+.stockRow .name h3 { margin: 0; font-size: var(--type-staff-body-size); }
+.stockRow .error, .stockRow .conflict { grid-column: 1 / -1; }
+.swatch { flex: none; width: var(--size-swatch); height: var(--size-swatch); border-radius: var(--radius-circle); border: var(--border-thin) solid var(--ornament-swatch-border); }
+@media (max-width: 639px) { .stockRow { grid-template-columns: auto auto; justify-content: space-between; } .stockRow .name { grid-column: 1 / -1; } .stockRow .stepper > div { width: calc(var(--size-staff-quantity) - var(--space-2)); } }
+
+.lost { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-inline-start: var(--border-inset) solid var(--staff-danger); background: var(--color-error-surface); }
+.lost p { margin: 0; flex: 1 1 var(--size-staff-name); }
+
+.hours { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); padding-top: var(--space-3); border-top: var(--border-thin) solid var(--staff-line); }
+.hours label { display: grid; gap: var(--space-2); min-width: 0; font-size: var(--type-staff-meta-size); font-weight: 600; }
+.hours input { min-width: 0; width: 100%; padding: var(--space-2); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control); background: var(--staff-surface); color: var(--staff-ink); }
+.toggle { min-height: var(--touch-lg); }

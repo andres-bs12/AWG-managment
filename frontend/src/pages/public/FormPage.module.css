@@ -1,0 +1,41 @@
+.form { display: grid; gap: var(--space-5); }
+.form > nav { margin: 0; }
+.step { display: grid; gap: var(--space-5); min-width: 0; }
+.stepHeader { display: grid; gap: var(--space-2); }
+.details { display: grid; gap: var(--space-6); min-width: 0; }
+.ornaments { display: grid; gap: var(--space-5); min-width: 0; }
+.contact { min-width: 0; padding-top: var(--space-5); border-top: var(--border-thin) solid var(--color-border); }
+.reviewActions { flex-direction: column; }
+.form .reviewActions > button { flex: none; width: 100%; }
+@media (min-width: 768px) { .reviewActions { flex-direction: row; } .form .reviewActions > button { flex: 1; width: auto; } .form .reviewActions > .back { order: -1; } }
+.step h2 { margin: 0; font-family: var(--font-display); font-size: var(--type-h2-size); line-height: var(--type-h2-line); font-weight: var(--type-h2-weight); letter-spacing: var(--type-h2-tracking); }
+.step h2:focus { outline: none; box-shadow: none; }
+.item { display: grid; gap: var(--space-5); min-width: 0; }
+.item h3 { margin: 0; font-family: var(--font-display); font-size: var(--type-h3-size); line-height: var(--type-h3-line); font-weight: var(--type-h3-weight); letter-spacing: var(--type-h3-tracking); }
+.editor { display: grid; gap: var(--space-6); min-width: 0; }
+.fields { display: grid; gap: var(--space-5); min-width: 0; }
+.fields > * { margin: 0; }
+.preview { width: min(100%, var(--size-preview-desktop)); justify-self: center; }
+.facts { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0; }
+.facts > div { display: flex; gap: var(--space-2); }
+.facts dt { color: var(--color-text-muted); }
+.facts dd { margin: 0; font-weight: var(--type-label-weight); }
+.muted { text-wrap: pretty; margin: 0; color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
+.review { display: grid; gap: var(--space-4); }
+.review > section { margin: 0; }
+.reviewProduct { display: grid; grid-template-columns: var(--size-review-art) minmax(0, 1fr) max-content; gap: var(--space-3); align-items: center; }
+.reviewProduct p { margin: 0; overflow-wrap: anywhere; }
+.reviewPreview { width: var(--size-review-art); }
+.price { white-space: nowrap; font-variant-numeric: tabular-nums lining-nums; font-weight: var(--type-label-weight); }
+.edit { min-width: var(--touch); min-height: var(--touch); padding: var(--space-1); border: 0; border-radius: var(--radius-small); background: transparent; color: var(--color-text); font: inherit; font-weight: var(--type-button-weight); text-decoration: underline; text-underline-offset: var(--space-1); cursor: pointer; }
+.edit:focus-visible { outline: none; box-shadow: var(--focus); }
+.error { margin: 0; color: var(--color-error); }
+.photos { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.photos img { width: var(--size-photo); height: var(--size-photo); border-radius: var(--radius-control); object-fit: cover; }
+.code { display: grid; gap: var(--space-3); padding: var(--space-4); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius-control); text-align: center; }
+.code strong { font-size: var(--type-h2-size); overflow-wrap: anywhere; user-select: all; }
+.form :is(input, textarea, button, summary, [tabindex]) { scroll-margin-block: var(--space-5); }
+@media (min-width: 1024px) { .editor { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); } }
+
+/* Phones at the stall: a compact ornament keeps the first field on the same screen. */
+@media (max-width: 767px) { .preview svg { max-height: var(--size-preview-mobile); } }
