@@ -43,6 +43,7 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
     - Archivos separados: antes de empezar, el encargo dice qué archivos toca; dos agentes no editan el mismo archivo.
     - En su rama el CI corre backend + frontend (tsc, lint, Node) en cada push; la suite E2E completa **no** corre ahí: correr `npm run test:changed` local, o lanzarla en GitHub → Actions → CI → «Run workflow» eligiendo la rama.
     - Al terminar: `git merge release/vX.Y` en su rama (nunca rebase ni force-push), `npm run check`, push de su rama, `scripts/ci-wait.sh`, y solo entonces se integra en `release/vX.Y` (merge o PR hacia `release/vX.Y`). Nunca desplegar.
+    - **Limpieza (dueño, 2026-11-13):** al integrar una rama, el PM borra su worktree y su rama (`git worktree remove`, `git branch -d`). Un agente que no avanza (sin informe ni cambios en su worktree tras ~45 min, o cortado por el límite de uso y no retomado) se retoma con un mensaje o se detiene; nunca quedan sesiones ni worktrees muertos.
     - Seguir el resto de §0.1 (pruebas de lo que cambia en el mismo encargo, informe ≤ 250 palabras) y leer `AGENTS.md` y este archivo al empezar.
 
 ## 1. Textos (copy) — lo que el dueño más corrige
