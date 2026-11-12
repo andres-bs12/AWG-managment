@@ -422,7 +422,7 @@
 
 .nameDetails input[id^='back-'] { text-transform: uppercase; }
 
-/* The no-refund note belongs to the name field: 8px below it, not a new field gap. */
+/* The name field is the only child; the choice-group rhythm owns the gap below it. */
 .nameDetails > :first-child {
   margin-bottom: 0;
 }

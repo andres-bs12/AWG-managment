@@ -35,7 +35,7 @@ export function BuyItemsStep({ t, draft, config, patchItem, err, described, acti
             <span data-label={withName ? t('multiNameYes', { price: formatEur(config.nameExtra, locale) }) : t('multiNameNo')}>{withName ? t('multiNameYes', { price: formatEur(config.nameExtra, locale) }) : t('multiNameNo')}</span>
           </label>)}</div>
         </fieldset>
-        {item.withName && <div className={styles.nameDetails}><Field label={t('backNameField')} htmlFor={`back-${item.uid}`} hint={t('shopBackNameHint')} error={err(`back-${item.uid}`)}><input id={`back-${item.uid}`} value={item.backName} maxLength={6} aria-invalid={!!err(`back-${item.uid}`)} aria-describedby={described(`back-${item.uid}`, true)} onChange={event => patchItem(item.uid, { backName: event.target.value.replace(/[^\p{L}]/gu, '').slice(0, 6) })} /></Field><p className={styles.muted}>{t('nameNonRefund')}</p></div>}
+        {item.withName && <div className={styles.nameDetails}><Field label={t('backNameField')} htmlFor={`back-${item.uid}`} hint={t('shopBackNameHint')} error={err(`back-${item.uid}`)}><input id={`back-${item.uid}`} value={item.backName} maxLength={6} aria-invalid={!!err(`back-${item.uid}`)} aria-describedby={described(`back-${item.uid}`, true)} onChange={event => patchItem(item.uid, { backName: event.target.value.replace(/[^\p{L}]/gu, '').slice(0, 6) })} /></Field></div>}
       </div></div>
     </div>)}
   </>
