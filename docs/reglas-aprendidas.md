@@ -35,7 +35,14 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 6. **Capturas visuales** (`a11y-visual`) se regeneran y revisan **una vez**, al final de la versión.
 7. **Commit y push de respaldo** al terminar cada bloque grande (en la rama `release/vX.Y`), sin desplegar.
 8. Plantilla de encargo: `docs/agent-routing.md` → «Plantilla de encargo».
-9. **Después de cada push, vigilar el CI hasta su resultado:** `scripts/ci-wait.sh` en segundo plano (sale con error si el run falla o no aparece). Una lista vacía de `gh run list` es un error que se investiga, nunca «todavía no corrió». No se dice «subido» ni se cierra el turno sin informar el resultado del CI; si falla, se corrige en el mismo turno. (Dueño, 2026-11-12: el E2E falló en GitHub y nadie se enteró.)
+9. **Después de cada push, vigilar el CI hasta su resultado:** `scripts/ci-wait.sh` en segundo plano (sale con error si el run falla o no aparece). Una lista vacía de `gh run list` es un error que se investiga, nunca «todavía no corrió». No se dice «subido» ni se cierra el turno sin informar el resultado del CI; si falla, se corrige en el mismo turno. (Dueño, 2026-11-12: el E2E falló en GitHub y nadie se enteró.) `ci-wait.sh` espera todos los runs del commit: el del PR salta `e2e`, así que un run verde solo no prueba nada; mirar que `e2e` aparezca como `success`, no `skipped`.
+10. **Varios agentes a la vez, en ramas de `release/vX.Y`** (dueño, 2026-11-12):
+    - Cada agente trabaja en **su propio worktree** con una rama que sale de `release/vX.Y` (por ejemplo `feat/v3.1-<tema>`). Nunca en la carpeta principal ni en la rama `release/vX.Y` directamente mientras otro agente la usa.
+    - Puerto propio para Playwright: `PW_PORT=5201` (5202, …); 5199 queda para la sesión principal.
+    - Archivos separados: antes de empezar, el encargo dice qué archivos toca; dos agentes no editan el mismo archivo.
+    - En su rama el CI corre backend + frontend (tsc, lint, Node) en cada push; la suite E2E completa **no** corre ahí: correr `npm run test:changed` local, o lanzarla en GitHub → Actions → CI → «Run workflow» eligiendo la rama.
+    - Al terminar: `git merge release/vX.Y` en su rama (nunca rebase ni force-push), `npm run check`, push de su rama, `scripts/ci-wait.sh`, y solo entonces se integra en `release/vX.Y` (merge o PR hacia `release/vX.Y`). Nunca desplegar.
+    - Seguir el resto de §0.1 (pruebas de lo que cambia en el mismo encargo, informe ≤ 250 palabras) y leer `AGENTS.md` y este archivo al empezar.
 
 ## 1. Textos (copy) — lo que el dueño más corrige
 

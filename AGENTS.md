@@ -166,6 +166,8 @@ Rama de este worktree: `feat/backend-domain`; incorpora las funciones de `releas
 
 Informes en `tasks/audit-results/`. Backlog en `tasks/todo.md`; decisiones del dueño en `tasks/preguntas-pendientes.md`.
 
+**Varios agentes en paralelo y CI:** cada agente en su worktree y rama desde `release/vX.Y`, con su `PW_PORT`; tras cada push, `scripts/ci-wait.sh` hasta el resultado (el hook de inicio corre `scripts/ci-status.sh`). Reglas 9 y 10 de §0.1 en `docs/reglas-aprendidas.md`.
+
 Forma de trabajo: Opus actúa como project manager (decisión del dueño, 2026-11-11): planifica, delega, revisa y verifica. Reparto (Codex astra/sol/terra solo si tiene créditos; Gemini 3.8 Flash por el CLI de Antigravity `agy`; GLM-5.3 y DeepSeek V4.1 Flash por Mistral Vibe; Claude Fable 5.2 solo como último recurso, cuando ni un subagente Opus ni Codex sol puedan resolverlo (hasta el sábado 2026-11-14); los modelos propios de Mistral no se usan) y el registro de resultados están en `docs/agent-routing.md`, que se actualiza tras cada delegación. Siempre `< /dev/null`. Nunca audita el mismo LLM que escribió el código.
 
 Staff (auditorías del 2026-11-05 `staff-ux-sale-orders-*` y `staff-ux-agenda-ops-*`): P0 y todos los P1 corregidos, junto con la mayoría de los P2. Cambios principales:
