@@ -15,6 +15,14 @@ export async function open(page: Page, locale = 'de') {
 export async function choose(page: Page, color = /^(Rot|Red)$/, finish = /^(Glänzend|Shiny)$/) {
   for (const name of [color, finish]) {
     const radio = page.getByRole('radio', { name })
+    // A newly added or selected ornament's editor slides in. Clicking during that entrance makes
+    // Playwright retry with forced block:'start' scrolling, which parks the chip under the
+    // multi-ornament strip that appears one frame later and takes the pointerup. Wait it out.
+    await radio.evaluate(node => Promise.all(document.getAnimations().filter(animation => {
+      const effect = animation.effect
+      return animation.playState === 'running' && effect instanceof KeyframeEffect && effect.target?.contains(node)
+        && Number.isFinite(effect.getComputedTiming().endTime)
+    }).map(animation => animation.finished.catch(() => {}))))
     await radio.locator('..').click()
     await expect(radio).toBeChecked()
   }
