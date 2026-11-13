@@ -1,15 +1,94 @@
 # Tareas AWG
 
+## v3.1 · cambios del dueño (2026-11-12) — hechos en `e141361`, CI verde; falta probar el tecleo en iPhone real
+
+- [x] **Móvil, campo del nombre del adorno (`/buy`, `/form`):** al tocar el input y empezar a escribir, la pantalla baja de golpe y luego sube y baja un poco con cada letra. Debe quedarse quieta mientras se escribe (probable choque entre el teclado/visualViewport, la reparación de foco de `lib/publicFormFocus.ts` y la vista previa que se actualiza con cada letra). Verificar en iPhone real.
+- [x] **Track:** quitar la opción de cambiar la dirección de entrega («change delivery address»); al dueño le resulta rara.
+- [x] **Formularios públicos (`/buy`, `/form`):** el botón de continuar ya no flota (sticky); va fijo en su sitio, al final del contenido. Revisar la barra de acciones (`usePublicActions.ts`, `PublicForm.module.css`) y las pruebas `public-mobile`/`layout` que asumen la barra sticky.
+- [x] **Track:** añadir un acceso a Instagram (contacto / contenido / «síguenos»), discreto y con buen UX: que no moleste, pero que quede claro que también nos pueden contactar por ahí. Sin texto de relleno (§1 de `docs/reglas-aprendidas.md`).
+
+## Integración de ramas (2026-11-12)
+
+- [x] Contenido del merge de producción v1.1 integrado con UI pública reciente; V8–V11 intactas y facturas V12. Backend 131 tests (javaagent), TypeScript/lint y 61 Node pasan.
+- [x] Finalizar staging cuando `.git` sea escribible; el sandbox dejó el índice sin resolver aunque el worktree ya no contiene conflictos. Ver `tasks/merge-release-v1.1-2026-11-12.md`. No hacer commit/abort/push. **Cerrado 2026-11-12:** el merge se commiteó en `b008af1`.
+
 ## Hecho
 
-- [x] Frontend v1 con mocks (agenda, venta, pedido, form, Track)
-- [x] Pulido UX staff
+- [x] 2026-11-12 · Seguridad pre-release: H2, M1–M4, L2–L5 y L8 implementados; H1 ya existía y se conserva. **Terminado localmente: 162 tests backend pasan con Byte Buddy**, sin commit/staging ni cambios en `frontend/src`. V13 separa el lock de métricas del de Agenda. Matriz de archivos/pruebas y límites: `tasks/security-review-fixes-2026-11-12.md`.
+- [ ] Antes de publicar esos fixes: auditoría independiente fuera del sandbox (Vibe y Antigravity no iniciaron aquí), aplicar V13 en PostgreSQL, reconstruir/verificar contenedores y configurar la regla Cloudflare de `docs/deploy.md`. Las pruebas reales SMTP/Stripe siguen pendientes.
+
+- [x] 2026-11-12 · Integración de las funciones de producción `release/v1.1` en `feat/backend-domain`: límites/horas de Agenda, entrega por ítem, cancelación suave, límite de 2 checkouts por IP y reservas de 15 minutos, Sales/QR y overhaul staff. V8–V11 se conservan sin cambios (ya aplicadas en producción); facturas pasan a `V12__invoices.sql`. Se mantiene la UI pública actual (tres pantallas, editor sin subpasos, fichas, sin campo de mascota y correcciones Safari). Los resultados del merge se registran aparte; sin commit ni push.
+
+- [x] 2026-11-12 · Public UI review follow-up: implemented findings 1–3 and 5–11; finding 4 and ContactFields were already fixed and left untouched. TypeScript/lint pass (existing warnings; 26 staff CSS contracts), plus 5 focus tests. Browser verification remains pending; no Playwright. See `tasks/public-ui-review-fixes-2026-11-12.md`.
+
+- [x] 2026-11-12 · Public QR form, Track and Home: implemented the 25 requested fixes; TypeScript, lint (existing warnings) and 40 Node tests pass. Playwright/browser and viewport checks remain pending per owner instruction. See `tasks/public-qr-track-home-fixes-2026-11-12.md` for the numbered file map.
+
+- [x] 2026-11-12 · Public `/buy` delivery, review and thanks: implemented fixes 1–18 and 20–21 (no fix 19 supplied), including full-row address errors, spacing/calendar limits, public action sizing/sticky states, review totals/copy and thanks loader/pluralization. TypeScript and lint pass with existing warnings. Browser/visual verification remains pending; no Playwright or ports used.
+- [x] 2026-11-12 · Public `/buy` step 1: implemented the 20 requested layout, label, control, photo, note, help and preview-state fixes. `npx tsc -b --noEmit` and lint pass (existing warnings); updated design-system E2E expectations. Browser/visual verification remains pending; no Playwright or ports used.
+- [x] 2026-11-09 · v1.2 local (sin subir): barras de Safari iOS 26 transparentes (WinterBackdrop/Snowfield con z-index negativo, ver AGENTS.md), scroll del documento con barra sticky en CSS, aviso de e-mail en gracias según `confirmationEmail`, barrido UX/copy a 360/1280 (Track sin inglés en alemán, `/form` sin «Kugel 1 von 1», singular/plural, «Abholtag» en recogida, vista previa por hover solo con ratón). Backend 107/107, Node 40/40, E2E 468 en verde, capturas regeneradas y revisadas.
+- [x] 2026-11-08 · Feedback del mercado: facturas por e-mail (V12; inicialmente V8 en esta rama), franja 18–20 h, flujo de varias Kugeln, textos en primera persona, alemán por defecto, gracias mínima con todas las Kugeln, valoración 1–5. Backend 105/105, Node 36/36, E2E 448 en verde, capturas regeneradas y revisadas.
+
+- [x] 2026-11-05 · SEC-F — implementación de M1/L5 y hardening barato I2/I4/I5; política compartida de tokens HTTP/mock, protección de la entrega del iPad, build HTTP obligatorio y escape local, meta referrer, documentación HSTS y CORS. E2E ampliados; validación de navegador pendiente. Ver `docs/sec-f-handoff.md`.
+
+- [x] 2026-11-05 · Task 11 — implementación de staff (P0/P1 solicitados, mock/HTTP, capa de diseño y suite escrita). Build/lint, 23 pruebas Node y 92 backend pasan. Sin Playwright ni commits; detalles y matriz en `docs/task11-staff-handoff.md`.
+
+- [x] 2026-11-05 · Task 8 — implementación QR de dos pantallas y componentes compartidos con `/buy`, DE/EN, errores/foco, borrador/fotos y estados de enlace; suite `e2e/form.spec.ts` escrita. Validación de navegador pendiente; ver `docs/task8-form-handoff.md`.
+
+- [x] Frontend v1 con mocks (agenda, venta, pedido, form, Track) y pulido UX staff
 - [x] Docs condensados en `docs/README.md`
+- [x] 2026-11-04 · Sprint 1 — Backend completo: dominio alineado al contrato del front, servicios portados del mock (agenda, capacidad, sugerencias, ventas, mercados, días de casa, Track, formulario con fotos), auth staff, rate limit, CORS, lock de agenda, 30 tests de integración.
+- [x] 2026-11-04 · Sprint 2 — Front conectado por HTTP (`http/services.ts`, proxy Vite), pagos por estado, arreglos de la auditoría (Entregas recarga, errores en Track, copy sin notificación falsa, credenciales demo ocultas, dirección protegida con token).
+- [x] 2026-11-04 · Sprint 3 — Tienda web Viena + Stripe Checkout (backend, webhook firmado, expiración, tests) y página `/buy`.
+- [x] 2026-11-04 · Sprint 3b — Tienda solo de personalizadas, colores con stock, `/buy` por pasos, auditoría Codex (webhook tardío, fotos huérfanas, timeouts).
 
-## Ahora — backend (dueño del repo)
+- [x] 2026-11-05 · Goals 1–5 — revisión del PR, Flyway (V1–V3, `ddl-auto=validate`), Docker/compose verificado, cambio de contraseña, cancelar pedido (repone stock y libera horas), rutas diferidas, páginas legales.
+- [x] 2026-11-05 · Sprint 4 — respuestas del dueño: stock editable (`/staff/inventory`), días de pintura con interruptor y máximo, fin de temporada 24-dic + "Santa ya salió" con lista de espera, depósito con importe, códigos `AWG`+6, e-mails al dueño y al cliente (sin SMTP no se envían), borradores legales DE/EN, kit de Stripe.
+- [x] 2026-11-05 · Sprint 6 — respuestas del dueño: colores rojo/verde/beige con acabado brillante o mate (stock por combinación), entregas web desde el 30-nov, enlace del formulario caduca 30 días tras la entrega, Track sin nombres para códigos antiguos, borrado de datos personales y fotos 60 días tras la entrega, doble opt-in de la lista de espera, rediseño UX de `/buy` (`docs/sprint6-buy-ux.md`), guía `docs/siguiente-fase.md`.
+- [x] 2026-11-05 · Sprint 5 — auditoría final doble (Claude + Codex: UI, UX, seguridad; `tasks/audit-final.md`), arreglos backend y frontend con revisión cruzada, códigos de error estables, ventas idempotentes, revisión de pagos, cabeceras de seguridad, fuentes locales.
 
-Dominio y API Spring en `awg-tracking/`. Los agentes no tocan ese código salvo petición.
+## Pendiente (ver `tasks/preguntas-pendientes.md` para decisiones del dueño)
 
-- [ ] Modelos / enums alineados al producto (`docs/README.md`)
-- [ ] Persistencia + API cuando toque
-- [ ] Swap HTTP del front (`docs/frontend-api-swap.md`) — solo cuando se pida
+- [ ] **v1.2 en iPhone real (dueño):** comprobar en Safari que las barras superior e inferior se ven como cristal en Home, Track y `/form` (en `/buy` la inferior toma el crema de la barra de acciones), al cargar y al hacer scroll. No se puede emular en el Mac (sin Xcode; Responsive Design Mode no emula Liquid Glass). Si alguna barra sigue teñida, anotar la pantalla y la versión de iOS.
+- [ ] Facturas: configurar `INVOICE_BUSINESS_NAME`/`INVOICE_ADDRESS`/`INVOICE_TAX_NOTE` (y `INVOICE_UID` si aplica) con datos aprobados por el asesor; probar V12 tras V11 en PostgreSQL y el envío con SMTP real. Sin eso no se emite ninguna factura.
+- [x] 2026-11-07 · Checkpoint histórico de ritmo público, sustituido por el editor y revisiones del 2026-11-11/12; verificar el flujo actual, no las cuatro pantallas/subpasos anteriores. Tokens 8px label/control, 24px field/action, 32px section with centred divider; trailing margins removed, compact tabs, duplicate details heading removed, shared review product row. HTTP build/lint and 50 Node tests pass. Claude: run layout/design-system/form/public-mobile and the full suite; regenerate/review the snapshots for the current three-screen flow. Handoff: `tasks/audit-results/public-form-rhythm-2026-11-07.md`. No commit; incoming owner-reported E2E baseline green. **Cerrado 2026-11-12:** cubierto por la suite completa en CI (`e2e-full`, 724 pruebas en 4 shards; lo único rojo fue `public-mobile` en Linux WebKit, en corrección aparte).
+
+- [x] Historical checkpoint, superseded by owner-reported **681 E2E passed** before staff phone polish below. Full E2E repair: Claude baseline **639 passed / 40 failed / 2 skipped (681)**. Product contrast/photo/filter fixes and stale test repairs implemented; HTTP build/lint and 50 Node tests pass. **Partial until Claude re-runs affected behavior, regenerates and visually reviews all 12 design/delivery/details/review snapshots, then runs the full suite** (expected 683 cases with the added two-phone production filter regression). Three baseline failures were `ENOSPC`; preserve evidence and allow enough artifact space. No axe rule, timeout or screenshot tolerance changed. Per-test causes, files and commands: `tasks/audit-results/e2e-repair-2026-11-06.md`. **Cerrado 2026-11-12:** cubierto por la suite completa en CI (`e2e-full`, 724 pruebas en 4 shards; lo único rojo fue `public-mobile` en Linux WebKit, en corrección aparte).
+
+- [x] 2026-11-06 · Staff mobile overhaul: implemented locally (single-date Agenda + day gear/hours V11, saved paint cards, whole-cart item handover, Search states, AWG home, Sales list/API/mock, QR receipt polling, mobile hierarchy, public contrast/info-icon/stale named-control tests). **Partial: Claude must run staff phones 360×640/440×741, QR/search/sales + prior staff/iPad regressions, full public axe and fresh snapshots; real Safari and merged behavior remain pending; V11 is already applied in production.** HTTP build/lint, 50 Node and 119 backend tests pass. Independent review findings fixed; CLI audit blocked by sandbox initialization. See `tasks/audit-results/staff-ux-mobile-2026-11-06.md`. **Cerrado 2026-11-12:** cubierto por la suite completa en CI (`e2e-full`, 724 pruebas en 4 shards; lo único rojo fue `public-mobile` en Linux WebKit, en corrección aparte).
+
+- [x] 2026-11-06 · Checkpoint histórico público v1.1 (layout sustituido por las decisiones del 2026-11-11/12; no restaurar subpasos, pausa o cuatro pantallas): implementación de scroll del documento, acciones sticky CSS, Home con presupuesto de altura, pausa visible, nombre único, compra en cuatro pasos, tarjetas identificadas y múltiples adornos. Los diez hallazgos de revisión móvil están corregidos; build HTTP/lint, 42 tests Node y 107 tests backend (Byte Buddy) pasan. **Parcial: Claude debe ejecutar Playwright (once viewports), revisar las capturas nuevas y probar Safari iOS 26 real**; no darlo por terminado antes. Detalles y comandos en `docs/v1.1-public-mobile-handoff.md`. Las capturas antiguas de compra no se regeneraron aquí; no se cambió la tolerancia. **Cerrado 2026-11-12:** cubierto por la suite completa en CI (`e2e-full`, 724 pruebas en 4 shards; lo único rojo fue `public-mobile` en Linux WebKit, en corrección aparte).
+
+
+- [x] AWG 1.1 (2026-11-06): Agenda painting-day control implemented, pending browser verification; item-level handover implemented with Playwright verification pending; checkout limits/expiry and soft cancellation incorporated from production v1.1; validate the merged behavior in browser and production integration. V8–V11 are already applied, with invoices now V12. See `AGENTS.md` for current state. **Cerrado 2026-11-12:** cubierto por la suite completa en CI (`e2e-full`, 724 pruebas en 4 shards; lo único rojo fue `public-mobile` en Linux WebKit, en corrección aparte).
+
+- [x] 2026-11-05 · Validación de navegador cerrada: suite completa en verde para `/buy`, `/form`, recogida en mercado, SEC-F (399/404 con tres timeouts por carga que pasan aislados) y capturas regeneradas y revisadas. Sustituye los seguimientos de Fix 9–12, a–e, Task 5–8, 7B y 11.
+- [ ] Staff UX — pendiente tras los arreglos del 2026-11-05 (informes `tasks/audit-results/staff-ux-*`):
+  - P2 que quedan (el resto se hizo el 2026-11-05):
+    - El resumen de venta ya muestra el día elegido sin repetir el calendario del servicio (#13, 2026-11-06); validar en navegador junto con el overhaul móvil. El espacio vertical en móvil (#27) y la marca «Web» en entregas (P2-10) se hicieron el 2026-11-06.
+  - Venta: «Change date» tras el QR (cancela y vuelve a planificar) y horas de recogida sin tiempo de pintura desactivadas, con el horario de pintura al pasar el mouse (2026-11-06). Revisión de Codex en `tasks/audit-results/codex-review-sale-change-date-2026-11-06.md`; quedan dos P2:
+    - Si ninguna hora tiene tiempo, el plan «one change makes room» no se ofrece; solo «place it on the agenda».
+    - En iPad no hay explicación por hora para las horas desactivadas; solo el texto general.
+  - HSTS se verifica en el proxy TLS real. Sigue abierto el conflicto de tipos Playwright/axe en `e2e/helpers.ts:45`.
+  - Revisión cruzada de Codex hecha (`tasks/audit-results/codex-review-staff-*.md`): 5 P1 y 3 P2, corregidos y verificados de nuevo por Codex. Los guardados de días de pintura que fallan después de salir ya se muestran al volver, con «Retry» (2026-11-06). Queda un punto:
+    - En el mock, los ítems de Viena sin fecha toman el primer miércoles o viernes después de pintar.
+- [ ] `/buy` premium: verificar en navegador a 360/768/1280 px y completar las mejoras y pruebas de `docs/plan-buy-premium.md`.
+- [ ] Stripe: `stripe login`, claves de prueba, prueba real del checkout y webhook (`docs/stripe-setup.md`); luego claves live y `SHOP_ENABLED=true`.
+- [ ] SMTP (`MAIL_*`, `OWNER_EMAIL`) y prueba real de los e-mails.
+- [x] 2026-11-06 · Despliegue v1: artwithgab.com (Cloudflare, Full strict) → AWS EC2 t4g.small en Estocolmo con Caddy, firewall solo Cloudflare, snapshots diarios (7). `deploy/deploy.sh` y `deploy/status.sh`. Ver `docs/deploy.md`.
+- [ ] Datos reales en los textos legales y revisión por un asesor.
+- [ ] Dominio y correo (buzón + SMTP transaccional): ver `docs/siguiente-fase.md`.
+- [ ] Stock real de las 6 combinaciones (rojo/verde/beige × brillante/mate) en `/staff/inventory`.
+- [ ] Asesor legal: botón "Zahlungspflichtig bestellen", exclusión de desistimiento de personalizados (§ 18 FAGG), plazos de borrado (60 días; 7 años contabilidad).
+- [ ] **Futuro — lista de espera:** pantalla de staff para ver los e-mails confirmados y envío automático al abrir la temporada 2027 (el doble opt-in ya existe).
+- [ ] **Futuro — avisos inteligentes con agentes**, cuando todo esté en producción.
+- [ ] Pendientes menores de la auditoría (UI): contraste medido en todas las pantallas, bloques de error con reintento homogéneos, revisión completa de diálogos y etiquetas accesibles.
+
+- [ ] Sprint 6 /buy Task 2: verificar visualmente y con teclado en 360 px y escritorio, probar Stripe real (éxito, demora y cancelación), verificar V6 en PostgreSQL y aplicar V13 (las métricas ya usan un lock separado; la concurrencia está cubierta por tests). Falta auditoría cruzada; las pruebas automáticas no sustituyen estas verificaciones.
+- [ ] Sprint 6 /buy Task 3 (lo que queda, humano): mediciones pendientes de `docs/ux-validation.md` y la prueba moderada con usuarios. La parte automática (suite Playwright y capturas) ya corre en CI (2026-11-12).
+- [x] Task 5A: Claude debe ejecutar los nueve casos escritos de `e2e/success.spec.ts` en 360/768/1280 px (pago, espera, calendario, SEQ, cancelación y privacidad). No ejecutados aquí; revisar también el conflicto previo de tipos Playwright/axe en `helpers.ts:45`. El mock ya expone métricas en memoria para probar privacidad sin omitir casos. **Cerrado 2026-11-12:** cubierto por la suite completa en CI (`e2e-full`, 724 pruebas en 4 shards; lo único rojo fue `public-mobile` en Linux WebKit, en corrección aparte).
+- [x] Task 5B: Claude debe ejecutar los siete casos escritos de `e2e/keyboard-availability.spec.ts`: teclado completo de escritorio, Tab/Shift+Tab sin controles ocultos ni solapados, fecha agotada y opciones agotadas DE/EN, fallo de red al reconsultar. Verificar los arreglos de foco, Enter y recuperación de calendario a 360/768/1280 px. Build y lint pasan; Playwright no se ejecutó por instrucción del dueño. Persiste el conflicto previo de tipos Playwright/axe en `helpers.ts:45`. **Cerrado 2026-11-12:** cubierto por la suite completa en CI (`e2e-full`, 724 pruebas en 4 shards; lo único rojo fue `public-mobile` en Linux WebKit, en corrección aparte).
+- [x] Task 5C: Claude debe ejecutar los siete casos completos de `e2e/journey-deep.spec.ts` en los cuatro proyectos (incluido movimiento reducido): checkout multipart exacto DE/EN, dos adornos/retirada, nombre/giro/precio, latencia, historial y recarga. Sin omisiones; cinco muestras de color y de la opción de nombre por proyecto, mediana < 100 ms (medición desde el clic en el documento, sin demora del driver/táctil). Verificar el historial nuevo de las tres pantallas y que recargar vuelve al diseño para reañadir fotos. Sin ejecutar Playwright aquí por instrucción del dueño; no se modificaron otros specs. La comprobación TypeScript del spec solo informa del conflicto previo de tipos Playwright/axe en `helpers.ts:45`. **Cerrado 2026-11-12:** cubierto por la suite completa en CI (`e2e-full`, 724 pruebas en 4 shards; lo único rojo fue `public-mobile` en Linux WebKit, en corrección aparte).
+
+- [x] AWG 1.1 soft cancellation: run the Playwright cancellation flow and visually verify staff detail and DE/EN Track; V9 is already applied in production; validate cancellation with the merged invoice/receipt behavior. **Cerrado 2026-11-12:** cubierto por la suite completa en CI (`e2e-full`, 724 pruebas en 4 shards; lo único rojo fue `public-mobile` en Linux WebKit, en corrección aparte).
+
+- [ ] 2026-11-06 · Staff phone polish: five screenshot defects implemented, plus separator/hierarchy sweep. Incoming owner-reported baseline: **681 E2E passed**. Claude must run updated staff-mobile (48 collected cases), sales/staff-review and the full suite; review fresh staff screenshots at 360×640/360×740, nav at 320–440, plus tablet/desktop. No public snapshot files changed. Handoff: `tasks/audit-results/staff-phone-polish-2026-11-06.md`.

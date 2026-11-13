@@ -1,0 +1,28 @@
+.nativeDialog { border: 1px solid var(--staff-line); border-radius: var(--radius-panel); padding: var(--space-4); width: min(var(--layout-staff-dialog), calc(100vw - var(--space-6))); max-height: calc(100dvh - var(--space-6)); overflow: auto; color: var(--staff-ink); background: var(--staff-surface); box-shadow: var(--shadow-2); }
+.nativeDialog::backdrop { background: var(--color-overlay); }
+.nativeDialog > .header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin: 0; }
+.nativeDialog > .header h2 { margin: 0; padding-top: var(--space-2); min-width: 0; }
+/* 44px target, pulled into the corner so the glyph lines up with the dialog padding. */
+.close { flex: none; display: inline-grid; place-items: center; width: var(--touch); height: var(--touch); margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) 0 0; padding: 0; border: 0; border-radius: var(--radius-small); background: transparent; color: var(--staff-ink); cursor: pointer; }
+@media (hover: hover) { .close:hover:not(:disabled) { background: var(--staff-bg); } }
+.close:focus-visible { outline: var(--border-control) solid var(--color-focus); outline-offset: var(--border-control); }
+.close:disabled { opacity: 0.4; cursor: default; }
+.nativeDialog > * + * { margin-top: var(--space-3); }
+.nativeDialog > button { margin-inline-end: var(--space-2); }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--radius-small); background: var(--staff-bg); font-size: var(--type-staff-meta-size); }
+.row[data-ready='true'] { background: var(--staff-slot-ready); color: var(--staff-slot-ready-ink); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: flex-end; }
+
+/* Handover dialog */
+.lead { color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
+.pick { display: grid; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.pick legend { padding: 0; margin-bottom: var(--space-2); font-weight: 600; }
+.pickRow { display: flex; align-items: center; gap: var(--space-3); min-height: var(--touch-lg); padding: var(--space-2) var(--space-3); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius-small); background: var(--staff-surface); cursor: pointer; }
+.pickRow:has(input:checked) { border-color: var(--color-selected); background: var(--color-selected-surface); }
+.pickRow[data-disabled] { cursor: default; color: var(--staff-muted); background: var(--staff-bg); }
+.pickRow input { flex: none; width: var(--size-check); height: var(--size-check); margin: 0; accent-color: var(--color-selected); }
+.pickRow span { display: grid; gap: var(--space-1); min-width: 0; overflow-wrap: anywhere; }
+.pickRow small { font-size: var(--type-staff-meta-size); }
+.due { display: grid; gap: var(--space-2); }
+.due p { margin: 0; }

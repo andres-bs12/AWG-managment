@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
-import styles from './Button.module.css'
+import publicStyles from './Button.module.css'
+import staffStyles from './StaffButton.module.css'
 
 type Props = {
   to: string
@@ -27,6 +28,7 @@ export function ButtonLink({
   state,
   ...rest
 }: Props) {
+  const styles = tone === 'staff' ? staffStyles : publicStyles
   const cls = [
     styles.btn,
     styles[variant],

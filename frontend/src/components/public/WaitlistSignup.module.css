@@ -1,0 +1,3 @@
+.signup { display: grid; gap: var(--space-4); padding: var(--space-4); border: var(--border-thin) solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-raised); color: var(--color-text); }
+.signup p { margin: 0; font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
+.signup a { display: inline-flex; align-items: center; min-height: var(--touch); color: var(--color-text); }

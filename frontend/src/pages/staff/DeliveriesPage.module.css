@@ -1,92 +1,100 @@
 .head {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .head h1 {
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .sub {
   color: var(--staff-muted);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .hint {
   color: var(--staff-muted);
-  font-size: var(--fs-small);
-  max-width: 42rem;
+  font-size: var(--type-staff-meta-size);
+  max-width: var(--layout-reading-max);
 }
 
 .panel {
   background: var(--staff-surface);
-  border: 1px solid var(--staff-line);
-  border-radius: 12px;
-  padding: 16px;
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--space-3);
+  padding: var(--space-4);
 }
 
 .filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.filter {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  font-weight: 650;
-}
-
-.select {
-  appearance: none;
-  width: 100%;
-  min-height: var(--touch);
-  padding: 0.55rem 2.4rem 0.55rem 0.8rem;
-  border: 1px solid var(--staff-line);
-  border-radius: var(--radius);
-  background-color: #fff;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%231c1914' d='M1.2 1.3 6 6.1l4.8-4.8 1.2 1.2L6 8.5 0 2.5z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.85rem center;
-  background-size: 12px 8px;
-  color: var(--staff-ink);
-  font-family: var(--font-staff);
-  font-weight: 650;
-  font-size: 16px;
-}
-
-.select:hover {
-  background-color: var(--staff-hover);
-}
-
-.select:focus-visible {
-  outline: none;
-  box-shadow: var(--focus);
+  grid-template-columns: repeat(auto-fit, minmax(var(--size-staff-name), 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 .group {
-  margin-top: 16px;
+  margin-top: var(--space-4);
 }
 
 .group:first-of-type {
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
 
 .group h2 {
-  margin-bottom: 4px;
-  font-size: 1rem;
+  margin-bottom: var(--space-1);
+  font-size: var(--type-staff-body-size);
 }
 
 .meta,
 .empty {
   color: var(--staff-muted);
-  font-size: var(--fs-small);
-  margin-bottom: 12px;
+  font-size: var(--type-staff-meta-size);
+  margin-bottom: var(--space-3);
 }
 
 .empty {
-  margin: 8px 0 0;
-  font-size: 1rem;
+  margin: 0;
+  font-size: var(--type-staff-body-size);
+}
+
+.dayFilters { grid-column: 1 / -1; min-width: 0; }
+.dayFilters fieldset > div { flex-wrap: wrap; padding: var(--space-2); }
+.dayFilters label { flex: 0 0 auto; }
+.past { display: flex; align-items: center; gap: var(--space-2); margin-block: var(--space-3); }
+.past input { width: var(--size-check); height: var(--size-check); accent-color: var(--staff-btn); }
+@media (min-width: 768px) { .filters { grid-template-columns: auto auto 1fr; } .filters > :first-child { grid-column: 1 / -1; } }
+
+/* A card and its handover action read as one unit, clearly apart from the next order. */
+.item {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.item > :first-child {
+  margin-bottom: 0;
+}
+
+.itemAction {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.panel { display: grid; gap: var(--space-4); min-width: 0; background: transparent; border: 0; padding: 0; }
+/* The live-region line stays in the DOM while empty but must not take a gap slot. */
+.panel > p:empty { display: none; }
+.filters { margin: 0; padding: var(--space-4); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius); background: var(--staff-surface); gap: var(--space-5); }
+.filters > * { min-width: 0; }
+.group { display: grid; gap: var(--space-3); margin-top: 0; }
+.group h2 { margin-bottom: var(--space-1); font-size: var(--type-staff-h2-size); }
+.quickDay { display: grid; gap: var(--space-1); font-size: var(--type-staff-meta-size); font-weight: 600; }
+.quickDay select { width: 100%; min-width: 0; padding: var(--space-2); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control); background: var(--staff-surface); color: var(--staff-ink); }
+@media (min-width: 768px) { .quickDay { display: none; } }
+@media (max-width: 767px) {
+  .dayFilters { display: none; }
+  .filters { gap: var(--space-3); }
+  .past { margin: 0; }
+  .head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); justify-content: space-between; }
+  .head h1 { margin: 0; }
 }

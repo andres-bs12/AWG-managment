@@ -6,27 +6,16 @@
   isolation: isolate;
 }
 
-.halo {
-  position: absolute;
-  inset: 4% -6% 10%;
-  background: radial-gradient(52% 46% at 50% 56%, rgba(255, 214, 140, 0.4) 0%, transparent 68%);
-  filter: blur(8px);
-  animation: haloBreathe 6.5s ease-in-out infinite;
-  z-index: -1;
-}
-
 .svg {
   width: 100%;
   height: auto;
   overflow: visible;
 }
 
-/** Only the building casts a shadow — shadowing the whole SVG made the snow look like a pasted card. */
+/** The stall is planted on the ground line (y=324), so it does not bob. */
 .cabin {
   transform-box: fill-box;
   transform-origin: 50% 100%;
-  filter: drop-shadow(0 10px 16px rgba(14, 24, 48, 0.3));
-  animation: float 7s ease-in-out infinite;
 }
 
 .star {
@@ -58,7 +47,8 @@
 .bulbs circle {
   transform-box: fill-box;
   transform-origin: center;
-  animation: bulbGlow 2.4s ease-in-out infinite;
+  /** Stepped, like real fairy lights: the glow filter only re-renders when a bulb switches. */
+  animation: bulbGlow 2.4s steps(3, jump-none) infinite;
   filter: drop-shadow(0 0 4px currentColor);
 }
 
@@ -156,28 +146,6 @@
 
 .puff4 {
   animation-delay: 4.5s;
-}
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-5px) rotate(-0.25deg);
-  }
-}
-
-@keyframes haloBreathe {
-  0%,
-  100% {
-    opacity: 0.6;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.06);
-  }
 }
 
 @keyframes starPulse {
@@ -301,7 +269,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cabin,
-  .halo,
   .star,
   .lampGlow,
   .lantern,

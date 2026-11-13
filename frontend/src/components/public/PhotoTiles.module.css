@@ -1,0 +1,25 @@
+.block { min-width: 0; }
+.label { margin: 0; font-size: var(--type-label-size); line-height: var(--type-label-line); font-weight: var(--type-label-weight); }
+.hint, .count, .warning { text-wrap: pretty; margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); }
+.tiles { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-2); }
+.tile, .add { position: relative; flex: 0 0 var(--size-photo); width: var(--size-photo); height: var(--size-photo); border-radius: var(--radius-control); }
+.tile img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.remove { position: absolute; top: var(--remove-offset); right: var(--remove-offset); z-index: 1; display: grid; place-items: center; width: var(--touch); height: var(--touch); padding: 0; border: 0; border-radius: var(--radius-circle); background: transparent; color: var(--color-text); cursor: pointer; }
+/* The visible glyph is small (24px) and sits half outside the photo's corner, so it never hides the
+   picture; the 44px hit area is centred on it and reaches mostly outside the tile. */
+.tiles { --remove-offset: calc(-1 * ((var(--touch) - var(--size-remove-glyph)) / 2 + var(--space-2))); }
+/* The 44px remove target reaches past the tile corner by -remove-offset (18px); a 12px gap would let it
+   cover the neighbouring tile (or the tile above after wrapping), so the gap never drops below that reach. */
+.tiles { gap: max(var(--space-3), calc(-1 * var(--remove-offset))); }
+/* Keep the outside remove target below the hint only when photos are present. */
+.tiles:has(> .tile) { padding-top: calc(-1 * var(--remove-offset)); }
+.remove span { display: grid; place-items: center; width: var(--size-remove-glyph); height: var(--size-remove-glyph); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-circle); background: var(--color-surface-raised); font-size: var(--type-body-size); line-height: 1; box-shadow: var(--shadow-1); }
+.add { display: grid; place-items: center; padding: var(--space-1); border: var(--border-control) dashed var(--color-control-border); background: var(--color-surface-raised); color: var(--color-text); font-size: var(--type-h1-size); cursor: pointer; }
+.add[aria-invalid='true'] { border-color: var(--color-error); }
+.reading { font-size: var(--type-hint-size); line-height: var(--type-hint-line); overflow-wrap: anywhere; }
+.count { margin-top: var(--space-2); }
+.error { margin: var(--space-2) 0 0; color: var(--color-error); font-size: var(--type-hint-size); font-weight: 600; line-height: var(--type-hint-line); }
+.block:focus-visible, .add:focus-visible, .remove:focus-visible span { outline: none; box-shadow: var(--focus); }
+.remove:focus-visible { outline: none; }
+@media (hover: hover) { .add:hover:not([aria-disabled='true']), .remove:hover:enabled span { background: var(--color-selection-hover); } }
+.add[aria-disabled='true'], .remove:disabled span { background: var(--color-disabled-surface); color: var(--color-disabled-text); cursor: wait; }

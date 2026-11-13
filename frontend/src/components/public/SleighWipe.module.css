@@ -15,14 +15,15 @@
 }
 
 .fillBack {
-  background: radial-gradient(120% 90% at 50% 20%, #2fae6a 0%, var(--green) 42%, var(--green-deep) 100%);
+  /* Sky, not green: a full-screen colour here becomes the colour of Safari's bars on iPhone. */
+  background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-top) calc(env(safe-area-inset-top, 0px) + 96px), var(--sky-mid) 58%, var(--sky-low) 100%);
   clip-path: circle(0% at 50% 50%);
   animation: wipeIn 0.46s var(--scene-ease) forwards;
 }
 
 .fillFront {
   background: radial-gradient(60% 50% at 50% 34%, rgba(255, 255, 255, 0.16) 0%, transparent 70%),
-    linear-gradient(180deg, transparent 55%, rgba(8, 48, 32, 0.45) 100%);
+    linear-gradient(180deg, transparent 55%, rgba(10, 40, 90, 0.3) 100%);
   opacity: 0;
   animation: fadeIn 0.5s 0.2s ease forwards;
 }

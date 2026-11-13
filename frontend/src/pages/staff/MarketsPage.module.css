@@ -2,12 +2,12 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 .head h1 {
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .sub {
@@ -20,17 +20,17 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-4);
   background: var(--staff-surface);
-  border: 1px solid var(--staff-line);
-  border-radius: 12px;
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--space-3);
   text-decoration: none;
   color: inherit;
 }
@@ -50,15 +50,15 @@
 
 .meta {
   color: var(--staff-muted);
-  font-size: var(--fs-small);
+  font-size: var(--type-staff-meta-size);
 }
 
 .empty,
 .error {
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .error {
-  color: #9a3b3b;
-  font-weight: 650;
+  color: var(--color-error);
+  font-weight: 600;
 }

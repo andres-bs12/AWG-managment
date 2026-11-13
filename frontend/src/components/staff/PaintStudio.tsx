@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Button } from '../ui/Button'
 import type { Photo } from '../../domain/types'
 import {
@@ -26,6 +26,7 @@ type Bitmap = {
 
 export function PaintStudio({ photos, alt }: Props) {
   const [index, setIndex] = useState(0)
+  const id = useId()
   const [filter, setFilter] = useState<PaintFilter>('color')
   const [bitmap, setBitmap] = useState<Bitmap | null>(null)
   const [mode, setMode] = useState<'canvas' | 'css'>('canvas')
@@ -86,7 +87,7 @@ export function PaintStudio({ photos, alt }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.closest('[role=tablist]')) return
       if (e.key === 'ArrowLeft') setIndex((i) => Math.max(0, i - 1))
       if (e.key === 'ArrowRight') setIndex((i) => Math.min(photos.length - 1, i + 1))
       const n = Number(e.key)
@@ -102,7 +103,10 @@ export function PaintStudio({ photos, alt }: Props) {
         ref={stageRef}
         className={styles.stage}
         onContextMenu={(e) => e.preventDefault()}
-        aria-label="Painting reference photo"
+        id={`${id}-photo-panel`}
+        role={photos.length > 1 ? 'tabpanel' : 'region'}
+        aria-labelledby={photos.length > 1 ? `${id}-photo-${Math.min(index, photos.length - 1)}` : undefined}
+        aria-label={photos.length > 1 ? undefined : 'Painting reference photo'}
       >
         {bitmap ? (
           <div
@@ -111,7 +115,7 @@ export function PaintStudio({ photos, alt }: Props) {
             style={{ width: bitmap.width, height: bitmap.height }}
           >
             {mode === 'canvas' && bitmap.pixels ? (
-              <canvas ref={canvasRef} className={styles.bitmap} aria-label={alt} />
+              <canvas role="img" ref={canvasRef} className={styles.bitmap} aria-label={alt} />
             ) : (
               <img
                 className={styles.bitmap}
@@ -178,9 +182,21 @@ export function PaintStudio({ photos, alt }: Props) {
                 key={item.id}
                 type="button"
                 className={styles.thumb}
+                id={`${id}-photo-${i}`}
+                role="tab"
+                aria-selected={i === index}
+                aria-controls={`${id}-photo-panel`}
+                tabIndex={i === index ? 0 : -1}
                 data-active={i === index ? 'true' : 'false'}
                 aria-label={`Photo ${i + 1} of ${photos.length}`}
                 onClick={() => setIndex(i)}
+                onKeyDown={event => {
+                  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+                  event.preventDefault(); event.stopPropagation()
+                  const next = event.key === 'Home' ? 0 : event.key === 'End' ? photos.length - 1 : (i + (event.key === 'ArrowLeft' ? -1 : 1) + photos.length) % photos.length
+                  setIndex(next)
+                  document.getElementById(`${id}-photo-${next}`)?.focus()
+                }}
               >
                 <img src={item.dataUrl} alt="" />
               </button>

@@ -1,71 +1,84 @@
 .panel {
-  background: #fff;
-  border: 1px solid var(--staff-line);
-  border-radius: 12px;
-  padding: 20px;
+  background: var(--staff-surface);
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--space-3);
+  padding: var(--space-4);
   position: sticky;
-  top: 12px;
+  top: var(--space-3);
 }
 
 .panel h2 {
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .code {
   font-weight: 700;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .empty,
 .meta,
 .list p {
   color: var(--staff-muted);
-  font-size: var(--fs-small);
+  font-size: var(--type-staff-meta-size);
 }
 
+/* Dividers sit between rows and above the total only, so no line is left dangling at the end
+   of the card when the total is hidden on narrow screens. */
 .list {
   list-style: none;
-  margin: 0 0 12px;
+  margin: 0;
   padding: 0;
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
-.list li {
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--staff-line);
+.list li + li {
+  padding-top: var(--space-3);
+  border-top: var(--border-thin) solid var(--staff-line);
 }
 
 .row {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
 .colorDot {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: var(--space-3);
+  height: var(--space-3);
   border-radius: 50%;
-  margin-right: 6px;
-  border: 1px solid rgba(0, 0, 0, 0.24);
-  vertical-align: 1px;
+  margin-right: var(--space-2);
+  border: var(--border-thin) solid var(--color-disabled-surface);
+  vertical-align: var(--border-thin);
 }
 
-.colorDot[data-color='red'] { background: #b7352b; }
-.colorDot[data-color='grey'] { background: #8b8d8f; }
+.colorDot[data-color='red'] { background: var(--ornament-red); }
+.colorDot[data-color='grey'] { background: var(--ornament-grey); }
 
 .total {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 1.25rem;
-  margin-top: 12px;
+  font-size: var(--type-staff-h2-size);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: var(--border-thin) solid var(--staff-line);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1023px) {
   .panel {
     position: static;
   }
 }
+
+.colorDot[data-color='green'] { background: var(--ornament-green); }
+.colorDot[data-color='beige'] { background: var(--ornament-beige); }
+.colorDot[data-color='white'] { background: var(--ornament-white); }
+
+@media (max-width: 1023px) { .total { display: none; } }
+
+.row > span, .total strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.row strong { min-width: 0; overflow-wrap: anywhere; }

@@ -1,13 +1,13 @@
 .page {
-  max-width: 760px;
+  max-width: var(--layout-form-max);
 }
 
 .head {
-  margin: 12px 0 16px;
+  margin: var(--space-3) 0 var(--space-4);
 }
 
 .head h1 {
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .sub,
@@ -18,31 +18,35 @@
 
 .form {
   background: var(--staff-surface);
-  border: 1px solid var(--staff-line);
-  border-radius: 12px;
-  padding: 16px;
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--space-3);
+  padding: var(--space-4);
 }
 
 .input {
+  min-height: var(--size-control-staff);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-thin) solid var(--color-control-border);
+  border-radius: var(--radius-control);
   color: var(--staff-ink);
-  border: 2px solid var(--staff-ink);
+  background: var(--staff-surface);
   font-family: var(--font-staff);
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0 12px;
+  grid-template-columns: repeat(auto-fit, minmax(var(--size-staff-name), 1fr));
+  gap: 0 var(--space-3);
 }
 
 .error,
 .notice {
-  margin-bottom: 12px;
-  font-weight: 650;
+  margin-bottom: var(--space-3);
+  font-weight: 600;
 }
 
 .error {
-  color: #9a3b3b;
+  color: var(--color-error);
 }
 
 .notice {
@@ -50,39 +54,42 @@
 }
 
 .days {
-  margin-top: 4px;
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  margin-top: var(--space-1);
 }
 
 .days h2 {
-  margin-bottom: 4px;
-  font-size: 1rem;
+  margin-bottom: var(--space-1);
+  font-size: var(--type-staff-body-size);
 }
 
 .dayList {
   list-style: none;
-  margin: 12px 0 0;
+  margin: 0;
   padding: 0;
 }
 
 .day {
   display: grid;
-  grid-template-columns: minmax(8rem, 1.3fr) 1fr 1fr auto;
-  gap: 10px;
+  grid-template-columns: minmax(var(--layout-postcode-max), 1.3fr) 1fr 1fr auto;
+  gap: var(--space-3);
   align-items: end;
-  padding: 12px 0;
-  border-top: 1px solid var(--staff-line);
+  padding: var(--space-3) 0;
+  border-top: var(--border-thin) solid var(--staff-line);
 }
 
 .dayDate {
   font-weight: 700;
-  padding-bottom: 10px;
+  padding-bottom: var(--space-3);
 }
 
 .time {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-weight: 650;
+  gap: var(--space-2);
+  font-weight: 600;
   min-width: 0;
 }
 
@@ -90,13 +97,13 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .locked {
   color: var(--staff-muted);
-  font-size: var(--fs-small);
-  font-weight: 650;
+  font-size: var(--type-staff-meta-size);
+  font-weight: 600;
 }
 
 .actions {
@@ -104,18 +111,20 @@
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-end;
-  gap: 12px;
-  margin-top: 8px;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
 }
 
 .deleteMarket {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
-@media (max-width: 720px) {
+.days > button { justify-self: start; }
+
+@media (max-width: 767px) {
   .day {
     grid-template-columns: 1fr 1fr;
   }
@@ -128,4 +137,28 @@
   .dayActions {
     align-items: stretch;
   }
+}
+
+/* Removing a day only stages the change; it must not outweigh Save. */
+.removeDay:not(:disabled) {
+  color: var(--staff-danger);
+}
+
+.day[data-invalid] {
+  /* Tint without moving the columns: the padding is taken back by the margin. */
+  margin-inline: calc(-1 * var(--space-3));
+  padding-inline: var(--space-3);
+  background: var(--color-error-surface);
+  border-radius: var(--radius-small);
+}
+
+.dayConflict {
+  display: block;
+  color: var(--staff-danger);
+  font-size: var(--type-staff-meta-size);
+  font-weight: 600;
+}
+
+.deleteMarketBtn:not(:disabled) {
+  color: var(--staff-danger);
 }

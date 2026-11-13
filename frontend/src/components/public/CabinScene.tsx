@@ -1,3 +1,4 @@
+import { Painter, SittingCat, SittingDog } from './FlatFolk'
 import styles from './CabinScene.module.css'
 
 type Props = {
@@ -28,68 +29,23 @@ const TOP_SHELF = [
 export function CabinScene({ title }: Props) {
   return (
     <div className={styles.wrap}>
-      <div className={styles.halo} aria-hidden="true" />
-      <svg className={styles.svg} viewBox="0 0 420 352" role="img" aria-label={title}>
-        <defs>
-          <linearGradient id="awgWall" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#c67b38" />
-            <stop offset="1" stopColor="#a25d26" />
-          </linearGradient>
-          <linearGradient id="awgGable" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#b96c2c" />
-            <stop offset="1" stopColor="#93511f" />
-          </linearGradient>
-          <linearGradient id="awgCounter" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#eab475" />
-            <stop offset="1" stopColor="#c07c38" />
-          </linearGradient>
-          <linearGradient id="awgBack" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#7a4a26" />
-            <stop offset="1" stopColor="#45261300" />
-          </linearGradient>
-          <radialGradient id="awgLamp" cx="0.5" cy="0.18" r="0.78">
-            <stop offset="0" stopColor="rgba(255, 220, 150, 0.9)" />
-            <stop offset="0.55" stopColor="rgba(255, 196, 112, 0.28)" />
-            <stop offset="1" stopColor="rgba(255, 190, 110, 0)" />
-          </radialGradient>
-          {/* Ground layers fade out downwards so the drift melts into the backdrop snow field. */}
-          <radialGradient id="awgGroundGlow" cx="0.5" cy="0.5" r="0.5">
-            <stop offset="0" stopColor="#ffffff" stopOpacity="0.92" />
-            <stop offset="0.55" stopColor="#f6fafe" stopOpacity="0.6" />
-            <stop offset="1" stopColor="#eef5fd" stopOpacity="0" />
-          </radialGradient>
-          <radialGradient id="awgContact" cx="0.5" cy="0.5" r="0.5">
-            <stop offset="0" stopColor="#7397c4" stopOpacity="0.5" />
-            <stop offset="0.5" stopColor="#8aabd4" stopOpacity="0.22" />
-            <stop offset="1" stopColor="#a8c4e4" stopOpacity="0" />
-          </radialGradient>
-          <linearGradient id="awgDrift" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#fdfeff" stopOpacity="1" />
-            <stop offset="0.5" stopColor="#f5faff" stopOpacity="0.9" />
-            <stop offset="1" stopColor="#e9f1fb" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="awgDriftShade" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#dfeaf8" stopOpacity="0.85" />
-            <stop offset="1" stopColor="#dfeaf8" stopOpacity="0" />
-          </linearGradient>
-        </defs>
+      <svg className={styles.svg} viewBox="0 0 420 332" role="img" aria-label={title}>
+        {/* flat snow ledge: straight full-width bottom edge at y=332, gently rounded top */}
+        <path d="M-10 332 V322 Q40 314 120 316 Q210 318 300 316 Q380 314 430 322 V332 Z" fill="#f2f8ff" />
+        {/* flat contact shadow right under the stall */}
+        <ellipse cx="210" cy="325" rx="150" ry="3.5" fill="#c9daef" />
 
-        {/* soft light pooling on the snow around the stall */}
-        <ellipse cx="210" cy="328" rx="258" ry="44" fill="url(#awgGroundGlow)" />
-
+        {/* layered fir with snow on each tier, and a smaller one tucked behind it */}
         <g className={styles.pineLeft}>
-          <rect x="28" y="282" width="8" height="36" rx="2" fill="#123227" />
-          <path d="M32 206 L58 256 L6 256 Z" fill="var(--pine-light)" />
-          <path d="M32 232 L64 286 L0 286 Z" fill="var(--pine)" />
-          <path d="M32 206 L43 226 L21 226 Z" fill="#eaf4ff" opacity="0.7" />
+          <rect x="29" y="292" width="7" height="32" rx="2" fill="#5b3a22" />
+          <path d="M32 204 L52 238 L12 238 Z" fill="var(--pine-light)" />
+          <path d="M32 224 L58 264 L6 264 Z" fill="var(--pine)" />
+          <path d="M32 248 L64 294 L0 294 Z" fill="#1a4237" />
+          <path d="M32 204 L41 219 L23 219 Z M14 236 Q32 230 50 236 Q32 242 14 236 Z M9 262 Q32 254 55 262 Q32 268 9 262 Z" fill="#eaf4ff" />
+          <circle cx="24" cy="252" r="2.6" fill="var(--berry)" />
+          <circle cx="42" cy="276" r="2.6" fill="var(--gold)" />
+          <circle cx="20" cy="282" r="2.2" fill="var(--gift-blue)" />
         </g>
-        <g className={styles.pineRight}>
-          <rect x="386" y="286" width="8" height="34" rx="2" fill="#123227" />
-          <path d="M390 228 L412 268 L368 268 Z" fill="var(--pine-light)" />
-          <path d="M390 248 L418 290 L362 290 Z" fill="var(--pine)" />
-          <path d="M390 228 L399 245 L381 245 Z" fill="#eaf4ff" opacity="0.7" />
-        </g>
-
         {/*
           Chimney steam. It leaves the mouth at y=44, right behind the chimney's snow lip, and is
           drawn before the cabin so the lip hides where each puff is born.
@@ -109,7 +65,7 @@ export function CabinScene({ title }: Props) {
           <rect x="274" y="46" width="34" height="13" rx="6" fill="#f7fbff" />
 
           {/* gable wall + roof */}
-          <path d="M210 62 L354 156 L66 156 Z" fill="url(#awgGable)" />
+          <path d="M210 62 L354 156 L66 156 Z" fill="#a8601f" />
           <g stroke="#7d4419" strokeWidth="2" opacity="0.35">
             <path d="M120 130 H300 M150 108 H270" />
           </g>
@@ -140,9 +96,9 @@ export function CabinScene({ title }: Props) {
           </g>
 
           {/* side walls */}
-          <rect x="62" y="156" width="296" height="152" rx="5" fill="url(#awgWall)" />
-          <rect x="62" y="156" width="26" height="152" fill="#96541f" />
-          <rect x="332" y="156" width="26" height="152" fill="#96541f" />
+          <rect x="62" y="156" width="296" height="152" rx="5" fill="#b86f30" />
+          <rect x="62" y="156" width="26" height="152" fill="#9a581f" />
+          <rect x="332" y="156" width="26" height="152" fill="#9a581f" />
           <g stroke="#8d4c1b" strokeWidth="2" opacity="0.3">
             <path d="M62 196 H358 M62 236 H358 M62 276 H358" />
           </g>
@@ -152,8 +108,8 @@ export function CabinScene({ title }: Props) {
 
           {/* opening */}
           <path d="M92 174 H328 V276 H92 Z" fill="#3c2213" />
-          <path d="M92 174 H328 V240 H92 Z" fill="url(#awgBack)" />
-          <path className={styles.lampGlow} d="M92 174 H328 V276 H92 Z" fill="url(#awgLamp)" />
+          <path d="M92 174 H328 V240 H92 Z" fill="#58361c" />
+          <path className={styles.lampGlow} d="M92 174 H328 V276 H92 Z" fill="#ffc878" fillOpacity="0.26" />
 
           {/* shelves with painted ornaments */}
           <g>
@@ -167,8 +123,6 @@ export function CabinScene({ title }: Props) {
             ))}
             <rect x="104" y="266" width="212" height="6" rx="3" fill="#7a4a23" />
             <g>
-              <rect x="112" y="246" width="30" height="20" rx="4" fill="var(--berry)" />
-              <rect x="124" y="246" width="6" height="20" fill="var(--gold)" />
               <rect x="152" y="250" width="26" height="16" rx="4" fill="var(--gift-blue)" />
               <rect x="162" y="250" width="6" height="16" fill="#f7fbff" />
               <circle cx="206" cy="256" r="10" fill="#2fae6a" />
@@ -199,11 +153,11 @@ export function CabinScene({ title }: Props) {
           </g>
 
           {/* counter + apron */}
-          <rect x="52" y="276" width="316" height="20" rx="7" fill="url(#awgCounter)" />
-          <rect x="52" y="276" width="316" height="6" rx="3" fill="#f6d8a8" opacity="0.65" />
-          <rect x="70" y="296" width="280" height="26" rx="4" fill="#a45f27" />
+          <rect x="52" y="276" width="316" height="20" rx="7" fill="#e2a964" />
+          <rect x="52" y="276" width="316" height="6" rx="3" fill="#f0c98f" />
+          <path d="M70 296 H350 V324 H70 Z" fill="#a45f27" />
           <g stroke="#8b4a22" strokeWidth="2" opacity="0.55">
-            <path d="M112 298 V320 M154 298 V320 M196 298 V320 M238 298 V320 M280 298 V320 M322 298 V320" />
+            <path d="M112 298 V322 M154 298 V322 M196 298 V322 M238 298 V322 M280 298 V322 M322 298 V322" />
           </g>
 
           {/* garland: two swags that stay on the counter apron */}
@@ -238,11 +192,11 @@ export function CabinScene({ title }: Props) {
 
           {/* wreath on the left post */}
           <g className={styles.wreath}>
-            <circle cx="75" cy="212" r="18" fill="none" stroke="var(--green-deep)" strokeWidth="10" />
-            <circle cx="75" cy="212" r="18" fill="none" stroke="var(--pine-light)" strokeWidth="4.5" opacity="0.85" />
-            <circle cx="64" cy="202" r="3.2" fill="var(--berry)" />
-            <circle cx="86" cy="220" r="3.2" fill="var(--berry)" />
-            <path d="M75 193 l-8 -9 l8 4 l8 -4 Z" fill="var(--berry)" />
+            <circle cx="78" cy="212" r="13" fill="none" stroke="var(--green-deep)" strokeWidth="8" />
+            <circle cx="78" cy="212" r="13" fill="none" stroke="var(--pine-light)" strokeWidth="3.5" opacity="0.85" />
+            <circle cx="70" cy="205" r="3.2" fill="var(--berry)" />
+            <circle cx="86" cy="219" r="3.2" fill="var(--berry)" />
+            <path d="M78 198 l-8 -9 l8 4 l8 -4 Z" fill="var(--berry)" />
           </g>
 
           {/* brush jar on the counter */}
@@ -255,11 +209,6 @@ export function CabinScene({ title }: Props) {
           </g>
         </g>
 
-        {/* Snow banked against the base. Tapered ends + a downward fade leave no visible edge. */}
-        <path d="M-30 352 Q40 306 130 311 Q210 315 290 310 Q380 305 450 352 Z" fill="url(#awgDrift)" />
-        {/* the stall's own shadow, cast forward onto that snow */}
-        <ellipse cx="208" cy="326" rx="150" ry="13" fill="url(#awgContact)" />
-
         <g className={styles.gifts}>
           <g>
             <rect x="44" y="296" width="36" height="28" rx="4" fill="var(--berry)" />
@@ -267,15 +216,12 @@ export function CabinScene({ title }: Props) {
             <rect x="44" y="306" width="36" height="7" fill="var(--gold)" />
             <path d="M62 296 l-6 -8 l6 3 l6 -3 Z" fill="var(--gold)" />
           </g>
-          <g>
-            <rect x="344" y="302" width="30" height="22" rx="4" fill="var(--gift-blue)" />
-            <rect x="356" y="302" width="7" height="22" fill="#f7fbff" />
-            <rect x="344" y="310" width="30" height="6" fill="#f7fbff" />
-          </g>
         </g>
 
-        {/* a shallow ripple in front, for depth */}
-        <path d="M-20 352 Q100 334 210 338 Q320 342 440 352 Z" fill="url(#awgDriftShade)" />
+        {/* What the stall is about: the cat on the counter, the dog in front, Gaby painting an ornament. */}
+        <SittingCat x={96} y={236} width={40} height={40} />
+        <SittingDog x={84} y={281} width={46} height={46} />
+        <Painter x={350} y={248} width={69} height={79} />
       </svg>
     </div>
   )

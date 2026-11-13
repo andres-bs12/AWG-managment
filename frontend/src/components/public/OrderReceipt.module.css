@@ -7,6 +7,10 @@
 .color { display: inline-flex; align-items: center; gap: var(--space-2); }
 .color i { width: 12px; height: 12px; border-radius: 50%; background: #8b929a; border: 1px solid #0002; }
 .color i[data-color='red'] { background: var(--berry-deep); }
+.color i[data-color='green'] { background: var(--ornament-green); }
+.color i[data-color='beige'] { background: var(--ornament-beige); }
+.color i[data-color='grey'] { background: var(--ornament-grey); }
+.color i[data-color='white'] { background: var(--ornament-white); }
 .total { border-top: 1px solid var(--snow-2); margin-top: var(--space-3); padding-top: var(--space-4); }
 .total > div { display: flex; justify-content: space-between; gap: var(--space-3); }
 .total strong { font-size: var(--fs-h2); }

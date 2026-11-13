@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "color-no-hex": true,
+    "declaration-property-value-disallowed-list": {
+      "/.*/": ["/\\b(?:rgb|rgba|hsl|hsla)\\(/"],
+      "/^(?!border(?:-|$)).*/": ["/\\b[0-9.]+px\\b/"]
+    }
+  },
+  "ignoreFiles": ["**/node_modules/**", "**/dist/**", "src/styles/tokens.css"]
+}

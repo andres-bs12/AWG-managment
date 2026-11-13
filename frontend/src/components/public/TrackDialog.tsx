@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { apiError } from '../../lib/apiError'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../../api/client'
 import { Button } from '../ui/Button'
@@ -12,13 +13,15 @@ type Props = {
   onSubmit: (code: string) => void
   initialCode?: string
   error?: string
+  lookup?: typeof api.tracking.getByCode
+  openerRef?: RefObject<HTMLElement | null>
 }
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
 /** Mount only while the pop-up should be visible — mounting is what resets and focuses it. */
-export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Props) {
-  const { t } = useLocale()
+export function TrackDialog({ onClose, onSubmit, initialCode = '', error, lookup = api.tracking.getByCode, openerRef }: Props) {
+  const { t, locale } = useLocale()
   const titleId = useId()
   const hintId = useId()
   const cardRef = useRef<HTMLDivElement>(null)
@@ -27,9 +30,14 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
   const [code, setCode] = useState(initialCode)
   const [localError, setLocalError] = useState('')
   const [busy, setBusy] = useState(false)
+  // Resolve the portal host after commit: during the first render after a lazy route loads, the
+  // Suspense fallback (which also carries data-public-shell) is still in the DOM and is removed on
+  // commit, which would leave the dialog inside a detached node on a direct visit to /track.
+  const [host, setHost] = useState<Element | null>(null)
+  useLayoutEffect(() => { setHost(document.querySelector('[data-public-shell]') ?? document.body) }, [])
 
   useEffect(() => {
-    restoreRef.current = document.activeElement as HTMLElement | null
+    restoreRef.current = openerRef?.current ?? document.activeElement as HTMLElement | null
     const { overflow } = document.body.style
     document.body.style.overflow = 'hidden'
     const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 220)
@@ -38,7 +46,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
       document.body.style.overflow = overflow
       restoreRef.current?.focus?.()
     }
-  }, [])
+  }, [openerRef])
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') {
@@ -68,14 +76,14 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
       inputRef.current?.focus()
       return
     }
+    if (!/^AWG[A-Z0-9]{4,6}$/i.test(next)) { setLocalError(t('trackCodeFormat')); inputRef.current?.focus(); return }
     setLocalError('')
     setBusy(true)
     try {
-      await api.tracking.getByCode(next)
+      await lookup(next)
       onSubmit(next)
     } catch (err) {
-      const message = err instanceof Error && err.message ? err.message : t('trackNotFound')
-      setLocalError(message)
+      setLocalError(apiError(err, locale, t('trackNotFound')).text)
       inputRef.current?.focus()
     } finally {
       setBusy(false)
@@ -84,6 +92,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
 
   const shownError = localError || error || ''
 
+  if (!host) return null
   return createPortal(
     <div className={styles.overlay} onKeyDown={onKeyDown}>
       <button
@@ -107,7 +116,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
             <circle cx="30" cy="30" r="9" fill="var(--berry)" />
             <circle cx="62" cy="38" r="7" fill="var(--gold)" />
             <circle cx="92" cy="30" r="9" fill="var(--green-bright)" />
-            <circle cx="124" cy="38" r="7" fill="var(--gift-blue)" />
+            <circle cx="124" cy="38" r="7" fill="var(--snow-field)" />
             <circle cx="156" cy="30" r="9" fill="var(--berry)" />
             <circle cx="188" cy="38" r="7" fill="var(--gold)" />
           </svg>
@@ -146,7 +155,7 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
               autoComplete="off"
               autoCapitalize="characters"
               spellCheck={false}
-              placeholder="AWG-2026"
+              placeholder="AWGK7Q2MX"
               disabled={busy}
               aria-invalid={shownError ? 'true' : 'false'}
               value={code}
@@ -165,6 +174,6 @@ export function TrackDialog({ onClose, onSubmit, initialCode = '', error }: Prop
         </form>
       </div>
     </div>,
-    document.body,
+    host,
   )
 }

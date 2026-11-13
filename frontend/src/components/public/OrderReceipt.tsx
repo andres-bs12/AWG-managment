@@ -1,8 +1,10 @@
 import type { OrnamentColor, PaymentState } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
+import { receiptTitle } from '../../lib/ornamentTitle'
+import { colorKeys } from '../../lib/ornamentPresentation'
 import styles from './OrderReceipt.module.css'
 
-type ReceiptItem = { petName: string; kind: 'custom' | 'finished'; color?: OrnamentColor; cost?: number; backName: string }
+type ReceiptItem = { petName: string; kind: 'custom' | 'finished'; withName?: boolean; color?: OrnamentColor; cost?: number; backName: string }
 
 export function OrderReceipt({ items, total, paymentState }: { items: ReceiptItem[]; total?: number; paymentState?: PaymentState }) {
   const { locale, t } = useLocale()
@@ -14,10 +16,9 @@ export function OrderReceipt({ items, total, paymentState }: { items: ReceiptIte
         {items.map((item, index) => (
           <li key={index}>
             <div>
-              <strong>{item.petName || t('itemNotPersonalised')}</strong>
+              <strong>{receiptTitle(item, index, items.length, t)}</strong>
               <span className={styles.meta}>
-                {item.color ? <span className={styles.color}><i data-color={item.color} aria-hidden="true" />{t(item.color === 'red' ? 'colorRed' : 'colorGrey')}</span> : item.kind === 'custom' ? <span>{t('colorUnknown')}</span> : null}
-                {item.backName ? <span>{t('backName')}: {item.backName}</span> : null}
+                {item.color ? <span className={styles.color}><i data-color={item.color} aria-hidden="true" />{t(colorKeys[item.color])}{item.color === 'grey' || item.color === 'white' ? ` (${t('legacyColour')})` : ''}</span> : item.kind === 'custom' ? <span>{t('colorUnknown')}</span> : null}
               </span>
             </div>
             {item.cost != null ? <span>{money(item.cost)}</span> : null}

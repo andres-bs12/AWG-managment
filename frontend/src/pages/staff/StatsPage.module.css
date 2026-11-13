@@ -1,0 +1,86 @@
+.page { display: grid; gap: var(--space-4); min-width: 0; }
+.page h1, .page h2, .page p, .page dl, .page dd { margin: 0; }
+.page h2 { font-size: var(--type-staff-h2-size); line-height: var(--type-staff-h2-line); font-weight: var(--type-staff-h2-weight); }
+/* Every text cell may shrink and wrap inside its card. */
+.page :is(h2, p, dt, dd, li, span, strong, summary) { min-width: 0; overflow-wrap: anywhere; }
+
+.meta { color: var(--staff-muted); font-size: var(--type-staff-meta-size); line-height: var(--type-staff-meta-line); }
+.rangeBlock { display: grid; gap: var(--space-2); }
+
+/* Equal one-row segments (range and view). Below 400px they use the meta size so four fit at 320px. */
+.compactSegments fieldset { margin: 0; }
+.compactSegments fieldset > div { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: var(--space-1); }
+.compactSegments label { min-width: 0; padding-inline: calc(var(--space-1) + var(--border-thin)); white-space: nowrap; }
+.compactSegments label[data-selected='true'] { padding-inline: var(--space-1); }
+@media (max-width: 399px) { .compactSegments label { font-size: var(--type-staff-meta-size); } }
+
+.alert { display: grid; gap: var(--space-3); justify-items: start; padding: var(--space-4); border: 1px solid var(--color-error); border-radius: var(--radius-control); background: var(--color-error-surface); color: var(--color-error); }
+
+.groups, .group { display: grid; gap: var(--space-4); min-width: 0; }
+.card { display: grid; align-content: start; gap: var(--space-4); min-width: 0; padding: var(--space-4); border: 1px solid var(--staff-line); border-radius: var(--radius-control); background: var(--staff-surface); }
+
+/* Money: one card of label/amount rows. */
+.money { display: grid; gap: var(--space-2); }
+.money div { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.money dd { font-size: var(--type-staff-h2-size); line-height: var(--type-staff-h2-line); font-weight: var(--type-staff-h2-weight); font-variant-numeric: tabular-nums; text-align: right; }
+.money div:first-child dd { font-size: var(--type-staff-h1-size); line-height: var(--type-staff-h1-line); font-weight: var(--type-staff-h1-weight); }
+.money div[data-warning] { color: var(--staff-warn); }
+.money div[data-warning] dt { font-weight: var(--type-staff-h2-weight); }
+
+/* Orders, ornaments and average: three equal cells in one card. */
+.counts { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.counts div, .views div { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.counts dd, .views dd { order: -1; font-size: var(--type-staff-h2-size); line-height: var(--type-staff-h2-line); font-weight: var(--type-staff-h2-weight); font-variant-numeric: tabular-nums; }
+.counts dt, .views dt { color: var(--staff-muted); font-size: var(--type-staff-meta-size); line-height: var(--type-staff-meta-line); }
+.views { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
+
+.chart { display: grid; gap: var(--space-3); min-width: 0; }
+.readout { min-height: var(--type-staff-body-line-box); font-variant-numeric: tabular-nums; }
+.plot { min-width: 0; border-radius: var(--radius-small); touch-action: pan-y; cursor: crosshair; }
+.plot:focus-visible { outline: none; box-shadow: var(--focus); }
+.svg { display: block; overflow: visible; }
+.grid { stroke: var(--staff-line); stroke-width: 1; }
+.axis { fill: var(--staff-muted); font-size: var(--type-staff-meta-size); font-variant-numeric: tabular-nums; }
+.bar { fill: var(--color-primary); }
+.bar[data-active] { fill: var(--color-primary-hover); }
+.hoverBand { fill: var(--staff-bg); }
+
+.details summary { min-height: var(--size-control-staff); padding-block: var(--space-3); font-weight: var(--type-staff-h2-weight); cursor: pointer; border-radius: var(--radius-small); }
+.details summary:focus-visible { outline: none; box-shadow: var(--focus); }
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.table th, .table td { padding: var(--space-2) 0 var(--space-2) var(--space-3); border-bottom: 1px solid var(--staff-line); text-align: right; white-space: nowrap; }
+.table th:first-child { padding-left: 0; text-align: left; font-weight: 400; }
+.table thead th { color: var(--staff-muted); font-size: var(--type-staff-meta-size); font-weight: var(--type-staff-h2-weight); }
+
+/* Labelled share rows: label and value, then the bar with its percentage. */
+.rows, .errors { display: grid; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.shareRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'label value' 'track share'; align-items: center; gap: var(--space-1) var(--space-3); }
+.shareRow:has(.shareMeta) { grid-template-areas: 'label value' 'meta meta' 'track share'; }
+.shareLabel { grid-area: label; display: flex; align-items: center; gap: var(--space-2); }
+.shareRow > .number { grid-area: value; }
+.shareMeta { grid-area: meta; }
+.track { grid-area: track; height: var(--space-2); border-radius: var(--radius-pill); background: var(--staff-bg); overflow: hidden; }
+.fill { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--color-primary); }
+.page .shareText { grid-area: share; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; overflow-wrap: normal; }
+.page .number { font-weight: var(--type-staff-h2-weight); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; overflow-wrap: normal; }
+.swatch { flex: none; width: var(--size-swatch); height: var(--size-swatch); border-radius: var(--radius-circle); border: 1px solid var(--ornament-swatch-border); }
+
+.errors li { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.errorLabel { display: grid; gap: var(--space-1); }
+
+/* Below 1024px only the chosen group shows. */
+@media (max-width: 1023px) {
+  .groups[data-view='sales'] .group:not([data-group='sales']),
+  .groups[data-view='customers'] .group:not([data-group='customers']),
+  .groups[data-view='website'] .group:not([data-group='website']) { display: none; }
+}
+
+/* From 1024px: no filter, every card in two balanced columns (sales first, then customers, then website). */
+@media (min-width: 1024px) {
+  .viewFilter { display: none; }
+  .groups { display: block; columns: 2; column-gap: var(--space-4); }
+  .group { display: contents; }
+  .groups > .group > *, .groups > .group > .noSalesRepeat { break-inside: avoid; margin-bottom: var(--space-4); }
+  .noSalesRepeat { display: none; }
+}

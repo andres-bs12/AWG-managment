@@ -1,7 +1,8 @@
+import { StaffText } from '../../components/staff/StaffText'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
-import { useMockStoreVersion } from '../../api/mock/useMockStore'
+import { useStaffRefresh } from '../../lib/useStaffRefresh'
 import { ButtonLink } from '../../components/ui/ButtonLink'
 import type { Market, MarketDay } from '../../domain/types'
 import { formatEur } from '../../lib/money'
@@ -20,7 +21,7 @@ function dayCountLabel(count: number): string {
 }
 
 export function MarketsPage() {
-  const version = useMockStoreVersion()
+  const version = useStaffRefresh()
   const [markets, setMarkets] = useState<Market[]>([])
   const [days, setDays] = useState<MarketDay[]>([])
   const [ready, setReady] = useState(false)
@@ -33,6 +34,7 @@ export function MarketsPage() {
         if (cancel) return
         setMarkets(nextMarkets.filter((market) => market.kind === 'market'))
         setDays(nextDays)
+        setError('')
         setReady(true)
       })
       .catch((err: unknown) => {
@@ -52,7 +54,6 @@ export function MarketsPage() {
       <div className={styles.head}>
         <div>
           <h1>Markets</h1>
-          <p className={styles.sub}>Stall seasons and the Friday–Sunday pickup days.</p>
         </div>
         <ButtonLink to="/staff/markets/new" tone="staff" variant="primary">
           New market
@@ -73,15 +74,15 @@ export function MarketsPage() {
             const count = days.filter((day) => day.marketId === market.id).length
             const meta = [
               market.stall == null ? 'No stall' : `Stall ${market.stall}`,
-              formatEur(market.totalCost),
+              formatEur(market.totalCost, 'en'),
               seasonLabel(market),
               dayCountLabel(count),
-            ].join(' · ')
+            ]
             return (
               <li key={market.id}>
                 <Link className={styles.card} to={`/staff/markets/${market.id}`}>
                   <span className={styles.name}>{market.name}</span>
-                  <span className={styles.meta}>{meta}</span>
+                  <span className={styles.meta}><StaffText>{meta.slice(0, 2).join(' · ')}</StaffText></span><span className={styles.meta}><StaffText>{meta.slice(2).join(' · ')}</StaffText></span>
                 </Link>
               </li>
             )

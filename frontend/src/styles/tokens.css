@@ -7,6 +7,182 @@
   --space-6: 32px;
   --space-7: 48px;
   --space-8: 64px;
+  --space-9: 80px;
+  --space-10: 96px;
+
+  /* Public design system (docs/design-system.md). Public UI uses only these semantic
+     tokens; the raw palette further below stays for illustrations and staff. */
+  --color-surface: #fffdf9;
+  --color-surface-raised: #ffffff;
+  --color-text: #152033;
+  --color-text-muted: #5c6b80;
+  --color-border: #c6cec9;
+  --color-control-border: #738078;
+  --color-primary: #1f7a4d;
+  --color-primary-hover: #14553a;
+  --color-on-primary: #ffffff;
+  /* C1: one selection treatment = 2px selected boundary + tint + label weight 600. */
+  --color-selected: #14553a;
+  --color-selected-surface: #e9f4ee;
+  --color-selection-hover: #f4f9f6;
+  --color-focus: #14553a;
+  --color-error: #9a3b3b;
+  --color-error-surface: #fff0ee;
+  --color-cart-surface: #eef4f8;
+  --color-cart-ink: #243352;
+  --color-disabled-surface: #f3f5f7;
+  --color-disabled-text: #5c6b80;
+
+  --size-control: 48px;
+  --size-editor-bar: 64px;
+  --size-swatch: 24px;
+  --size-check: 24px;
+  --size-help-glyph: 24px;
+  --size-icon: 24px;
+  --border-thin: 1px;
+  --border-control: 2px;
+  --border-inset: 4px;
+  --radius-small: 8px;
+  --radius-control: 12px;
+  --radius-panel: 20px;
+  --shadow-1: 0 4px 12px rgba(21, 32, 51, 0.1);
+  --shadow-2: 0 16px 40px rgba(21, 32, 51, 0.16);
+  /* Shadow cast upwards by a bar docked to the bottom of the screen (mirror of --shadow-1). */
+  --shadow-up: 0 -4px 12px rgba(21, 32, 51, 0.1);
+  --layout-configurator-max: 1100px;
+  --layout-form-max: 760px;
+
+  --dur-press: 100ms;
+  --dur-change: 200ms;
+  --dur-enter: 300ms;
+  --dur-flip: 450ms;
+  --ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+
+  /* Complete public role tuples and shared dimensions, design system §§3–8. */
+  --type-display-size: clamp(2rem, 6vw, 3.25rem);
+  --type-display-line: 1.10;
+  --type-display-weight: 800;
+  --type-display-tracking: -0.015em;
+  --type-h1-size: 1.75rem;
+  --type-h1-line: 1.20;
+  --type-h1-weight: 700;
+  --type-h1-tracking: 0em;
+  --type-h2-size: 1.625rem;
+  --type-h2-line: 1.25;
+  --type-h2-weight: 700;
+  --type-h2-tracking: 0em;
+  --type-h3-size: 1.25rem;
+  --type-h3-line: 1.30;
+  --type-h3-weight: 700;
+  --type-h3-tracking: 0em;
+  --type-label-size: 1rem;
+  --type-label-line: 1.40;
+  --type-label-weight: 600;
+  --type-label-tracking: 0em;
+  --type-body-size: 1rem;
+  --type-body-line: 1.50;
+  --type-body-weight: 400;
+  --type-body-tracking: 0em;
+  --type-hint-size: 0.875rem;
+  --type-hint-line: 1.45;
+  --type-hint-weight: 400;
+  --type-hint-tracking: 0em;
+  --type-caption-size: 0.75rem;
+  --type-caption-line: 1.50;
+  --type-caption-weight: 600;
+  --type-caption-tracking: 0em;
+  --type-price-size: 1.5rem;
+  --type-price-line: 1.25;
+  --type-price-weight: 700;
+  --type-price-tracking: 0em;
+  --type-button-size: 1rem;
+  --type-button-line: 1.25;
+  --type-button-weight: 600;
+  --type-button-tracking: 0em;
+  --color-focus-gap: #ffffff;
+  --color-primary-pressed: var(--color-primary-hover);
+  --color-success: var(--color-selected);
+  --color-success-surface: var(--color-selected-surface);
+  --color-warning: #805515;
+  --color-warning-surface: #fff4d6;
+  --color-info: var(--color-text);
+  --color-info-surface: var(--color-surface);
+  --color-overlay: rgba(21, 32, 51, 0.56);
+  --radius-circle: 50%;
+  --shadow-none: none;
+  --z-scene: 0;
+  --z-content: 1;
+  --z-header: 2;
+  --z-sticky: 3;
+  --z-popover: 4;
+  --z-modal: 5;
+  --size-review-art: 76px;
+  --size-date-card: 88px;
+  --size-photo: 76px;
+  /* Visible glyph of the photo remove control; its hit area stays --touch. */
+  --size-remove-glyph: 24px;
+  --size-preview-mobile: 140px;
+  --size-preview-tablet: 220px;
+  --size-preview-desktop: 280px;
+  --size-preview-success: 150px;
+  --size-textarea-min: 96px;
+  --size-choice-card: 72px;
+  --size-icon-sm: 16px;
+  --size-step-marker: 32px;
+  --size-progress-rail: 4px;
+  --layout-reading-max: 680px;
+  --layout-status-max: 440px;
+  --layout-field-max: 34rem;
+  --layout-postcode-max: 8rem;
+  --layout-calendar-max: 420px;
+  --layout-gutter: var(--space-4);
+  /* Home height reserves include the wrapping legal footer and 56px actions. */
+  --layout-home-reserve: 500px;
+  --layout-home-short-reserve: 420px;
+  --layout-header-height: var(--space-8);
+  /* Focus clearance under the sticky multi-ornament editor bar (set on /buy, phones and tablets). */
+  --public-sticky-top: 0px;
+  --measure-prose: 65ch;
+  --measure-hint: 52ch;
+  --measure-heading: 28ch;
+  --dur-exit: 200ms;
+  --dur-reduced: 0ms;
+  --dur-reduced-fade: 150ms;
+  --dur-pet-cycle: 10s;
+  --ease-press: cubic-bezier(0.2, 0, 0, 1);
+  --motion-shift: var(--space-2);
+  --motion-press-scale: 0.97;
+  --ornament-highlight: rgba(255, 255, 255, 0.55);
+  --ornament-glint: rgba(255, 255, 255, 0.22);
+  --ornament-swatch-highlight: rgba(255, 255, 255, 0.60);
+  --ornament-swatch-border: var(--color-control-border);
+  --icon-stroke: 2;
+  --guide-frame-height: 440px;
+  --guide-zoom-size: 2rem;
+  --preview-perspective: 800px;
+  --preview-glint-shift: 90px;
+  --preview-turn-shift: 110px;
+  --preview-script-size: 40px;
+  --art-white: #ffffff;
+  --art-black: #000000;
+  --ornament-grey: #9ca3af;
+  --ornament-white: #f5f5f4;
+  --portrait-grey: #7b8390;
+  --portrait-white: #dededb;
+  --portrait-unknown: var(--color-disabled-surface);
+
+  /* Ornament artwork: body colour + the slightly darker tint behind the pet portrait (C3). */
+  --ornament-red: #b03a2e;
+  --ornament-green: #2f6b3f;
+  --ornament-beige: #d8c3a0;
+  --portrait-red: #963126;
+  --portrait-green: #275b35;
+  --portrait-beige: #bea780;
+  --ornament-cap: #d2b66f;
+  --ornament-hook: #a98948;
+  --ornament-name-light: #ffffff;
+  --ornament-name-dark: #5a4330;
 
   --touch: 44px;
   --touch-lg: 56px;
@@ -16,6 +192,8 @@
 
   --font-display: 'Baloo 2', 'Trebuchet MS', 'Avenir Next Rounded', system-ui, sans-serif;
   --font-sans: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+  /* Back-of-ornament lettering, like Gaby's hand-painted script. */
+  --font-script: 'Dancing Script Variable', 'Dancing Script', 'Brush Script MT', cursive;
   --font-staff: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
 
   --fs-body: 1rem;
@@ -24,7 +202,7 @@
   --fs-h2: 1.25rem;
   --fs-display: clamp(2rem, 6vw, 3.25rem);
 
-  --focus: 0 0 0 3px #fff, 0 0 0 6px #2c5aa0;
+  --focus: 0 0 0 3px var(--color-focus-gap), 0 0 0 6px var(--color-focus);
 
   /* Public (stall) */
   --night: #1b2740;
@@ -45,19 +223,18 @@
   --public-muted: #5c6b80;
 
   /* Public scene (illustrated, Santa-Tracker-ish) */
-  --sky-top: #101a33;
-  --sky-mid: #263a72;
-  --sky-low: #5a72ad;
-  --sky-horizon: #a9c2e0;
-  --aurora-a: rgba(63, 208, 201, 0.34);
-  --aurora-b: rgba(138, 108, 220, 0.3);
-  --ridge-far: #45598f;
-  --ridge-near: #2c3d6b;
+  --sky-top: #1f7fd0;
+  --sky-mid: #3fa0e2;
+  --sky-low: #84cdee;
+  --sky-horizon: #dff5f7;
+  --ridge-far: #b4dcf6;
+  --ridge-near: #7fbdf0;
+  /** Sky colour used for the depth haze between scenery layers. */
+  --haze: #e4f6f8;
   --pine: #1d4a3f;
   --pine-light: #2a6a54;
   --snow-field: #f2f8ff;
-  --snow-shade: #d6e6f6;
-  --moon: #fff6d8;
+  --snow-shade: #dcedf8;
   --gold: #ffd166;
   --gold-deep: #e0a83c;
   --berry: #e0473f;
@@ -68,29 +245,71 @@
   --scene-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --pop-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* Staff */
-  --staff-bg: #f0f3f3;
-  --staff-surface: #ffffff;
-  --staff-ink: #20312e;
-  --staff-muted: #5b6c67;
-  --staff-line: #d7e0dc;
-  --staff-btn: #234c40;
-  --staff-selected: #234c40;
-  --staff-pressed: #11100e;
-  --staff-hover: #e8efec;
-  --staff-ok: #2f6b4f;
-  --staff-warn: #9a6b2f;
-  --staff-danger: #9a3b3b;
+  /* Staff semantic layer: denser IBM Plex controls, shared selection and feedback. */
+  --color-staff-bg: #f0f3f3;
+  --color-staff-surface: var(--color-surface-raised);
+  --color-staff-text: var(--color-text);
+  --color-staff-muted: var(--color-text-muted);
+  --color-staff-line: var(--color-border);
+  --staff-bg: var(--color-staff-bg);
+  --staff-surface: var(--color-staff-surface);
+  --staff-ink: var(--color-staff-text);
+  --staff-muted: var(--color-staff-muted);
+  --staff-line: var(--color-staff-line);
+  --staff-btn: var(--color-primary);
+  --staff-selected: var(--color-selected);
+  --staff-pressed: var(--color-primary-pressed);
+  --staff-hover: var(--color-selection-hover);
+  --staff-ok: var(--color-success);
+  --staff-warn: var(--color-warning);
+  --staff-danger: var(--color-error);
+  --type-staff-h1-size: 1.375rem;
+  --type-staff-h1-line: 1.25;
+  --type-staff-h1-weight: 700;
+  --type-staff-h2-size: 1.125rem;
+  --type-staff-h2-line: 1.35;
+  --type-staff-h2-weight: 600;
+  --type-staff-body-size: 1rem;
+  --type-staff-body-line: 1.5;
+  /* One staff body line as a length (em: follows the element's own text size). */
+  --type-staff-body-line-box: calc(var(--type-staff-body-line) * 1em);
+  /* Search field min width: em so that with large text it wraps to its own row instead of shrinking. */
+  --size-staff-search-min: 12em;
+  --type-staff-body-weight: 400;
+  --type-staff-meta-size: 0.875rem;
+  --type-staff-meta-line: 1.45;
+  --type-staff-meta-weight: 400;
+  --size-control-staff: 44px;
+  --size-staff-tabs: 68px;
+  --staff-actions-height: 0px;
+  --size-staff-header: 80px;
+  --layout-staff-max: 1280px;
+  --layout-staff-side: 340px;
+  --z-staff-tabs: 10;
+  --z-staff-menu: 11;
+  --staff-canvas: #141210;
+  --staff-canvas-raised: #1c1914;
+  --staff-canvas-text: #f7f3ea;
+  --staff-canvas-muted: #d8d0c2;
+  --staff-held-pattern: repeating-linear-gradient(135deg, transparent 0 6px, var(--color-control-border) 6px 7px, transparent 7px 13px);
+  --size-agenda-hour: 80px;
+  --size-staff-name: 180px;
+  --size-staff-handoff: 132px;
+  --size-staff-qr: 220px;
+  --size-staff-qr-render: 720px;
+  --size-staff-qr-large: 560px;
+  --size-staff-quantity: 80px;
+  --layout-staff-dialog: 520px;
   --staff-slot: #e7eeeb;
   --staff-slot-ink: #2d2a25;
   --staff-slot-idle: #e4e8e6;
-  --staff-slot-idle-ink: #6a7672;
+  --staff-slot-idle-ink: #495b55;
   --staff-slot-painting: #f3e2a8;
   --staff-slot-painting-ink: #5c4a12;
   --staff-slot-ready: #c8e6d4;
   --staff-slot-ready-ink: #1f4d35;
   --staff-slot-done: #eceeed;
-  --staff-slot-done-ink: #9aa3a0;
+  --staff-slot-done-ink: #52615c;
 }
 
 @media (prefers-reduced-motion: reduce) {

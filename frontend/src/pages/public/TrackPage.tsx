@@ -1,18 +1,20 @@
+import { apiError } from '../../lib/apiError'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import { OrderReceipt } from '../../components/public/OrderReceipt'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
+import { InstagramIcon, INSTAGRAM_URL } from '../../components/public/InstagramLink'
 import { GiftBoxReady } from '../../components/public/GiftBoxReady'
 import { PaintingOrnament } from '../../components/public/PaintingOrnament'
 import { SleighWipe } from '../../components/public/SleighWipe'
 import { TrackDialog } from '../../components/public/TrackDialog'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
-import { Field } from '../../components/ui/Field'
 import { useLocale } from '../../i18n/LocaleContext'
 import { formatDateLabel, formatHour } from '../../lib/time'
-import type { Address, TrackView } from '../../domain/types'
+import { deliveryDatePhrase } from '../../lib/deliveryWindow'
+import type { TrackView } from '../../domain/types'
 import styles from './TrackPage.module.css'
 
 /** Wipe only runs after a code resolves — keep it readable even when the API is instant. */
@@ -25,26 +27,32 @@ export function TrackPage() {
   const { t, locale } = useLocale()
   const { code: codeParam } = useParams()
   const navigate = useNavigate()
+  // Arriving from the QR form: confirm the save once, here where the order state is shown.
+  const formSaved = !!(useLocation().state as { formSaved?: boolean } | null)?.formSaved
   const timers = useRef<number[]>([])
+  const savedNotice = useRef<HTMLParagraphElement>(null)
+
+  const savedFocused = useRef(false)
+  const staffDevice = useSearchParams()[0].get('staff') === '1'
+  // One anonymous page view per visit; the stall iPad (?staff=1) is not a visitor.
+  useEffect(() => { if (!staffDevice) void api.metrics.track({ event: 'track_view' }).catch(() => {}) }, [staffDevice])
+  const dialogOpener = useRef<HTMLButtonElement | null>(null)
 
   const [fetchPhase, setPhase] = useState<Phase>(codeParam ? 'checking' : 'idle')
   const [reloadKey, setReloadKey] = useState(0)
   const [loaded, setLoaded] = useState<TrackView | null>(null)
   const [fetchError, setError] = useState('')
   const [dialogOpen, setDialogOpen] = useState(!codeParam)
-  const [addr, setAddr] = useState<Address>({ line1: '', city: 'Vienna', postalCode: '' })
-  const [editing, setEditing] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [copyMessage, setCopyMessage] = useState('')
 
   useEffect(() => {
     if (!codeParam) return
 
     let cancelled = false
     setPhase('checking')
+    setDialogOpen(false)
     setLoaded(null)
     setError('')
-    setEditing(false)
-    setSaved(false)
 
     api.tracking
       .getByCode(codeParam)
@@ -52,7 +60,7 @@ export function TrackPage() {
         if (cancelled) return
         setLoaded(data)
         setError('')
-        if (data.delivery.address) setAddr(data.delivery.address)
+        if (formSaved) { setPhase('done'); return }
         setPhase('loading')
         timers.current.push(
           window.setTimeout(() => {
@@ -66,12 +74,14 @@ export function TrackPage() {
           }, MIN_WIPE_MS),
         )
       })
-      .catch((err: Error) => {
+      .catch((err) => {
         if (cancelled) return
         setLoaded(null)
-        setError(err.message || t('trackNotFound'))
+        // Name the code that was looked up, so a typo is easy to spot.
+        const notFound = !(err && typeof err === 'object' && 'code' in err) || (err as { code?: string }).code === 'ORDER_NOT_FOUND'
+        setError(notFound ? t('trackMissBody', { code: codeParam.toUpperCase() }) : apiError(err, locale, t('trackNotFound')).text)
         setPhase('done')
-        setDialogOpen(true)
+        setDialogOpen(false)
       })
 
     return () => {
@@ -79,28 +89,25 @@ export function TrackPage() {
       timers.current.forEach(window.clearTimeout)
       timers.current = []
     }
-  }, [codeParam, reloadKey, t])
+  }, [codeParam, reloadKey, t, locale, formSaved])
 
   /** Without a code in the URL there is nothing to show, whatever a previous lookup left behind. */
   const phase: Phase = codeParam ? fetchPhase : 'idle'
   const view = codeParam ? loaded : null
   const error = codeParam ? fetchError : ''
-
-  async function saveAddress() {
-    if (!view) return
-    const next = await api.tracking.updateViennaAddress(view.code, addr)
-    setLoaded(next)
-    setEditing(false)
-    setSaved(true)
-  }
+  // The confirmation lives inside the card, so it is focused once the card is on screen.
+  useEffect(() => {
+    if (!formSaved || phase !== 'done' || savedFocused.current) return
+    savedFocused.current = true
+    savedNotice.current?.focus()
+  }, [formSaved, phase])
 
   const status = view?.status ?? 'preparing'
-  const homeDelivery = view?.delivery.kind === 'vienna'
   const statusLabel =
-    status === 'delivered' ? t('delivered') : status === 'ready' ? (homeDelivery ? t('outForDelivery') : t('ready')) : t('preparing')
+    status === 'cancelled' ? t('orderCancelled') : status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
   const stepIndex = status === 'delivered' ? 2 : status === 'ready' ? 1 : 0
-  const steps = [t('stepPainting'), homeDelivery ? t('outForDelivery') : t('stepReady'), t('stepHandover')]
-  /** Sleigh only after a hit — misses stay in the dialog without this animation. */
+  const steps = [t('stepPainting'), t('ready'), t('stepHandover')]
+  /** Sleigh only after a hit — misses use the page recovery state without this animation. */
   const showWipe = phase === 'loading' || phase === 'leaving'
 
   /** Two short lines: the slot the customer picked, then how long the stall is still around. */
@@ -108,7 +115,9 @@ export function TrackPage() {
   if (view) {
     const when = view.when
     if (when.kind === 'vienna') {
+      // What on the first line, when on the second.
       whenLines.push(t('whenVienna'))
+      if (when.date) whenLines.push(deliveryDatePhrase(when.date, locale))
     } else if (when.kind === 'market') {
       const head = [
         when.date ? formatDateLabel(when.date, locale === 'de' ? 'de-AT' : 'en-GB') : null,
@@ -124,14 +133,18 @@ export function TrackPage() {
     if (whenLines.length === 0) whenLines.push(t('whenTbd'))
   }
 
+  // The form was saved even if loading the order fails: both cards confirm it, at the card's content width.
+  const savedBanner = formSaved ? <p ref={savedNotice} tabIndex={-1} className={styles.savedBanner} role="status">{t('formSavedBanner')}</p> : null
+
   return (
     <div className={styles.page}>
       {showWipe ? <SleighWipe label={t('sleigh')} leaving={phase === 'leaving'} /> : null}
 
       {view && phase === 'done' ? (
         <section className={styles.card} aria-live="polite">
+          {savedBanner}
           <div className={styles.art}>
-            {status === 'preparing' ? (
+            {status === 'cancelled' ? null : status === 'preparing' ? (
               <PaintingOrnament label={t('artPainting')} />
             ) : (
               <GiftBoxReady label={t('artReady')} />
@@ -141,79 +154,43 @@ export function TrackPage() {
           <div className={styles.details}>
             <span
               className={`${styles.chip} ${
-                status === 'preparing' ? styles.chipWork : status === 'delivered' ? styles.chipDone : styles.chipReady
+                status === 'cancelled' ? '' : status === 'preparing' ? styles.chipWork : status === 'delivered' ? styles.chipDone : styles.chipReady
               }`}
             >
               {statusLabel}
             </span>
-            <h1 className={styles.title}>{t('trackGreeting', { name: view.customerName })}</h1>
+            <h1 className={styles.title}>{view.customerName && view.customerName !== 'Walk-in' ? t('trackGreeting', { name: view.customerName }) : (locale === 'de' ? 'Deine Bestellung' : 'Your order')}</h1>
 
-            <ProgressSteps labels={steps} current={stepIndex} label={statusLabel} />
+            {status === 'cancelled' ? <p>{t('orderCancelledBody')}</p> : <ProgressSteps labels={steps} current={stepIndex} label={statusLabel} />}
 
             <dl className={styles.facts}>
               <div>
                 <dt>{t('trackCode')}</dt>
-                <dd className={styles.code}>{view.code}</dd>
+                <dd className={styles.codeRow}><span className={styles.code}>{view.code}</span>
+                  <Button variant="secondary" onClick={() => { void navigator.clipboard.writeText(view.code).then(() => setCopyMessage('copiedCode')).catch(() => setCopyMessage('copyFailed')) }}>{t('copyCode')}</Button>
+                  <span role="status" className={styles.copyStatus}>{copyMessage && t(copyMessage)}</span></dd>
               </div>
-              <div>
+              {status !== 'cancelled' && <div>
                 <dt>{t('pickupWhen')}</dt>
                 <dd>
                   {whenLines[0]}
                   {whenLines[1] ? <span className={styles.whenExtra}>{whenLines[1]}</span> : null}
                 </dd>
-              </div>
+              </div>}
             </dl>
 
             <OrderReceipt items={view.items} total={view.total} paymentState={view.paymentState} />
 
-            {view.delivery.kind === 'vienna' ? (
-              <div className={styles.address}>
-                {!editing ? (
-                  <>
-                    {saved ? <p className={styles.saved}>{t('addressSaved')}</p> : null}
-                    <Button variant="secondary" fullWidth onClick={() => setEditing(true)}>
-                      {t('editAddress')}
-                    </Button>
-                  </>
-                ) : (
-                  <div>
-                    <Field label={t('street')} htmlFor="line1">
-                      <input
-                        id="line1"
-                        value={addr.line1}
-                        onChange={(e) => setAddr({ ...addr, line1: e.target.value })}
-                      />
-                    </Field>
-                    <Field label={t('extra')} htmlFor="line2">
-                      <input
-                        id="line2"
-                        value={addr.line2 ?? ''}
-                        onChange={(e) => setAddr({ ...addr, line2: e.target.value })}
-                      />
-                    </Field>
-                    <Field label={t('postal')} htmlFor="postal">
-                      <input
-                        id="postal"
-                        value={addr.postalCode}
-                        onChange={(e) => setAddr({ ...addr, postalCode: e.target.value })}
-                      />
-                    </Field>
-                    <Field label={t('city')} htmlFor="city">
-                      <input id="city" value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} />
-                    </Field>
-                    <Button fullWidth onClick={() => void saveAddress()}>
-                      {t('saveAddress')}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ) : null}
+            <a className={styles.instagram} href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer">
+              <InstagramIcon className={styles.instagramIcon} />
+              <span>{t('trackInstagram')}</span>
+            </a>
 
             <div className={styles.actions}>
-              <ButtonLink to="/" variant="secondary" className={styles.homeBtn}>
+              <ButtonLink to="/" variant="secondary">
                 {t('backHome')}
               </ButtonLink>
-              <button type="button" className={styles.another} onClick={() => setDialogOpen(true)}>
+              <button type="button" className={styles.another} onClick={event => { dialogOpener.current = event.currentTarget; setDialogOpen(true) }}>
                 {t('trackAnother')}
               </button>
             </div>
@@ -221,19 +198,20 @@ export function TrackPage() {
         </section>
       ) : null}
 
-      {!view && phase !== 'checking' && phase !== 'loading' && phase !== 'leaving' ? (
-        <section className={styles.card}>
-          <div className={styles.artSmall} aria-hidden="true">
+      {!view && (!!codeParam || !dialogOpen) && phase !== 'checking' && phase !== 'loading' && phase !== 'leaving' ? (
+        <section className={`${styles.card} ${error ? styles.emptyCard : ''}`}>
+          {savedBanner}
+          {!error && <div className={styles.artSmall} aria-hidden="true">
             <PaintingOrnament label={t('artPainting')} />
-          </div>
+          </div>}
           <div className={styles.details}>
             <h1 className={styles.title}>{error ? t('trackMissTitle') : t('trackTitle')}</h1>
             <p className={styles.sub}>{error || t('trackLead')}</p>
-            <Button size="lg" fullWidth className={styles.openBtn} onClick={() => setDialogOpen(true)}>
-              {t('trackOpen')}
+            <Button size="lg" fullWidth className={styles.openBtn} onClick={event => { dialogOpener.current = event.currentTarget; setDialogOpen(true) }}>
+              {t(error ? 'trackAnother' : 'trackOpen')}
             </Button>
             <div className={styles.actions}>
-              <ButtonLink to="/" variant="secondary" className={styles.homeBtn}>
+              <ButtonLink to="/" variant="secondary">
                 {t('backHome')}
               </ButtonLink>
             </div>
@@ -243,9 +221,9 @@ export function TrackPage() {
 
       {dialogOpen ? (
         <TrackDialog
+          openerRef={dialogOpener}
           onClose={() => setDialogOpen(false)}
           initialCode={codeParam ?? ''}
-          error={error}
           onSubmit={(next) => {
             setDialogOpen(false)
             setError('')

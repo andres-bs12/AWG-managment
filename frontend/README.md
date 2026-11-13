@@ -54,6 +54,15 @@ Contexto del proyecto: [docs/README.md](../docs/README.md).
 ## Scripts
 
 - `npm run dev` — Vite
-- `npm run build` — typecheck + bundle
+- `VITE_DATA_SOURCE=http npm run build` — typecheck + production bundle against the real API (also used by Docker and agent checks).
+- `npm run build:mock` — explicit local demo/e2e preview; sets `VITE_DATA_SOURCE=mock VITE_ALLOW_MOCK_BUILD=1`. Never publish this bundle: it contains demo credentials and browser-only data.
 - `npm run lint` — oxlint
 - `npm run preview` — sirve el bundle
+
+Production-mode `vite build` fails unless `VITE_DATA_SOURCE=http` or the local-only escape hatch `VITE_ALLOW_MOCK_BUILD=1` is explicitly set. A missing/misspelled data source must not silently produce a deployable mock. Development still defaults to the mock. Do not put the escape hatch in a deployment environment. `node --test tests/*.test.mjs` checks the build policy and token storage without a browser.
+
+## Customer token storage
+
+Opening `/form/:token` never persists the token. After a successful customer form submission or checkout creation, the API layer stores `{token, savedAt}` under `awg-form-token:<NORMALIZED_CODE>` for 45 days from that save. Reads do not renew the lifetime. Startup and reads delete expired, malformed and undated legacy entries; legacy customers must resubmit their personal form to restore address-edit access. The server's separate expiry (30 days after handover) still takes precedence.
+
+The staff iPad handoff opens `/form/:token?staff=1` after logout; the marker survives reload and suppresses token storage on submission. An active staff session also suppresses storage. Form drafts are removed after submission and staff logout clears every `awg-form-token:*` entry. QR/copy links for a customer's own phone remain ordinary unmarked links. Both HTTP and mock enforce the same token policy for Track and address edits.

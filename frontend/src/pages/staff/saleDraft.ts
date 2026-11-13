@@ -1,7 +1,7 @@
-import type { Address, CapacityResult, CreateSaleItemInput, ItemKind, Market, MarketDay, OrnamentColor } from '../../domain/types'
+import type { Address, CapacityResult, CustomFinish, CreateSaleItemInput, ItemKind, Market, MarketDay, OrnamentColor } from '../../domain/types'
 import { isMarketPickupWeekday } from '../../lib/calendar'
 import { formatDateLabel, formatHour, formatMinutes, hoursOverlap } from '../../lib/time'
-import { itemCost } from '../../lib/money'
+import { itemCost, type Pricing } from '../../lib/money'
 
 export const SALE_DRAFT_KEY = 'awg-sale-draft'
 
@@ -24,6 +24,7 @@ export type DraftItem = {
   kind: ItemKind
   withName: boolean
   color: OrnamentColor
+  finish: CustomFinish
   durationMinutes: number
   durationPreset: DurationPreset
   paintDate?: string
@@ -46,6 +47,7 @@ export type SaleDraft = {
   differentPickups: boolean
   phase: SalePhase
   order?: CreatedSaleRef
+  idempotencyKey?: string
   placingItemId?: string
 }
 
@@ -88,6 +90,7 @@ export function makeCustom(partial?: Partial<DraftItem>): DraftItem {
     id: newDraftId(),
     withName: false,
     color: partial?.color ?? 'red',
+    finish: partial?.finish ?? 'shiny',
     durationMinutes: minutes,
     durationPreset: presetFromMinutes(minutes),
     fromCalendar: false,
@@ -104,6 +107,7 @@ export function makeFinished(): DraftItem {
     kind: 'finished',
     withName: false,
     color: 'red',
+    finish: 'shiny',
     durationMinutes: 0,
     durationPreset: '60',
     fromCalendar: false,
@@ -150,8 +154,8 @@ export function applySlot(item: DraftItem, date: string, start: number, end: num
   }
 }
 
-export function draftTotal(items: DraftItem[]): number {
-  return items.reduce((sum, item) => sum + itemCost(item.kind, item.withName), 0)
+export function draftTotal(items: DraftItem[], prices: Pricing): number {
+  return Math.round(items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0) * 100) / 100
 }
 
 export function paintMinutes(items: DraftItem[]): number {
@@ -170,12 +174,13 @@ export function slotLabel(item: DraftItem): string | null {
 export function deliveryLabel(item: DraftItem, markets: Market[], days: MarketDay[]): string {
   if (item.kind === 'finished' && item.delivery.mode === 'now') return 'Deliver now'
   if (item.delivery.mode === 'vienna') {
-    const date = item.delivery.pickupDate ? formatDateLabel(item.delivery.pickupDate) : null
-    return ['Vienna delivery · Wed/Fri · no exact time', date].filter(Boolean).join(' · ')
+    return item.delivery.pickupDate ? `Vienna delivery · ${formatDateLabel(item.delivery.pickupDate)}` : 'Vienna delivery · day not chosen'
   }
+  // No place or date until a pickup day is chosen.
+  if (!item.delivery.pickupDate) return 'Pickup · day not chosen'
   const day = days.find((d) => d.id === item.delivery.marketDayId) ?? days.find((d) => d.date === item.delivery.pickupDate)
   const market = markets.find((m) => m.id === (item.delivery.marketId ?? day?.marketId))
-  const date = day ? formatDateLabel(day.date) : item.delivery.pickupDate ? formatDateLabel(item.delivery.pickupDate) : 'Market day'
+  const date = formatDateLabel(day?.date ?? item.delivery.pickupDate)
   const hour = item.delivery.pickupHour != null ? formatHour(item.delivery.pickupHour) : null
   return [market?.name, date, hour].filter(Boolean).join(' · ')
 }
@@ -201,6 +206,7 @@ export function toCreateItems(items: DraftItem[], days: MarketDay[], today?: Mar
       kind: item.kind,
       withName: item.kind === 'custom' && item.withName,
       color: item.kind === 'custom' ? item.color : undefined,
+      finish: item.kind === 'custom' ? item.finish ?? 'shiny' : undefined,
       paintDate: item.kind === 'custom' ? item.paintDate : undefined,
       paintStart: item.kind === 'custom' ? item.paintStart : undefined,
       paintEnd: item.kind === 'custom' ? item.paintEnd : undefined,
@@ -217,7 +223,6 @@ export const SLOT_TAKEN_COPY = 'That hour is taken · change / place on board'
 
 export function saleErrorMessage(err: unknown, fallback = 'Could not create sale'): string {
   const msg = err instanceof Error ? err.message : ''
-  if (/overlap/i.test(msg) || /hour is taken/i.test(msg)) return SLOT_TAKEN_COPY
   return msg || fallback
 }
 
@@ -236,7 +241,7 @@ export function buildDraftFromParams(params: URLSearchParams): SaleDraft {
     ? {
         ...stored,
         phase: (stored.phase as string) === 'formWhere' ? 'qr' as const : stored.phase,
-        items: stored.items.map((item) => ({ ...item, color: item.color ?? 'red' as const })),
+        items: stored.items.map((item) => ({ ...item, color: item.color ?? 'red' as const, finish: item.finish ?? 'shiny' as const })),
       }
     : null
 
