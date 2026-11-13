@@ -5,6 +5,32 @@ import { choose, chooseFirstDate, next, open, photo } from './helpers'
 // fullyParallel, so sibling pages do not compete for the CPU while scroll positions settle.
 test.describe.configure({ mode: 'default' })
 
+// Linux WebKit's isMobile emulation (CI, not macOS WebKit or iOS Safari) loses track of the
+// scroll offset when the document shrinks below the current scroll position (step change,
+// added or removed ornament): the page renders at scrollY, but scrollTo, scrollIntoView and
+// Playwright's own click scrolling act on a hidden offset that is off by up to the old
+// position, so taps miss and the action row is never scrolled into view. The offset only
+// resyncs when the hidden position hits 0, so do exactly that on every shrink and return to
+// the rendered position: the user sees the same frame, and later scrolls land where asked.
+test.beforeEach(async ({ page, browserName, isMobile }) => {
+  if (browserName !== 'webkit' || !isMobile || process.platform !== 'linux') return
+  await page.addInitScript(() => {
+    let height = 0
+    const watch = () => new ResizeObserver(() => {
+      const next = document.documentElement.scrollHeight
+      if (next < height) {
+        const y = window.scrollY
+        window.scrollTo(0, next)
+        window.scrollTo(0, 0)
+        window.scrollTo(0, y)
+      }
+      height = next
+    }).observe(document.documentElement)
+    if (document.documentElement) watch()
+    else document.addEventListener('DOMContentLoaded', watch, { once: true })
+  })
+})
+
 /** Check actual geometry, including overflow ancestors; visibility alone misses clipped buttons. */
 async function insideViewport(target: Locator) {
   await expect(target).toBeVisible()
@@ -42,7 +68,9 @@ async function documentLayout(page: Page) {
 async function actions(page: Page) {
   const bar = page.locator('[data-public-actions]')
   await expect(bar).toHaveCSS('position', 'static')
-  await bar.scrollIntoViewIfNeeded()
+  // scrollIntoViewIfNeeded accepts a fractional overhang (Chromium at 412 px left the bar's
+  // bottom 0.4 px below the viewport); centring scrolls by whole pixels with room to spare.
+  await bar.evaluate(node => node.scrollIntoView({ block: 'center', behavior: 'instant' }))
   await insideViewport(bar)
   await insideViewport(page.locator('form button[type=submit]'))
   expect(await bar.evaluate(node => node.getBoundingClientRect().bottom <= node.closest('[data-public-page]')!.getBoundingClientRect().bottom + 0.5)).toBe(true)
