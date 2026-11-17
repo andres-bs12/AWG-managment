@@ -6,11 +6,6 @@
   margin-bottom: var(--space-1);
 }
 
-.sub {
-  color: var(--staff-muted);
-  margin-bottom: var(--space-2);
-}
-
 .hint {
   color: var(--staff-muted);
   font-size: var(--type-staff-meta-size);
@@ -44,7 +39,6 @@
   font-size: var(--type-staff-body-size);
 }
 
-.meta,
 .empty {
   color: var(--staff-muted);
   font-size: var(--type-staff-meta-size);
@@ -72,13 +66,6 @@
 
 .item > :first-child {
   margin-bottom: 0;
-}
-
-.itemAction {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
 }
 
 .panel { display: grid; gap: var(--space-4); min-width: 0; background: transparent; border: 0; padding: 0; }

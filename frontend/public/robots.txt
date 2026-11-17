@@ -1,0 +1,10 @@
+# Order, form and staff pages are private; only the public pages are worth indexing.
+User-agent: *
+Disallow: /api/
+Disallow: /staff
+Disallow: /form/
+Disallow: /track/
+Disallow: /buy/thanks
+Disallow: /waitlist/
+
+Sitemap: https://artwithgab.com/sitemap.xml

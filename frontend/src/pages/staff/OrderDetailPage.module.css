@@ -1,7 +1,6 @@
 .page { display: grid; gap: var(--space-4); max-width: var(--layout-configurator-max); margin: 0 auto; min-width: 0; }
 .hero { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); }
 .hero h1 { margin: var(--space-1) 0; font-size: var(--type-staff-h1-size); letter-spacing: .025em; }
-.eyebrow { font-size: var(--type-staff-meta-size); color: var(--staff-muted); margin: 0; }
 .customer { margin: 0; overflow-wrap: anywhere; }
 .status { padding: var(--space-2) var(--space-3); border-radius: var(--radius-pill); background: var(--staff-hover); color: var(--staff-muted); font-weight: 600; font-size: var(--type-staff-meta-size); text-align: center; }
 .status[data-ready='true'] { color: var(--staff-ok); }

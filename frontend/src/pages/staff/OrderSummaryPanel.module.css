@@ -17,7 +17,6 @@
 }
 
 .empty,
-.meta,
 .list p {
   color: var(--staff-muted);
   font-size: var(--type-staff-meta-size);

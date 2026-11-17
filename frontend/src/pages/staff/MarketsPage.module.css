@@ -10,10 +10,6 @@
   margin-bottom: var(--space-1);
 }
 
-.sub {
-  color: var(--staff-muted);
-}
-
 .list {
   list-style: none;
   margin: 0;

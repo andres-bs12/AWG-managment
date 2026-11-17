@@ -40,22 +40,6 @@
   box-shadow: none;
 }
 
-.step h2:has(+ .intro) {
-  margin-bottom: var(--space-2);
-}
-
-.intro { text-wrap: pretty;
-  margin: 0 0 var(--space-5);
-}
-
-.intro p {
-  margin: 0;
-}
-
-.intro p + p {
-  margin-top: var(--space-2);
-}
-
 /* Section and card titles: one level below the step title, display font so they never look like a label. */
 .step h3,
 .sectionTitle {
@@ -89,9 +73,6 @@
 }
 
 /* Cancel the field gap after the last grid row (fields keep their own bottom margin). */
-.section > .formGrid:last-child {
-  margin-bottom: calc(-1 * var(--space-5));
-}
 
 .section + .section {
   margin-top: var(--space-6);
@@ -123,51 +104,6 @@
 }
 
 /* ── Step 1: product, ornament cards, choices ────────────────────────── */
-
-.product {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
-  padding: var(--space-4);
-  border-radius: var(--radius);
-  background: var(--snow);
-}
-
-.product h3 {
-  margin-bottom: var(--space-1);
-  font-size: 1.125rem;
-}
-
-.product p {
-  margin: var(--space-1) 0 0;
-}
-
-.productArt {
-  flex: 0 0 72px;
-  width: 72px;
-  height: 86px;
-}
-
-.card {
-  margin-bottom: var(--space-4);
-  padding: var(--space-5);
-  border: 1px solid var(--snow-2);
-  border-radius: var(--radius);
-  background: #fff;
-}
-
-.cardHead {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
-}
-
-.cardHead h3 {
-  flex: 1;
-  margin: 0;
-}
 
 .price {
   font-weight: 700;
@@ -376,46 +312,6 @@
   font-weight: 600;
 }
 
-.namePreview {
-  display: flex;
-  gap: var(--space-5);
-  margin: var(--space-3) 0 0 calc(24px + var(--space-3));
-}
-
-.namePreview figure {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1);
-  margin: 0;
-}
-
-.namePreview svg {
-  width: 64px;
-  height: 77px;
-}
-
-.namePreview figcaption {
-  color: var(--public-muted);
-  font-size: var(--fs-small);
-}
-
-.backArt { color: #b03a2e; }
-.backArt[data-color='green'] { color: #2f6b3f; }
-.backArt[data-color='beige'] { color: #d8c3a0; }
-
-.backText {
-  fill: #fff8ec;
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.backArt[data-color='beige'] .backText {
-  fill: #5a4330;
-}
-
 .nameDetails {
   margin: var(--space-4) 0 0;
 }
@@ -486,128 +382,17 @@
   font-weight: var(--type-label-weight);
 }
 
-.calendarLegend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  margin: var(--space-3) 0 0;
-  color: var(--public-muted);
-  font-size: var(--fs-small);
-}
-
-.calendarLegend span {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.legendAvailable,
-.legendSelected {
-  width: 16px;
-  height: 16px;
-  border: var(--border-thin) solid var(--color-control-border);
-  border-radius: 50%;
-}
-
-.legendSelected {
-  background: var(--color-selected);
-}
-
 /* Selected day, said in words (no box: it is the answer, not a note). */
-.dateConfirmation {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: var(--space-4) 0 0;
-  font-weight: 700;
-}
-
-.dateConfirmation svg {
-  flex: none;
-}
 
 /* ── Step 4: contact and address ─────────────────────────────────────── */
 
 /* 6-column form grid. Fields are subgrids (see Field.module.css), so side-by-side inputs align. */
-.formGrid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  column-gap: var(--space-4);
-}
-
-.formGrid > * {
-  grid-column: span 6;
-}
 
 /* PLZ + Ort are one entity: one row at every width. */
-.formGrid > .colPostal { grid-column: span 2; }
-.formGrid > .colCity { grid-column: span 4; }
-
-@media (min-width: 768px) {
-  .formGrid > .colHalf { grid-column: span 3; }
-  .formGrid > .colWide { grid-column: span 4; }
-  .formGrid > .colNarrow { grid-column: span 2; }
-}
 
 /* Ort is fixed: same rows as a field (label, hint, control), with the value where the input would be. */
-.cityField {
-  display: grid;
-  grid-row: span 4;
-  grid-template-rows: subgrid;
-  margin-bottom: var(--space-5);
-}
-
-.cityLabel { grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; align-self: end; gap: 0 var(--space-1); }
-.cityLabel strong { font-weight: var(--type-label-weight); line-height: var(--type-label-line); }
-.cityValue { grid-row: 3; display: flex; align-items: center; min-height: var(--touch); margin-top: var(--space-2); padding: var(--space-2) var(--space-1); font-size: var(--type-body-size); }
-.helpRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
 
 /* ── Step 5: review ──────────────────────────────────────────────────── */
-
-.reviewCard {
-  margin-bottom: var(--space-4);
-  padding: var(--space-5);
-  border: 1px solid var(--snow-2);
-  border-radius: var(--radius);
-  background: #fff;
-}
-
-.reviewCard p {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.reviewCard p + p {
-  margin-top: var(--space-3);
-}
-
-.reviewCard .cardHead {
-  margin-bottom: var(--space-3);
-}
-
-.totals {
-  margin: 0;
-}
-
-.totals div {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-1) 0;
-}
-
-.totals div:last-child {
-  margin-top: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--snow-2);
-  font-size: 1.1rem;
-  font-weight: 700;
-}
-
-.totals dd {
-  margin: 0;
-  white-space: nowrap;
-}
 
 .terms {
   margin-top: var(--space-5);
@@ -699,17 +484,12 @@ form.shop > .actions { margin-top: var(--space-5); }
 }
 
 .linkBtn:focus-visible,
-.help:focus-visible,
 .day:has(input:focus-visible) {
   outline: none;
   box-shadow: var(--focus);
 }
 
 @media (max-width: 767px) {
-
-  .card,
-  .reviewCard { padding: var(--space-4); }
-  .productArt { flex-basis: 56px; width: 56px; height: 64px; }
   .cart:not(.reviewCart) { display: none; }
   .actions button { flex: 1 1 auto; min-width: 0; }
   .mobileTotal:not([hidden]) {
@@ -809,16 +589,8 @@ form.shop > .actions { margin-top: var(--space-5); }
 
 .seq { border: 0; padding: 1.5rem 0; }
 .seq legend { font-weight: 700; }
-.seqScale { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.seqEnd { font-size: var(--type-hint-size); color: var(--color-text-muted); }
-.seqOption { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: var(--touch); min-height: var(--touch); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-surface-raised); font-variant-numeric: tabular-nums; cursor: pointer; }
-.seqOption[data-selected='true'] { border: var(--border-control) solid var(--color-selected); background: var(--color-selected-surface); font-weight: var(--type-label-weight); }
-.seqOption:has(input:focus-visible) { box-shadow: var(--focus); }
-@media (hover: hover) { .seqOption:hover:not([data-selected='true']) { background: var(--color-selection-hover); } }
 .seqThanks { margin: var(--space-2) 0 0; color: var(--color-text); }
-.reviewItem[data-changed='true'], .reviewCard[data-changed='true'] { animation: reviewed 450ms ease-out; }
 @keyframes reviewed { from { opacity: .55; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .reviewItem[data-changed='true'], .reviewCard[data-changed='true'] { animation: none; } }
 /* Keep seven non-overlapping targets at 360px; a measured narrow container becomes a date list. */
 @media (max-width: 767px) {
   .calendarField { margin-inline: calc(-1 * var(--space-4)); }
@@ -832,9 +604,7 @@ form.shop > .actions { margin-top: var(--space-5); }
 .calendar[data-list='true'] .day { width: 100%; height: auto; min-height: var(--touch); padding: var(--space-2); border-radius: var(--radius-control); }
 .calendar[data-list='true'] .dayNumber { display: none; }
 .calendar[data-list='true'] .dayFull { display: inline; }
-.dateConfirmation { min-height: calc(var(--type-body-size) * var(--type-body-line)); color: var(--color-text); }
 .chip[data-disabled='true'] { border-color: var(--color-control-border); }
-
 
 .waitlist { display: grid; gap: var(--space-3); }
 

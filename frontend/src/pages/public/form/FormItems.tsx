@@ -9,7 +9,6 @@ import { OrnamentPreview } from '../../../components/public/OrnamentPreview'
 import { PhotoTiles } from '../../../components/public/PhotoTiles'
 import { Card } from '../../../components/public/PublicForm'
 import { BackNameField } from '../../../components/public/BackNameField'
-import { HelpTip } from '../../../components/ui/HelpTip'
 import styles from '../FormPage.module.css'
 
 export function FormItems({ items, draft, errors, photoErrors, patch, addFiles, validate }: {
@@ -53,9 +52,4 @@ export function FormItems({ items, draft, errors, photoErrors, patch, addFiles, 
         </div>
       </div></Card>
   })}</>
-}
-
-export function FormEditHelp() {
-  const { t } = useLocale()
-  return <HelpTip label={t('formExplainChanges')}>{t('formCanEdit')}</HelpTip>
 }

@@ -10,7 +10,6 @@
   margin-bottom: var(--space-1);
 }
 
-.sub,
 .hint,
 .empty {
   color: var(--staff-muted);

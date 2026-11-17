@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { InstagramIcon, INSTAGRAM_URL } from '../components/public/InstagramLink'
 import { IntroCurtain } from '../components/public/IntroCurtain'
@@ -23,6 +23,15 @@ export function PublicLayout() {
   /** The home hero already shouts the brand, so the header there is only the language switch. */
   const atHome = location.pathname === '/'
   const [intro, setIntro] = useState(() => !introPlayed && atHome)
+
+  /** Each public page names itself in the tab and in search results; the form sets its own step title. */
+  useEffect(() => {
+    const path = location.pathname
+    if (path.startsWith('/form')) return
+    const page = path === '/buy/thanks' ? 'shopThanksTitle' : path.startsWith('/buy') ? 'shopTitle' : path.startsWith('/track') ? 'trackTitle'
+      : path === '/impressum' ? 'impressum' : path === '/agb' ? 'terms' : path === '/datenschutz' ? 'privacy' : null
+    document.title = page ? `${t(page)} · ${t('brand')}` : t('metaHomeTitle')
+  }, [location.pathname, t])
 
   /** Pauses the home entrance animations under the curtain, so they play as it lifts. */
   useLayoutEffect(() => {

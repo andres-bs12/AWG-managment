@@ -4,12 +4,10 @@ import type { Api } from '../contracts'
 import { forgetFormToken, readFormToken, rememberFormToken } from '../formTokens'
 import type {
   AgendaDay,
-  CustomerFormPayload,
   CustomerFormView,
   Order,
   OrderItem,
   Photo,
-  ShopCheckoutInput,
   ShopConfig,
   ShopDeliveryDate,
   ShopPickupDay,
@@ -153,7 +151,8 @@ async function fileToPhoto(file: File): Promise<Photo> {
   return { id: `pho-${Math.random().toString(36).slice(2, 9)}`, name: file.name, dataUrl }
 }
 
-function buildFormData(payload: CustomerFormPayload): FormData {
+/** Multipart body shared by the customer form and the shop checkout: JSON payload plus new photos as files. */
+function buildFormData<T extends { items: { photos: Photo[] }[] }>(payload: T): FormData {
   const form = new FormData()
   const reduced = {
     ...payload,
@@ -164,26 +163,6 @@ function buildFormData(payload: CustomerFormPayload): FormData {
   }
   form.append('payload', new Blob([JSON.stringify(reduced)], { type: 'application/json' }))
   for (const item of payload.items) {
-    for (const photo of item.photos) {
-      if (photo.dataUrl.startsWith('data:')) {
-        form.append(`photo-${photo.id}`, dataUrlToBlob(photo.dataUrl), photo.name)
-      }
-    }
-  }
-  return form
-}
-
-function buildCheckoutFormData(input: ShopCheckoutInput): FormData {
-  const form = new FormData()
-  const reduced = {
-    ...input,
-    items: input.items.map((item) => ({
-      ...item,
-      photos: item.photos.map((photo) => ({ id: photo.id, name: photo.name })),
-    })),
-  }
-  form.append('payload', new Blob([JSON.stringify(reduced)], { type: 'application/json' }))
-  for (const item of input.items) {
     for (const photo of item.photos) {
       if (photo.dataUrl.startsWith('data:')) {
         form.append(`photo-${photo.id}`, dataUrlToBlob(photo.dataUrl), photo.name)
@@ -299,7 +278,7 @@ export const httpApi: Api = {
     checkout: async (input) => {
       const result = await request<{ orderCode: string; formToken: string; checkoutUrl: string }>(
         '/api/shop/checkout',
-        { method: 'POST', body: buildCheckoutFormData(input) },
+        { method: 'POST', body: buildFormData(input) },
       )
       rememberFormToken(result.orderCode, result.formToken)
       return result

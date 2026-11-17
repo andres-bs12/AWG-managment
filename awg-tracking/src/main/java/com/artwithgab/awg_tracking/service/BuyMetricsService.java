@@ -45,7 +45,7 @@ public class BuyMetricsService {
     }
     @Transactional(readOnly = true)
     public List<BuyMetric> list(LocalDate from, LocalDate to) {
-        if (from.isAfter(to)) throw new BadRequestException("Invalid date range.");
+        if (from.isAfter(to) || java.time.temporal.ChronoUnit.DAYS.between(from, to) > StatsService.MAX_DAYS) throw new BadRequestException("Invalid date range.");
         return repository.findByDateBetweenOrderByDateAsc(from, to);
     }
 }

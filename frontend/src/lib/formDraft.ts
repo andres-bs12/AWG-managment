@@ -4,6 +4,17 @@ export type FormItemDraft = { orderItemId: string; petName: string; backName: st
 export type FormDraft = { customerName: string; phone: string; email: string; address: Address; items: FormItemDraft[] }
 export const formDraftKey = (token: string) => `awg-form-draft:${token}`
 
+/**
+ * The stall iPad is shared: an abandoned draft holds the previous customer's contact data under a
+ * key that contains their form token. Staff sign-out (which starts every handoff) removes them all.
+ */
+export function clearFormDrafts(): void {
+  try {
+    const keys = Array.from({ length: sessionStorage.length }, (_, index) => sessionStorage.key(index))
+    for (const key of keys) if (key?.startsWith('awg-form-draft:')) sessionStorage.removeItem(key)
+  } catch { /* Storage unavailable. */ }
+}
+
 /** Persist text and server photo identifiers, never local image bytes or remote URLs. */
 export function serializeFormDraft(draft: FormDraft): string {
   return JSON.stringify({ ...draft, items: draft.items.map(item => ({ ...item,

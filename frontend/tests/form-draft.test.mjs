@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { restoreFormDraft, serializeFormDraft } from '../src/lib/formDraft.ts'
+import { clearFormDrafts, restoreFormDraft, serializeFormDraft } from '../src/lib/formDraft.ts'
 
 const photo = { id: 'saved', name: 'server.jpg', dataUrl: '/api/photos/saved' }
 const source = { customerName: 'Alex', email: 'a@example.com', phone: '123', address: { line1: 'Street 1', postalCode: '1010', city: 'Wien' }, items: [{ orderItemId: 'one', petName: 'Luna', backName: 'Luna', note: '', photos: [photo], photosNeedReload: false }] }
@@ -23,4 +23,15 @@ test('malformed storage falls back safely, preserving the current server view', 
   for (const raw of ['{', '{}', JSON.stringify({ ...source, address: null }), JSON.stringify({ ...source, items: [{ ...source.items[0], petName: null }] })]) {
     assert.deepEqual(restoreFormDraft(raw, source), source)
   }
+})
+
+test('staff sign-out removes every abandoned form draft and nothing else', () => {
+  const values = new Map([['awg-form-draft:tokenA', '{}'], ['awg-sale-draft', '{}'], ['awg-form-draft:tokenB', '{}']])
+  globalThis.sessionStorage = {
+    get length() { return values.size },
+    key: index => [...values.keys()][index] ?? null,
+    removeItem: key => values.delete(key),
+  }
+  clearFormDrafts()
+  assert.deepEqual([...values.keys()], ['awg-sale-draft'])
 })

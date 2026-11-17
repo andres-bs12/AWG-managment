@@ -30,6 +30,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class AuthService {
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final int MAX_PASSWORD_BYTES = 72;
     /** Hash compared on unknown e-mails so both paths cost the same (no user enumeration by timing). */
     private volatile String dummyHash;
 
@@ -42,6 +43,8 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(String email, String password) {
+        // The encoder throws on longer input; no stored password can be that long, so it is simply wrong.
+        if (password.getBytes(StandardCharsets.UTF_8).length > MAX_PASSWORD_BYTES) throw new UnauthorizedException("Wrong e-mail or password.");
         Optional<StaffUser> user = staffUserRepository.findByEmail(email.trim().toLowerCase(Locale.ROOT));
         boolean ok = passwordEncoder.matches(password, user.map(StaffUser::getPasswordHash).orElseGet(this::dummyHash));
         if (user.isEmpty() || !ok) throw new UnauthorizedException("Wrong e-mail or password.");
@@ -72,6 +75,10 @@ public class AuthService {
         }
         if (newPassword.length() < 10) {
             throw new com.artwithgab.awg_tracking.exception.BadRequestException("Use at least 10 characters.");
+        }
+        // bcrypt only reads 72 bytes and the encoder throws beyond that.
+        if (newPassword.getBytes(StandardCharsets.UTF_8).length > MAX_PASSWORD_BYTES) {
+            throw new com.artwithgab.awg_tracking.exception.BadRequestException("Use at most 72 characters.");
         }
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         sessionRepository.deleteOtherSessions(user.getId(), currentToken == null ? "" : hash(currentToken));

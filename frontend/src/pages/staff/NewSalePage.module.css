@@ -128,23 +128,6 @@
   flex-shrink: 0;
 }
 
-.amountField {
-  display: grid;
-  gap: var(--space-2);
-  margin: var(--space-3) 0;
-  font-weight: 700;
-}
-
-.amountField input {
-  width: 100%;
-  min-height: var(--space-7);
-  border: var(--border-thin) solid var(--staff-line);
-  border-radius: var(--space-2);
-  padding: 0 var(--space-3);
-  font: inherit;
-  background: var(--staff-surface);
-}
-
 .err {
   color: var(--staff-danger);
   font-weight: 600;
@@ -275,13 +258,6 @@
 
 .slotBox:last-child {
   padding-bottom: 0;
-}
-
-.slotHint {
-  margin: 0 0 var(--space-2);
-  font-weight: 600;
-  color: var(--staff-muted);
-  font-size: var(--type-staff-meta-size);
 }
 
 .moveSuggestion {

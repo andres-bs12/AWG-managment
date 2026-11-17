@@ -1,6 +1,6 @@
 # Contexto del proyecto — ArtWithGab (AWG)
 
-**Actualizado:** 2026-11-12 (v3.1 en preparación en la rama `release/v3.1`: sin la promesa de plazo de pintura en el checkout, reglas aprendidas; v3.0.2 sigue en producción)
+**Actualizado:** 2026-11-16 (auditoría completa en `release/v3.1`: limpieza de código sobrante, base de SEO y tres arreglos pequeños de seguridad, sin commit; v3.0.2 sigue en producción)
 **Propósito de este archivo:** memoria persistente para el dueño del proyecto y los agentes que trabajen en este repositorio.
 
 ## Instrucción de mantenimiento
@@ -89,6 +89,7 @@ Scripts disponibles en `frontend/package.json`: `dev`, `build`, `build:mock`, `l
 
 ## v3.1 (2026-11-12, rama `release/v3.1`, sin desplegar)
 
+- **Auditoría completa 2026-11-16 (sin commit ni despliegue):** informe en `tasks/audit-results/full-audit-2026-11-16.md`. Sin hallazgos graves de seguridad en el código. Aplicado: borradores de `/form` se borran al cerrar sesión de staff (iPad compartido), contraseñas > 72 bytes responden 400/401 en vez de 500, tope de 400 días en `GET /api/metrics/buy`; ~700 líneas de código muerto fuera (archivos de plantilla, componentes sin uso, 64 claves i18n, 140 selectores CSS, consultas y `checkoutMinutes` del backend); SEO base (`index.html` con descripción y Open Graph, `public/robots.txt`, `public/sitemap.xml`, título por página en `PublicLayout`, clave `metaHomeTitle`). El título y la descripción para Google son texto nuevo pendiente de aprobación del dueño. Backend 171 pruebas y 89 Node en verde. **Pendiente del dueño (lo más urgente):** Impressum/AGB/Datenschutz siguen como borrador con huecos mientras la tienda cobra; además imagen `og:image`, Search Console, nginx 1.27, regla de Cloudflare y compra 4242. En Vibe ya no existe el alias `glm-5-3` (solo `zai-glm-5-3-flash`, `deepseek-v4-1-flash` y `mistral-medium-3.5`).
 - **Estado 2026-11-13:** suite completa `e2e-full` en verde por primera vez en CI (732/732, commit `deb944b`), más backend y frontend. Cambios del dueño hechos: barra de acciones pública en el flujo (sin sticky; `usePublicActions.ts` eliminado), página quieta al escribir el nombre (fila Vorne/Hinten reservada, nombres de ficha a dos líneas), Track sin cambio de dirección y con fila de Instagram (`InstagramLink.tsx`). Pendiente: probar el tecleo en iPhone real; decidir si se borra `PATCH /api/track/{code}/address` (sin uso). Las pruebas `public-mobile` llevan un parche solo para Linux WebKit `isMobile` (offset de scroll obsoleto de la emulación, no de usuarios reales).
 
 - **Precios editables** en Stock (`GET/PUT /api/prices`, revisión optimista 409 `PRICES_CHANGED`, toma `ScheduleLock`; sin fila se usan los `awg.pricing.*`). **V14__price_settings.sql**: tabla `price_setting` y `order_item.name_extra` (recargo cobrado; los ítems antiguos con nombre se fijan a 12,99). Las facturas usan el recargo guardado. Probada en PostgreSQL local.

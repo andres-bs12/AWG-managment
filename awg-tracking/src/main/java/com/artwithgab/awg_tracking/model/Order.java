@@ -30,7 +30,7 @@ public class Order {
     @jakarta.persistence.Version
     private long version;
 
-    /** Public code (AWG + 4 digits). Used by Track and in links. */
+    /** Public code (AWG + 6 characters; older orders have 4). Used by Track and in links. */
     @Column(nullable = false, unique = true)
     private String code;
 

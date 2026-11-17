@@ -32,11 +32,6 @@ public class PaintingDayService {
     }
 
     @Transactional
-    public PaintingDayDto update(LocalDate date, boolean open, int maxPaintings) {
-        return update(date, open, maxPaintings, null, null);
-    }
-
-    @Transactional
     public PaintingDayDto update(LocalDate date, boolean open, int maxPaintings, Double openHour, Double closeHour) {
         validateHours(openHour, closeHour);
         calendarService.lockSchedule();
