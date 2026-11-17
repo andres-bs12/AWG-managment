@@ -15,6 +15,7 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 7. **Versiones:** cada versión nueva lleva número (`frontend/package.json` + etiqueta git `vX.Y.Z` al desplegar). Rama `release/vX.Y` en GitHub; **no desplegar a producción (artwithgab.com) sin orden explícita del dueño.** Subir a GitHub sí está permitido cuando lo pide.
 8. **Auditoría cruzada:** nunca revisa el mismo LLM que escribió el código. Opus planifica y verifica; el reparto está en `docs/agent-routing.md`.
 9. Código, comentarios e identificadores en inglés; respuestas al dueño en español latinoamericano.
+10. **Versión base antes de crear la subrama (dueño, 2026-11-18).** Quien haga cambios (Gabriella u otro agente) debe **comprobar siempre desde qué versión ramificar**: `git fetch` y `git branch -r | grep release` para ver las ramas `release/vX.Y`, y confirmar en `AGENTS.md` cuál es la versión en desarrollo (hoy `release/v3.1`; `main` y `release/v1.1` no son la base). Después `git checkout release/vX.Y && git pull` y solo entonces `git checkout -b feat/nombre`. El PR apunta a esa misma `release/vX.Y`. Si hay duda sobre la versión, preguntar al dueño antes de empezar.
 
 ## 0.1 Flujo rápido y barato (dueño, 2026-11-12: «ahorrar tokens, resultados de alta calidad»)
 
