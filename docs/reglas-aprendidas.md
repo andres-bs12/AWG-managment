@@ -131,3 +131,4 @@ Añadir aquí, con fecha, cada corrección nueva del dueño hasta integrarla en 
 - 2026-11-12 (v3.1): diálogos de staff se cierran con X, Escape o toque fuera; «Not yet» eliminado.
 - 2026-11-12 (v3.1): quitar del checkout la promesa de plazo de pintura tras el pago (EN y DE). Regla general en §1.
 - 2026-11-12 (v3.1): el CI falló tras un push (runner Ubuntu 26.04) y no se detectó porque `gh run list` vacío se tomó como «no empezó». Regla 9 de §0.1 y `scripts/ci-wait.sh`.
+- 2026-11-18 (dueño): **Gabriella (colaboradora) trabaja en subramas y entrega por pull request hacia `release/v3.1`.** Cuando haya cambios suyos, el agente no mezcla nada por su cuenta: revisa el PR (diff, CI, reglas de este archivo), resume los hallazgos al dueño y **le pregunta antes de mezclar**.
