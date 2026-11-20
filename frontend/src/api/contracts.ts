@@ -1,3 +1,4 @@
+import type { MarketOrnament, MarketOrnamentStatus } from '../domain/marketStock'
 import type {
   InventoryItem, PaintingDay, Prices, PricesUpdate,
   AgendaDay,
@@ -126,6 +127,12 @@ export type Api = {
   metrics: { track: (metric: BuyMetric) => Promise<void> }
   /** Staff only. Vienna dates, both inclusive (max 400 days). */
   stats: { get: (from: string, to: string) => Promise<import('../domain/types').Stats> }
+  marketStock: {
+    list: () => Promise<MarketOrnament[]>
+    photo: (id: string) => Promise<string | null>
+    changeStatus: (id: string, status: MarketOrnamentStatus, revision: number) => Promise<MarketOrnament>
+    savePhoto: (id: string, photo: Blob, revision: number) => Promise<MarketOrnament>
+  }
   inventory: { list: () => Promise<InventoryItem[]>; update: (id: string, quantity: number, expectedQuantity?: number) => Promise<InventoryItem> }
   prices: { get: () => Promise<Prices>; update: (input: PricesUpdate) => Promise<Prices> }
   paintingDays: { list: (from: string, to: string) => Promise<PaintingDay[]>; update: (date: string, open: boolean, maxPaintings: number, hours?: { openHour: number; closeHour: number }) => Promise<PaintingDay> }

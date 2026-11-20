@@ -3,6 +3,7 @@ import { api } from '../../api/client'
 import type { InventoryItem, Prices } from '../../domain/types'
 import { Button } from '../../components/ui/Button'
 import { StaffBackLink } from '../../components/staff/StaffBackLink'
+import { MarketStock } from './MarketStock'
 import { NumberStepper } from '../../components/staff/NumberStepper'
 import { parseEuroAmount } from '../../lib/staffInput'
 import styles from './SettingsRows.module.css'
@@ -32,7 +33,8 @@ export function InventoryPage() {
     return () => { active = false }
   }, [retry])
   return <section className={styles.page}>
-    <StaffBackLink to="/staff/agenda" label="Agenda" /><h1>Stock</h1><p>Custom = bases ready to paint. Finished = painted in advance.</p>
+    <StaffBackLink to="/staff/agenda" label="Agenda" /><h1>Stock</h1>
+    <MarketStock />
     {loading && <p role="status">Loading prices and stock…</p>}
     {error && <div role="alert"><p>{error}</p><Button tone="staff" onClick={() => { setLoading(true); setError(''); setRetry(n => n + 1) }}>Try again</Button></div>}
     {!loading && !error && prices && !rows.length && <p>No stock rows configured.</p>}
@@ -40,7 +42,7 @@ export function InventoryPage() {
       <PricesCard initial={prices} />
       {colors.some(color => !legacy(color)) && <h2>Custom bases</h2>}
       {colorCards(false)}
-      {rows.filter(row => row.kind === 'finished').map(row => <article key={row.id} className={`${styles.stockCard} ${styles.finishedCard}`} aria-label="Finished ornaments"><h2>Finished ornaments</h2><StockRow item={row} /></article>)}
+      {rows.filter(row => row.kind === 'finished').map(row => <article key={row.id} className={`${styles.stockCard} ${styles.finishedCard}`} aria-label="Finished ornaments"><h2>Unnumbered finished stock</h2><StockRow item={row} /></article>)}
       {colors.some(legacy) && <><h2>No longer sold</h2>{colorCards(true)}</>}
     </div>}
   </section>

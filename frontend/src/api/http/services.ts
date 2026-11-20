@@ -175,6 +175,17 @@ function buildFormData<T extends { items: { photos: Photo[] }[] }>(payload: T): 
 const enc = encodeURIComponent
 
 export const httpApi: Api = {
+  marketStock: {
+    list: () => request('/api/market-stock', {}, staff),
+    photo: async id => (await request<{ url: string | null }>(`/api/market-stock/${enc(id)}/photo`, {}, staff)).url,
+    changeStatus: (id, status, revision) => request(`/api/market-stock/${enc(id)}`, jsonInit('PATCH', { status, revision }), staff),
+    savePhoto: (id, photo, revision) => {
+      const body = new FormData()
+      body.set('photo', photo, 'ornament.jpg')
+      body.set('revision', String(revision))
+      return request(`/api/market-stock/${enc(id)}/photo`, { method: 'PUT', body }, staff)
+    },
+  },
   inventory: { list: () => request('/api/inventory', {}, staff), update: (id, quantity, expectedQuantity) => request(`/api/inventory/${enc(id)}`, jsonInit('PATCH', { quantity, expectedQuantity }), staff) },
   prices: { get: () => request('/api/prices', {}, staff), update: (input) => request('/api/prices', jsonInit('PUT', input), staff) },
   paintingDays: { list: (from, to) => request(`/api/painting-days?from=${enc(from)}&to=${enc(to)}`, {}, staff), update: (date, open, maxPaintings, hours) => request(`/api/painting-days/${enc(date)}`, jsonInit('PATCH', { open, maxPaintings, ...hours }), staff) },

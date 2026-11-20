@@ -96,6 +96,7 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
       return route.fulfill({ status: 204 })
     }
     if (path === '/api/shop/config') return json(route, config)
+    if (path === '/api/market-stock') return json(route, [])
     if (path === '/api/inventory') return json(route, inventory)
     if (path === '/api/prices' && method === 'GET') return json(route, prices)
     if (path === '/api/markets' && method === 'GET') return json(route, allMarkets)

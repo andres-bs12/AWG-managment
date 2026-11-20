@@ -1,0 +1,70 @@
+.section, .detail { display: grid; gap: var(--space-4); min-width: 0; }
+.heading { display: grid; gap: var(--space-1); justify-items: start; }
+.section h2, .section h3, .section h4, .section p, .detail p { margin: 0; }
+.heading p, .muted { color: var(--staff-muted); }
+.totals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-2);
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--radius-control);
+  background: var(--staff-surface);
+}
+.totals div { min-width: 0; padding: var(--space-1); display: grid; justify-items: center; }
+.totals div + div { border-inline-start: var(--border-thin) solid var(--staff-line); }
+.totals dt { color: var(--staff-muted); font-size: var(--type-staff-meta-size); text-align: center; }
+.totals dd { margin: 0; font-size: var(--type-staff-body-size); font-weight: 700; font-variant-numeric: tabular-nums; }
+.search { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--space-3); }
+.search .field, .detail .field { margin: 0; }
+.search input, .search select, .detail input { min-width: 0; width: 100%; }
+.search input[type='search'] { appearance: none; }
+.colors { display: grid; gap: var(--space-2); }
+.card { border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius-control); background: var(--staff-surface); }
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-lg);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--type-staff-body-size);
+  font-weight: 600;
+}
+summary.cardHeader { cursor: pointer; list-style: none; border-radius: inherit; }
+summary.cardHeader::-webkit-details-marker { display: none; }
+.swatch { flex: none; width: var(--size-swatch); height: var(--size-swatch); border-radius: var(--radius-circle); border: var(--border-thin) solid var(--ornament-swatch-border); }
+.color { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.count { color: var(--staff-muted); font-size: var(--type-staff-meta-size); font-weight: 400; }
+.chevron { flex: none; width: var(--space-2); height: var(--space-2); margin-inline: var(--space-1); border-right: var(--border-control) solid currentColor; border-bottom: var(--border-control) solid currentColor; transform: rotate(45deg); }
+.card[open] .chevron { transform: rotate(225deg); }
+.finishes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); padding: var(--space-3); border-top: var(--border-thin) solid var(--staff-line); }
+.finish { display: grid; gap: var(--space-2); align-content: start; min-width: 0; }
+.finish :is(h3, h4) { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); font-size: var(--type-staff-body-size); }
+.finish :is(h3, h4) span { color: var(--staff-muted); font-weight: 400; }
+.items { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space-1); }
+.ornament {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: var(--touch);
+  padding: var(--space-1) var(--space-2);
+  text-align: start;
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--radius-small);
+  font: inherit;
+  color: var(--staff-ink);
+  background: var(--staff-surface);
+  cursor: pointer;
+}
+@media (hover: hover) { .ornament:hover, summary.cardHeader:hover { background: var(--staff-bg); } }
+.status { display: inline-block; padding: var(--space-1) var(--space-2); border-radius: var(--radius-small); font-size: var(--type-staff-meta-size); line-height: 1.2; color: var(--staff-muted); background: var(--staff-bg); }
+.status[data-status='painted'] { color: var(--staff-slot-ready-ink); background: var(--staff-slot-ready); }
+.status[data-status='sold'] { color: var(--color-cart-ink); background: var(--color-cart-surface); }
+.detailLine, .actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.detailLine { justify-content: space-between; }
+.photo { display: block; width: 100%; max-height: 44dvh; object-fit: contain; background: var(--staff-bg); border-radius: var(--radius-control); }
+.error { color: var(--color-error); }

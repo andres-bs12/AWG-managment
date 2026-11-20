@@ -138,7 +138,7 @@ public class PhotoStorageService {
      * JPEG/PNG must really be images with sane dimensions (rejects a fake signature and huge
      * "decompression bomb" sizes). WebP/HEIC cannot be decoded by the JDK and are checked by signature only.
      */
-    private static void checkDecodable(MultipartFile file, String contentType) {
+    static void checkDecodable(MultipartFile file, String contentType) {
         if (!contentType.equals("image/jpeg") && !contentType.equals("image/png")) return;
         try (InputStream in = file.getInputStream();
              javax.imageio.stream.ImageInputStream iis = javax.imageio.ImageIO.createImageInputStream(in)) {
