@@ -75,7 +75,7 @@ public class TrackingService {
 
     private static DeliveryDto withoutAddressUnless(DeliveryDto d, boolean include) {
         return include && d.kind() == DeliveryKind.DELIVERY ? d
-                : new DeliveryDto(d.kind(), d.marketId(), d.marketDayId(), d.pickupHour(), null,
+                : new DeliveryDto(d.kind(), d.marketId(), d.marketName(), d.marketDayId(), d.pickupHour(), null,
                         d.deliveryDate(), d.arrivalFrom(), d.arrivalTo());
     }
 

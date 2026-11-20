@@ -15,10 +15,11 @@ public final class CalendarRules {
     private CalendarRules() {
     }
 
-    /** Market pickup: Friday, Saturday, Sunday. */
+    /** Market pickup: weekends and the first market’s Wednesday/Thursday in 2026. */
     public static boolean isMarketPickupDay(LocalDate date) {
         DayOfWeek d = date.getDayOfWeek();
-        return d == DayOfWeek.FRIDAY || d == DayOfWeek.SATURDAY || d == DayOfWeek.SUNDAY;
+        return date.equals(LocalDate.of(2026, 11, 25)) || date.equals(LocalDate.of(2026, 11, 26))
+                || d == DayOfWeek.FRIDAY || d == DayOfWeek.SATURDAY || d == DayOfWeek.SUNDAY;
     }
 
     /** Vienna delivery: Wednesday or Friday. */

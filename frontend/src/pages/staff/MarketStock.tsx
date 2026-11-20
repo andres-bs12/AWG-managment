@@ -1,25 +1,22 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
 import { prepareMarketPhoto, seedMarketPhoto } from '../../api/marketStockPhotos'
 import { StaffDialog } from '../../components/staff/StaffDialog'
+import { StaffText } from '../../components/staff/StaffText'
 import { Button } from '../../components/ui/Button'
 import { Field } from '../../components/ui/Field'
 import {
-  marketColors, marketFinishes, marketStatusLabels,
-  type MarketOrnament, type MarketOrnamentStatus,
+  marketColors, marketFinishes, marketOrnamentParts, marketStatusLabels, searchIds,
+  type MarketOrnament, type MarketOrnamentStatus, type MarketPaintStatus,
 } from '../../domain/marketStock'
+import { useStaffRefresh } from '../../lib/useStaffRefresh'
 import styles from './MarketStock.module.css'
 
 const statusOptions = Object.entries(marketStatusLabels)
 
-function searchIds(query: string, ornaments: MarketOrnament[]): MarketOrnament[] {
-  const clean = query.toUpperCase().replace(/[^A-Z0-9]/g, '')
-  const shortCode = /^([A-Z][SM])O?(\d+)$/.exec(clean)
-  const canonical = shortCode ? shortCode[1] + String(Number(shortCode[2])).padStart(2, '0') : clean
-  return ornaments.filter(item => item.id.startsWith(clean) || item.id === canonical)
-}
-
 export function MarketStock() {
+  const version = useStaffRefresh()
   const [ornaments, setOrnaments] = useState<MarketOrnament[] | null>(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
@@ -30,10 +27,10 @@ export function MarketStock() {
   useEffect(() => {
     let active = true
     api.marketStock.list()
-      .then(rows => { if (active) setOrnaments(rows) })
+      .then(rows => { if (active) { setOrnaments(rows); setError('') } })
       .catch(() => { if (active) setError('Could not load market stock. Check the connection and try again.') })
     return () => { active = false }
-  }, [attempt])
+  }, [attempt, version])
 
   const matches = searchIds(query, (ornaments ?? []).filter(item => status === 'all' || item.status === status))
   const selected = ornaments?.find(item => item.id === selectedId)
@@ -113,7 +110,7 @@ export function MarketStock() {
       </div>
     </>}
     {selected && <OrnamentDialog key={selected.id} item={selected}
-      onClose={() => setSelectedId(null)} onUpdate={applyUpdate} />}
+      onClose={() => setSelectedId(null)} onUpdate={applyUpdate} onReplaceAll={setOrnaments} />}
   </section>
 }
 
@@ -123,18 +120,18 @@ function Status({ value }: { value: MarketOrnamentStatus }) {
 
 const soldDate = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Vienna', dateStyle: 'medium', timeStyle: 'short' })
 
-function OrnamentDialog({ item, onClose, onUpdate }: {
+function OrnamentDialog({ item, onClose, onUpdate, onReplaceAll }: {
   item: MarketOrnament
   onClose: () => void
   onUpdate: (row: MarketOrnament) => void
+  onReplaceAll: (rows: MarketOrnament[]) => void
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [photo, setPhoto] = useState<{ revision: number; url: string | null; failed?: boolean } | null>(null)
   const [photoAttempt, setPhotoAttempt] = useState(0)
-  const color = marketColors.find(entry => entry.code === item.id[0])
-  const finish = marketFinishes.find(entry => entry.code === item.id[1])
+  const parts = marketOrnamentParts(item.id)
   const fallback = seedMarketPhoto(item.id)
   const currentPhoto = photo?.revision === item.revision ? photo : null
   const image = item.hasUploadedPhoto ? currentPhoto?.url : fallback
@@ -159,10 +156,9 @@ function OrnamentDialog({ item, onClose, onUpdate }: {
       setNotice(success)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the ornament. Try again.')
-      if ((err as { code?: string })?.code === 'MARKET_STOCK_CHANGED') {
+      if (['MARKET_STOCK_CHANGED', 'MARKET_STOCK_SELL_IN_SALE'].includes((err as { code?: string })?.code ?? '')) {
         try {
-          const fresh = (await api.marketStock.list()).find(row => row.id === item.id)
-          if (fresh) onUpdate(fresh)
+          onReplaceAll(await api.marketStock.list())
         } catch {
           setError('Could not refresh this ornament. Reopen Stock and try again.')
         }
@@ -172,7 +168,7 @@ function OrnamentDialog({ item, onClose, onUpdate }: {
     }
   }
 
-  function changeStatus(status: MarketOrnamentStatus, message: string) {
+  function changeStatus(status: MarketPaintStatus, message: string) {
     void save(() => api.marketStock.changeStatus(item.id, status, item.revision), message)
   }
 
@@ -184,18 +180,20 @@ function OrnamentDialog({ item, onClose, onUpdate }: {
 
   return <StaffDialog title={item.id} busy={busy} onClose={onClose}>
     <div className={styles.detail}>
-      <div className={styles.detailLine}><p>{color?.label} · {finish?.label}</p><Status value={item.status} /></div>
-      {item.soldAt && <p className={styles.muted}>Sold {soldDate.format(new Date(item.soldAt))}</p>}
-      <div className={styles.actions}>
-        {item.status === 'unpainted' && <Button tone="staff" size="lg" disabled={busy}
-          onClick={() => changeStatus('painted', 'Marked as painted.')}>Mark painted</Button>}
-        {item.status === 'painted' && <>
-          <Button tone="staff" size="lg" disabled={busy} onClick={() => changeStatus('sold', 'Sale recorded.')}>Mark sold</Button>
-          <Button tone="staff" variant="secondary" disabled={busy} onClick={() => changeStatus('unpainted', 'Moved back to To paint.')}>Mark unpainted</Button>
-        </>}
-        {item.status === 'sold' && <Button tone="staff" variant="secondary" disabled={busy}
-          onClick={() => changeStatus('painted', 'Sale undone.')}>Undo sale</Button>}
+      <div className={styles.detailLine}>
+        {parts && <p><StaffText>{`${parts.color.label} · ${parts.finish.label}`}</StaffText></p>}
+        {item.status !== 'sold' && <Status value={item.status} />}
       </div>
+      {item.status === 'sold' && <p className={styles.saleLink}>
+        <span>Sold{item.soldAt && ` ${soldDate.format(new Date(item.soldAt))}`}{item.orderId && item.orderCode && ' ·'}</span>
+        {item.orderId && item.orderCode && <Link to={`/staff/orders/${encodeURIComponent(item.orderId)}`} state={{ from: '/staff/inventory' }}>Order {item.orderCode}</Link>}
+      </p>}
+      {item.status !== 'sold' && <div className={styles.actions}>
+        {item.status === 'unpainted' ? <Button tone="staff" size="lg" disabled={busy}
+          onClick={() => changeStatus('painted', 'Marked as painted.')}>Mark painted</Button>
+          : <Button tone="staff" variant="secondary" disabled={busy}
+            onClick={() => changeStatus('unpainted', 'Moved back to To paint.')}>Mark unpainted</Button>}
+      </div>}
       {notice && <p role="status">{notice}</p>}
       {error && <p className={styles.error} role="alert">{error}</p>}
       {image && <img className={styles.photo} src={image} alt={`Painted design on ${item.id}`} />}
@@ -204,10 +202,10 @@ function OrnamentDialog({ item, onClose, onUpdate }: {
         <p role="alert">Could not load the photo.</p>
         <Button tone="staff" variant="secondary" onClick={() => { setPhoto(null); setPhotoAttempt(value => value + 1) }}>Retry photo</Button>
       </div>}
-      <Field className={styles.field} label={item.hasUploadedPhoto || fallback ? 'Replace photo' : 'Add photo'} htmlFor="market-stock-photo">
+      {item.status !== 'sold' && <Field className={styles.field} label={item.hasUploadedPhoto || fallback ? 'Replace photo' : 'Add photo'} htmlFor="market-stock-photo">
         <input id="market-stock-photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
           disabled={busy} onChange={upload} />
-      </Field>
+      </Field>}
     </div>
   </StaffDialog>
 }

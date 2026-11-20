@@ -52,7 +52,8 @@ public record AwgProperties(
     public record Shop(boolean enabled, String publicBaseUrl, String stripeSecretKey, String stripeWebhookSecret,
                        int leadDays, int maxDaysAhead,
                        java.time.LocalDate seasonEnd, int maxOpenCheckouts, java.time.LocalDate deliveriesFrom,
-                       java.time.LocalTime deliveryWindowStart, java.time.LocalTime deliveryWindowEnd) {
+                       java.time.LocalTime deliveryWindowStart, java.time.LocalTime deliveryWindowEnd,
+                       java.util.UUID primaryPickupMarketId) {
         public Shop {
             if (deliveryWindowStart == null) deliveryWindowStart = java.time.LocalTime.of(18, 0);
             if (deliveryWindowEnd == null) deliveryWindowEnd = java.time.LocalTime.of(20, 0);

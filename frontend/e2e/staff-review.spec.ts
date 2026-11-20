@@ -1,6 +1,21 @@
 import { test, expect, type Page } from '@playwright/test'
 import { axe } from './helpers'
-import { staffUser, token, today, marketDay, spareMarket, httpFixture, navigation, signedIn, newFinishedSale } from './staff-fixture'
+import { staffUser, token, today, marketDay, spareMarket, httpFixture, navigation, signedIn } from './staff-fixture'
+
+async function addInlineFinishedPiece(page: Page, id = 'RM01') {
+  await page.getByRole('button', { name: /Add finished/ }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.getByRole('list', { name: 'Ready ornaments' }).getByRole('button', { name: new RegExp(`^${id} ·`) }).last().click()
+}
+
+async function newInlineFinishedSale(page: Page) {
+  await addInlineFinishedPiece(page)
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  await page.getByRole('radio', { name: 'Paid', exact: true }).locator('..').click()
+  await page.getByRole('radio', { name: 'Cash', exact: true }).locator('..').click()
+  await page.getByRole('button', { name: 'Done', exact: true }).click()
+  await expect(page.getByRole('link', { name: 'Open order', exact: true })).toBeVisible()
+}
 
 test('login retains the requested route and rejects an incorrect password', async ({ page }) => {
   await httpFixture(page)
@@ -53,7 +68,7 @@ test('401 redirects through the router, keeps the draft, and restores its route 
   const agendaLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/agenda/days')
   await signedIn(page, '/staff/sales/new')
   await agendaLoaded
-  await page.getByRole('button', { name: /Add finished product/ }).click()
+  await addInlineFinishedPiece(page)
   const stored = await page.evaluate(() => sessionStorage.getItem('awg-sale-draft'))
   await page.evaluate(() => { (window as Window & { staffNavigationProbe?: string }).staffNavigationProbe = 'kept' })
   fixture.expireAgenda()
@@ -73,28 +88,52 @@ test('401 redirects through the router, keeps the draft, and restores its route 
 test('a fresh sale consumes the query once, survives reload, and sends a new HTTP idempotency key', async ({ page }) => {
   const fixture = await httpFixture(page)
   await signedIn(page, '/staff/sales/new')
-  await newFinishedSale(page)
+  await newInlineFinishedSale(page)
   await expect.poll(() => fixture.saleRequests.length).toBe(1)
   const first = fixture.saleRequests[0]
+  expect(first.input.items[0].marketOrnamentId).toBe('RM01')
   await page.locator('a[href="/staff/sales/new?fresh=1"]:visible').first().click()
   await expect(page).toHaveURL(/\/staff\/sales\/new$/)
-  await page.getByRole('button', { name: /Add finished product/ }).click()
+  await addInlineFinishedPiece(page, 'RM02')
   await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('awg-sale-draft')!).items.length)).toBe(1)
   const secondKey = await page.evaluate(() => JSON.parse(sessionStorage.getItem('awg-sale-draft')!).idempotencyKey)
   expect(secondKey).toBeTruthy()
   expect(secondKey).not.toBe(first.key)
   await page.reload()
-  await expect(page.getByRole('heading', { name: /Finished 1/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /RM02 · Red · Matte/ })).toBeVisible()
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.getByRole('radio', { name: 'Paid', exact: true }).locator('..').click()
   await page.getByRole('radio', { name: 'Cash', exact: true }).locator('..').click()
   await page.getByRole('button', { name: 'Done', exact: true }).click()
   await expect.poll(() => fixture.saleRequests.length).toBe(2)
   expect(fixture.saleRequests[1].key).toBe(secondKey)
+  expect(fixture.saleRequests[1].input.items[0].marketOrnamentId).toBe('RM02')
   expect(fixture.saleRequests[1].id).not.toBe(first.id)
   await expect(page.getByRole('link', { name: 'Open order', exact: true })).toHaveAttribute('href', `/staff/orders/${fixture.saleRequests[1].id}`)
   await axe(page)
 })
+
+for (const status of ['sold', 'unpainted'] as const) {
+  test(`a finished piece that becomes ${status} refreshes stock and can be replaced`, async ({ page }) => {
+    const fixture = await httpFixture(page)
+    await signedIn(page, '/staff/sales/new')
+    await addInlineFinishedPiece(page)
+    await page.getByRole('button', { name: 'Continue', exact: true }).click()
+    await page.getByRole('radio', { name: 'Cash', exact: true }).locator('..').click()
+    fixture.marketPieces[0].status = status
+    await page.getByRole('button', { name: 'Done', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText(status === 'sold' ? 'has already been sold' : 'is no longer Ready')
+    await expect(page.getByText('Piece no longer available.')).toBeVisible()
+    await page.getByRole('button', { name: 'Change piece', exact: true }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.getByRole('list', { name: 'Ready ornaments' }).getByRole('button', { name: /^RM02 ·/ }).click()
+    await expect(page.getByRole('heading', { name: /^RM02 · Red · Matte/ })).toBeVisible()
+    await page.getByRole('button', { name: 'Continue', exact: true }).click()
+    await page.getByRole('button', { name: 'Done', exact: true }).click()
+    await expect(page.getByRole('link', { name: 'Open order', exact: true })).toBeVisible()
+    expect(fixture.saleRequests[0].input.items[0].marketOrnamentId).toBe('RM02')
+  })
+}
 
 test('custom calendar sale reaches QR, and fresh starts a second custom order with its own payment', async ({ page }) => {
   const fixture = await httpFixture(page)
@@ -106,7 +145,8 @@ test('custom calendar sale reaches QR, and fresh starts a second custom order wi
   await expect(page.getByRole('button', { name: 'Enlarge customer QR code', exact: true })).toBeVisible()
   await expect.poll(() => fixture.saleRequests.length).toBe(1)
   const first = fixture.saleRequests[0]
-  expect(first.input.items).toEqual([expect.objectContaining({ kind: 'custom', paintDate: today, paintStart: 13, paintEnd: 14, deliveryKind: 'market', pickupHour: 14 })])
+  expect(first.input.soldOnMarketDayId).toBe(marketDay.id)
+  expect(first.input.items).toEqual([expect.objectContaining({ kind: 'custom', paintDate: today, paintStart: 13, paintEnd: 14, deliveryKind: 'market', pickupHour: 15 })])
   await expect(page.getByRole('complementary').filter({ has: page.getByRole('heading', { name: 'Order summary', exact: true }) })).toContainText(fixture.records.get(first.id)!.code)
   await axe(page)
 
@@ -141,6 +181,60 @@ test('custom calendar sale reaches QR, and fresh starts a second custom order wi
   await axe(page)
 })
 
+test('New sale Back confirms discarding a draft and restores the start choices', async ({ page }) => {
+  await httpFixture(page)
+  await signedIn(page, '/staff/sales/new')
+  const custom = page.getByRole('button', { name: /Add custom ornament/ })
+  const finished = page.getByRole('button', { name: /Add finished product/ })
+  const back = page.getByRole('button', { name: 'Back', exact: true })
+  const summary = page.getByRole('heading', { name: 'Order summary', exact: true })
+  const progress = page.getByRole('navigation', { name: 'Sale progress' })
+  await expect(back).toHaveCount(0)
+  await expect(summary).toHaveCount(0)
+  await expect(progress).toHaveCount(0)
+  await expect(page.getByText('€0.00', { exact: true })).toHaveCount(0)
+  for (const choice of [custom, finished]) {
+    await expect(choice).toBeVisible()
+    await expect(choice.locator('svg')).toBeVisible()
+  }
+  if ((page.viewportSize()?.width ?? 0) >= 768) {
+    const customBox = (await custom.boundingBox())!
+    const finishedBox = (await finished.boundingBox())!
+    const workspace = (await custom.locator('xpath=../../..').boundingBox())!
+    expect(customBox.height).toBeGreaterThanOrEqual(120)
+    expect(finishedBox.height).toBeGreaterThanOrEqual(120)
+    expect(customBox.x).toBeCloseTo(workspace.x)
+    expect(finishedBox.x + finishedBox.width).toBeCloseTo(workspace.x + workspace.width)
+  }
+  await custom.click()
+  await expect(summary).toBeVisible()
+  await expect(progress.locator('li')).toHaveCount(3)
+  await expect(progress.locator('[aria-current="step"]')).toContainText('Items')
+  await expect(progress.locator('[aria-hidden="true"]')).toHaveText(['1', '2', '3'])
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  await expect(progress.locator('[aria-current="step"]')).toContainText('Pickup')
+  await expect(progress.locator('[aria-hidden="true"]')).toHaveText(['✓', '2', '3'])
+  await page.getByRole('button', { name: 'Back to items', exact: true }).click()
+
+  const item = page.getByRole('heading', { name: /Custom 1/ })
+  await expect(item).toBeVisible()
+  await back.click()
+  const discard = page.getByRole('dialog', { name: 'Discard this sale?', exact: true })
+  await expect(discard).toContainText('The ornaments you added are removed.')
+  await page.keyboard.press('Escape')
+  await expect(discard).toHaveCount(0)
+  await expect(item).toBeVisible()
+
+  await back.click()
+  await discard.getByRole('button', { name: 'Discard', exact: true }).click()
+  await expect(custom).toBeVisible()
+  await expect(finished).toBeVisible()
+  await expect(back).toHaveCount(0)
+  await expect(item).toHaveCount(0)
+  await expect(summary).toHaveCount(0)
+  await expect(progress).toHaveCount(0)
+})
+
 test('staff totals use server prices, stock is explicit, and deposit records the displayed amount', async ({ page }) => {
   const fixture = await httpFixture(page)
   await signedIn(page, '/staff/sales/new')
@@ -163,9 +257,10 @@ test('staff totals use server prices, stock is explicit, and deposit records the
   await page.getByRole('checkbox', { name: /Name on the back/ }).check()
   await expect(page.getByRole('heading', { name: /Custom 1/ })).toContainText('71')
   await expect(page.getByRole('radio', { name: '1 h 15', exact: true })).toBeChecked()
-  await page.getByRole('button', { name: 'Start over', exact: true }).click()
-  await page.getByRole('button', { name: /Add finished product/ }).click()
-  await expect(page.getByRole('heading', { name: /Finished 1/ })).toContainText('41')
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Discard this sale?', exact: true }).getByRole('button', { name: 'Discard', exact: true }).click()
+  await addInlineFinishedPiece(page)
+  await expect(page.getByRole('heading', { name: /RM01 · Red · Matte/ })).toContainText('41')
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(page.getByLabel(/Deposit received/)).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeDisabled()
@@ -195,11 +290,18 @@ test.describe('Vienna live clock and HTTP refresh', () => {
     await expect(marker).toHaveAttribute('data-now', '10:01')
     await expect.poll(() => fixture.dayReads).toBeGreaterThan(beforeMinute)
     const beforeFocus = fixture.dayReads
-    fixture.items.get(fixture.original.id)!.petName = 'Milo'
+    fixture.items.get(fixture.original.id)!.delivery.pickupHour = 18
     await page.evaluate(() => dispatchEvent(new Event('focus')))
     await expect.poll(() => fixture.dayReads).toBeGreaterThan(beforeFocus)
     const block = page.locator('[data-slot-id="block-review"]')
-    await expect(block).toHaveAccessibleName(/^Milo,/)
+    await expect(block).toHaveAccessibleName(/^AWGREVIEW, Alex Review, Pickup Fri 18:00,/)
+    await expect(marker).toHaveCSS('pointer-events', 'none')
+    const markerLayer = await marker.evaluate(node => Number(getComputedStyle(node).zIndex))
+    const selectedBlockLayer = await block.evaluate(node => {
+      node.focus({ preventScroll: true })
+      return Number(getComputedStyle(node).zIndex)
+    })
+    expect(markerLayer).toBeGreaterThan(selectedBlockLayer)
     const grid = await block.locator('..').boundingBox()
     expect(grid).not.toBeNull()
     const hourHeight = grid!.height / (marketDay.closeHour - marketDay.openHour)
@@ -211,35 +313,75 @@ test.describe('Vienna live clock and HTTP refresh', () => {
   })
 })
 
-test('Save move refetches the HTTP agenda and renders the new position', async ({ page }) => {
+async function dragCalendar(page: Page, x: number, y: number, distance: number, touch: boolean) {
+  if (touch) {
+    const input = await page.context().newCDPSession(page)
+    try {
+      await input.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] })
+      await expect(page.locator('[data-calendar]')).toHaveAttribute('data-dragging', 'true')
+      await input.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + distance }] })
+      await input.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    } finally {
+      await input.detach()
+    }
+  } else {
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x, y + distance, { steps: 8 })
+    await page.mouse.up()
+  }
+}
+
+test('a held drag on free calendar time proposes a quarter-hour range', async ({ page }, testInfo) => {
+  await httpFixture(page)
+  await signedIn(page, `/staff/agenda?date=${today}&view=list`)
+  await expect(page.getByRole('group', { name: 'Agenda view' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Add paint session' })).toHaveCount(0)
+  const grid = page.locator('[data-calendar]')
+  await expect(grid).toBeVisible()
+  const bounds = (await grid.boundingBox())!
+  const hour = bounds.height / (marketDay.closeHour - marketDay.openHour)
+  await dragCalendar(page, bounds.x + bounds.width / 2, bounds.y + hour / 4 + 2, hour * 1.05, Boolean(testInfo.project.use.hasTouch))
+  const proposal = page.getByRole('dialog', { name: 'New paint session' })
+  await expect(proposal.getByLabel('Paint start')).toHaveValue('10:15')
+  await expect(proposal.getByLabel('Paint end')).toHaveValue('11:15')
+  await proposal.getByRole('button', { name: 'Start sale', exact: true }).click()
+  await expect(page.getByRole('heading', { name: /Custom 1/ })).toBeVisible()
+})
+
+test('dragging a block shows a refused move and saves after retry', async ({ page }, testInfo) => {
   const fixture = await httpFixture(page)
   await signedIn(page, `/staff/agenda?date=${today}&view=calendar`)
   const block = page.locator('[data-slot-id="block-review"]')
   await expect(block).toHaveAccessibleName(/12:00–13:00/)
-  await page.getByRole('button', { name: 'Move sessions', exact: true }).click()
   const bounds = await block.boundingBox()
   expect(bounds).not.toBeNull()
   const grid = block.locator('..')
   const gridBounds = await grid.boundingBox()
   expect(gridBounds).not.toBeNull()
   const hourHeight = gridBounds!.height / (marketDay.closeHour - marketDay.openHour)
-  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2 + 2 * hourHeight, { steps: 8 })
-  await page.mouse.up()
-  await expect(page.getByRole('button', { name: 'Save move', exact: true })).toBeVisible()
+  await page.route('**/api/agenda/blocks/block-review', route => route.fulfill({ status: 409, json: { message: 'Daily painting limit reached.' } }), { times: 1 })
+  await dragCalendar(page, bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2, 2.18 * hourHeight, Boolean(testInfo.project.use.hasTouch))
+  const dialog = page.getByRole('dialog', { name: 'Confirm schedule change' })
+  const save = dialog.getByRole('button', { name: 'Save move', exact: true })
+  await expect(dialog).toContainText('14:15–15:15')
+  await save.click()
+  await expect(dialog.getByRole('alert')).toHaveText('Daily painting limit reached.')
+  await expect(block).toHaveAttribute('aria-label', /12:00–13:00/)
   const reads = fixture.dayReads
-  await page.getByRole('button', { name: 'Save move', exact: true }).click()
+  await save.click()
   await expect.poll(() => fixture.dayReads).toBeGreaterThan(reads)
-  await expect(block).toHaveAccessibleName(/14:00–15:00/)
-  await expect(page.getByRole('button', { name: 'Save move', exact: true })).toHaveCount(0)
-  expect(fixture.mutations.filter(entry => entry.path === '/api/agenda/blocks/block-review')).toEqual([{ path: '/api/agenda/blocks/block-review', body: { date: today, startHour: 14 } }])
+  await expect(block).toHaveAccessibleName(/14:15–15:15/)
+  await expect(dialog).toHaveCount(0)
+  expect(fixture.mutations.filter(entry => entry.path === '/api/agenda/blocks/block-review')).toEqual([{ path: '/api/agenda/blocks/block-review', body: { date: today, startHour: 14.25 } }])
   await axe(page)
 })
 
 test('search encodes code, customer name and phone and opens the returned order', async ({ page }) => {
   const fixture = await httpFixture(page)
   await signedIn(page)
+  await expect(page.getByRole('search').getByRole('button')).toHaveCount(0)
+  await expect(page.getByRole('searchbox', { name: 'Search orders', exact: true })).toHaveAttribute('enterkeyhint', 'search')
   await page.getByRole('searchbox', { name: 'Search orders', exact: true }).fill('Alex & +43')
   await page.getByRole('searchbox', { name: 'Search orders', exact: true }).press('Enter')
   await expect(page.getByRole('heading', { name: 'Search orders', exact: true })).toBeVisible()
@@ -257,10 +399,17 @@ test('attention badge opens REVIEW orders and PENDING holds stay visible without
   await expect(hold).not.toContainText('Alex')
   await expect(hold).not.toContainText('Luna')
   await expect.poll(() => hold.evaluate(node => getComputedStyle(node).backgroundImage)).toMatch(/gradient/)
-  const attention = page.getByRole('link', { name: /Needs attention/ }).first()
-  await expect(attention).toContainText('(1)')
+  await expect(hold.locator('img')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: /^Needs attention/ })).toHaveCount(0)
+  const more = page.getByRole('button', { name: 'More, 1 order needs attention', exact: true })
+  await expect(more.locator('[data-attention-dot]')).toBeVisible()
+  await more.click()
+  const menu = page.getByRole('navigation', { name: 'More staff tools', exact: true })
+  const attention = menu.getByRole('link', { name: 'Needs attention (1)', exact: true })
+  await expect(menu.locator(':scope > *').first()).toHaveText('Needs attention (1)')
   await attention.click()
   await expect(page.getByRole('heading', { name: 'Needs attention', exact: true })).toBeVisible()
+  await expect(more).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('link', { name: /AWGREVIEW/ })).toContainText(/review/i)
   await axe(page)
 })
@@ -506,29 +655,76 @@ for (const view of staffPages) {
   })
 }
 
-test('portrait navigation exposes five reachable bottom tabs and Painting days in More', async ({ page }) => {
+test('staff navigation prioritises New sale and keeps Deliveries selected in More', async ({ page }) => {
   await httpFixture(page)
   await signedIn(page)
-  if (page.viewportSize()!.width >= 1100) {
-    await page.getByRole('button', { name: 'More', exact: true }).click()
-    await expect(page.getByRole('navigation', { name: 'More staff tools', exact: true }).getByRole('link', { name: 'Painting days', exact: true })).toBeVisible()
-    return
-  }
-  const tabs = page.getByRole('navigation', { name: /Staff tabs|Staff navigation|Quick navigation/ })
-  await expect(tabs).toBeVisible()
-  for (const name of ['Agenda', 'Deliveries', 'New sale', 'Search']) {
-    const link = tabs.getByRole('link', { name, exact: true })
-    await expect(link).toBeVisible()
-    const box = await link.boundingBox()
-    expect(box!.width).toBeGreaterThanOrEqual(44)
-    expect(box!.height).toBeGreaterThanOrEqual(44)
-  }
-  await tabs.getByRole('button', { name: 'More', exact: true }).click()
-  await page.getByRole('navigation', { name: 'More staff tools', exact: true }).getByRole('link', { name: 'Painting days', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Painting days', exact: true })).toBeVisible()
+  const nav = page.getByRole('navigation', { name: page.viewportSize()!.width >= 1101 ? 'Staff' : 'Staff tabs', exact: true })
+  await expect(nav.locator(':scope > *')).toHaveCount(2)
+  await expect(nav.locator(':scope > *').first()).toHaveText('New sale')
+  await expect(nav.getByRole('link', { name: 'Agenda', exact: true })).toHaveCount(0)
+  const sale = nav.getByRole('link', { name: 'New sale', exact: true })
+  expect((await sale.boundingBox())!.height).toBeGreaterThanOrEqual(56)
+  const more = nav.getByRole('button', { name: 'More', exact: true })
+  const moreBounds = (await more.boundingBox())!
+  expect(moreBounds.width).toBeGreaterThanOrEqual(44)
+  expect(moreBounds.height).toBeGreaterThanOrEqual(44)
+  await expect(more.locator('svg')).toBeVisible()
+  await expect(more.locator('[data-attention-dot]')).toHaveCount(0)
+  const home = page.getByRole('banner').getByRole('link', { name: 'AWG · Agenda', exact: true })
+  const homeBounds = (await home.boundingBox())!
+  expect(homeBounds.width).toBeGreaterThanOrEqual(44)
+  expect(homeBounds.height).toBeGreaterThanOrEqual(44)
+  await expect(page.getByRole('searchbox', { name: 'Search orders', exact: true })).toBeVisible()
+  await more.click()
+  const menu = page.getByRole('navigation', { name: 'More staff tools', exact: true })
+  await expect(menu.getByRole('link', { name: 'Painting days', exact: true })).toBeVisible()
+  await expect(menu.locator(':scope > *').first()).toHaveText('Needs attention (0)')
+  const deliveries = menu.getByRole('link', { name: 'Deliveries', exact: true })
+  await deliveries.click()
+  await expect(page.getByRole('heading', { name: 'Deliveries', exact: true })).toBeVisible()
+  await expect(more).toHaveAttribute('aria-current', 'page')
+  await more.click()
+  await expect(deliveries).toHaveAttribute('aria-current', 'page')
   await axe(page)
 })
 
+test('More clears its attention badge and surfaces the error in the header when the count fails to load', async ({ page }) => {
+  await httpFixture(page, { attention: true })
+  await signedIn(page)
+  await expect(page.getByRole('button', { name: /^More, 1 order/ })).toBeVisible()
+  await page.route('**/api/orders/attention', route => route.fulfill({ status: 503, json: { message: 'Could not load attention count.' } }))
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  const more = page.getByRole('button', { name: 'More', exact: true })
+  await expect(more).toBeVisible()
+  await expect(more.locator('[data-attention-dot]')).toHaveCount(0)
+  await expect(page.getByRole('alert')).toHaveText('Could not load attention count.')
+})
+
+test('the agenda loads the first pet photo in a large thumbnail and falls back to the swatch', async ({ page }) => {
+  const fixture = await httpFixture(page)
+  const ornament = fixture.items.get(fixture.original.id)!
+  ornament.photos = [
+    { id: 'first', name: 'first.gif', dataUrl: '/api/photos/first' },
+    { id: 'second', name: 'second.gif', dataUrl: '/api/photos/second' },
+  ]
+  await page.route('**/api/photos/first', route => route.fulfill({
+    contentType: 'image/gif', body: Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'),
+  }))
+  await signedIn(page)
+  const block = page.locator('[data-slot-id="block-review"]')
+  const photo = block.getByAltText('Pet photo', { exact: true })
+  await expect(photo).toHaveAttribute('src', /\/api\/photos\/first$/)
+  await expect(photo).toHaveAttribute('loading', 'lazy')
+  await expect(photo).toHaveJSProperty('naturalWidth', 1)
+  const bounds = (await photo.boundingBox())!
+  expect(bounds.width).toBeGreaterThanOrEqual(56)
+  expect(bounds.height).toBeGreaterThanOrEqual(56)
+
+  ornament.photos[0].dataUrl = '/api/photos/missing'
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect(block.getByRole('img', { name: 'red ornament' })).toBeVisible()
+  await expect(block.getByAltText('Pet photo')).toHaveCount(0)
+})
 
 test.describe('390px phone staff layout', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
@@ -571,10 +767,12 @@ test('leaving a created sale is explicit, the QR stays reachable from payment, a
   await proceed.click()
   await page.getByRole('button', { name: 'Create order & show QR', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Enlarge customer QR code', exact: true })).toBeVisible()
+  const progress = page.getByRole('navigation', { name: 'Sale progress' })
+  await expect(progress.locator('[aria-current="step"]')).toContainText('QR & pay')
+  await expect(progress.locator('[aria-hidden="true"]')).toHaveText(['✓', '✓', '3'])
   await expect.poll(() => fixture.saleRequests.length).toBe(1)
   const code = fixture.records.get(fixture.saleRequests[0].id)!.code
-  await expect(page.getByRole('button', { name: 'Start over', exact: true })).toHaveCount(0)
-  await page.locator('[class*="head"]').getByRole('button', { name: 'New sale', exact: true }).click()
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
   const leave = page.getByRole('dialog', { name: 'Leave this sale?', exact: true })
   await expect(leave).toContainText(`${code} stays saved and unpaid`)
   await axe(page)
@@ -598,10 +796,10 @@ test('after the QR, Change date asks first, cancels the order and offers only pi
   await expect.poll(() => fixture.saleRequests.length).toBe(1)
   const firstId = fixture.saleRequests[0].id
 
-  // Only hours from 17:00 leave time to paint.
+  // Only hours from 17:00 leave time to paint (15 min handling before pickup).
   await page.route('**/api/agenda/capacity', async route => {
     const body = route.request().postDataJSON() as { beforeHour?: number }
-    return route.fulfill({ json: body.beforeHour != null && body.beforeHour < 17
+    return route.fulfill({ json: body.beforeHour != null && body.beforeHour < 16.75
       ? { ok: false, slot: null, remainingHours: 0, message: 'No free paint slot before this handoff.' }
       : { ok: true, slot: { date: today, startHour: 13, endHour: 14 }, remainingHours: 3, message: 'Available' } })
   })
@@ -624,7 +822,7 @@ test('after the QR, Change date asks first, cancels the order and offers only pi
   await expect(late).toBeEnabled()
   const hours = page.locator('[class*="hours"] button')
   // The hour chosen before stays pressable and explains why it no longer works; other early hours are disabled.
-  await expect(page.getByText('Pickup 14:00 · no painting time left before it.')).toBeVisible()
+  await expect(page.getByText('Pickup 15:00 · no painting time left before it.')).toBeVisible()
   for (const button of await hours.all()) {
     const label = (await button.textContent())!.trim()
     if (Number(label.slice(0, 2)) < 17 && await button.getAttribute('aria-pressed') !== 'true') await expect(button).toBeDisabled()
@@ -659,6 +857,7 @@ test('Change date refuses to cancel an order that already has a payment', async 
 })
 
 test('mock: one finished ornament, Deliver now, Paid in cash completes the sale', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('awg-active-market-id', 'mkt-rathaus'))
   await page.goto('/staff/login')
   // The demo email is prefilled, so the password has focus.
   await expect(page.getByLabel('Password', { exact: true })).toBeFocused()
@@ -666,9 +865,8 @@ test('mock: one finished ornament, Deliver now, Paid in cash completes the sale'
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.locator('div[data-staff-page]')).toBeVisible()
   await navigation(page, '/staff/sales/new')
-  await page.getByRole('button', { name: /Add finished product/ }).click()
-  // The mock answers with latency: wait for server prices and stock before continuing.
-  await expect(page.getByText(/^Finished stock: \d+ left$/)).toBeVisible()
+  await addInlineFinishedPiece(page)
+  await expect(page.getByRole('heading', { name: /RM01 · Red · Matte/ })).toContainText('€')
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.getByRole('radio', { name: 'Deliver now', exact: true }).locator('..').click()
   await page.getByRole('radio', { name: 'Paid', exact: true }).locator('..').click()
@@ -683,22 +881,31 @@ test('mock: one finished ornament, Deliver now, Paid in cash completes the sale'
 
 test('painting days pick a day in the calendar, flag over-limit days and save each change without a Save button', async ({ page }) => {
   const fixture = await httpFixture(page)
+  // Real backend derives max from hours: give 7 Nov a 2h window (10–12) with 3 bookings so it is over limit.
+  await page.route(url => url.pathname === '/api/painting-days', async route => {
+    await route.fulfill({ json: [
+      { date: '2026-11-05', open: true, maxPaintings: 10, booked: 0, openHour: 10, closeHour: 20 },
+      { date: today, open: true, maxPaintings: 10, booked: 1, openHour: 10, closeHour: 20 },
+      { date: '2026-11-07', open: true, maxPaintings: 2, booked: 3, openHour: 10, closeHour: 12 },
+    ] })
+  })
   await signedIn(page, '/staff/painting-days')
   // Past days cannot be picked; today is selected and edited below the calendar.
   await expect(page.getByRole('button', { name: /^\w+ 5 November 2026/ })).toBeDisabled()
   await expect(page.getByRole('button', { name: /^\w+ 6 November 2026/ })).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('button', { name: /^\w+ 7 November 2026/ }).click()
-  await expect(page.getByText('3/2 booked · Over limit; existing bookings remain')).toBeVisible()
+  await expect(page.getByText('10:00–12:00 · 3 of 2 booked · Over limit; existing bookings remain')).toBeVisible()
   await page.getByRole('button', { name: /^\w+ 6 November 2026/ }).click()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('spinbutton')).toHaveCount(0)
   const toggle = page.getByRole('switch', { name: /^Open\b/ }).first()
   const box = await toggle.boundingBox()
   expect(box!.width).toBeGreaterThanOrEqual(24)
-  await page.getByRole('button', { name: /^Increase Max paintings/ }).first().click()
+  await page.getByLabel(/^Painting ends Fri,? 6 Nov$/, { exact: true }).fill('13:00')
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible()
-  await expect(page.getByText('1/3 booked', { exact: true })).toBeVisible()
+  await expect(page.getByText('10:00–13:00 · 1 of 3 booked', { exact: true })).toBeVisible()
   await toggle.uncheck()
-  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 3, openHour: 10, closeHour: 20 }, { open: false, maxPaintings: 3, openHour: 10, closeHour: 20 }])
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, openHour: 10, closeHour: 13 }, { open: false, openHour: 10, closeHour: 13 }])
   await axe(page)
 })
 
@@ -758,6 +965,7 @@ test('stock rows save only when changed and a conflict keeps the server value by
 })
 
 async function mockSignIn(page: Page, to: string) {
+  await page.addInitScript(() => localStorage.setItem('awg-active-market-id', 'mkt-rathaus'))
   await page.goto('/staff/login')
   await page.getByLabel('Password', { exact: true }).fill('gaby')
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -805,6 +1013,11 @@ test('mock: a multi-ornament order is grouped before production filters and rows
 
 test('mock: a full Today cannot be chosen and the market-day choice opens instead', async ({ page }) => {
   await mockSignIn(page, '/staff/sales/new')
+  await page.evaluate(async () => {
+    const storePath = '/src/api/mock/store.ts'
+    const store = await import(storePath)
+    store.updatePaintingDay('2026-11-28', true, { openHour: 15, closeHour: 18 })
+  })
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
   await expect(page.getByRole('heading', { name: /Custom 1 · €/ })).toBeVisible()
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
@@ -819,14 +1032,14 @@ test('painting-day edits typed quickly are all sent, even when leaving during th
   const fixture = await httpFixture(page)
   await page.route(url => url.pathname.startsWith('/api/painting-days/'), async route => { await new Promise(resolve => setTimeout(resolve, 300)); await route.fallback() })
   await signedIn(page, '/staff/painting-days')
-  const increase = page.getByRole('button', { name: /^Increase Max paintings/ }).first()
-  await increase.click()
-  await increase.click()
-  await increase.click()
-  await expect(page.getByRole('spinbutton').first()).toHaveValue('5')
+  const endInput = page.getByLabel(/^Painting ends Fri,? 6 Nov$/, { exact: true })
+  await endInput.fill('15:00')
+  await endInput.fill('14:00')
+  await endInput.fill('13:00')
+  await expect(endInput).toHaveValue('13:00')
   // Leave before the 400ms pause ends: the last value is still saved.
   await navigation(page, '/staff/agenda')
-  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 5, openHour: 10, closeHour: 20 }])
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, openHour: 10, closeHour: 13 }])
 })
 
 test('a painting-day save that fails after leaving is shown on return and can be retried', async ({ page }) => {
@@ -834,19 +1047,19 @@ test('a painting-day save that fails after leaving is shown on return and can be
   let fail = true
   await page.route(url => url.pathname.startsWith('/api/painting-days/'), route => fail ? route.fulfill({ status: 503, json: { code: 'UNAVAILABLE', message: 'Server is busy, try again.' } }) : route.fallback())
   await signedIn(page, '/staff/painting-days')
-  await page.getByRole('button', { name: /^Increase Max paintings/ }).first().click()
+  await page.getByLabel(/^Painting ends Fri,? 6 Nov$/, { exact: true }).fill('13:00')
   await navigation(page, '/staff/agenda')
   await expect(page.getByRole('heading', { name: 'Agenda', exact: true })).toBeVisible()
   await navigation(page, '/staff/painting-days')
   const lost = page.getByRole('alert').filter({ hasText: /^Not saved:/ })
-  await expect(lost).toContainText('max 3')
+  await expect(lost).toContainText('10:00–13:00')
   await axe(page)
   fail = false
   await lost.getByRole('button', { name: 'Retry', exact: true }).click()
   await expect(lost).toHaveCount(0)
   // The visible row shows the value that was finally saved.
-  await expect(page.getByRole('spinbutton').first()).toHaveValue('3')
-  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, maxPaintings: 3, openHour: 10, closeHour: 20 }])
+  await expect(page.getByLabel(/^Painting ends Fri,? 6 Nov$/, { exact: true })).toHaveValue('13:00')
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path.startsWith('/api/painting-days/')).map(entry => entry.body)).toEqual([{ open: true, openHour: 10, closeHour: 13 }])
 })
 
 
@@ -854,12 +1067,12 @@ test('agenda painting capacity saves changes and warns without removing bookings
   const fixture = await httpFixture(page)
   await signedIn(page, '/staff/agenda')
   await page.getByRole('button', { name: /^Painting hours for Fri,? 6 Nov$/, exact: true }).click()
-  const row = page.getByRole('dialog', { name: /^Painting hours · Fri,? 6 Nov$/, exact: true }).locator('article').filter({ has: page.getByRole('spinbutton', { name: /Max paintings for/ }) })
-  await expect(row.getByText('1/2 booked')).toBeVisible()
-  await row.getByRole('button', { name: /^Decrease Max paintings/ }).click()
-  await row.getByRole('button', { name: /^Decrease Max paintings/ }).click()
-  await expect(row.getByText('1/0 booked · Over limit; existing bookings remain')).toBeVisible()
-  await expect.poll(() => fixture.mutations.filter(entry => entry.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: true, maxPaintings: 0, openHour: 10, closeHour: 20 })
-  await row.getByRole('switch').uncheck()
-  await expect.poll(() => fixture.mutations.filter(entry => entry.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: false, maxPaintings: 0, openHour: 10, closeHour: 20 })
+  const dialog = page.getByRole('dialog', { name: /^Painting hours · Fri,? 6 Nov$/, exact: true })
+  await expect(dialog.getByRole('spinbutton')).toHaveCount(0)
+  await expect(dialog.getByText('1 booked · room for 10', { exact: true })).toBeVisible()
+  await dialog.getByLabel(/^Painting ends Fri,? 6 Nov$/, { exact: true }).fill('10:30')
+  await expect(dialog.getByText('1 booked · room for 0 · Over limit; existing bookings remain')).toBeVisible()
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: true, openHour: 10, closeHour: 10.5 })
+  await dialog.getByRole('switch').uncheck()
+  await expect.poll(() => fixture.mutations.filter(entry => entry.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: false, openHour: 10, closeHour: 10.5 })
 })

@@ -1,5 +1,5 @@
 import styles from '../BuyPage.module.css'
-import { pickupTimes, type BuyStepProps } from './shared'
+import { pickupTimes, selectedPickupDay, type BuyStepProps } from './shared'
 import { useLocale } from '../../../i18n/LocaleContext'
 import { Button } from '../../../components/ui/Button'
 import { formatEur } from '../../../lib/money'
@@ -26,7 +26,7 @@ export function BuyDateStep(props: Props) {
   const postUnavailable = shippingState === 'ready' && !shippingQuote?.available
   const choose = (kind: DeliveryKind) => {
     if (kind === 'post' && postUnavailable) return
-    if (kind !== draft.deliveryKind) patch({ deliveryKind: kind, deliveryDate: '', pickupTime: '' })
+    if (kind !== draft.deliveryKind) patch({ deliveryKind: kind, deliveryDate: '', pickupMarketDayId: '', pickupTime: '' })
   }
   const fee = config.deliveryFee ? `+${formatEur(config.deliveryFee, locale)}` : t('shopFree')
   const methods: { kind: DeliveryKind; title: string; detail: string; disabled?: boolean }[] = [
@@ -75,7 +75,7 @@ function PostSection({ t, shippingQuote, shippingState, setDatesRetry, err, desc
 
 function PickupSection({ t, draft, pickupDays, pickupState, setDatesRetry, patch, formatDate, err, described }: Props) {
   const compactDate = useCompactDate()
-  const day = pickupDays.find(entry => entry.date === draft.deliveryDate)
+  const day = selectedPickupDay(pickupDays, draft)
   const times = day ? pickupTimes(day) : []
   const hours = (entry: ShopPickupDay) => t('timeOClock', { time: `${entry.openTime}–${entry.closeTime}` })
   const markets = [...new Set(pickupDays.map(entry => pickupPlace(entry, t)))]
@@ -90,8 +90,12 @@ function PickupSection({ t, draft, pickupDays, pickupState, setDatesRetry, patch
       {(pickupState === 'loading' || pickupState === 'idle') && <div className={styles.pickupDays} aria-hidden="true"><div className={styles.dateSkeleton} /><div className={styles.dateSkeleton} /></div>}
       {pickupState === 'ready' && markets.map(place => <div key={place} className={styles.pickupMarket}>
         <h3>{place}</h3>
-        <div className={styles.pickupDays}>{pickupDays.filter(entry => pickupPlace(entry, t) === place).map(entry => <label key={entry.date} className={styles.choiceCard} data-selected={draft.deliveryDate === entry.date}>
-          <input className={styles.choiceInput} type="radio" name="pickup-day" value={entry.date} aria-label={`${formatDate(entry.date)}, ${hours(entry)}, ${place}`} checked={draft.deliveryDate === entry.date} onChange={() => patch({ deliveryDate: entry.date, pickupTime: pickupTimes(entry).includes(draft.pickupTime) ? draft.pickupTime : '' })} />
+        <div className={styles.pickupDays}>{pickupDays.filter(entry => pickupPlace(entry, t) === place).map(entry => <label key={entry.marketDayId ?? entry.date} className={styles.choiceCard} data-selected={day === entry}>
+          <input className={styles.choiceInput} type="radio" name="pickup-day" value={entry.marketDayId ?? entry.date} aria-label={`${formatDate(entry.date)}, ${hours(entry)}, ${place}`} checked={day === entry} onChange={() => patch({
+            deliveryDate: entry.date,
+            pickupMarketDayId: entry.marketDayId ?? '',
+            pickupTime: day && pickupPlace(day, t) === place && pickupTimes(entry).includes(draft.pickupTime) ? draft.pickupTime : '',
+          })} />
           <strong>{compactDate(entry.date)}</strong><span>{hours(entry)}</span>
         </label>)}</div>
       </div>)}

@@ -97,6 +97,7 @@ export function StatsPage() {
 
 function StatsBody({ stats, view }: { stats: Stats; view: StatsView }) {
   const { sales, web } = stats
+  const marketSales = [...(stats.marketSales ?? [])].sort((a, b) => b.count - a.count)
   const hasSales = sales.orders > 0
   const multiDay = stats.daily.length > 1
   const notCounted = [
@@ -127,6 +128,19 @@ function StatsBody({ stats, view }: { stats: Stats; view: StatsView }) {
           <div><dd>{eur(sales.averageOrder)}</dd><dt>Average order</dt></div>
         </dl>
         {notCounted && <p className={styles.meta}><StaffText>{`Not counted: ${notCounted}`}</StaffText></p>}
+      </> : noSales}
+      <Card title="Non-personalised sold">
+        {marketSales.length ? <dl className={styles.breakdown}>
+          {marketSales.map(row => <div key={`${row.color}-${row.finish}`}>
+            <dt className={styles.shareLabel}>
+              <span className={styles.swatch} style={{ background: `var(--ornament-${row.color})` }} aria-hidden="true" />
+              <StaffText>{`${colorLabel(row.color)} · ${finishLabel(row.finish)}`}</StaffText>
+            </dt>
+            <dd className={styles.number}>{row.count.toLocaleString('en-GB')}</dd>
+          </div>)}
+        </dl> : <p className={styles.meta}>No numbered ornaments sold in this range.</p>}
+      </Card>
+      {hasSales && <>
         {multiDay && <Card title="Sales per day">
           <DailyBars name="Sales per day" rows={stats.daily.map(day => ({ date: day.date, value: day.revenue, text: `${eur(day.revenue)} · ${plural(day.orders, 'order')}` }))}
             tick={value => eur(value).replace(/\.00$/, '')} best="Best day"
@@ -138,7 +152,7 @@ function StatsBody({ stats, view }: { stats: Stats; view: StatsView }) {
               meta={`${plural(row.orders, 'order')} · ${plural(row.ornaments, 'ornament')}`} share={percent(row.revenue, sales.revenue)} shareOf="of revenue" />)}
           </ul>
         </Card>
-      </> : noSales}
+      </>}
     </div>
 
     <div className={styles.group} data-group="customers">

@@ -1,5 +1,14 @@
 # Tareas AWG
 
+## Pendiente 2026-11-20
+
+- [ ] **Decisión del dueño — tienda web en fechas solapadas (25–29 nov):** definir si la recogida online ofrece un puesto primario o ambos y configurar `SHOP_PRIMARY_PICKUP_MARKET_ID`.
+- [ ] **BD local de Gaby:** reiniciar su base local o ejecutar `flyway repair` porque `V15__market_ornament_stock.sql` se editó en sitio.
+- [ ] **Probar en el iPad real:** arrastre táctil, pulsación larga en Agenda y carga/vista de fotos de adornos.
+- [ ] **Backlog de velocidad en el puesto** (pendiente de confirmar por el dueño): ocultar selector de tiempo de pintura por ítem (auto 60/75 min); quitar «Move another order's paint session» de New sale; que solo pedidos `REVIEW` enciendan el punto rojo (no `PENDING` de Stripe); en detalle de pedido poner Mark picked up / pago primero; QR + código de pedido + pago en una sola pantalla; Deliveries por defecto en Hoy · este puesto con filtro por nombre/código; y limpiar la columna Pickups and deliveries de Agenda (quitar nombre de mascota, «Personalised · no name» y «All deliveries», dejando código, hora, tipo y estado).
+- [ ] **Commit y push** de los cambios actuales tras revisión del dueño.
+- [ ] **CI:** correr `e2e-full` en GitHub Actions antes de desplegar `v3.1`.
+
 ## v3.1 · cambios del dueño (2026-11-12) — hechos en `e141361`, CI verde; falta probar el tecleo en iPhone real
 
 - [x] **Móvil, campo del nombre del adorno (`/buy`, `/form`):** al tocar el input y empezar a escribir, la pantalla baja de golpe y luego sube y baja un poco con cada letra. Debe quedarse quieta mientras se escribe (probable choque entre el teclado/visualViewport, la reparación de foco de `lib/publicFormFocus.ts` y la vista previa que se actualiza con cada letra). Verificar en iPhone real.

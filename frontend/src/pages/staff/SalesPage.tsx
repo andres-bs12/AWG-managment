@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
-import type { SalesFilters, SalesPage as SalesResult } from '../../domain/types'
+import type { SaleItemPreview, SalesFilters, SalesPage as SalesResult } from '../../domain/types'
+import { marketOrnamentParts } from '../../domain/marketStock'
 import { Button } from '../../components/ui/Button'
-import { ButtonLink } from '../../components/ui/ButtonLink'
 import { Field } from '../../components/ui/Field'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { formatEur } from '../../lib/money'
@@ -38,7 +38,7 @@ export function SalesPage() {
     if (value) next.set(key, value)
     else next.delete(key)
     if (key !== 'page') next.delete('page')
-    setParams(next, { replace: key === 'q' })
+    setParams(next)
   }
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export function SalesPage() {
       }).catch(err => {
         if (active) setResponse({ result: null, error: err instanceof Error ? err.message : 'Could not load sales.', key: requestKey })
       })
-    }, query ? 250 : 0)
+    }, 0)
     return () => { active = false; window.clearTimeout(timer) }
   }, [query, state, source, period, page, today, refresh, retry, requestKey])
 
@@ -66,13 +66,12 @@ export function SalesPage() {
   }, [lastPage, params, setParams])
 
   return <section className={styles.page}>
-    <div className={styles.heading}><h1>Sales</h1><ButtonLink to="/staff/sales/new" tone="staff" variant="secondary">New sale</ButtonLink></div>
+    <h1>Sales</h1>
     <StaffFilters count={Number(Boolean(state)) + Number(Boolean(source)) + Number(period !== 'all')} inline={
-      <Field label="Code, customer name or phone" htmlFor="sales-query" hint="Phone search needs at least three digits.">
-        <input id="sales-query" type="search" placeholder="Code, name or phone" autoComplete="off" value={query} onChange={event => update('q', event.target.value)} />
-      </Field>
+      <div className={styles.period}>
+        <SegmentedControl legend="Sale date" hideLegend value={period} name="sales-period" onChange={value => update('period', value)} options={[{ value: 'today', label: 'Today' }, { value: 'week', label: '7 days' }, { value: 'all', label: 'All' }]} />
+      </div>
     }>
-    <div className={styles.filters}>
       <div className={styles.filterRow}>
         <Field label="Payment" htmlFor="sales-state"><select id="sales-state" value={state ?? ''} onChange={event => update('state', event.target.value)}>
           <option value="">All payments</option><option value="unpaid">Unpaid</option><option value="deposit">Deposit paid</option><option value="paid">Paid</option><option value="pending">Checkout pending</option><option value="review">Payment review</option>
@@ -81,19 +80,31 @@ export function SalesPage() {
           <option value="">All sources</option><option value="stall">Stall</option><option value="web">Web</option>
         </select></Field>
       </div>
-      <SegmentedControl legend="Created" value={period} name="sales-period" onChange={value => update('period', value)} options={[{ value: 'today', label: 'Today' }, { value: 'week', label: '7 days' }, { value: 'all', label: 'All' }]} />
-    </div>
     </StaffFilters>
     {busy && <p role="status">Loading sales…</p>}
     {error && <div role="alert"><p>{error}</p><Button tone="staff" onClick={() => setRetry(value => value + 1)}>Retry</Button></div>}
     {!busy && !error && result && <>
-      {!result.orders.length ? <p role="status">No sales match these filters.</p> : <ul className={styles.list} aria-label="Sales results">{result.orders.map(order => <li key={order.id}>
-        <Link className={styles.sale} to={`/staff/orders/${order.id}`} state={{ from: `/staff/sales?${params}` }}>
-          <div className={styles.row}><strong>{order.customerName || 'Customer pending'}</strong><strong className={styles.total}>{formatEur(order.total, 'en')}</strong></div>
-          <div className={styles.row}><span className={styles.code}>{order.code}</span><span className={styles.payment} data-warning={order.checkoutStatus === 'pending' || order.checkoutStatus === 'review' || undefined}>{salePaymentLabel(order, amount => formatEur(amount, 'en'))}</span></div>
-          <span className={styles.meta}><StaffText>{`${order.source === 'web' ? 'Web' : 'Stall'} · ${formatDateLabel(viennaDate(order.createdAt))}${order.status === 'CANCELLED' ? ' · Cancelled' : ''}`}</StaffText></span>
-        </Link>
-      </li>)}</ul>}
+      {!result.orders.length ? <p role="status">No sales match these filters.</p> : <ul className={styles.list} aria-label="Sales results">{result.orders.map(order => {
+        const web = order.source === 'web'
+        const market = web ? null : order.soldAtMarketName
+        const date = formatDateLabel(viennaDate(order.createdAt))
+        return <li key={order.id}>
+          <Link className={styles.sale} to={`/staff/orders/${order.id}`} state={{ from: `/staff/sales?${params}` }}>
+            <div className={styles.identity}><strong className={styles.code}>{order.code}</strong><span>{order.customerName || 'Customer pending'}</span></div>
+            {order.saleItems?.length ? <ul className={styles.items} aria-label="Ornaments">{order.saleItems.map(item =>
+              <li key={item.id}><SaleItem item={item} /></li>
+            )}</ul> : <span className={styles.items}>{order.items} {order.items === 1 ? 'ornament' : 'ornaments'}</span>}
+            <div className={styles.location}>
+              <span>{web ? 'Web shop' : market || 'Stall'}</span>
+              <span className={styles.meta}><StaffText>{`${market ? 'Stall · ' : ''}${date}${order.status === 'CANCELLED' ? ' · Cancelled' : ''}`}</StaffText></span>
+            </div>
+            <div className={styles.amount}>
+              <strong className={styles.total}>{formatEur(order.total, 'en')}</strong>
+              <span className={styles.payment} data-warning={order.checkoutStatus === 'pending' || order.checkoutStatus === 'review' || undefined}><StaffText>{salePaymentLabel(order, amount => formatEur(amount, 'en'))}</StaffText></span>
+            </div>
+          </Link>
+        </li>
+      })}</ul>}
       {result.totalPages > 1 && <nav className={styles.pagination} aria-label="Sales pages">
         <Button tone="staff" variant="secondary" disabled={page === 0} onClick={() => update('page', String(page - 1))}>Previous</Button>
         <span aria-live="polite">{page + 1} / {result.totalPages}</span>
@@ -101,4 +112,14 @@ export function SalesPage() {
       </nav>}
     </>}
   </section>
+}
+
+function SaleItem({ item }: { item: SaleItemPreview }) {
+  const piece = item.marketOrnamentId ? marketOrnamentParts(item.marketOrnamentId) : null
+  const color = item.color ?? piece?.color.key
+  return <>
+    {item.photoUrl ? <img className={styles.photo} src={item.photoUrl} alt="" loading="lazy" /> : color ?
+      <span className={styles.swatch} style={{ background: `var(--ornament-${color})` }} role="img" aria-label={`${color} ornament`} /> : null}
+    <span>{item.kind === 'custom' ? 'Custom' : 'Finished'}</span>
+  </>
 }

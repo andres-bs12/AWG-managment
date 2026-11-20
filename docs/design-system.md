@@ -831,7 +831,7 @@ The layer tokens already specified in §6 are now present in `tokens.css`. Share
 
 **Added:** 2026-11-05 · Task 11. This is the staff layer of the same system, scoped by `[data-staff-page]`. It covers sign in, the staff shell, new sale, agenda, search/attention, order detail, deliveries, painting, inventory, painting days, markets and password changes. Staff copy is English. Public component contracts and the owner-approved public layouts remain in force on customer routes.
 
-Use the existing spacing, radius, elevation, focus, reduced-motion and semantic feedback tokens. C1 also applies to staff: a 2px `--color-selected` boundary, `--color-selected-surface` tint, ink text and weight 600; no dark filled selection or inset ring. Unselected controls compensate for their 1px boundary with 1px padding. Native radios supply arrow-key behaviour. Slot colours are production statuses, each with an explicit label; they are not selection colours. Pending/review web reservations use the tokenized hatch and opaque text backplates, with no customer details.
+Use the existing spacing, radius, elevation, focus, reduced-motion and semantic feedback tokens. C1 also applies to staff: a 2px `--color-selected` boundary, `--color-selected-surface` tint, ink text and weight 600; no dark filled selection or inset ring. Unselected controls compensate for their 1px boundary with 1px padding. Native radios supply arrow-key behaviour. Agenda appointments and handoff cards share a neutral surface and use coloured tags with explicit status labels. Pending/review web reservations use the tokenized hatch and opaque text backplates, with no customer details.
 
 Staff-specific tokens in `tokens.css`:
 

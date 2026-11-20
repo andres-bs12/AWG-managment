@@ -16,7 +16,7 @@ export function DeliveryOrderCard({ row, from, routeMode, busy, activeIds, onTog
   // Where and when, in the order staff need it: Vienna district first (route planning), market pickup time.
   const itemDue = (item: DatedDelivery) => item.deliveryKind === 'vienna'
     ? ['Vienna delivery', viennaDistrict(item.postalCode), formatDateLabel(item.date)].filter(Boolean).join(' · ')
-    : `Market pickup · ${formatDateLabel(item.date)}${item.timeLabel || item.marketHours ? ` · ${item.timeLabel || item.marketHours}` : ''}`
+    : `${item.marketName ?? 'Market pickup'} · ${formatDateLabel(item.date)}${item.timeLabel || item.marketHours ? ` · ${item.timeLabel || item.marketHours}` : ''}`
   const dueDates = [...new Set(items.map(itemDue))]
   const delivery = items.find(item => item.deliveryKind === 'vienna')
   const address = delivery?.addressLabel

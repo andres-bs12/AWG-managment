@@ -39,14 +39,18 @@ class Sprint5ApiTests extends ApiTestSupport {
         long ordersBefore = orders.count();
         String key = "sale-draft-0001-abcd";
 
-        MvcResult first = saleWithKey(token, key, finishedItem());
+        Map<String, Object> item = finishedItem();
+        MvcResult first = saleWithKey(token, key, item);
         assertThat(first.getResponse().getStatus()).isEqualTo(201);
-        MvcResult again = saleWithKey(token, key, finishedItem());
+        MvcResult again = saleWithKey(token, key, item);
         assertThat(again.getResponse().getStatus()).isEqualTo(200);
         assertThat(this.<String>read(again, "$.id")).isEqualTo(read(first, "$.id"));
 
         assertThat(orders.count()).isEqualTo(ordersBefore + 1);
-        assertThat(inventory.findFirstByItemKind(ItemKind.GENERIC).orElseThrow().getQuantity()).isEqualTo(before - 1);
+        var sold = marketStock.summary((String) item.get("marketOrnamentId")).orElseThrow();
+        assertThat(sold.getStatus()).isEqualTo("sold");
+        assertThat(sold.getRevision()).isEqualTo(1);
+        assertThat(inventory.findFirstByItemKind(ItemKind.GENERIC).orElseThrow().getQuantity()).isEqualTo(before);
     }
 
     @Test

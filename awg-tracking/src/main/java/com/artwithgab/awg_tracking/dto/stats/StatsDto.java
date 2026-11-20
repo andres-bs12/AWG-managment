@@ -8,7 +8,7 @@ import java.util.List;
  * orders and web checkouts that are not paid yet; those are counted separately.
  */
 public record StatsDto(String from, String to, Sales sales, List<SourceRow> bySource, List<DayRow> daily,
-                       List<ColorRow> colors, Delivery delivery, Web web) {
+                       List<ColorRow> colors, Delivery delivery, Web web, List<ColorRow> marketSales) {
 
     public record Sales(int orders, int ornaments, int custom, int finished, int withName,
                         BigDecimal revenue, BigDecimal received, BigDecimal outstanding, BigDecimal averageOrder,

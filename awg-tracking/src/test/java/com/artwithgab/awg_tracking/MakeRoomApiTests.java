@@ -37,6 +37,7 @@ class MakeRoomApiTests extends ApiTestSupport {
     @Test
     void movesTheFewestSessionsAndPrefersLatestHandoffThenSaleUsesTheFreedSlot() throws Exception {
         String token = login();
+        paintingDay(TUE, true, 2);
         var earlier = pickup(token, TUE, 10, SAT);
         var later = pickup(token, TUE, 11, SUN);
         var handoff = later.getHandoffDate();
@@ -91,6 +92,7 @@ class MakeRoomApiTests extends ApiTestSupport {
     @Test
     void allSameDayPickupsReturnTheSpecifiedReasonAndMessage() throws Exception {
         String token = login();
+        paintingDay(SAT, true, 2);
         pickup(token, SAT, 12, SAT);
         pickup(token, SAT, 13, SAT);
         mvc.perform(makeRoom(token, "same-day-only", SAT, 60))
@@ -128,6 +130,7 @@ class MakeRoomApiTests extends ApiTestSupport {
     @Test
     void replayReturnsTheOriginalBodyAfterTheAgendaChanges() throws Exception {
         String token = login();
+        paintingDay(TUE, true, 2);
         pickup(token, TUE, 10, SAT);
         pickup(token, TUE, 11, SUN);
         String original = mvc.perform(makeRoom(token, "replay-test", TUE, 60))
@@ -231,15 +234,19 @@ class MakeRoomApiTests extends ApiTestSupport {
     }
 
     private OrderItem pickup(String token, String date, double start, double end, String handoff) throws Exception {
-        String id = saleOk(token, customItem(false, date, start, end, "market", dayId(token, handoff), 14.0));
+        String id = saleOk(token, customItem(false, date, start, end, "market", dayId(token, handoff), 14.5));
         return orders.findById(UUID.fromString(id)).orElseThrow().getOrderItems().getFirst();
     }
 
-    private void paintingDay(String date, boolean open, int maxPaintings) {
+    private void paintingDay(String date, boolean open, int paintingHours) {
         PaintingDay day = new PaintingDay();
         day.setDate(LocalDate.parse(date));
         day.setOpen(open);
-        day.setMaxPaintings(maxPaintings);
+        if (open) {
+            double start = SAT.equals(date) ? 12.0 : 10.0;
+            day.setOpenHour(start);
+            day.setCloseHour(start + paintingHours);
+        }
         paintingDays.save(day);
     }
 }

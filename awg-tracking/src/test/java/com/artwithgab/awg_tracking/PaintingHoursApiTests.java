@@ -17,32 +17,47 @@ class PaintingHoursApiTests extends ApiTestSupport {
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].openHour").value(10.0))
-                .andExpect(jsonPath("$[0].closeHour").value(13.0));
+                .andExpect(jsonPath("$[0].closeHour").value(13.0))
+                .andExpect(jsonPath("$[0].maxPaintings").value(3));
+        mvc.perform(get("/api/painting-days").param("from", WED).param("to", WED)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].openHour").value(10.0))
+                .andExpect(jsonPath("$[0].closeHour").value(12.0))
+                .andExpect(jsonPath("$[0].maxPaintings").value(2));
         mvc.perform(get("/api/painting-days").param("from", SAT).param("to", SAT)
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].openHour").value(12.0))
-                .andExpect(jsonPath("$[0].closeHour").value(19.0));
+                .andExpect(jsonPath("$[0].closeHour").value(19.0))
+                .andExpect(jsonPath("$[0].maxPaintings").value(7));
     }
 
     @Test
     void changingHoursPreservesBookingsAndAutomaticPlanningUsesNewWindow() throws Exception {
         String token = login();
         String orderId = saleOk(token, customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0));
+        // Two painting hours (11:30-13:30) derive max 2: 1 existing booking leaves room for 1 more.
         mvc.perform(patch("/api/painting-days/" + TUE).header("Authorization", bearer(token))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("open", true, "maxPaintings", 4, "openHour", 11.5, "closeHour", 12.5))))
+                        .content(json(Map.of("open", true, "openHour", 11.5, "closeHour", 13.5))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.booked").value(1))
-                .andExpect(jsonPath("$.openHour").value(11.5)).andExpect(jsonPath("$.closeHour").value(12.5));
+                .andExpect(jsonPath("$.maxPaintings").value(2))
+                .andExpect(jsonPath("$.openHour").value(11.5)).andExpect(jsonPath("$.closeHour").value(13.5));
         mvc.perform(post("/api/agenda/capacity").header("Authorization", bearer(token))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("date", TUE, "durationHours", 1))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.ok").value(true))
                 .andExpect(jsonPath("$.slot.startHour").value(11.5))
                 .andExpect(jsonPath("$.slot.endHour").value(12.5));
+        // Shrinking to 1 hour (11:30-12:30) derives max 1, so the existing booking fills the day.
+        mvc.perform(patch("/api/painting-days/" + TUE).header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("open", true, "openHour", 11.5, "closeHour", 12.5))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.maxPaintings").value(1));
         mvc.perform(post("/api/agenda/capacity").header("Authorization", bearer(token))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("date", TUE, "durationHours", 1.25))))
+                        .content(json(Map.of("date", TUE, "durationHours", 1))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.ok").value(false));
         mvc.perform(get("/api/agenda/days/" + TUE).header("Authorization", bearer(token)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.marketDay.openHour").value(10.0))
@@ -55,8 +70,8 @@ class PaintingHoursApiTests extends ApiTestSupport {
         String token = login();
         mvc.perform(patch("/api/painting-days/" + SAT).header("Authorization", bearer(token))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("open", true, "maxPaintings", 4, "openHour", 8.25, "closeHour", 20.0))))
-                .andExpect(status().isOk());
+                        .content(json(Map.of("open", true, "openHour", 8.25, "closeHour", 20.0))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.maxPaintings").value(11));
         mvc.perform(get("/api/market-days").header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.date=='" + SAT + "')].openHour").value(org.hamcrest.Matchers.contains(12.0)))
@@ -71,16 +86,18 @@ class PaintingHoursApiTests extends ApiTestSupport {
     }
 
     @Test
-    void capacityOnlyEditsKeepExistingHours() throws Exception {
+    void switchOnlyEditsKeepExistingHoursAndDerivedMax() throws Exception {
         String token = login();
         mvc.perform(patch("/api/painting-days/" + TUE).header("Authorization", bearer(token))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("open", true, "maxPaintings", 4, "openHour", 9.25, "closeHour", 14.75))))
-                .andExpect(status().isOk());
+                        .content(json(Map.of("open", true, "maxPaintings", 9, "openHour", 9.25, "closeHour", 14.75))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.maxPaintings").value(5));
         mvc.perform(patch("/api/painting-days/" + TUE).header("Authorization", bearer(token))
-                        .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("open", false, "maxPaintings", 0))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.openHour").value(9.25))
-                .andExpect(jsonPath("$.closeHour").value(14.75));
+                        .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("open", false))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.open").value(false))
+                .andExpect(jsonPath("$.openHour").value(9.25))
+                .andExpect(jsonPath("$.closeHour").value(14.75))
+                .andExpect(jsonPath("$.maxPaintings").value(5));
     }
 
     @Test

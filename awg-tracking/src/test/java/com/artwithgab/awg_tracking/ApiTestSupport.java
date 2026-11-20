@@ -79,6 +79,19 @@ public abstract class ApiTestSupport {
     @Autowired
     private com.artwithgab.awg_tracking.repository.OrderRepository storedOrders;
 
+    @Autowired
+    protected com.artwithgab.awg_tracking.repository.MarketOrnamentRepository marketStock;
+    private static final AtomicInteger PIECE = new AtomicInteger(100000);
+
+    /** Explicit ready stock, independent of the PostgreSQL migration seed. */
+    protected String readyMarketPiece() {
+        var ornament = new com.artwithgab.awg_tracking.model.MarketOrnament();
+        ornament.setId("RS" + PIECE.incrementAndGet());
+        ornament.setStatus("painted");
+        marketStock.saveAndFlush(ornament);
+        return ornament.getId();
+    }
+
     /** A fresh client address per call, because the rate limiter keys on it and the clock is frozen. */
     protected static String freshIp() {
         return "10.1." + (IP.get() / 250) + "." + (IP.getAndIncrement() % 250 + 1);
@@ -143,6 +156,7 @@ public abstract class ApiTestSupport {
     protected Map<String, Object> finishedItem() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("kind", "finished");
+        m.put("marketOrnamentId", readyMarketPiece());
         m.put("withName", false); // Jackson 3 rejects a missing primitive (see report)
         m.put("deliveryKind", "market");
         return m;

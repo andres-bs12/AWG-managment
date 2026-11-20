@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
 })
 class NotificationServiceTests {
     @Autowired OrderService orders;
+    @Autowired com.artwithgab.awg_tracking.repository.MarketOrnamentRepository marketStock;
     @Autowired TransactionTemplate transactions;
     @Autowired com.artwithgab.awg_tracking.repository.InvoiceRepository invoices;
     @Autowired com.artwithgab.awg_tracking.repository.InvoiceCounterRepository counters;
@@ -45,8 +46,12 @@ class NotificationServiceTests {
     }
 
     @Test void salePaymentAndCancellationAreSentAfterCommit() {
-        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null);
-        var order = orders.createSale(new CreateSaleRequest(null, "<b>Customer</b>", "", "customer@example.com", List.of(item)));
+        var piece = new com.artwithgab.awg_tracking.model.MarketOrnament();
+        piece.setId("RM" + UUID.randomUUID().toString().substring(0, 6));
+        piece.setStatus("painted");
+        marketStock.saveAndFlush(piece);
+        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null, piece.getId());
+        var order = orders.createSale(new CreateSaleRequest(null, "<b>Customer</b>", "", "customer@example.com", List.of(item), null));
         UUID id = UUID.fromString(order.id());
         try {
             orders.updatePaymentState(id, PaymentState.PAID, PaymentMethod.CASH, null);
@@ -81,14 +86,14 @@ class NotificationServiceTests {
     void customerGetsOneShippedMailAfterEveryPostItemIsHandedOver(String trackingNumber) {
         var address = new com.artwithgab.awg_tracking.dto.common.AddressDto("Hauptplatz 1", null, "Linz", "4020");
         var finishedPost = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null,
-                DeliveryKind.POST, null, null, null, address);
+                DeliveryKind.POST, null, null, null, address, readyMarketPiece());
         // The shipped order is committed, so each invocation needs a different paint slot.
         LocalDate paintDate = LocalDate.of(2026, 11, trackingNumber == null ? 25 : 26);
         var customPost = new CreateSaleItemRequest(ItemKind.CUSTOM, false, CustomColor.RED, CustomFinish.SHINY,
-                paintDate, 10.0, 11.0, DeliveryKind.POST, null, null, null, address);
+                paintDate, 10.0, 11.0, DeliveryKind.POST, null, null, null, address, null);
         var pickup = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null,
-                DeliveryKind.MARKET, null, null, null, null);
-        var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(pickup, finishedPost, customPost)));
+                DeliveryKind.MARKET, null, null, null, null, readyMarketPiece());
+        var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(pickup, finishedPost, customPost), null));
         UUID id = UUID.fromString(order.id());
         String subject = "Deine Bestellung ist unterwegs · " + order.code();
         var firstPost = List.of(UUID.fromString(order.itemIds().get(1)));
@@ -110,11 +115,15 @@ class NotificationServiceTests {
     }
 
     @Test void rolledBackSaleDoesNotSend() {
-        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null);
+        var piece = new com.artwithgab.awg_tracking.model.MarketOrnament();
+        piece.setId("RM" + UUID.randomUUID().toString().substring(0, 6));
+        piece.setStatus("painted");
+        marketStock.saveAndFlush(piece);
+        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null, piece.getId());
         long before = invoices.count();
         long numberBefore = counters.findById(1L).orElseThrow().getLastNumber();
         transactions.executeWithoutResult(status -> {
-            var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(item)));
+            var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(item), null));
             orders.updatePaymentState(UUID.fromString(order.id()), PaymentState.DEPOSIT, PaymentMethod.CASH, null);
             assertEquals(before + 1, invoices.count());
             status.setRollbackOnly();
@@ -123,6 +132,13 @@ class NotificationServiceTests {
         assertEquals(numberBefore, counters.findById(1L).orElseThrow().getLastNumber());
         verify(mail, after(300).never()).send(any(SimpleMailMessage.class));
         verify(mail, never()).send(any(jakarta.mail.internet.MimeMessage.class));
+    }
+
+    private String readyMarketPiece() {
+        var piece = new com.artwithgab.awg_tracking.model.MarketOrnament();
+        piece.setId("RM" + UUID.randomUUID().toString().substring(0, 6));
+        piece.setStatus("painted");
+        return marketStock.saveAndFlush(piece).getId();
     }
 
     private static String textPart(jakarta.mail.Part part, String type) throws Exception {

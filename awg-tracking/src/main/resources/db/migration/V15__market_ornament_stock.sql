@@ -16,3 +16,6 @@ FROM (
                  ('GS', 16), ('GM', 8), ('CS', 16), ('CM', 8)) AS groups(prefix, quantity)
     CROSS JOIN LATERAL generate_series(1, quantity) AS numbers(n)
 ) AS ornaments;
+
+ALTER TABLE order_item ADD COLUMN market_ornament_id varchar(8) REFERENCES market_ornament(id);
+CREATE INDEX idx_order_item_market_ornament ON order_item(market_ornament_id);

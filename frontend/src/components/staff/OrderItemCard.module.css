@@ -46,3 +46,62 @@
 .blocked { color: var(--staff-warn); font-size: var(--type-staff-meta-size); font-weight: 600; }
 .handover > div { display: grid; gap: var(--space-1); }
 .handover p { color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
+
+.marketPhoto {
+  flex: 0 0 var(--space-10);
+  width: var(--space-10);
+  box-sizing: content-box;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--radius-small);
+  background: var(--staff-bg);
+}
+.marketPhoto img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.marketPlaceholder {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--space-1);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-2);
+  color: var(--staff-ink);
+  container-type: inline-size;
+}
+.marketPlaceholderSwatch {
+  width: clamp(var(--space-4), 22cqi, var(--space-5));
+  height: clamp(var(--space-4), 22cqi, var(--space-5));
+  border-radius: var(--radius-circle);
+  border: var(--border-thin) solid var(--ornament-swatch-border);
+}
+.marketPlaceholderCode {
+  font-size: clamp(var(--type-staff-body-size), 24cqi, var(--type-price-size));
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.03em;
+  overflow-wrap: anywhere;
+}
+.title .marketCode { font-size: var(--type-staff-h1-size); letter-spacing: 0.02em; }
+.title .marketSpec {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-1);
+  color: var(--staff-ink);
+  font-weight: 600;
+}
+.marketSwatch {
+  flex: none;
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-circle);
+  border: var(--border-thin) solid var(--ornament-swatch-border);
+}
+
+@media (max-width: 639px) {
+  .marketPhoto {
+    flex-basis: var(--space-9);
+    width: var(--space-9);
+  }
+}

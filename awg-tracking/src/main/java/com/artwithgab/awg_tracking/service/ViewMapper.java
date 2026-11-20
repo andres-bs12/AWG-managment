@@ -13,6 +13,7 @@ import com.artwithgab.awg_tracking.dto.order.OrderItemDto;
 import com.artwithgab.awg_tracking.dto.tracking.TrackWhenDto;
 import com.artwithgab.awg_tracking.enums.DeliveryKind;
 import com.artwithgab.awg_tracking.enums.ItemKind;
+import com.artwithgab.awg_tracking.enums.MarketKind;
 import com.artwithgab.awg_tracking.model.*;
 import com.artwithgab.awg_tracking.support.Hours;
 import com.artwithgab.awg_tracking.support.AustrianPost;
@@ -97,7 +98,7 @@ public class ViewMapper {
     /** Day the item is handed off, resolved against the calendar. */
     public Optional<MarketDay> handoffDay(OrderItem item, CalendarIndex index) {
         if (item.getDeliveryKind() == DeliveryKind.MARKET) {
-            return index.marketDayOn(item.getHandoffDate()).or(() -> index.dayByDate(item.getHandoffDate()));
+            return index.pickupDay(item).or(() -> index.dayByDate(item.getHandoffDate()));
         }
         return index.dayByDate(item.getHandoffDate());
     }
@@ -108,6 +109,8 @@ public class ViewMapper {
         return new DeliveryDto(
                 item.getDeliveryKind(),
                 market ? day.map(d -> d.getMarket().getId().toString()).orElse(null) : null,
+                market ? day.filter(d -> d.getMarket().getKind() == MarketKind.MARKET)
+                        .map(d -> d.getMarket().getName()).orElse(null) : null,
                 day.map(d -> d.getId().toString()).orElse(null),
                 item.getPickUpTime() == null ? null : Hours.of(item.getPickUpTime()),
                 market ? null : address(item.getOrder().getDeliveryAddress()),
@@ -132,7 +135,8 @@ public class ViewMapper {
                         .toList(),
                 i.getOrder().isFormSubmitted() || i.getItemKind() == ItemKind.GENERIC,
                 i.isHandedOver(),
-                delivery(i, index));
+                delivery(i, index),
+                i.getMarketOrnamentId());
     }
 
     /** Painting block derived from the item. Null for items without painting time. */
@@ -162,7 +166,7 @@ public class ViewMapper {
                     Hours.of(properties.shop().deliveryWindowStart()), null, null,
                     Hours.of(properties.shop().deliveryWindowEnd()), null, null);
         }
-        return handoffDay(item, index)
+        return index.pickupDay(item)
                 .map(day -> new TrackWhenDto(
                         "market",
                         day.getDate().toString(),

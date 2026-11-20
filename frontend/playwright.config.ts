@@ -23,15 +23,15 @@ export default defineConfig({
     })),
     ...[[360, 640], [440, 741]].map(([width, height]) => ({
       name: `staff-phone-${width}x${height}`,
-      testMatch: /staff-mobile\.spec\.ts/,
+      testMatch: /staff-mobile\.spec\.ts|two-markets\.spec\.ts|agenda-ipad\.spec\.ts|new-sale-corner-cases\.spec\.ts/,
       use: { browserName: 'chromium' as const, viewport: { width, height }, isMobile: true, hasTouch: true },
     })),
     { name: 'mobile', use: { viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true }, testIgnore: /reduced-motion|staff-review|public-mobile|staff-mobile/ },
     { name: 'tablet', use: { viewport: { width: 768, height: 1024 } }, testIgnore: /reduced-motion|staff-review|public-mobile|staff-mobile/ },
     { name: 'desktop', use: { viewport: { width: 1280, height: 900 } }, testIgnore: /reduced-motion|public-mobile|staff-mobile/ },
     // The stall iPad Air 11" (QR form and the shop journeys), portrait and landscape.
-    { name: 'ipadPortrait', use: { viewport: { width: 820, height: 1180 }, hasTouch: true }, testMatch: /form|pickup|journey\.spec|layout|staff-review/ },
-    { name: 'ipadLandscape', use: { viewport: { width: 1180, height: 820 }, hasTouch: true }, testMatch: /form|pickup|journey\.spec|layout|staff-review/ },
+    { name: 'ipadPortrait', use: { viewport: { width: 820, height: 1180 }, hasTouch: true }, testMatch: /form|pickup|journey\.spec|layout|staff-review|two-markets|agenda-ipad|new-sale-corner-cases/ },
+    { name: 'ipadLandscape', use: { viewport: { width: 1180, height: 820 }, hasTouch: true }, testMatch: /form|pickup|journey\.spec|layout|staff-review|two-markets|agenda-ipad|new-sale-corner-cases/ },
     { name: 'reducedMotion', use: { viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, contextOptions: { reducedMotion: 'reduce' } }, testMatch: /reduced-motion|journey-deep|form/ },
   ],
 })

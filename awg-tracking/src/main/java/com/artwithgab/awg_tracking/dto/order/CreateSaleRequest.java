@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
+import java.util.UUID;
 
 /** Mirrors `CreateSaleInput`. Customer fields are optional: the customer form collects them. */
 public record CreateSaleRequest(
@@ -14,6 +15,7 @@ public record CreateSaleRequest(
         @Size(max = 120) String customerName,
         @Size(max = 40) String phone,
         @Email @Size(max = 200) String email,
-        @NotEmpty(message = "Add at least one ornament") @Size(max = 20) @Valid List<CreateSaleItemRequest> items
+        @NotEmpty(message = "Add at least one ornament") @Size(max = 20) @Valid List<CreateSaleItemRequest> items,
+        UUID soldOnMarketDayId
 ) {
 }

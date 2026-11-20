@@ -37,12 +37,11 @@ export function InventoryPage() {
     <MarketStock />
     {loading && <p role="status">Loading prices and stock…</p>}
     {error && <div role="alert"><p>{error}</p><Button tone="staff" onClick={() => { setLoading(true); setError(''); setRetry(n => n + 1) }}>Try again</Button></div>}
-    {!loading && !error && prices && !rows.length && <p>No stock rows configured.</p>}
+    {!loading && !error && prices && !custom.length && <p>No custom stock configured.</p>}
     {prices && <div className={styles.list}>
       <PricesCard initial={prices} />
       {colors.some(color => !legacy(color)) && <h2>Custom bases</h2>}
       {colorCards(false)}
-      {rows.filter(row => row.kind === 'finished').map(row => <article key={row.id} className={`${styles.stockCard} ${styles.finishedCard}`} aria-label="Finished ornaments"><h2>Unnumbered finished stock</h2><StockRow item={row} /></article>)}
       {colors.some(legacy) && <><h2>No longer sold</h2>{colorCards(true)}</>}
     </div>}
   </section>
@@ -154,7 +153,7 @@ function StockRow({ item }: { item: InventoryItem }) {
   const [notice, setNotice] = useState('')
   const value = Number(quantity)
   const valid = quantity.trim() !== '' && Number.isInteger(value) && value >= 0 && value <= 10000
-  const name = item.kind === 'finished' ? 'Finished ornaments' : `Custom · ${item.color} · ${item.finish ?? 'shiny'}`
+  const name = `Custom · ${item.color} · ${item.finish ?? 'shiny'}`
   async function save() {
     if (busy) return
     if (!valid) { setError('Enter a whole number from 0 to 10000.'); return }
@@ -176,7 +175,7 @@ function StockRow({ item }: { item: InventoryItem }) {
   const dirty = valid && value !== saved
   return <div className={styles.stockRow} role="group" aria-label={name}>
     <div className={styles.name}>
-      <h3>{item.kind === 'finished' ? 'Available' : item.finish === 'matte' ? 'Matte' : 'Shiny'}</h3>
+      <h3>{item.finish === 'matte' ? 'Matte' : 'Shiny'}</h3>
       {dirty && <p>Unsaved changes</p>}{notice && !dirty && <p role="status">{notice}</p>}{saved === 0 && <p className={`${styles.flag} ${styles.soldOut}`}>Sold out</p>}{saved === 1 && <p className={`${styles.flag} ${styles.lowStock}`}>Low stock: last one</p>}
     </div>
     <NumberStepper label={`${name} quantity`} value={quantity} onChange={next => { setQuantity(next); setNotice('') }} max={10000} disabled={busy} />

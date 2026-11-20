@@ -27,6 +27,7 @@ public record CreateSaleItemRequest(
         UUID marketId,
         UUID marketDayId,
         Double pickupHour,
-        @Valid AddressDto address
+        @Valid AddressDto address,
+        String marketOrnamentId
 ) {
 }

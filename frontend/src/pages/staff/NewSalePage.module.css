@@ -1,29 +1,17 @@
-.page h1 {
-  margin-bottom: var(--space-2);
-}
-
 .head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-3);
+  display: grid;
+  gap: var(--space-4);
   margin-bottom: var(--space-4);
 }
 
-.head > button {
-  white-space: nowrap;
-}
-
-.steps {
+.headingRow {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-3);
-  color: var(--staff-muted);
+  align-items: center;
+  gap: var(--space-3);
 }
 
-.steps span[data-on='true'] {
-  color: var(--staff-ink);
-  font-weight: 700;
+.headingRow > button {
+  white-space: nowrap;
 }
 
 .workspace {
@@ -31,6 +19,10 @@
   grid-template-columns: minmax(0, 1fr) var(--layout-staff-side);
   gap: var(--space-5);
   align-items: start;
+}
+
+.workspace[data-empty] {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .main h2 {
@@ -75,11 +67,143 @@
 /* The row owns the spacing, so the title centres exactly on Remove. */
 .cardHead h3 {
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-/* A finished item's card holds only its header: equal padding above and below. */
-.cardHead:last-child {
+.pieceActions { display: grid; justify-items: start; gap: var(--space-2); }
+.pieceActions p { margin: 0; }
+
+.finishedRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.salePhoto {
+  width: calc(var(--space-10) + var(--space-4));
+  box-sizing: content-box;
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--radius-small);
+}
+
+.finishedBody {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.finishedBody .cardHead {
   margin-bottom: 0;
+}
+
+.pieceHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+.pieceCode {
+  font-size: var(--type-staff-h1-size);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+}
+
+.piecePrice {
+  font-size: var(--type-staff-body-size);
+  font-weight: 600;
+  color: var(--staff-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pieceSpec {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--staff-ink);
+  font-size: var(--type-staff-meta-size);
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.swatchDot {
+  flex: none;
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-circle);
+  border: var(--border-thin) solid var(--ornament-swatch-border);
+}
+
+.deliveryPiece {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  min-width: 0;
+}
+
+.deliveryPhoto {
+  width: var(--space-10);
+  box-sizing: content-box;
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--radius-small);
+}
+
+.deliveryPieceMeta {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.deliveryPieceMeta h3 {
+  margin: 0;
+  font-size: var(--type-staff-h1-size);
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+}
+
+.deliveryPieces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+}
+
+.deliveryChip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--radius-control);
+  background: var(--staff-bg);
+  min-width: 0;
+}
+
+.deliveryChip strong {
+  font-size: var(--type-staff-h2-size);
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 479px) {
+  .finishedRow {
+    gap: var(--space-3);
+  }
+  .salePhoto {
+    width: var(--space-10);
+  }
+  .deliveryPhoto {
+    width: var(--space-9);
+  }
 }
 
 .actions {
@@ -94,6 +218,10 @@
   align-items: center;
   gap: var(--space-2);
   margin: var(--space-2) 0 var(--space-1);
+}
+
+.addRow button[data-selected] {
+  padding-inline: var(--space-2);
 }
 
 .minsRow {
@@ -284,6 +412,7 @@
 .sessionList li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-3); border: var(--border-thin) solid var(--staff-line); border-radius: var(--space-2); background: var(--staff-surface); }
 .sessionList li[data-state='missing'] { border-color: var(--staff-danger); }
 .sessionList p { margin: var(--space-1) 0 0; font-weight: 400; }
+.sessionList small { display: block; margin-top: var(--space-1); color: var(--staff-muted); font-weight: 400; }
 .sessionList li[data-state='pending'] p { color: var(--staff-muted); }
 @keyframes planIn { from { opacity: 1; transform: translateY(var(--space-1)); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .planSelected { animation: none; } }
@@ -453,13 +582,39 @@
 
 .startChoices {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--size-staff-name)), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--size-staff-name) + var(--space-8))), 1fr));
   gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  /* iPad: the empty sale is only these two choices, so they become large tap tiles. */
+  .workspace[data-empty] .startChoices > button {
+    min-height: max(var(--size-staff-sale-choice), 40svh);
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-4);
+  }
+
+  .workspace[data-empty] .startChoices button > span {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .workspace[data-empty] .startChoices strong {
+    font-size: var(--type-staff-h1-size, var(--type-staff-h2-size));
+  }
+
+  .workspace[data-empty] .startChoices .saleKindIcon {
+    width: calc(var(--space-8) * 2);
+    height: calc(var(--space-8) * 2);
+  }
 }
 
 .startChoices button > span {
   display: grid;
   gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
   text-align: left;
 }
 
@@ -468,6 +623,32 @@
   font-size: var(--type-staff-meta-size);
   font-weight: 400;
 }
+
+.saleKindIcon {
+  flex: none;
+  width: var(--size-icon);
+  height: var(--size-icon);
+  color: var(--sale-icon-ink);
+  background: var(--sale-icon-surface);
+  border-radius: var(--radius-small);
+}
+
+.saleKindIcon[data-kind='custom'] {
+  --sale-icon-ink: var(--staff-selected);
+  --sale-icon-surface: var(--color-success-surface);
+}
+
+.saleKindIcon[data-kind='finished'] {
+  --sale-icon-ink: var(--staff-ink);
+  --sale-icon-surface: var(--staff-bg);
+}
+
+.startChoices .saleKindIcon {
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-control);
+}
+
 .hourHint { margin: var(--space-2) 0 0; min-height: 1lh; color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
 .hourWrap { display: inline-flex; }
 .hourWrap > button:disabled { pointer-events: none; }

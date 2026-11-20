@@ -16,7 +16,6 @@
   margin-bottom: var(--space-2);
 }
 
-.empty,
 .list p {
   color: var(--staff-muted);
   font-size: var(--type-staff-meta-size);
@@ -67,6 +66,12 @@
   border-top: var(--border-thin) solid var(--staff-line);
 }
 
+.mixedNote {
+  margin: var(--space-3) 0 0;
+  color: var(--staff-muted);
+  font-size: var(--type-staff-meta-size);
+}
+
 @media (max-width: 1023px) {
   .panel {
     position: static;
@@ -81,3 +86,60 @@
 
 .row > span, .total strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .row strong { min-width: 0; overflow-wrap: anywhere; }
+
+.finishedItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.thumb {
+  width: var(--space-10);
+  box-sizing: content-box;
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--radius-small);
+}
+
+.details {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.details .row {
+  margin-bottom: 0;
+  align-items: baseline;
+}
+
+.details p {
+  margin: 0;
+}
+
+.pieceCode {
+  font-size: var(--type-staff-h2-size);
+  letter-spacing: 0.02em;
+}
+
+.list .pieceSpec {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--staff-ink);
+  font-weight: 600;
+}
+
+.swatchDot {
+  flex: none;
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-circle);
+  border: var(--border-thin) solid var(--ornament-swatch-border);
+}
+
+@media (max-width: 479px) {
+  .thumb {
+    width: var(--space-9);
+  }
+}

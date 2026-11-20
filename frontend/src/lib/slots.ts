@@ -1,3 +1,4 @@
+import type { TimeBlock } from '../domain/types'
 import { hoursOverlap } from './time'
 
 /** Paint window used for overlap checks (single-column agenda). */
@@ -5,6 +6,18 @@ export type PaintRange = {
   id: string
   startHour: number
   endHour: number
+}
+
+export function paintElapsedUntil(date: string, today: string, nowHour: number): number {
+  if (date < today) return Infinity
+  if (date > today) return 0
+  // Preserve the rounded quarter recorded when a session is marked Ready.
+  return Math.max(0.25, Math.ceil(nowHour * 4) / 4)
+}
+
+export function bookedPaintRange(block: TimeBlock, elapsedUntil: number): PaintRange | null {
+  const endHour = block.status === 'finished' ? Math.min(block.endHour, elapsedUntil) : block.endHour
+  return endHour > block.startHour ? { id: block.id, startHour: block.startHour, endHour } : null
 }
 
 export function paintRangeOverlaps(

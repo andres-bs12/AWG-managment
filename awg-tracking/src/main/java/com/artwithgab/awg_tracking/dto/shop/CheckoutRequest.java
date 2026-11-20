@@ -9,6 +9,7 @@ import com.artwithgab.awg_tracking.enums.DeliveryKind;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Web order. {@code deliveryKind} is "post" (default; needs {@code address} and {@code expectedArrivalTo}) or "market"
@@ -23,6 +24,7 @@ public record CheckoutRequest(
         LocalDate deliveryDate,
         LocalDate expectedArrivalTo,
         DeliveryKind deliveryKind,
+        UUID marketDayId,
         LocalTime pickupTime,
         @NotEmpty @Size(max = 10) @Valid List<ShopItemRequest> items,
         @AssertTrue(message = "Accept the terms to continue") boolean acceptTerms

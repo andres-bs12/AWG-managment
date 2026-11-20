@@ -7,12 +7,14 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 public record CapacityRequest(
         @NotNull LocalDate date,
         @Positive double durationHours,
         Double afterHour,
         Double beforeHour,
-        @Valid @Size(max = 50) List<BusyHoursDto> extraBusy
+        @Valid @Size(max = 50) List<BusyHoursDto> extraBusy,
+        UUID handoffMarketDayId
 ) {
 }

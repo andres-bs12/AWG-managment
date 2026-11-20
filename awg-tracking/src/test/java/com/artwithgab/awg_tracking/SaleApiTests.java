@@ -3,6 +3,7 @@ package com.artwithgab.awg_tracking;
 import com.artwithgab.awg_tracking.enums.CustomColor;
 import com.artwithgab.awg_tracking.enums.ItemKind;
 import com.artwithgab.awg_tracking.repository.InventoryRepository;
+import com.artwithgab.awg_tracking.repository.OrderRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MvcResult;
@@ -10,8 +11,10 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -19,6 +22,9 @@ class SaleApiTests extends ApiTestSupport {
 
     @Autowired
     InventoryRepository inventory;
+
+    @Autowired
+    OrderRepository orders;
 
     @Test
     void customPlusFinishedSaleTotals10297AndDeductsStock() throws Exception {
@@ -37,7 +43,7 @@ class SaleApiTests extends ApiTestSupport {
         assertEquals(0, new BigDecimal("102.97").compareTo(new BigDecimal(this.<Object>read(res, "$.total").toString())));
 
         assertEquals(redBefore - 1, inventory.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity());
-        assertEquals(genericBefore - 1, inventory.findFirstByItemKind(ItemKind.GENERIC).orElseThrow().getQuantity());
+        assertEquals(genericBefore, inventory.findFirstByItemKind(ItemKind.GENERIC).orElseThrow().getQuantity());
     }
 
     @Test
@@ -94,5 +100,37 @@ class SaleApiTests extends ApiTestSupport {
                         .header("Authorization", bearer(token)).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content(json(body)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void sameDayPickupRequiresFifteenMinutesAfterPaintEnd() throws Exception {
+        String token = login();
+        String sat = dayId(token, SAT);
+        // 13:00-14:00 with pickup at 14:00 leaves 0 min handling -> rejected.
+        MvcResult tooSoon = sale(token, customItem(false, SAT, 13.0, 14.0, "market", sat, 14.0));
+        assertEquals(400, tooSoon.getResponse().getStatus());
+        assertEquals("Choose a paint time before pickup, within working hours.", this.<String>read(tooSoon, "$.message"));
+
+        // 13:00-14:00 with pickup at 15:00 (or 12:45-13:45 with pickup at 14:00) -> accepted.
+        MvcResult okQuarter = sale(token, customItem(false, SAT, 12.75, 13.75, "market", sat, 14.0));
+        assertEquals(201, okQuarter.getResponse().getStatus(), okQuarter.getResponse().getContentAsString());
+    }
+
+    @Test
+    void legacyViennaPaintingMustStayBeforeTheHandoffDay() throws Exception {
+        String token = login();
+        UUID orderId = UUID.fromString(legacyViennaOrder(token, 10.0, false));
+        UUID itemId = orders.findById(orderId).orElseThrow().getOrderItems().getFirst().getId();
+
+        mvc.perform(patch("/api/agenda/blocks/{id}", itemId)
+                        .header("Authorization", bearer(token)).contentType("application/json")
+                        .content(json(Map.of("date", WED, "startHour", 10))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Vienna orders must be painted before the handoff day"));
+
+        mvc.perform(patch("/api/agenda/blocks/{id}", itemId)
+                        .header("Authorization", bearer(token)).contentType("application/json")
+                        .content(json(Map.of("date", TUE, "startHour", 11))))
+                .andExpect(status().isNoContent());
     }
 }

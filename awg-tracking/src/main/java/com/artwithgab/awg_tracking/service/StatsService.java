@@ -90,7 +90,26 @@ public class StatsService {
                 count(items, i -> i.getDeliveryKind() == DeliveryKind.DELIVERY),
                 count(items, i -> i.getDeliveryKind() == DeliveryKind.POST));
 
-        return new StatsDto(from.toString(), to.toString(), sales, bySource, daily, colors, delivery, web(rows));
+        Map<String, Integer> marketCounts = new TreeMap<>();
+        for (OrderItem item : items) {
+            String id = item.getMarketOrnamentId();
+            if (item.getItemKind() != ItemKind.GENERIC || id == null) continue;
+            String color = switch (id.charAt(0)) {
+                case 'R' -> "red";
+                case 'W' -> "wine";
+                case 'G' -> "green";
+                case 'C' -> "beige";
+                default -> throw new IllegalStateException("Unknown market ornament color: " + id);
+            };
+            String finish = id.charAt(1) == 'S' ? "shiny" : "matte";
+            marketCounts.merge(color + "|" + finish, 1, Integer::sum);
+        }
+        List<StatsDto.ColorRow> marketSales = marketCounts.entrySet().stream().map(e -> {
+            String[] key = e.getKey().split("\\|");
+            return new StatsDto.ColorRow(key[0], key[1], e.getValue());
+        }).sorted(Comparator.comparingInt(StatsDto.ColorRow::count).reversed()).toList();
+
+        return new StatsDto(from.toString(), to.toString(), sales, bySource, daily, colors, delivery, web(rows), marketSales);
     }
 
     private static StatsDto.Web web(List<BuyMetric> rows) {

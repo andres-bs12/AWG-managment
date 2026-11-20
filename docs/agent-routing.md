@@ -10,11 +10,13 @@
 |---|---|---|
 | Orchestrator / project manager | **Claude Opus** (Claude Code) | Owner (2026-11-11): act as project manager and delegate by default. Plans, splits work, delegates, merges results, decides. Does the hard parts itself: delicate backend, security, integration, browser/Playwright, computer use. Final word on every change. |
 | Complex implementation (peer) | **Codex `gpt-6.1-astra`, effort medium** | Hard features or refactors when Opus is busy orchestrating. Expensive: only for genuinely complex work. |
-| Standard implementation | **Codex `gpt-6.1-sol`, medium / high** | Most features and fixes. High when the task spans several layers or files. |
+| Standard implementation | **Codex `gpt-6.1-sol` / `gpt-6.2-sol` (on trial), medium / high** | Most features and fixes. High when the task spans several layers or files. |
 | Easy / mechanical work | **GLM-5.3 Flash** or **DeepSeek V4.1 Flash** (via Vibe) | Renames, copy edits, small tests, boilerplate, docs touch-ups. Compare both in the log. |
 | Medium work / third auditor | **GLM-5.3** (via Vibe) | Single-file features; independent read-only reviews (different family from Claude and GPT). |
 | Images and visual review | **Codex `gpt-6.1-terra`** / **ChatGPT** | Image generation, reading screenshots, visual critique. |
-| Scoped UI implementation / auditor (non-Claude, non-GPT) | **Gemini 3.8 Flash** via Antigravity CLI `agy` | Single-component front-end work, read-only reviews of Claude or Codex code. Fallback when Codex is out of credits. |
+| Auditor (non-Claude, non-GPT) | **Gemini 4 Neon** (`gemini-4-neon-high`) via `agy`, `--mode plan`, diff pasted | Read-only reviews of Claude or Codex code. Replaces GLM-5.3 as third auditor when Mistral ends (after Nov 2026). Quality on our code untested as of 2026-11-20: grade it. |
+| Scoped implementation (non-Claude, non-GPT) | **Gemini 4 Hydrogen** / **Neon** via `agy`, default mode | Implementation now works headless (2026-11-20 smoke test). Grade on real tasks: Neon for harder fixes, Hydrogen for small scoped ones. |
+| Extra Claude capacity | **Opus 5.5 / Sonnet 5.5** via `agy` | Draws on Google's quota, saving Claude Code tokens. Counts as Claude for the cross-LLM rule. |
 | Last resort (temporary) | **Claude Fable 5.2** (Agent tool, `model: "fable"`) | **Only for problems no Opus subagent or Codex sol can solve** (owner, 2026-11-11). Available until Saturday 2026-11-14. Counts as Claude for the cross-LLM rule. |
 | Visual / UX audits, test fixing | **Claude Opus subagent** (Agent tool, `model: "opus"`) or Codex sol | Opus can run Playwright and read screenshots; Codex sol for code audits and implementation. |
 
@@ -36,8 +38,17 @@ codex exec -s read-only -m gpt-6.1-sol -c model_reasoning_effort=medium "<review
 PATH="$HOME/.local/bin:$PATH" vibe --trust --model glm-5-3 --enabled-tools read_file --enabled-tools grep \
   --max-turns 60 --time-limit 1500 -p "<brief>" < /dev/null
 # For implementation drop --enabled-tools and add --agent accept-edits (still review the diff afterwards).
-# Gemini through Antigravity (`agy models` lists ids: gemini-3.8-flash-high|medium|low)
-agy --model gemini-3.8-flash-high --mode accept-edits -p "<task>" --print-timeout 1500s < /dev/null
+# Gemini / Claude through Antigravity (`agy models` lists ids; updated 2026-11-20)
+#   gemini-4-neon-{low,medium,high,xhigh}      planner / auditor
+#   gemini-4-hydrogen-{low,medium,high,xhigh}  fast executor
+#   gemini-4-argon-{low,medium,high}           older
+#   gemini-pro-orchestrator-neon | gemini-pro-orchestrator-g1-pro   plan with Neon/Argon, execute with Hydrogen
+#   claude-opus-5-5-{low,medium,high} | claude-sonnet-5-5-{low,medium,high}   Google quota, counts as Claude for cross-LLM
+#   gemini-3.8-flash-{low,medium,high}         superseded
+# Audit (read-only, diff pasted in the prompt; this is the proven pattern):
+agy --model gemini-4-neon-high -p "<review brief with diff; never edit>" --print-timeout 1500s < /dev/null   # no --mode: plan mode denies commands
+# Implementation: default mode (NO --mode flag) works headless since 2026-11-20; accept-edits auto-denies tools:
+agy --model claude-opus-5-5-high -p "<task>" --print-timeout 0s < /dev/null
 # Codex credits: smoke-test first; the ChatGPT plan returns "You've hit your usage limit … try again at HH:MM".
 codex exec -s read-only -m gpt-6.1-sol -c model_reasoning_effort=low "Reply with just OK" < /dev/null
 ```
@@ -105,10 +116,40 @@ Every brief is short and contains exactly:
 | 2026-11-12 | Read-only security audit of the fixes (rerun launched directly in background) | GLM-5.3 via Vibe | A | All fixes verified by reading; 2 real lows (6×10 MB photos exceed 60 MiB request cap; no global cap on public metrics) fixed by Opus. First run produced nothing because it was launched with `&` + pgrep wait. |
 | 2026-11-12 | Post-merge E2E repair (install WebKit, fix stale specs, regenerate snapshots) | Opus subagent | A | Found a real bug (TrackDialog host attached to the loading screen); 715 passed / 2 skipped. |
 
+| 2026-11-20 | Market-stock frontend (multi-file) | Claude Opus 5.5 via `agy` (high) | F | 429 "Individual quota reached" after ~4 min, reset in ~5 h: the Claude model group in Antigravity has a small quota. Use agy's Claude models for short tasks only; reassigned to Codex gpt-6.2-sol. |
+
+| 2026-11-20 | Market-stock backend: sales link, JPA entity, V15 FK, 15 new tests | Codex gpt-6.1-sol high | A (pending audit) | 186 tests green, ~9 min, 138k tokens. Claude verified on a PostgreSQL clone: V15 applies after V14, `validate` passes, real sale/double sale/not-painted/stats/cancel all correct. |
+| 2026-11-20 | Read-only audit with `--mode plan` | Gemini 4 Neon via `agy` | F | Tried to run a command and plan mode auto-denied it: no output. Read-only audits now run in default mode with "never edit" in the brief. |
+
+| 2026-11-20 | Read-only audit of the Codex market-stock backend (default mode, diff pasted) | Gemini 4 Neon via `agy` | A | 2 findings, both real after Claude's check: lazy proxy id read could load 5 MB photo blobs (stats/bundle/cancel), and inconsistent 400/409 order on stale sold pieces; confirmed the rest of the spec. No false positives. ~9 min; `-p` prints only at the end, so the panel shows no output while it works (normal). |
+| 2026-11-20 | Market-stock frontend (picker, Stock, Stats, mock, 4 specs) | Codex gpt-6.2-sol high | pending E2E | build/lint/89 Node green, ~210k tokens, ~20 min. First real 6.2-sol task. |
+
+| 2026-11-20 | 2 backend fixes from an audit (JPA read-only FK column + error-check order) with tests | Gemini 4 Hydrogen via `agy`, default mode | A | Correct, in scope, added a test that the proxy stays uninitialised; found the Byte Buddy agent by itself; 188 tests green, ~8 min. First real Hydrogen code task: good for small scoped backend fixes. |
+
+| 2026-11-20 | iPad photo-first picker + photo on sale/summary/order cards (5 files + spec), ran Playwright itself and took iPad/phone screenshots | Gemini 4 Neon via `agy`, default mode | A | Did exactly what the owner asked; Claude reviewed the 6 captures: big recognisable photos, 3/5/2 columns, code + `Colour · S/M`, photo kept on the sale. agy CAN open ports (ran Playwright on 5251), unlike Codex. ~15 min. Strong at UI work too. |
+
+| 2026-11-20 | Staff nav + agenda calendar-only + block drag + pet photos (front + agenda DTO) | Codex gpt-6.2-sol high | B | Built to brief, 221k tokens; E2E 191/192 on iPad/phone/desktop, but Neon's audit found real iPad touch bugs in the new drag (short move opens the order, Safari scroll steals the hold, no keyboard move) and an unbounded base64 photo cache. |
+| 2026-11-20 | Read-only frontend audit (default mode, diff + files) | Gemini 4 Neon via `agy` | A- (pending fix verification) | 9 concrete findings incl. iPad Safari touch-action and pointer-capture details; quality comparable to Codex audits. |
+
+| 2026-11-20 | Read-only design: two simultaneous markets (code places file:line, migration, questions) + stall noise/missing review | Gemini 4 Argon high via `agy` | A | Precise: found V1 already allows a MarketDay per market per date, the pickup market is lost on save, ~15 one-market-per-date assumptions with lines, 4 sharp owner questions. Stall review mostly useful; 1 item contradicted the owner (Pickups tab). Uses Argon's separate weekly quota (0 % before): good home for read-only design work. ~10 min. |
+
+| 2026-11-20 | Nav 2 buttons + 6 audit fixes (LRU blob photo cache, dedupe, mock emit order, Stock refresh, header errors, mobile search close) | Gemini 4 Neon via `agy` | A- | All 8 items done, verified each finding as real, 191/194 (3 = other agent's area), screenshots. Gemini 4 5 h quota went 25 % → 52 % running two Neon tasks in parallel (~25 min each). |
+
+| 2026-11-20 | Agenda round 2: capacity from hours (front+back, no migration), long-press move + keyboard move, titles, bigger photos, code+handoff on blocks, 3 audit fixes, 1 product bug behind a failing test | Gemini 4 Neon via `agy` | A | 190/190 E2E on iPad/phone/desktop, 190 backend; Claude's screenshot check matches the owner's asks. Left minor noise in the deliveries column (queued). |
+
+| 2026-11-20 | Inline piece picker in New sale (remove dialog, specs, screenshots) | Gemini 4 Hydrogen via `agy` | A | Clean, in scope, ran Playwright itself (21/21) and took iPad captures; Claude's check matches the owner's ask. Hydrogen is reliable for scoped UI/backend tasks. |
+
+| 2026-11-20 | Two markets part 1 (V16, ~15 one-market-per-date places, I'm-at stall, Agenda/Deliveries/Track/invoices/shop) | Codex gpt-6.2-sol high | B (pending fixes) | 194 Java tests green; V16 applied on a PostgreSQL clone (HOME-day pickups stay unmatched, by design). Neon found 2 P1 (painting hours from the lowest-UUID stall on overlap dates; edits/deletes strand bookings) + fail-open web pickup. ChatGPT 5 h: 48 % → 71 %. |
+| 2026-11-20 | Read-only audit of two-markets backend | Gemini 4 Neon medium via `agy` | A (pending fix verification) | 5 concrete findings with scenarios; listed what it verified clean. Medium effort was enough. |
+| 2026-11-20 | Agy start failure | Gemini 4 Hydrogen | — | `failed to start conversation: backend returned an empty conversation id` (exit 0, nothing done); transient, relaunch worked. The wrapper should classify this as failed. |
+
 ## Routing changes
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-11-20 | Why Google runs failed, and the fix: (1) `--mode plan` and `--mode accept-edits` auto-deny every shell command headless unless `permissions.allow` has a `command(...)` rule — that caused the Hydrogen, 3.8 Flash and Neon failures; (2) Opus/Sonnet in agy hit the small Claude-group quota (429). **Default mode (no `--mode`) lets Gemini 4 Hydrogen and Neon run commands and edit headless**: both fixed a failing test file end to end. Use default mode for implementation and audits (audits say "never edit" in the brief) | Owner wants Google to write code too |
+| 2026-11-20 | New Codex models `gpt-6.2-sol` and `gpt-6.2-astra` answer on the ChatGPT plan (`gpt-6.2-terra` is rejected). Trial plan: 6.2-sol for audits and standard implementation next to 6.1-sol (compare in the log); 6.2-astra only for genuinely hard problems. Google models get graded task by task: Gemini 4 Neon = auditor, Hydrogen = small scoped implementation, Opus 5.5 via agy = multi-file implementation | Owner: try the new models and learn what each does well |
+| 2026-11-20 | `agy` can implement headless in the **default mode** (no `--mode`): smoke test ran `ls`, `node`, `./mvnw` and wrote files in the repo. `--mode accept-edits` was the blocker; `--mode auto` is not available on this account. Claude Opus subagents (Claude quota) are replaced by Opus 5.5 / Gemini via `agy` (Google quota) for implementation; Claude Code stays orchestrator and Claude auditor | Owner: save Claude tokens, Claude only reviews |
 | 2026-11-11 | Fable 5.2 only as a last resort; visual audits and test fixing go to Opus subagents, code to Codex sol (credits back after 19:53) | Owner's decision; Fable also hit its 5-hour limit mid-audit |
 | 2026-11-11 | Gemini via agy: no headless implementation (permission prompts cannot be answered and full auto-approve is blocked). Use it as a read-only auditor with the diff pasted into the prompt and `--mode plan` | Two runs with zero edits; the pasted-diff audit worked |
 | 2026-11-11 | Opus works as project manager and delegates by default. Gemini 3.8 Flash (agy) joins as implementer/auditor; Fable 5.2 for heavy load until 2026-11-14; Codex only when the smoke test shows credits | Owner's decision; Codex hit the ChatGPT limit |
@@ -121,7 +162,8 @@ Every brief is short and contains exactly:
 ## Setup status
 
 - Claude Code: ✅ (Fable 5.2 available until 2026-11-14)
-- Antigravity CLI `agy`: ✅ `~/.local/bin/agy`, signed in; models Gemini 3.8 Flash (high/medium/low), also Claude Sonnet/Opus 4.6 and GPT-OSS 120B (do not use those for cross-LLM audits of Claude/GPT code).
+- Antigravity CLI `agy`: ✅ `~/.local/bin/agy`, signed in. **Upgraded plan on 2026-11-20.** Models: Gemini 4 Neon (low/medium/high/xhigh; planner/auditor, launched 2026-11-18), Gemini 4 Hydrogen (fast executor), Gemini 4 Argon (older), Orchestrator (Neon) and (Argon) (plan with Neon/Argon, execute with Hydrogen), Gemini 3.8 Flash, **Claude Opus 5.5 and Sonnet 5.5 (low/medium/high)** and GPT-OSS 120B. All answered a headless smoke test on 2026-11-20. Claude models via `agy` use Google's quota (saves Claude Code tokens) but still count as Claude for the cross-LLM rule. Quality of Neon/Hydrogen on our code is **untested**: grade them in the log. Whether Hydrogen can edit headless (shell permission block seen with 3.8 Flash) is **untested**.
+- **Budget goal (2026-11-20):** spread work across Claude, ChatGPT/Codex (Gaby also uses ChatGPT, so likely a shared quota) and Google so none runs out; keep quality. **Mistral/Vibe (GLM, DeepSeek) ends after November 2026**: from December drop it from the table and give its auditor role to a Gemini 4 model.
 - Codex CLI: ✅
 - Mistral Vibe 3.1: ✅ `~/.local/bin/vibe`, signed in (key in the macOS Keychain). Plan: Education, €127.50/month Vibe Code + €12.75/month API, resets on the 1st; pay-as-you-go **off**.
 - GLM-5.3 and GLM-5.3 Flash: ✅ built into Vibe.
@@ -141,3 +183,24 @@ Every brief is short and contains exactly:
 | 2026-11-16 | Read-only frontend audit: dead code + security | Codex gpt-6.1-sol (medium) | A | 8 findings, all real: form drafts left on the shared iPad (P2), 3 unreachable components, template leftovers, dead helpers and i18n keys, duplicate multipart builder. 98k tokens. |
 | 2026-11-16 | Read-only backend audit: security + dead code (Vibe) | GLM-5.3 Flash | B | `glm-5-3` alias no longer exists in Vibe (only the Flash model). 3 P3 security notes (1 applied, 2 by design) and 7 dead-code items: 5 real, 2 kept because tests use them. Could not grep (shell denied), read files instead. |
 | 2026-11-16 | Full audit lead: backend/deploy/live-site security review, verification of both audits, clean-up, SEO base | Claude Fable 5.2 (owner-requested) | — | Report in `tasks/audit-results/full-audit-2026-11-16.md`. |
+
+## Agent panel (built 2026-11-20)
+
+A narrow window the owner keeps at the right edge of the screen: model, short title, state, elapsed time; filters Trabajando / Terminados / Todos; click a row for the last 12 log lines.
+
+- Launch every delegated CLI through the wrapper: `node scripts/agents/agent-run.mjs run --name <short> --model "<Model name>" --title "<what it does, Spanish, short>" -- <cli> <args>` (in the background so the chat is not blocked). It records `.agents/runs/<id>/{status.json,log.txt}` (including the run's `cwd`), closes stdin, and classifies the end: `done`, `failed` (also when a CLI exits 0 but did nothing, e.g. agy "no output produced / auto-denied") or `limit` (usage-limit text, with the retry time).
+- Claude Code subagents (Agent tool) are registered by hand: `id=$(node scripts/agents/agent-run.mjs start --name <n> --model "Claude Opus" --title "...")`, optional `ping $id --note "..."`, then `finish $id --state done|failed|limit --note "..."` when the result returns.
+- `scripts/agents/open-panel.sh` starts the server (`dashboard-server.mjs`, 127.0.0.1:4747) and opens the window only if it is not already open. The SessionStart hook in `.claude/settings.json` runs it; the orchestrator runs it again before delegating the first task of a session.
+- **"Actualizar uso" button:** `POST /api/usage/refresh` (header `X-Agents-Action: refresh-usage`) re-reads Codex and Antigravity at once and Claude's file; the bars also refresh by themselves every 30 s. Claude's numbers come from `scripts/agents/statusline.mjs`, wired as `statusLine` in the git-ignored `.claude/settings.local.json`: Claude Code feeds it a JSON blob after each message and it records `rate_limits` when present (free, no tokens). **Unverified until a real blob arrives**: check `~/.awg-agents/statusline-last.json` for a `rate_limits` key; if missing, fall back to the manual command below.
+- **Usage bars (5 h and weekly):** ChatGPT/Codex is read live from the newest `~/.codex/sessions/**/*.jsonl` (`rate_limits`; only as fresh as Codex's last session). Claude's usage can only be read by the orchestrator (MCP `get_usage`), so refresh it with `node scripts/agents/agent-run.mjs usage claude --five <pct> --five-reset <ISO> --week <pct> --week-reset <ISO>` at the start of a session and before big delegations; the panel says "dato de hace N min" when older than 30 min. Google/Antigravity is read live from its local language server (`GetUserStatus` on 127.0.0.1, port and local token from `~/.gemini/antigravity/daemon/hub_*.json`; quota per model group with remaining fraction and reset time), so it needs Antigravity open. Bars turn amber at 70 % and red at 90 %.
+- **Clear finished:** the "Limpiar terminados" button (with an inline confirm) calls `POST /api/clear-finished`, which deletes the run folders of every finished run (done, failed, limit) and never touches working ones. The call needs the `X-Agents-Action: clear-finished` header and the localhost Host check, so no other web page can trigger it.
+- `stalled` = no output and no git file change in the run's `cwd` for 5 min (a guess, not an error). For running runs with a `cwd` inside a git repo, `dashboard-server.mjs` inspects `git status --porcelain -uall` (cached 15 s per run, capped at 400 files, symlinks skipped, ignoring `node_modules`, `target`, `test-results`, `playwright-report`, `.agents`) and exposes `cwd` and `lastFileChange: { path, at }`. The panel shows `"Último cambio: <file> · <rel>"` (or `"Último cambio en el repo: …"` when multiple running runs share `cwd`). Logs live in `.agents/` (gitignored).
+- Never `pkill -f` a script name while agents run: the name also appears in the agents' own command lines (this killed a Codex run on 2026-11-20).
+
+| 2026-11-20 | Dashboard page (single HTML file) | Gemini 4 Hydrogen via `agy`, accept-edits | F | Exit code 0 but **no file written**: every tool call auto-denied in headless mode, same block as 3.8 Flash. The wrapper first reported it as done (fixed: exit 0 + "no output produced/auto-denied" now = failed). |
+| 2026-11-20 | Same page, `--mode plan`, "reply with the whole file in one code block" | Gemini 4 Hydrogen via `agy` | A- | 1174 lines, correct API use, clean UI at 360 px (states, filters, counts, tab title), verified in the browser. Workaround for no headless edits: ask for the file as text and save it yourself. |
+| 2026-11-20 | Panel server (zero-dep Node, endpoints, Host check) | Codex gpt-6.1-sol medium | B+ | Complete and correct on the first try (endpoints, 403 on bad Host, 400 on bad id verified by Claude); could not bind a port in its sandbox so it did not curl-test. Run died by SIGTERM from Claude's own `pkill`. |
+| 2026-11-20 | Read-only audit of the panel wrapper + server (code pasted, `--mode plan`) | Gemini 4 Neon via `agy` | A | 8 findings, all real and concrete (id collisions, status.json race, `--key=value` silently marking failed runs done, false failed/limit classification, symlink/FIFO read in the server, EMFILE, truncated logs); its own report triggered finding #5 live. All fixed by Claude and re-tested. Neon is a strong auditor: use it for Claude/Codex code. |
+
+| 2026-11-20 | Gemini 4 Argon (agy) | Agenda: Gaby away, gear grid, deliveries column | Code and screenshots done; hit the **weekly individual quota** (429, reset in ~162 h) while running its last Playwright pass. Argon's weekly pool went 7 % → 100 % in one day of design + 3 tasks: use Argon sparingly (designs/reviews), not for long Playwright loops. Grade B+ (good UI fixes; missed resolved-market label in the gear and inconsistent counts). |
+| 2026-11-20 | Gemini 4 Hydrogen (agy) | New sale corner cases (10 rules) | 9 fixed + 1 OK; pure rules in lib/newSaleRules.ts, 5 Node + 24 E2E new; backend 207, Node 96 green. Grade A. |

@@ -34,9 +34,11 @@ export const STAFF_ACCOUNTS: Array<StaffUser & { password: string }> = [
 export type MockState = {
   pendingCheckouts?: Record<string, string>
   inventory?: import('../../domain/types').InventoryItem[]
-  paintingDays?: Record<string, { open: boolean; maxPaintings: number; openHour?: number; closeHour?: number }>
+  paintingDays?: Record<string, { open: boolean; maxPaintings?: number; openHour?: number; closeHour?: number; paintingMarketId?: string | null }>
+  soldOnMarketDays?: Record<string, string>
   waitlist?: string[]
   waitlistTokens?: Record<string, { email: string; confirmed: boolean }>
+  openingMarketsSeeded?: boolean
   seedRevision: number
   staff: StaffUser[]
   customers: Customer[]
@@ -60,7 +62,7 @@ export function createSeed(): MockState {
       name: 'Rathausplatz',
       kind: 'market',
       totalCost: 2400,
-      startDate: '2026-11-27',
+      startDate: '2026-11-25',
       finishDate: '2026-12-06',
       stall: 12,
     },
@@ -69,9 +71,9 @@ export function createSeed(): MockState {
       name: 'Christkindlmarkt Spittelberg',
       kind: 'market',
       totalCost: 900,
-      startDate: null,
-      finishDate: null,
-      stall: null,
+      startDate: '2026-11-25',
+      finishDate: '2026-11-29',
+      stall: 4,
     },
     {
       id: 'mkt-casa',
@@ -87,6 +89,12 @@ export function createSeed(): MockState {
   const stall = stallHours()
   const casa = (date: string) => homePaintHours(date) ?? stall
   const marketDays: MarketDay[] = [
+    { id: 'md-25', marketId: 'mkt-rathaus', date: '2026-11-25', ...stall, isToday: false },
+    { id: 'md-26', marketId: 'mkt-rathaus', date: '2026-11-26', ...stall, isToday: false },
+    ...[25, 26, 27, 28, 29].map(day => ({
+      id: `md-spittelberg-${day}`, marketId: 'mkt-spittelberg', date: `2026-11-${day}`,
+      openHour: 13, closeHour: 20, isToday: day === 28,
+    })),
     { id: 'md-27', marketId: 'mkt-rathaus', date: '2026-11-27', ...stall, isToday: false },
     { id: 'md-28', marketId: 'mkt-rathaus', date: '2026-11-28', ...stall, isToday: true },
     { id: 'md-29', marketId: 'mkt-rathaus', date: '2026-11-29', ...stall, isToday: false },
@@ -130,6 +138,7 @@ export function createSeed(): MockState {
       id: 'orn-100',
       orderId: 'ord-100',
       kind: 'custom',
+      marketOrnamentId: null,
       color: 'red',
       finish: 'shiny',
       petName: 'Milo',
@@ -149,6 +158,7 @@ export function createSeed(): MockState {
       id: 'orn-101',
       orderId: 'ord-101',
       kind: 'custom',
+      marketOrnamentId: null,
       color: 'red',
       finish: 'shiny',
       petName: 'Bruno',
@@ -165,6 +175,7 @@ export function createSeed(): MockState {
       id: 'orn-102',
       orderId: 'ord-102',
       kind: 'custom',
+      marketOrnamentId: null,
       color: 'red',
       finish: 'shiny',
       petName: 'Nala',
@@ -181,6 +192,7 @@ export function createSeed(): MockState {
       id: 'orn-103',
       orderId: 'ord-103',
       kind: 'custom',
+      marketOrnamentId: null,
       color: 'red',
       finish: 'shiny',
       petName: 'Anna',
@@ -201,6 +213,7 @@ export function createSeed(): MockState {
       id: 'orn-104',
       orderId: 'ord-104',
       kind: 'custom',
+      marketOrnamentId: null,
       color: 'red',
       finish: 'shiny',
       petName: 'Otto',
@@ -221,6 +234,7 @@ export function createSeed(): MockState {
       id: 'orn-105',
       orderId: 'ord-105',
       kind: 'custom',
+      marketOrnamentId: null,
       color: 'red',
       finish: 'shiny',
       petName: 'Lena',
@@ -241,6 +255,7 @@ export function createSeed(): MockState {
       id: 'orn-106',
       orderId: 'ord-106',
       kind: 'custom',
+      marketOrnamentId: null,
       color: 'red',
       finish: 'shiny',
       petName: 'Felix',
@@ -257,6 +272,7 @@ export function createSeed(): MockState {
       id: 'orn-107a',
       orderId: 'ord-107',
       kind: 'custom',
+      marketOrnamentId: null,
       color: 'red',
       finish: 'shiny',
       petName: 'Pip',
@@ -273,6 +289,7 @@ export function createSeed(): MockState {
       id: 'orn-107b',
       orderId: 'ord-107',
       kind: 'custom',
+      marketOrnamentId: null,
       color: 'red',
       finish: 'shiny',
       petName: 'Dot',
@@ -289,6 +306,7 @@ export function createSeed(): MockState {
       id: 'orn-wait',
       orderId: 'ord-wait',
       kind: 'custom',
+      marketOrnamentId: null,
       color: 'red',
       finish: 'shiny',
       petName: '',
@@ -435,5 +453,9 @@ export function createSeed(): MockState {
     { id: 'blk-105', marketDayId: 'md-casa-01', orderItemId: 'orn-105', startHour: 11.25, endHour: 12, status: 'finished' },
   ]
 
-  return { seedRevision: SEED_REVISION, staff, customers, markets, marketDays, orders, items, blocks }
+  // The demo orders were sold at Rathausplatz, including orders picked up or delivered elsewhere.
+  const soldOnMarketDays = Object.fromEntries(orders.map(order => [order.id, 'md-28']))
+  const paintingDays = { '2026-11-28': { open: true, openHour: 12, closeHour: 18 } }
+
+  return { seedRevision: SEED_REVISION, staff, customers, markets, marketDays, orders, items, blocks, paintingDays, soldOnMarketDays }
 }

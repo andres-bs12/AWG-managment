@@ -26,6 +26,8 @@
 .money div:first-child dd { font-size: var(--type-staff-h1-size); line-height: var(--type-staff-h1-line); font-weight: var(--type-staff-h1-weight); }
 .money div[data-warning] { color: var(--staff-warn); }
 .money div[data-warning] dt { font-weight: var(--type-staff-h2-weight); }
+.breakdown { display: grid; gap: var(--space-2); }
+.breakdown > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'label count'; align-items: center; gap: var(--space-3); }
 
 /* Orders, ornaments and average: three equal cells in one card. */
 .counts { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }

@@ -11,10 +11,10 @@ const SUN = 0
 
 export function isMarketPickupWeekday(date: string): boolean {
   const weekday = utcWeekday(date)
-  return weekday === FRI || weekday === SAT || weekday === SUN
+  return date === '2026-11-25' || date === '2026-11-26' || weekday === FRI || weekday === SAT || weekday === SUN
 }
 
-/** Friday, Saturday, and Sunday from `start` through `finish`, inclusive. */
+/** Market dates in the inclusive season, including the 2026 opening-week exception. */
 export function marketPickupDates(start: string, finish: string): string[] {
   if (!start || !finish || finish < start) return []
   return datesInRange(start, finish).filter(isMarketPickupWeekday)

@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @lombok.extern.slf4j.Slf4j
@@ -32,6 +34,7 @@ public class OrderService {
     private final CustomerRepository customerRepository;
     private final OrderCodeGenerator codeGenerator;
     private final InventoryService inventoryService;
+    private final MarketStockService marketStockService;
     private final PricingService pricingService;
     private final ShippingService shippingService;
     private final CalendarService calendarService;
@@ -105,11 +108,23 @@ public class OrderService {
         CalendarIndex index = s.index();
 
         var prices = pricingService.current();
+        Set<String> marketIds = new HashSet<>();
         for (int n = 0; n < req.items().size(); n++) {
             CreateSaleItemRequest row = req.items().get(n);
             if (row.deliveryKind() == DeliveryKind.DELIVERY) {
                 throw new BadRequestException("Choose Post shipping or market pickup.")
                         .code("VALIDATION").field("items[" + n + "].deliveryKind");
+            }
+            String marketId = row.marketOrnamentId();
+            if (row.kind() == ItemKind.GENERIC) {
+                if (marketId == null || marketId.isBlank()) {
+                    throw new BadRequestException("Choose a numbered ornament.").code("VALIDATION").field("marketOrnamentId");
+                }
+                if (!marketIds.add(marketId)) {
+                    throw new BadRequestException("Choose each numbered ornament only once.").code("VALIDATION").field("marketOrnamentId");
+                }
+            } else if (marketId != null) {
+                throw new BadRequestException("Custom ornaments cannot use numbered market stock.").code("VALIDATION").field("marketOrnamentId");
             }
             if (row.kind() == ItemKind.CUSTOM && row.color() != null && !row.color().isOffered()) {
                 throw new BadRequestException("This color is no longer sold.").code("VALIDATION").field("items[" + n + "].color");
@@ -149,13 +164,19 @@ public class OrderService {
             MarketDay deliveryDay = intoSlot == null || intoSlot.deliveryKind() == DeliveryKind.POST
                     ? null : index.byId(intoSlot.marketDayId()).orElse(null);
             Double beforeHour = intoSlot != null && intoSlot.deliveryKind() == DeliveryKind.MARKET && deliveryDay != null
-                    && deliveryDay.getDate().toString().equals(move.freedSlot().date()) ? intoSlot.pickupHour() : null;
+                    && deliveryDay.getDate().toString().equals(move.freedSlot().date()) && intoSlot.pickupHour() != null
+                    ? intoSlot.pickupHour() - AgendaService.PAINT_HANDLING_HOURS : null;
+            MarketDay pickup = intoSlot != null && intoSlot.deliveryKind() == DeliveryKind.MARKET ? deliveryDay : null;
+            s.assertPaintingLocation(LocalDate.parse(move.freedSlot().date()), pickup);
+            if (moving != null && moveDestination != null) {
+                s.assertPaintingLocation(moveDestination.getDate(), s.marketPickup(moving).orElse(null));
+            }
             MoveSuggestionDto fresh = agendaService.findMoveSuggestion(s,
                     LocalDate.parse(move.from().date()),
                     move.freedSlot().endHour() - move.freedSlot().startHour(),
                     intoSlot != null && intoSlot.deliveryKind() == DeliveryKind.POST ? shippingWindow.collectionDate()
                             : deliveryDay != null ? deliveryDay.getDate() : LocalDate.parse(move.freedSlot().date()),
-                    beforeHour);
+                    beforeHour, pickup);
             if (moving == null || moveDestination == null || !move.equals(fresh)) {
                 throw new ConflictException("Pickup or agenda changed. Recalculate the painting plan.");
             }
@@ -178,7 +199,7 @@ public class OrderService {
             order.setDeliveryFee(prices.shippingFee());
         }
 
-        MarketDay soldOn = index.marketDayOn(index.today()).orElse(null);
+        MarketDay soldOn = saleMarketDay(index, req.soldOnMarketDayId());
         List<double[]> newBlocks = new ArrayList<>();
         List<LocalDate> newBlockDates = new ArrayList<>();
         BigDecimal total = shippingWindow == null ? BigDecimal.ZERO : prices.shippingFee();
@@ -202,6 +223,10 @@ public class OrderService {
             item.setDeliveryKind(row.deliveryKind());
             boolean post = row.deliveryKind() == DeliveryKind.POST;
             MarketDay handoffDay = post ? null : index.byId(row.marketDayId()).orElse(null);
+            if (!post && row.marketDayId() != null && handoffDay == null) {
+                throw new BadRequestException("Choose a calendar day.").code("VALIDATION")
+                        .field("items[" + (position - 1) + "].marketDayId");
+            }
             LocalDate handoff;
             if (post) {
                 handoff = shippingWindow.collectionDate();
@@ -213,18 +238,24 @@ public class OrderService {
                     throw new BadRequestException("Choose a market day for the pickup");
                 }
                 handoff = handoffDay.getDate();
-            } else if (!custom) {
-                handoff = index.today();
+            } else if (!custom && row.deliveryKind() == DeliveryKind.MARKET) {
+                handoff = index.today(); // finished ornament handed over on the spot
+                handoffDay = soldOn;
             } else {
                 throw new BadRequestException("Choose a pickup day");
             }
             if (handoff.isBefore(index.today())) throw new BadRequestException("That pickup day has already passed");
             item.setHandoffDate(handoff);
+            if (row.deliveryKind() == DeliveryKind.MARKET && handoffDay != null
+                    && handoffDay.getMarket().getKind() == MarketKind.MARKET) {
+                item.setHandoffDay(handoffDay);
+            }
             Double pickupHour = row.deliveryKind() == DeliveryKind.MARKET && row.pickupHour() != null ? Hours.snap(row.pickupHour()) : null;
             if (pickupHour != null && handoffDay != null) {
                 double open = Hours.of(handoffDay.getOpenTime());
                 double close = Hours.of(handoffDay.getCloseTime());
                 if (pickupHour < open - Hours.EPS || pickupHour >= close) throw new BadRequestException("Pickup hour is outside market hours");
+                if (index.isToday(handoffDay) && pickupHour < index.nowHour() - Hours.EPS) throw new BadRequestException("That pickup hour has already passed");
             }
             item.setPickUpTime(pickupHour == null ? null : Hours.toTime(pickupHour));
 
@@ -236,6 +267,7 @@ public class OrderService {
                 if (row.paintDate() == null || row.paintStart() == null || row.paintEnd() == null) {
                     throw new BadRequestException("Custom ornament needs a paint slot");
                 }
+                s.assertPaintingLocation(row.paintDate(), item.getHandoffDay());
                 double start = Hours.snap(row.paintStart());
                 double end = Hours.snap(row.paintEnd());
                 MarketDay md = index.dayByDate(row.paintDate(), row.marketId()).or(() -> index.dayByDate(row.paintDate()))
@@ -243,11 +275,11 @@ public class OrderService {
                 String movingId = moving == null ? null : moving.getId().toString();
                 boolean clashExisting = s.busyOn(md.getDate(), movingId).stream().anyMatch(b -> Hours.overlap(start, end, b.start(), b.end()));
                 boolean outside = end <= start
-                        || start < s.paintingOpenHour(md.getDate(), md) - Hours.EPS
-                        || end > s.paintingCloseHour(md.getDate(), md) + Hours.EPS
+                        || start < s.paintingOpenHour(md.getDate()) - Hours.EPS
+                        || end > s.paintingCloseHour(md.getDate()) + Hours.EPS
                         || md.getDate().isBefore(index.today())
                         || (index.isToday(md) && start < index.nowHour())
-                        || (move != null && moveDestination.getId().equals(md.getId())
+                        || (move != null && moveDestination.getDate().equals(md.getDate())
                             && Hours.overlap(start, end, move.to().startHour(), move.to().endHour()));
                 if (outside) throw new BadRequestException("Choose a paint time before pickup, within working hours.");
                 AgendaService.assertBeforeHandoff(row.deliveryKind(), handoff, pickupHour, md.getDate(), end, false);
@@ -262,7 +294,8 @@ public class OrderService {
                 item.setPaintEnd(md.getDate().atTime(Hours.toTime(end)));
             }
 
-            inventoryService.deductItem(item);
+            if (custom) inventoryService.deductItem(item);
+            else item.setMarketOrnament(marketStockService.sell(row.marketOrnamentId()));
             total = total.add(item.getCost());
             item.setOrder(order);
             order.getOrderItems().add(item);
@@ -296,6 +329,14 @@ public class OrderService {
             AustrianPost.requireAddress(null);
         }
         return address;
+    }
+
+    private static MarketDay saleMarketDay(CalendarIndex index, UUID id) {
+        List<MarketDay> openStalls = index.marketDaysOn(index.today());
+        if (id == null && openStalls.size() <= 1) return openStalls.stream().findFirst().orElse(null);
+        return openStalls.stream().filter(day -> day.getId().equals(id)).findFirst()
+                .orElseThrow(() -> new BadRequestException("Choose the market where this sale took place.")
+                        .code("VALIDATION").field("soldOnMarketDayId"));
     }
 
     // ─── Updates ────────────────────────────────────────────────────────────
@@ -379,11 +420,22 @@ public class OrderService {
     /** Changes one item's production status; un-finishing an item also undoes the handoff. */
     @Transactional
     public void setItemStatus(UUID orderId, UUID itemId, ProductionStatus status) {
+        calendarService.lockSchedule();
         Order order = orderRepository.findForHandover(orderId).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
         requireActive(order);
         OrderItem item = order.getOrderItems().stream().filter(i -> i.getId().equals(itemId)).findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Item not found"));
         boolean wasFinished = item.getProductionStatus() == ProductionStatus.FINISHED;
+        if (!wasFinished && status == ProductionStatus.FINISHED) shortenFinishedSession(item);
+        if (wasFinished && status != ProductionStatus.FINISHED && item.getPaintStart() != null && !order.isUnconfirmedWeb()) {
+            AgendaService.Snapshot schedule = agendaService.snapshot();
+            LocalDate date = item.getPaintStart().toLocalDate();
+            double start = Math.max(Hours.of(item.getPaintStart().toLocalTime()), schedule.paintElapsedUntil(date));
+            double end = Hours.of(item.getPaintEnd().toLocalTime());
+            if (start < end && schedule.busyOn(date, itemId.toString()).stream().anyMatch(b -> Hours.overlap(start, end, b.start(), b.end()))) {
+                throw new ConflictException("Another session has booked this painting time.");
+            }
+        }
         item.setProductionStatus(status);
         if (!wasFinished && status == ProductionStatus.FINISHED && order.getOrderItems().stream().allMatch(i -> i.getProductionStatus() == ProductionStatus.FINISHED)) {
             events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.ALL_FINISHED));
@@ -392,6 +444,20 @@ public class OrderService {
             item.setHandedOver(false);
             updateHandover(order);
         }
+    }
+
+    private void shortenFinishedSession(OrderItem item) {
+        LocalDateTime start = item.getPaintStart();
+        LocalDateTime end = item.getPaintEnd();
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (start == null || end == null || !now.toLocalDate().equals(start.toLocalDate()) || !now.isBefore(end)) return;
+
+        LocalDateTime midnight = start.toLocalDate().atStartOfDay();
+        LocalDateTime quarter = now.truncatedTo(ChronoUnit.HOURS).plusMinutes(now.getMinute() / 15 * 15L);
+        LocalDateTime recordedEnd = now.equals(quarter) && !quarter.equals(midnight) ? quarter : quarter.plusMinutes(15);
+        if (!recordedEnd.isBefore(end)) return;
+        if (now.isBefore(start) || !recordedEnd.isAfter(start)) item.setPaintStart(recordedEnd.minusMinutes(15));
+        item.setPaintEnd(recordedEnd);
     }
 
     /**
@@ -420,6 +486,7 @@ public class OrderService {
         }
         events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.CANCELLED));
         for (OrderItem item : order.getOrderItems()) {
+            if (item.getMarketOrnamentId() != null) marketStockService.returnSold(item.getMarketOrnamentId());
             boolean resellable = item.getItemKind() == ItemKind.GENERIC || item.getProductionStatus() == ProductionStatus.NOT_STARTED;
             if (item.getInventory() != null && resellable) item.getInventory().setQuantity(item.getInventory().getQuantity() + 1);
         }
@@ -507,7 +574,8 @@ public class OrderService {
         };
         var result = orderRepository.findAll(filters, org.springframework.data.domain.PageRequest.of(page, size,
                 org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt", "id")));
-        return new SalesPageDto(result.getContent().stream().map(OrderService::summary).toList(), page, size, result.getTotalElements(), result.getTotalPages());
+        return new SalesPageDto(result.getContent().stream().map(order -> summary(order, true)).toList(),
+                page, size, result.getTotalElements(), result.getTotalPages());
     }
 
     /** Web orders staff must look at: still waiting for Stripe, or paid with a mismatching amount. */
@@ -518,14 +586,25 @@ public class OrderService {
     }
 
     static OrderSummaryDto summary(Order o) {
+        return summary(o, false);
+    }
+
+    private static OrderSummaryDto summary(Order o, boolean includeSaleItems) {
         String next = o.getOrderItems().stream().map(OrderItem::getHandoffDate).filter(Objects::nonNull)
                 .min(Comparator.naturalOrder()).map(Object::toString).orElse(null);
+        boolean web = o.getSource() == OrderSource.WEB;
+        String soldAtMarketName = web ? null : o.getOrderItems().stream().map(OrderItem::getSoldOnDay)
+                .filter(Objects::nonNull).map(day -> day.getMarket().getName()).findFirst().orElse(null);
+        List<OrderSummaryDto.SaleItem> saleItems = includeSaleItems ? o.getOrderItems().stream().map(item ->
+                new OrderSummaryDto.SaleItem(item.getId().toString(), item.getItemKind(), item.getCustomColor(),
+                        item.getPhotos().isEmpty() ? null : ViewMapper.photoUrl(item.getPhotos().getFirst()),
+                        item.getMarketOrnamentId())).toList() : List.of();
         return new OrderSummaryDto(o.getId().toString(), o.getCode(), o.getCustomer() == null ? "" : o.getCustomer().getName(),
                 o.getCustomer() == null ? "" : o.getCustomer().getPhone(), o.getCreatedAt() == null ? null : o.getCreatedAt().toString(),
                 o.getPaymentState().name().toLowerCase(Locale.ROOT), o.getCheckoutStatus() == null ? null : o.getCheckoutStatus().name().toLowerCase(Locale.ROOT),
                 o.getTotal(), o.getOrderItems().size(), next, o.isHandedOver(),
-                o.getSource() == OrderSource.WEB ? "web" : "stall", o.getStatus(),
-                o.getAmountPaid() == null ? BigDecimal.ZERO : o.getAmountPaid());
+                web ? "web" : "stall", o.getStatus(),
+                o.getAmountPaid() == null ? BigDecimal.ZERO : o.getAmountPaid(), soldAtMarketName, saleItems);
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
