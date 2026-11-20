@@ -2,7 +2,7 @@
 
 **Creado:** 2026-11-12 (v3.1). **Lectura obligatoria** antes de diseñar, arreglar o revisar cualquier cosa del proyecto, junto con `AGENTS.md` y, para UI pública, `docs/design-system.md`.
 
-Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra vez entre v1.0 y v3.0.2. No repite el sistema de diseño: dice **qué revisar** y **qué no volver a hacer**. Cada vez que el dueño corrija algo nuevo, añade aquí la regla (una línea, con fecha) en la sección que corresponda.
+Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra vez desde v1.0 hasta v3.1.0. No repite el sistema de diseño: dice **qué revisar** y **qué no volver a hacer**. Cada vez que el dueño corrija algo nuevo, añade aquí la regla (una línea, con fecha) en la sección que corresponda.
 
 ## 0. Cómo trabajar
 
@@ -41,12 +41,17 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 9. **Después de cada push, vigilar el CI hasta su resultado:** `scripts/ci-wait.sh` en segundo plano (sale con error si el run falla o no aparece). Una lista vacía de `gh run list` es un error que se investiga, nunca «todavía no corrió». No se dice «subido» ni se cierra el turno sin informar el resultado del CI; si falla, se corrige en el mismo turno. (Dueño, 2026-11-12: el E2E falló en GitHub y nadie se enteró.) `ci-wait.sh` espera todos los runs del commit: el del PR salta `e2e`, así que un run verde solo no prueba nada; mirar que `e2e-quick` (o `e2e-full` antes de desplegar) aparezca como `success`, no `skipped`.
 10. **Varios agentes a la vez, en ramas de `release/vX.Y`** (dueño, 2026-11-12):
     - Cada agente trabaja en **su propio worktree** con una rama que sale de `release/vX.Y` (por ejemplo `feat/v3.1-<tema>`). Nunca en la carpeta principal ni en la rama `release/vX.Y` directamente mientras otro agente la usa.
-    - Puerto propio para Playwright: `PW_PORT=5201` (5202, …); 5199 queda para la sesión principal. Si hay dos o más agentes corriendo Playwright a la vez, cada uno usa `PW_WORKERS=3` (con 7 cada uno la CPU se satura y aparecen fallos falsos: 21 fallos con 7 workers, 84/84 con 3, 2026-11-12).
+    - Puerto propio para Playwright: `PW_PORT=5201` (5202, …); 5199 queda para la sesión principal. Coordinar las ejecuciones según la regla 11.
     - Archivos separados: antes de empezar, el encargo dice qué archivos toca; dos agentes no editan el mismo archivo.
     - En su rama el CI corre backend + frontend (tsc, lint, Node) en cada push; la suite E2E completa **no** corre ahí: correr `npm run test:changed` local, o lanzarla en GitHub → Actions → CI → «Run workflow» eligiendo la rama.
     - Al terminar: `git merge release/vX.Y` en su rama (nunca rebase ni force-push), `npm run check`, push de su rama, `scripts/ci-wait.sh`, y solo entonces se integra en `release/vX.Y` (merge o PR hacia `release/vX.Y`). Nunca desplegar.
     - **Limpieza (dueño, 2026-11-13):** al integrar una rama, el PM borra su worktree y su rama (`git worktree remove`, `git branch -d`). Un agente que no avanza (sin informe ni cambios en su worktree tras ~45 min, o cortado por el límite de uso y no retomado) se retoma con un mensaje o se detiene; nunca quedan sesiones ni worktrees muertos.
     - Seguir el resto de §0.1 (pruebas de lo que cambia en el mismo encargo, informe ≤ 250 palabras) y leer `AGENTS.md` y este archivo al empezar.
+11. **Una ejecución de Playwright por máquina a la vez** (retrospectiva v3.1). Si hay que compartir la máquina, limitar cada ejecución a `PW_WORKERS=3`.
+12. **Mantener al menos 15 GB libres** antes de ejecutar Playwright. Limpiar `test-results/` al terminar de revisar la evidencia que haga falta conservar.
+13. **Validar geometría solo en CI.** Las fuentes de Linux cambian los saltos de línea y los separadores huérfanos. Revisar `e2e-quick` antes de dar por verde un cambio visual.
+14. **El PM escribe los casos límite** de cada encargo que cambia un flujo.
+15. **El encargo indica «actualiza los selectores E2E que cambies».** Quien modifica la UI actualiza los selectores y ejecuta sus specs según la regla 1.
 
 ## 1. Textos (copy) — lo que el dueño más corrige
 
@@ -55,7 +60,7 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 - **Nunca repetir la misma frase en una pantalla** (incluido texto solo para lectores de pantalla que se anuncia junto).
 - **Singular/plural siempre**: «Kugel/Kugeln», «Abholtag/Liefertag», «Gestalte Kugel 1 von 2» solo con 2+; con una sola Kugel no hay «Kugel 1 von 1» ni resumen de nombre.
 - **Alemán por defecto**, «du/dein», Gaby en primera persona sin empalagar; inglés británico. Nunca texto inglés del servidor en una página alemana (traducir códigos con `lib/apiError.ts`).
-- **Texto legal:** no inventarlo. Pendiente del asesor.
+- **Texto legal:** los textos publicados son la referencia. Los cambios pendientes de revisión del asesor se registran en `tasks/todo.md`.
 - **Cada acción dice lo que hace** («Kugel Luna ändern», no «Ändern» suelto); una sola acción «… ändern» por tarjeta de revisión.
 
 ## 2. Espaciado y geometría
@@ -98,7 +103,7 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 - Solo el nombre pagado del reverso es editable (máx. 6 letras); también es `petName`. No volver a pedir el nombre del animal por separado.
 - Tarjetas de revisión compactas: un «… ändern» junto al título, atributos combinados («Rot · Glänzend»), sin repetir el nombre, fotos sin título.
 - Un atajo «Frühester Termin» + calendario, no varios atajos casi iguales.
-- Restricciones explicadas una vez, junto a la decisión, con (?) (p. ej. solo Viena). Ayudas (?) junto a lo que explican, nunca sueltas bajo un párrafo.
+- Restricciones explicadas una vez, junto a la decisión, con (?) (p. ej. envíos solo dentro de Austria). Ayudas (?) junto a lo que explican, nunca sueltas bajo un párrafo.
 - `/form` se usa en el iPad del puesto por gente mayor: extremadamente claro; tras guardar, ir a `/track/CODE`.
 - Escala de valoración: opciones de igual ancho en una fila, etiquetas de los extremos bajo 1 y 5, se bloquea tras responder.
 - Datos demo con el camino feliz (sin colores agotados salvo para probar ese estado).
@@ -110,12 +115,12 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 - **Toda reserva de tiempo de pintura/stock toma `ScheduleLock`** (fila 1). Métricas usan su propia fila (2). No tomar el lock antes de autorizar (era un oráculo de existencia).
 - **Endpoints públicos que envían e-mail son un relay en potencia:** pedidos web `PENDING`/`REVIEW` no aceptan escrituras públicas (409 `PAYMENT_PENDING`) ni reciben correo; correos de edición agrupados (1 por pedido/15 min); cupos de lista de espera (3/cliente/h, 30/h, 200/día) comprobados antes de buscar al suscriptor; nunca meter texto libre del cliente en saludos de correos que puede disparar un tercero.
 - **Rate limits pensados para IPv6** (/64), fallos de login por cuenta+cliente (no bloquear al staff real por cuenta), presupuesto global contra enumeración en Track, limpieza periódica (no `removeIf` por petición).
-- **Cuerpos acotados:** nginx 64 KiB por defecto, 64 MB solo en checkout y formularios; webhook comprueba cabeceras antes de leer (256 KiB); JVM con techo de heap y salida en OOM.
+- **Cuerpos acotados:** nginx 64 KiB por defecto, 64 MiB para checkout y formularios y 6 MiB para la ruta de fotos de stock; webhook comprueba cabeceras antes de leer (256 KiB); JVM con techo de heap y salida en OOM.
 - **Logs sin datos personales:** de SMTP solo clase de excepción y código.
 - **Tokens del formulario** se guardan solo tras éxito, con caducidad (45 días); el iPad del puesto (`?staff=1`) no guarda nada; logout de staff borra `awg-form-token:*`.
 - URL de checkout aceptada solo si es del mismo origen o `https://checkout.stripe.com`.
 - Fotos JPEG/PNG se decodifican completas antes de guardarse; truncadas se rechazan (`PHOTO_INVALID`).
-- **Migraciones Flyway:** nunca editar ni reutilizar números ya aplicados en producción (V1–V13). Un cambio de entidad necesita migración nueva. Backup antes de cada despliegue.
+- **Migraciones Flyway:** nunca editar ni reutilizar números ya aplicados en producción (V1–V17). Un cambio de entidad necesita migración nueva. Backup antes de cada despliegue.
 - Build de producción solo con `VITE_DATA_SOURCE=http`; `build:mock` nunca se despliega.
 - Tras desplegar algo que toca pagos: la compra de prueba 4242 sigue pendiente (ver `docs/checklist-lanzamiento.md`).
 

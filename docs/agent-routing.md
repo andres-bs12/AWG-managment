@@ -10,13 +10,14 @@
 |---|---|---|
 | Orchestrator / project manager | **Claude Opus** (Claude Code) | Owner (2026-11-11): act as project manager and delegate by default. Plans, splits work, delegates, merges results, decides. Does the hard parts itself: delicate backend, security, integration, browser/Playwright, computer use. Final word on every change. |
 | Complex implementation (peer) | **Codex `gpt-6.1-astra`, effort medium** | Hard features or refactors when Opus is busy orchestrating. Expensive: only for genuinely complex work. |
-| Standard implementation | **Codex `gpt-6.1-sol` / `gpt-6.2-sol` (on trial), medium / high** | Most features and fixes. High when the task spans several layers or files. |
+| Standard implementation | **Codex `gpt-6.2-sol`** (default) / `gpt-6.1-sol` | Workhorse of v3.1 (8 tasks, A/B). **high** for backend or multi-layer work (≈200–250k tokens); **medium** for 1–2 file UI changes (high spent 116k on a header button). Cannot run Playwright: Claude runs E2E after it. |
 | Easy / mechanical work | **GLM-5.3 Flash** or **DeepSeek V4.1 Flash** (via Vibe) | Renames, copy edits, small tests, boilerplate, docs touch-ups. Compare both in the log. |
 | Medium work / third auditor | **GLM-5.3** (via Vibe) | Single-file features; independent read-only reviews (different family from Claude and GPT). |
 | Images and visual review | **Codex `gpt-6.1-terra`** / **ChatGPT** | Image generation, reading screenshots, visual critique. |
-| Auditor (non-Claude, non-GPT) | **Gemini 4 Neon** (`gemini-4-neon-high`) via `agy`, `--mode plan`, diff pasted | Read-only reviews of Claude or Codex code. Replaces GLM-5.3 as third auditor when Mistral ends (after Nov 2026). Quality on our code untested as of 2026-11-20: grade it. |
-| Scoped implementation (non-Claude, non-GPT) | **Gemini 4 Hydrogen** / **Neon** via `agy`, default mode | Implementation now works headless (2026-11-20 smoke test). Grade on real tasks: Neon for harder fixes, Hydrogen for small scoped ones. |
-| Extra Claude capacity | **Opus 5.5 / Sonnet 5.5** via `agy` | Draws on Google's quota, saving Claude Code tokens. Counts as Claude for the cross-LLM rule. |
+| Auditor (non-Claude, non-GPT) | **Gemini 4 Neon** (`gemini-4-neon-high`) via `agy`, **default mode** (no `--mode`), brief says "never edit" | Read-only reviews of Claude or Codex code; finds real bugs (v3.1: grade A on 3 audits). Third auditor after Mistral ends. |
+| Frontend + E2E in one loop (non-Claude, non-GPT) | **Gemini 4 Hydrogen** (`gemini-4-hydrogen-high`) / **Neon** via `agy`, default mode | Best choice when the task needs Playwright: agy opens ports, so the agent runs its own specs and closes the loop (v3.1: Hydrogen A ×3, Neon A ×3). Neon for UI judgement, Hydrogen for rules/fixes. |
+| Design proposals | **Gemini 4 Argon** (`gemini-4-argon-high`) via `agy` | Read-only designs and decision memos (v3.1: two-markets and Post shipping, both A). **Weekly pool is small**: one design + a few tasks used 100 % of a week. Never long Playwright loops. |
+| Extra Claude capacity | **Opus 5.5 / Sonnet 5.5** via `agy` | Tiny Claude-group quota (429 after 4 min on 2026-11-20). Only for short scoped work; never as the main implementer. |
 | Last resort (temporary) | **Claude Fable 5.2** (Agent tool, `model: "fable"`) | **Only for problems no Opus subagent or Codex sol can solve** (owner, 2026-11-11). Available until Saturday 2026-11-14. Counts as Claude for the cross-LLM rule. |
 | Visual / UX audits, test fixing | **Claude Opus subagent** (Agent tool, `model: "opus"`) or Codex sol | Opus can run Playwright and read screenshots; Codex sol for code audits and implementation. |
 
@@ -148,10 +149,74 @@ Every brief is short and contains exactly:
 | 2026-11-20 | Post shipping staff phase + make-room popup + audit fixes | Gemini 4 Neon high | B | Complete flows, 80/80 specs; Codex audit then found 4 P1 (parcel partial handover, stale handover resend, make-room minutes, mock reservations), all fixed by Neon. |
 | 2026-11-20 | Read-only frontend audit (post shipping) | Codex gpt-6.2-sol medium | A | 7 real findings, 0 false positives; 144k tokens. |
 
+## v3.1 retrospective (2026-11-20) — what each model did and what to change
+
+Release v3.1.0 shipped in one day: numbered stock in New sale, staff iPad cleanup, two simultaneous markets,
+Gaby-location painting rules, New sale corner cases, Agenda round 3 and Austrian Post shipping (separate session).
+
+| Task | Model | Result | Grade |
+|---|---|---|---|
+| Market stock backend + V15 tests | Codex 6.1-sol high | 1st try correct; Hydrogen later fixed a lazy-proxy photo load found by Neon | A |
+| Market stock frontend, picker | Codex 6.2-sol high | Worked; Neon's audit found real gaps | B |
+| Audits (backend, frontend, two-markets) | Gemini 4 Neon high | Real P1/P3 findings, no false alarms | A |
+| iPad photo picker, nav/agenda round 2 | Neon high | Clean UI work, ran its own Playwright | A / A− |
+| Backend fixes, inline picker, 10 New sale corner cases | Gemini 4 Hydrogen high | Pure rules in `lib/newSaleRules.ts`, 24 own E2E green | A |
+| Two-markets design, Post shipping design | Gemini 4 Argon high | Concise, decision-ready, worked examples | A |
+| Agenda Gaby-away UI | Argon high | Good UI; missed one label and a count mismatch; **weekly quota ran out mid-task** | B+ |
+| Two markets impl, Gaby rules, New sale stepper/Sales/early-paint, Agenda round 3 | Codex 6.2-sol high | Multi-layer, tests green; leaves 1–3 stale E2E selectors each time | A / B |
+| Multi-file impl via agy | Opus 5.5 (agy) | 429 Claude-group quota after 4 min | F |
+| PM: briefs, corner-case lists, E2E triage, CSS polish, deploy | Claude Opus (Code) | Caught what agents missed (inconsistent counts, small buttons, CI-only separator, lazy image test) | — |
+
+**Token use (from `~/.awg-agents/runs`).** Codex prints `tokens used`; agy does not, so Google runs are measured
+only by the quota % in the panel.
+- Codex 6.2-sol high: 115k (header button), 131–151k (backend passes), 215–254k (multi-layer rounds), 240k
+  (Post backend); medium audit 144k.
+- Google: the Gemini 4 5-hour pool went 73 % → 88 % across ~10 Neon/Hydrogen runs (heavy UI + Playwright work),
+  so a run costs roughly 1–3 % of the 5-hour pool. Argon used 100 % of its weekly pool in 4 runs.
+
+**Neon as a coder (owner, 2026-11-20):** Artificial Analysis ranks Gemini 4 Neon close to Opus 5.5, and our
+evidence agrees: Neon coded the iPad picker, nav/agenda round 2 and most of the Post staff phase (A/A−).
+**Neon becomes a main implementer next to Codex 6.2-sol**: Neon for frontend and full-stack UI work that needs
+Playwright, Codex for backend-heavy logic; each audits the other (different families). Watch the shared
+Gemini 4 5-hour pool; when it passes ~80 %, route to Codex.
+
+**Weekly budget rule (owner, 2026-11-20).** After the v3.1 day: Claude week 25 % (day 1 of 7), ChatGPT week
+37 %, Argon week 100 %, agy Opus/Sonnet week 84 %. At that pace all three subscriptions hit their weekly limit
+early. From now on:
+- **Daily target ≈ 14 % of each weekly pool**; the panel shows it. Past that, only urgent work.
+- **Audits once per feature/version, at the end**, scoped to the diff, not after every task. Only for backend,
+  security, money, migrations or shared flows (see proportional-review). Small UI changes: E2E + the PM's visual
+  check, no audit.
+- **Cheapest capable auditor:** Neon (≈1–3 % of the Gemini 4 5-hour pool) before Codex (≈140k tokens per audit).
+- **Codex effort medium by default**, high only for backend/multi-layer.
+- **The PM (Claude) spends less:** short messages, few screenshots, agy agents run Playwright, compact the
+  context early instead of carrying long sessions.
+
+**Routing changes from this evidence**
+1. **Frontend tasks that need E2E → Hydrogen/Neon via agy first** (they run Playwright themselves). Codex for
+   backend and multi-layer logic. This removes most of the Claude E2E-triage tokens.
+2. **Codex effort by size:** medium for ≤2-file UI tweaks, high for backend/multi-layer. Astra not needed in v3.1.
+3. **Argon = designs only**, at most one per day; its weekly pool is the scarcest resource.
+4. **agy Claude models are not a workhorse** (tiny quota). Inside other sessions, Opus subagents only for short
+   cross-reviews of Codex code; ask sessions to follow this file.
+5. **One Playwright run per machine at a time** (or `PW_WORKERS=3`): parallel runs from several agents plus a
+   nearly full disk produced 8–23 false failures. Clean `test-results/` and keep ≥15 GB free.
+6. **Geometry tests (wrapping, orphan separators) are only trustworthy in CI** (Linux fonts). Push and read
+   e2e-quick before calling a UI change green.
+7. **Every flow brief carries a corner-case list written by the PM** and "update the E2E selectors you change"
+   (owner, 2026-11-20). Stale selectors were the most common failure.
+8. **Separate session per big feature** (Post shipping) worked: own worktree, merged after the release commit.
+   Give that session the routing rules and the disk/Playwright limits in its background.
+
+**Quota picture at release time:** ChatGPT 5 h 0 % / week 36 %; Gemini 4 5 h 88 %; Argon week 100 %;
+agy Opus/Sonnet week 84 %; Claude 5 h 0 % / week 8 %. Binding limits were Google's weekly pools and the ChatGPT
+5-hour window, not Claude's weekly budget.
+
 ## Routing changes
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-11-20 | v3.1 retrospective (section above): agy Gemini for frontend+E2E, Codex effort by size, Argon designs only, one Playwright at a time, CI is the judge for geometry tests | Evidence from 15 delegated tasks in v3.1 |
 | 2026-11-20 | Why Google runs failed, and the fix: (1) `--mode plan` and `--mode accept-edits` auto-deny every shell command headless unless `permissions.allow` has a `command(...)` rule — that caused the Hydrogen, 3.8 Flash and Neon failures; (2) Opus/Sonnet in agy hit the small Claude-group quota (429). **Default mode (no `--mode`) lets Gemini 4 Hydrogen and Neon run commands and edit headless**: both fixed a failing test file end to end. Use default mode for implementation and audits (audits say "never edit" in the brief) | Owner wants Google to write code too |
 | 2026-11-20 | New Codex models `gpt-6.2-sol` and `gpt-6.2-astra` answer on the ChatGPT plan (`gpt-6.2-terra` is rejected). Trial plan: 6.2-sol for audits and standard implementation next to 6.1-sol (compare in the log); 6.2-astra only for genuinely hard problems. Google models get graded task by task: Gemini 4 Neon = auditor, Hydrogen = small scoped implementation, Opus 5.5 via agy = multi-file implementation | Owner: try the new models and learn what each does well |
 | 2026-11-20 | `agy` can implement headless in the **default mode** (no `--mode`): smoke test ran `ls`, `node`, `./mvnw` and wrote files in the repo. `--mode accept-edits` was the blocker; `--mode auto` is not available on this account. Claude Opus subagents (Claude quota) are replaced by Opus 5.5 / Gemini via `agy` (Google quota) for implementation; Claude Code stays orchestrator and Claude auditor | Owner: save Claude tokens, Claude only reviews |
