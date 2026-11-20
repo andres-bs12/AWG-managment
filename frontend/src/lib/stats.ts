@@ -1,4 +1,5 @@
 import type { Order, OrderItem, Stats, StatsFunnelStage } from '../domain/types.ts'
+import { marketOrnamentParts } from '../domain/marketStock.ts'
 
 export type StatsPeriod = 'today' | 'week' | 'month' | 'season'
 
@@ -83,7 +84,7 @@ export function errorCodeLabel(code: string): string {
   return code === 'required' ? 'Missing' : code === 'invalid' ? 'Not valid' : ''
 }
 
-const colorLabels: Record<string, string> = { red: 'Red', green: 'Green', beige: 'Beige', grey: 'Grey', white: 'White' }
+const colorLabels: Record<string, string> = { red: 'Red', wine: 'Wine', green: 'Green', beige: 'Beige', grey: 'Grey', white: 'White' }
 const finishLabels: Record<string, string> = { shiny: 'Shiny', matte: 'Matte' }
 export function colorLabel(color: string): string { return colorLabels[color] ?? fieldLabel(color) }
 export function finishLabel(finish: string): string { return finishLabels[finish] ?? fieldLabel(finish) }
@@ -138,6 +139,20 @@ export function aggregateStats(input: {
   }
   const colors = [...colorCounts].sort(([a], [b]) => a.localeCompare(b)).map(([key, count]) => ({ color: key.split('|')[0], finish: key.split('|')[1], count })).sort((a, b) => b.count - a.count)
 
+  const marketCounts = new Map<string, Stats['marketSales'][number]>()
+  for (const item of items) {
+    if (item.kind !== 'finished' || !item.marketOrnamentId) continue
+    const parts = marketOrnamentParts(item.marketOrnamentId)
+    if (!parts) continue
+    const { color, finish } = parts
+    const key = color.code + finish.code
+    const row = marketCounts.get(key)
+    if (row) row.count++
+    else marketCounts.set(key, { color: color.key, finish: finish.key, count: 1 })
+  }
+  const marketSales = [...marketCounts.values()].sort((a, b) =>
+    b.count - a.count || a.color.localeCompare(b.color) || a.finish.localeCompare(b.finish))
+
   const total = (event: string, test: (row: MetricRow) => boolean = () => true) => metrics.filter(row => row.event === event && test(row)).reduce((sum, row) => sum + row.count, 0)
   const errors = new Map<string, number>()
   for (const row of metrics) if (row.event === 'buy_validation_error') {
@@ -155,7 +170,7 @@ export function aggregateStats(input: {
       averageOrder: sold.length ? round2(revenue / sold.length) : 0,
       cancelled: created.length - active.length, checkoutsInProgress: active.length - sold.length,
     },
-    bySource, daily, colors,
+    bySource, daily, colors, marketSales,
     delivery: { market: items.filter(item => item.delivery.kind !== 'vienna').length, vienna: items.filter(item => item.delivery.kind === 'vienna').length },
     web: {
       homeViews: total('home_view'), buyViews: total('buy_view'), trackViews: total('track_view'), formViews: total('form_view'),

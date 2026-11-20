@@ -1,5 +1,7 @@
 import type { Address, CapacityResult, CustomFinish, CreateSaleItemInput, ItemKind, Market, MarketDay, OrnamentColor } from '../../domain/types'
+import { marketOrnamentLabel, marketOrnamentParts } from '../../domain/marketStock'
 import { isMarketPickupWeekday } from '../../lib/calendar'
+import { earliestPickupHourAfterPaint, PAINT_HANDLING_HOURS } from '../../lib/newSaleRules'
 import { formatDateLabel, formatHour, formatMinutes, hoursOverlap } from '../../lib/time'
 import { itemCost, type Pricing } from '../../lib/money'
 
@@ -16,12 +18,14 @@ export type DraftDelivery = {
   pickupDate?: string
   pickupHour?: number | null
   address?: Address
+  manualDay?: boolean
 }
 
 export type DraftItem = {
   plannedMove?: import('../../domain/types').MoveSuggestion
   id: string
   kind: ItemKind
+  marketOrnamentId?: string
   withName: boolean
   color: OrnamentColor
   finish: CustomFinish
@@ -101,10 +105,11 @@ export function makeCustom(partial?: Partial<DraftItem>): DraftItem {
   }
 }
 
-export function makeFinished(): DraftItem {
+export function makeFinished(marketOrnamentId?: string): DraftItem {
   return {
     id: newDraftId(),
     kind: 'finished',
+    marketOrnamentId,
     withName: false,
     color: 'red',
     finish: 'shiny',
@@ -129,13 +134,43 @@ export function makeCustomFromSlot(date: string, start: number, end: number): Dr
     delivery: {
       mode: 'market',
       pickupDate: isMarketPickupWeekday(date) ? date : undefined,
-      pickupHour: isMarketPickupWeekday(date) ? end : null,
+      pickupHour: isMarketPickupWeekday(date) ? earliestPickupHourAfterPaint(end) : null,
     },
   })
 }
 
 export function applySlot(item: DraftItem, date: string, start: number, end: number): DraftItem {
   const minutes = Math.max(15, Math.round((end - start) * 60))
+  if (item.delivery.mode === 'vienna') {
+    const validViennaDate = item.delivery.pickupDate && item.delivery.pickupDate > date ? item.delivery.pickupDate : undefined
+    return {
+      ...item,
+      durationMinutes: minutes,
+      durationPreset: presetFromMinutes(minutes),
+      paintDate: date,
+      paintStart: start,
+      paintEnd: end,
+      fromCalendar: true,
+      slotLocked: true,
+      delivery: {
+        ...item.delivery,
+        mode: 'vienna',
+        pickupDate: validViennaDate,
+        ...(validViennaDate ? {} : { marketDayId: undefined, manualDay: false }),
+        pickupHour: null,
+      },
+    }
+  }
+  const existingDate = item.delivery.pickupDate
+  const keepExistingDate = Boolean(existingDate && existingDate >= date && isMarketPickupWeekday(existingDate))
+  const pickupDate = keepExistingDate ? existingDate : (isMarketPickupWeekday(date) ? date : undefined)
+  const dateChanged = pickupDate !== existingDate
+  const minSameDayHour = end + PAINT_HANDLING_HOURS - 0.001
+  const keepHour = pickupDate === date
+    ? (item.delivery.pickupHour != null && item.delivery.pickupHour >= minSameDayHour
+      ? item.delivery.pickupHour
+      : earliestPickupHourAfterPaint(end))
+    : (pickupDate && pickupDate > date ? (item.delivery.pickupHour ?? null) : null)
   return {
     ...item,
     durationMinutes: minutes,
@@ -147,9 +182,10 @@ export function applySlot(item: DraftItem, date: string, start: number, end: num
     slotLocked: true,
     delivery: {
       ...item.delivery,
-      mode: item.delivery.mode === 'vienna' ? 'vienna' : 'market',
-      pickupDate: item.delivery.mode === 'vienna' ? item.delivery.pickupDate : isMarketPickupWeekday(date) ? date : item.delivery.pickupDate,
-      pickupHour: item.delivery.mode === 'vienna' ? null : (item.delivery.pickupHour ?? (isMarketPickupWeekday(date) ? end : null)),
+      mode: 'market',
+      pickupDate,
+      ...(dateChanged ? { marketDayId: undefined, manualDay: false } : {}),
+      pickupHour: keepHour,
     },
   }
 }
@@ -163,7 +199,25 @@ export function paintMinutes(items: DraftItem[]): number {
 }
 
 export function itemLabel(item: DraftItem, index: number): string {
+  if (item.kind === 'finished' && item.marketOrnamentId) return marketOrnamentLabel(item.marketOrnamentId)
   return `${item.kind === 'custom' ? 'Custom' : 'Finished'} ${index + 1}`
+}
+
+/** Short attribute line for numbered market ornaments: "Red · M" (S = Shiny, M = Matte). */
+export function marketPieceShortSpec(id?: string | null): string | null {
+  if (!id) return null
+  const parts = marketOrnamentParts(id)
+  return parts ? `${parts.color.label} · ${parts.finish.code}` : null
+}
+
+export function duplicateMarketPiece(items: DraftItem[]): string | null {
+  const seen = new Set<string>()
+  for (const item of items) {
+    if (item.kind !== 'finished' || !item.marketOrnamentId) continue
+    if (seen.has(item.marketOrnamentId)) return item.marketOrnamentId
+    seen.add(item.marketOrnamentId)
+  }
+  return null
 }
 
 export function slotLabel(item: DraftItem): string | null {
@@ -198,12 +252,13 @@ export function toCreateItems(items: DraftItem[], days: MarketDay[], today?: Mar
   return items.map((item) => {
     const mode = item.kind === 'finished' && item.delivery.mode === 'now' ? 'now' : item.delivery.mode
     const pickupDay =
-      days.find((d) => d.id === item.delivery.marketDayId) ??
-      days.find((d) => d.date === item.delivery.pickupDate) ??
-      (mode === 'now' ? today : undefined)
+      mode === 'now'
+        ? (today ?? days.find((d) => d.id === item.delivery.marketDayId) ?? days.find((d) => d.date === item.delivery.pickupDate))
+        : (days.find((d) => d.id === item.delivery.marketDayId) ?? days.find((d) => d.date === item.delivery.pickupDate))
     const deliveryKind = mode === 'vienna' ? 'vienna' : 'market'
     return {
       kind: item.kind,
+      marketOrnamentId: item.kind === 'finished' ? item.marketOrnamentId : undefined,
       withName: item.kind === 'custom' && item.withName,
       color: item.kind === 'custom' ? item.color : undefined,
       finish: item.kind === 'custom' ? item.finish ?? 'shiny' : undefined,
@@ -211,8 +266,8 @@ export function toCreateItems(items: DraftItem[], days: MarketDay[], today?: Mar
       paintStart: item.kind === 'custom' ? item.paintStart : undefined,
       paintEnd: item.kind === 'custom' ? item.paintEnd : undefined,
       deliveryKind,
-      marketId: deliveryKind === 'market' ? (item.delivery.marketId ?? pickupDay?.marketId) : undefined,
-      marketDayId: item.delivery.marketDayId ?? pickupDay?.id,
+      marketId: deliveryKind === 'market' ? (mode === 'now' ? pickupDay?.marketId : (item.delivery.marketId ?? pickupDay?.marketId)) : undefined,
+      marketDayId: mode === 'now' ? pickupDay?.id : (item.delivery.marketDayId ?? pickupDay?.id),
       pickupHour: deliveryKind === 'vienna' ? null : mode === 'now' ? (item.delivery.pickupHour ?? null) : (item.delivery.pickupHour ?? null),
       address: deliveryKind === 'vienna' ? (item.delivery.address ?? null) : null,
     }
@@ -237,11 +292,17 @@ export function buildDraftFromParams(params: URLSearchParams): SaleDraft {
   const endRaw = params.get('end')
   const placeItem = params.get('placeItem')
   const stored = readStoredDraft()
-  const normalizedStored = stored
+  const rawPhase = stored ? ((stored.phase as string) === 'formWhere' ? 'qr' as const : stored.phase) : null
+  const validItems = stored && Array.isArray(stored.items)
+    ? stored.items
+        .filter((item): item is DraftItem => Boolean(item && typeof item.id === 'string' && (item.kind === 'custom' || item.kind === 'finished') && item.delivery && typeof item.delivery.mode === 'string'))
+        .map((item) => ({ ...item, color: item.color ?? 'red' as const, finish: item.finish ?? 'shiny' as const }))
+    : []
+  const normalizedStored: SaleDraft | null = stored && validItems.length
     ? {
         ...stored,
-        phase: (stored.phase as string) === 'formWhere' ? 'qr' as const : stored.phase,
-        items: stored.items.map((item) => ({ ...item, color: item.color ?? 'red' as const, finish: item.finish ?? 'shiny' as const })),
+        phase: !stored.order && rawPhase && ['qr', 'payment', 'done'].includes(rawPhase) ? 'items' : (rawPhase ?? 'items'),
+        items: validItems,
       }
     : null
 

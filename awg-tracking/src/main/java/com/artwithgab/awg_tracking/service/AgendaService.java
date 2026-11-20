@@ -3,10 +3,12 @@ package com.artwithgab.awg_tracking.service;
 import com.artwithgab.awg_tracking.dto.agenda.*;
 import com.artwithgab.awg_tracking.dto.common.HourSpanDto;
 import com.artwithgab.awg_tracking.enums.DeliveryKind;
+import com.artwithgab.awg_tracking.enums.ItemKind;
 import com.artwithgab.awg_tracking.enums.ProductionStatus;
 import com.artwithgab.awg_tracking.exception.BadRequestException;
 import com.artwithgab.awg_tracking.exception.ConflictException;
 import com.artwithgab.awg_tracking.exception.ResourceNotFoundException;
+import com.artwithgab.awg_tracking.model.Market;
 import com.artwithgab.awg_tracking.model.MarketDay;
 import com.artwithgab.awg_tracking.model.Order;
 import com.artwithgab.awg_tracking.model.OrderItem;
@@ -34,17 +36,55 @@ public class AgendaService {
     private final CalendarService calendarService;
     private final ViewMapper mapper;
 
+    static final String PAINT_NOT_AT_THIS_MARKET = "PAINT_NOT_AT_THIS_MARKET";
+    /** Handling buffer required between paint end and a same-day market pickup (15 minutes). */
+    static final double PAINT_HANDLING_HOURS = 0.25;
+
     /** A busy painting range on one date. */
     record Busy(String id, double start, double end) {
     }
 
+    /** Maximum paintings a day can take: one ~60-minute block per full painting hour (10–13 → 3, 10–12 → 2). */
+    static int maxPaintingsFromHours(double openHour, double closeHour) {
+        return Math.max(0, (int) Math.floor((closeHour - openHour) + Hours.EPS));
+    }
+
+    /**
+     * Effective painting hours on a date:
+     * 1. PaintingDay override if set;
+     * 2. the hours of the market Gaby paints at on that date ("paints at" on PaintingDay), if open;
+     * 3. the configured primary pickup market's day on that date, if open;
+     * 4. the stall that opens earliest (tie: name);
+     * 5. the home painting day on that date.
+     */
+    static double[] effectivePaintingHours(LocalDate date, com.artwithgab.awg_tracking.model.PaintingDay rule,
+                                           List<MarketDay> stallsOnDate, Optional<MarketDay> fallbackDay,
+                                           UUID primaryPickupMarketId) {
+        UUID paintingMarketId = rule != null && rule.getPaintingMarket() != null ? rule.getPaintingMarket().getId() : null;
+        Optional<MarketDay> day = CalendarIndex.effectivePaintingStall(stallsOnDate, paintingMarketId, primaryPickupMarketId)
+                .or(() -> fallbackDay);
+        double open = rule != null && rule.getOpenHour() != null
+                ? rule.getOpenHour()
+                : day.map(d -> Hours.of(d.getOpenTime())).orElseGet(() -> Hours.of(CalendarRules.homePaintHours(date)[0]));
+        double close = rule != null && rule.getCloseHour() != null
+                ? rule.getCloseHour()
+                : day.map(d -> Hours.of(d.getCloseTime())).orElseGet(() -> Hours.of(CalendarRules.homePaintHours(date)[1]));
+        return new double[]{open, close};
+    }
+
     /** Data for one request: calendar plus every item. */
     record Snapshot(CalendarIndex index, List<OrderItem> items, Map<LocalDate, com.artwithgab.awg_tracking.model.PaintingDay> paintingDays,
-                    int defaultMaxPaintings) {
-        /** Custom ornaments painted on a date (pending web orders included: they hold their time). */
+                    int defaultMaxPaintings, UUID primaryPickupMarketId) {
+        Snapshot(CalendarIndex index, List<OrderItem> items, Map<LocalDate, com.artwithgab.awg_tracking.model.PaintingDay> paintingDays,
+                 int defaultMaxPaintings) {
+            this(index, items, paintingDays, defaultMaxPaintings, null);
+        }
+
+        /** Active bookings, including pending web orders. Finished sessions occupy only their recorded time. */
         int paintingsOn(LocalDate date, String ignoreId) {
             return (int) items.stream()
                     .filter(i -> i.getPaintStart() != null && i.getPaintStart().toLocalDate().equals(date))
+                    .filter(i -> i.getProductionStatus() != ProductionStatus.FINISHED)
                     .filter(i -> ignoreId == null || !i.getId().toString().equals(ignoreId))
                     .count();
         }
@@ -54,32 +94,69 @@ public class AgendaService {
             return rule == null || rule.isOpen();
         }
 
-        int maxPaintings(LocalDate date) {
+        Market paintingMarket(LocalDate date) {
             var rule = paintingDays.get(date);
-            return rule == null ? defaultMaxPaintings : rule.getMaxPaintings();
+            return rule == null ? null : rule.getPaintingMarket();
+        }
+
+        Optional<MarketDay> paintingMarketDay(LocalDate date) {
+            Market paintsAt = paintingMarket(date);
+            return index.paintingDayOn(date, paintsAt == null ? null : paintsAt.getId(), primaryPickupMarketId);
+        }
+
+        /** The painting market when a same-day pickup would be at a different stall. */
+        Optional<Market> paintingMarketMismatch(LocalDate paintDate, MarketDay pickup) {
+            if (pickup == null || !paintDate.equals(pickup.getDate())) return Optional.empty();
+            return paintingMarketDay(paintDate).map(MarketDay::getMarket)
+                    .filter(market -> !market.getId().equals(pickup.getMarket().getId()));
+        }
+
+        void assertPaintingLocation(LocalDate paintDate, MarketDay pickup) {
+            paintingMarketMismatch(paintDate, pickup).ifPresent(market -> {
+                throw new ConflictException(paintingLocationMessage(market)).code(PAINT_NOT_AT_THIS_MARKET);
+            });
+        }
+
+        Optional<MarketDay> marketPickup(OrderItem item) {
+            return item.getDeliveryKind() == DeliveryKind.MARKET ? index.pickupDay(item) : Optional.empty();
+        }
+
+        int maxPaintings(LocalDate date) {
+            return maxPaintingsFromHours(paintingOpenHour(date), paintingCloseHour(date));
         }
 
         double paintingOpenHour(LocalDate date) {
-            var rule = paintingDays.get(date);
-            if (rule != null && rule.getOpenHour() != null) return rule.getOpenHour();
-            return index.dayByDate(date).map(day -> Hours.of(day.getOpenTime()))
-                    .orElseGet(() -> Hours.of(CalendarRules.homePaintHours(date)[0]));
+            return effectivePaintingHours(date, paintingDays.get(date), index.marketDaysOn(date),
+                    index.dayByDate(date), primaryPickupMarketId)[0];
         }
 
         double paintingCloseHour(LocalDate date) {
-            var rule = paintingDays.get(date);
-            if (rule != null && rule.getCloseHour() != null) return rule.getCloseHour();
-            return index.dayByDate(date).map(day -> Hours.of(day.getCloseTime()))
-                    .orElseGet(() -> Hours.of(CalendarRules.homePaintHours(date)[1]));
+            return effectivePaintingHours(date, paintingDays.get(date), index.marketDaysOn(date),
+                    index.dayByDate(date), primaryPickupMarketId)[1];
         }
 
         List<Busy> busyOn(LocalDate date, String ignoreId) {
+            double elapsedUntil = paintElapsedUntil(date);
             return items.stream()
                     .filter(i -> i.getPaintStart() != null && i.getPaintStart().toLocalDate().equals(date))
                     .filter(i -> !i.getId().toString().equals(ignoreId))
-                    .map(i -> new Busy(i.getId().toString(), Hours.of(i.getPaintStart().toLocalTime()), Hours.of(i.getPaintEnd().toLocalTime())))
+                    .map(i -> {
+                        double end = Hours.of(i.getPaintEnd().toLocalTime());
+                        if (i.getProductionStatus() == ProductionStatus.FINISHED && !i.getOrder().isUnconfirmedWeb()) {
+                            end = Math.min(end, elapsedUntil);
+                        }
+                        return new Busy(i.getId().toString(), Hours.of(i.getPaintStart().toLocalTime()), end);
+                    })
+                    .filter(b -> b.end() > b.start())
                     .sorted(Comparator.comparingDouble(Busy::start))
                     .toList();
+        }
+
+        double paintElapsedUntil(LocalDate date) {
+            if (date.isBefore(index.today())) return Double.POSITIVE_INFINITY;
+            if (date.isAfter(index.today())) return 0;
+            // Keep the rounded quarter recorded when a session is marked Ready.
+            return index.roundedQuarterHour();
         }
     }
 
@@ -87,7 +164,7 @@ public class AgendaService {
         Map<LocalDate, com.artwithgab.awg_tracking.model.PaintingDay> rules = new HashMap<>();
         paintingDayRepository.findAll().forEach(d -> rules.put(d.getDate(), d));
         return new Snapshot(calendarService.snapshot(), orderItemRepository.findAllWithOrder(), rules,
-                props.calendar().defaultMaxPaintings());
+                props.calendar().defaultMaxPaintings(), props.shop().primaryPickupMarketId());
     }
 
     // ─── Reads ──────────────────────────────────────────────────────────────
@@ -106,7 +183,7 @@ public class AgendaService {
 
     private AgendaDayDto dayView(Snapshot s, LocalDate date) {
         CalendarIndex index = s.index();
-        MarketDay day = index.dayByDate(date).or(index::todayDay)
+        MarketDay day = s.paintingMarketDay(date).or(index::todayDay)
                 .orElseThrow(() -> new ResourceNotFoundException("No market day on that date."));
         List<AgendaSlotDto> slots = s.items().stream()
                 .filter(i -> i.getPaintStart() != null && i.getPaintStart().toLocalDate().equals(day.getDate()))
@@ -115,12 +192,18 @@ public class AgendaService {
                     Order order = i.getOrder();
                     if (order.isUnconfirmedWeb()) {
                         return new AgendaSlotDto(mapper.block(i, index), null, null, null, true,
-                                order.getCheckoutExpiresAt() == null || order.isPaymentReview() ? null : order.getCheckoutExpiresAt().toString());
+                                order.getCheckoutExpiresAt() == null || order.isPaymentReview() ? null : order.getCheckoutExpiresAt().toString(), null);
                     }
-                    return new AgendaSlotDto(mapper.block(i, index), mapper.order(order), mapper.item(i, index), mapper.customer(order.getCustomer()), false, null);
+                    return new AgendaSlotDto(mapper.block(i, index), mapper.order(order), mapper.item(i, index),
+                            mapper.customer(order.getCustomer()), false, null, firstPhotoUrl(i));
                 })
                 .toList();
-        return new AgendaDayDto(mapper.marketDay(day, index.today()), mapper.market(day.getMarket()), slots, deliveries(s, day.getDate()));
+        List<MarketDay> stalls = index.marketDaysOn(day.getDate());
+        Market paintsAt = s.paintingMarket(day.getDate());
+        return new AgendaDayDto(mapper.marketDay(day, index.today()), mapper.market(day.getMarket()), slots, deliveries(s, day.getDate()),
+                stalls.stream().map(d -> mapper.market(d.getMarket())).toList(),
+                stalls.stream().map(d -> mapper.marketDay(d, index.today())).toList(),
+                paintsAt == null ? null : paintsAt.getId().toString(), paintsAt == null ? null : paintsAt.getName());
     }
 
     /** Staff read the delivery day on each row, for example "Wed 2 Dec". */
@@ -134,14 +217,19 @@ public class AgendaService {
             if (order.isUnconfirmedWeb()) continue;
             var customer = order.getCustomer();
             String title = firstNonBlank(item.getPetName(), customer.getName(), "Ornament");
-            String photoUrl = item.getPhotos().isEmpty() ? null : ViewMapper.photoUrl(item.getPhotos().getFirst());
+            String photoUrl = firstPhotoUrl(item);
             boolean market = item.getDeliveryKind() == DeliveryKind.MARKET;
+            MarketDay pickupDay = market ? s.index().pickupDay(item).orElse(null) : null;
+            Market pickupMarket = pickupDay == null ? null : pickupDay.getMarket();
             Double hour = market && item.getPickUpTime() != null ? Hours.of(item.getPickUpTime()) : null;
             rows.add(new AgendaDeliveryDto(
                     customer.getName(), item.getCustomColor(), item.getCustomFinish(), ViewMapper.nz(item.getNameInOrnament()),
                     order.getId().toString(), order.getCode(), item.getId().toString(), title,
                     item.getProductionStatus(), item.isHandedOver(), item.getDeliveryKind(), hour,
-                    market ? "Market pickup" : "Vienna · " + VIENNA_DAY.format(date),
+                    market ? (pickupMarket == null ? "Market pickup" : pickupMarket.getName()) : "Vienna · " + VIENNA_DAY.format(date),
+                    pickupMarket == null ? null : pickupMarket.getId().toString(),
+                    pickupMarket == null ? null : pickupMarket.getName(),
+                    pickupDay == null ? null : pickupDay.getId().toString(),
                     hour == null ? null : Hours.format(hour),
                     customer.getPhone(),
                     market ? null : addressLabel(order),
@@ -169,20 +257,50 @@ public class AgendaService {
         return "";
     }
 
+    private static String firstPhotoUrl(OrderItem item) {
+        return item.getPhotos().isEmpty() ? null : ViewMapper.photoUrl(item.getPhotos().getFirst());
+    }
+
     // ─── Capacity ───────────────────────────────────────────────────────────
+
+    static void assertPaintingLocationChange(CalendarIndex index, List<OrderItem> items, LocalDate date,
+                                             UUID previousMarketId, UUID nextMarketId) {
+        if (Objects.equals(previousMarketId, nextMarketId)) return;
+        long pickups = items.stream()
+                .filter(item -> item.getItemKind() == ItemKind.CUSTOM && item.getDeliveryKind() == DeliveryKind.MARKET
+                        && date.equals(item.getHandoffDate()) && item.getPaintStart() != null
+                        && date.equals(item.getPaintStart().toLocalDate()))
+                .flatMap(item -> index.pickupDay(item).stream())
+                .filter(pickup -> !pickup.getMarket().getId().equals(nextMarketId))
+                .count();
+        if (pickups > 0) {
+            throw new ConflictException("Changing where Gaby paints would leave " + pickups
+                    + (pickups == 1 ? " same-day pickup" : " same-day pickups") + " at another market.")
+                    .code(PAINT_NOT_AT_THIS_MARKET);
+        }
+    }
+
+    private static String paintingLocationMessage(Market market) {
+        return "Gaby is painting at " + market.getName() + " that day. Pick another day.";
+    }
 
     @Transactional(readOnly = true)
     public CapacityResultDto checkCapacity(CapacityRequest req) {
+        Snapshot s = snapshot();
+        var mismatch = s.paintingMarketMismatch(req.date(), s.index().byId(req.handoffMarketDayId()).orElse(null));
+        if (mismatch.isPresent()) {
+            return new CapacityResultDto(false, null, 0, paintingLocationMessage(mismatch.get()));
+        }
         List<Busy> extra = req.extraBusy() == null ? List.of()
                 : req.extraBusy().stream().map(b -> new Busy("draft", b.startHour(), b.endHour())).toList();
-        return findFreeSlot(snapshot(), req.date(), req.durationHours(), req.afterHour(), null, extra, null, req.beforeHour());
+        return findFreeSlot(s, req.date(), req.durationHours(), req.afterHour(), null, extra, null, req.beforeHour());
     }
 
     /** Port of findFreeSlot: first gap of durationHours between afterHour and beforeHour on that date. */
     CapacityResultDto findFreeSlot(Snapshot s, LocalDate date, double duration, Double afterHour, UUID marketId,
                                    List<Busy> extraBusy, String ignoreBlockId, Double beforeHour) {
         CalendarIndex index = s.index();
-        // Automatic planning respects Gaby's day switch and daily limit; manual moves do not come here.
+        // Automatic planning respects Gaby's day switch and daily limit.
         if (!s.paintingOpen(date)) return new CapacityResultDto(false, null, 0, "Painting is closed on this day.");
         if (s.paintingsOn(date, ignoreBlockId) + extraBusy.size() >= s.maxPaintings(date)) {
             return new CapacityResultDto(false, null, 0, "Daily painting limit reached.");
@@ -227,14 +345,17 @@ public class AgendaService {
 
     @Transactional(readOnly = true)
     public MoveSuggestionDto findMoveSuggestion(MoveSuggestionRequest req) {
-        return findMoveSuggestion(snapshot(), req.date(), req.durationHours(), req.handoffDate(), req.beforeHour());
+        Snapshot s = snapshot();
+        return findMoveSuggestion(s, req.date(), req.durationHours(), req.handoffDate(), req.beforeHour(),
+                s.index().byId(req.handoffMarketDayId()).orElse(null));
     }
 
     /**
      * Port of findMoveSuggestion: find a not-started block on {@code date} that can move to another
      * free slot before its own handoff, freeing room for a new sale.
      */
-    MoveSuggestionDto findMoveSuggestion(Snapshot s, LocalDate date, double duration, LocalDate handoffDate, Double beforeHour) {
+    MoveSuggestionDto findMoveSuggestion(Snapshot s, LocalDate date, double duration, LocalDate handoffDate, Double beforeHour, MarketDay pickup) {
+        if (s.paintingMarketMismatch(date, pickup).isPresent()) return null;
         CalendarIndex index = s.index();
         Optional<MarketDay> target = index.dayByDate(date);
         LocalDate todayDate = index.todayDay().map(MarketDay::getDate).orElse(index.today());
@@ -257,7 +378,9 @@ public class AgendaService {
             if (index.isToday(targetDay) && start < index.nowHour()) continue;
             LocalDate handoff = item.getHandoffDate();
 
+            MarketDay itemPickup = s.marketPickup(item).orElse(null);
             for (LocalDate alt : CalendarRules.paintDatesToTry(handoff, todayDate)) {
+                if (s.paintingMarketMismatch(alt, itemPickup).isPresent()) continue;
                 HourSpanDto freed = new HourSpanDto(targetDay.getDate().toString(), start, start + duration);
                 boolean sameDay = alt.equals(targetDay.getDate());
                 CapacityResultDto alternative = findFreeSlot(s, alt, blockDuration, null, null,
@@ -265,7 +388,7 @@ public class AgendaService {
                         sameDay ? item.getId().toString() : null, null);
                 if (!alternative.ok() || alternative.slot() == null) continue;
                 if (alt.equals(handoff) && (item.getDeliveryKind() == DeliveryKind.DELIVERY || item.getPickUpTime() == null
-                        || alternative.slot().endHour() > Hours.of(item.getPickUpTime()))) continue;
+                        || alternative.slot().endHour() + PAINT_HANDLING_HOURS > Hours.of(item.getPickUpTime()) + Hours.EPS)) continue;
                 String title = item.getPetName() == null || item.getPetName().isBlank() ? "Walk-in order" : item.getPetName();
                 return new MoveSuggestionDto(item.getId().toString(), item.getOrder().getCode(), title,
                         new HourSpanDto(targetDay.getDate().toString(), start, end), alternative.slot(), freed);
@@ -286,9 +409,14 @@ public class AgendaService {
         if (item.getProductionStatus() != ProductionStatus.NOT_STARTED) {
             throw new ConflictException("Only not started sessions can be moved");
         }
+        s.assertPaintingLocation(date, s.marketPickup(item).orElse(null));
         double duration = Hours.of(item.getPaintEnd().toLocalTime()) - Hours.of(item.getPaintStart().toLocalTime());
         CalendarIndex index = s.index();
         MarketDay day = index.dayByDate(date).orElseThrow(() -> new BadRequestException("No market day"));
+        if (!s.paintingOpen(date)) throw new ConflictException("Painting is closed on this day.");
+        if (s.paintingsOn(date, blockId.toString()) >= s.maxPaintings(date)) {
+            throw new ConflictException("Daily painting limit reached.");
+        }
         double start = Hours.snap(startHour);
         double end = start + duration;
         if (start < s.paintingOpenHour(date) - Hours.EPS || end > s.paintingCloseHour(date) + Hours.EPS) {
@@ -314,7 +442,8 @@ public class AgendaService {
         if (kind == DeliveryKind.DELIVERY && !paintDate.isBefore(handoff)) {
             throw new BadRequestException("Vienna orders must be painted before the handoff day");
         }
-        if (kind == DeliveryKind.MARKET && paintDate.equals(handoff) && pickupHour != null && paintEnd > pickupHour + Hours.EPS) {
+        if (kind == DeliveryKind.MARKET && paintDate.equals(handoff) && pickupHour != null
+                && paintEnd + PAINT_HANDLING_HOURS > pickupHour + Hours.EPS) {
             throw new BadRequestException(moving
                     ? "This session must finish before pickup at " + Hours.format(pickupHour)
                     : "Choose a paint time before pickup, within working hours.");

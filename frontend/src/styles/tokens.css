@@ -295,6 +295,7 @@
   --staff-held-pattern: repeating-linear-gradient(135deg, transparent 0 6px, var(--color-control-border) 6px 7px, transparent 7px 13px);
   --size-agenda-hour: 80px;
   --size-staff-name: 180px;
+  --size-staff-sale-choice: 120px;
   --size-staff-handoff: 132px;
   --size-staff-qr: 220px;
   --size-staff-qr-render: 720px;

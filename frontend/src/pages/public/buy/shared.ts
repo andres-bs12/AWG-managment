@@ -26,4 +26,11 @@ export type BuyStepProps = {
   serverError: string
 }
 
+/** Legacy date-only drafts and responses can only resolve a unique market on that date. */
+export function selectedPickupDay(days: ShopPickupDay[], draft: BuyDraft): ShopPickupDay | undefined {
+  const onDate = days.filter(day => day.date === draft.deliveryDate)
+  if (draft.pickupMarketDayId) return onDate.find(day => day.marketDayId === draft.pickupMarketDayId)
+  return onDate.length === 1 ? onDate[0] : undefined
+}
+
 export { pickupTimes } from '../../../lib/pickupTimes'

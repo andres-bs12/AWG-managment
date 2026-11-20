@@ -63,7 +63,7 @@ class StaffOpsApiTests extends ApiTestSupport {
         String token = login();
         saleOk(token, customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0));
         mvc.perform(patch("/api/painting-days/" + TUE).header("Authorization", bearer(token))
-                .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("open", true, "maxPaintings", 0))))
+                .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("open", true, "openHour", 10.0, "closeHour", 10.5))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.booked").value(1))
                 .andExpect(jsonPath("$.maxPaintings").value(0));
         mvc.perform(get("/api/painting-days").param("from", TUE).param("to", TUE)

@@ -8,3 +8,13 @@
 .progress li[aria-current] .dot { border-color: var(--color-selected); background: var(--color-selected-surface); }
 .progress li[data-complete='true'] .dot { background: var(--color-selected); border-color: var(--color-selected); color: var(--color-on-primary); }
 .label { overflow-wrap: anywhere; hyphens: auto; }
+
+.progress[data-tone='staff'] {
+  width: 100%;
+  max-width: var(--measure-prose);
+  margin: 0;
+}
+.progress[data-tone='staff'] li {
+  font-size: var(--type-staff-meta-size);
+  line-height: var(--type-staff-meta-line);
+}

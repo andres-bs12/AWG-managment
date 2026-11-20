@@ -65,7 +65,6 @@ async function clearAction(action: Locator) {
 
 const pages = [
   { path: `/staff/agenda?date=${today}&view=list`, heading: 'Agenda' },
-  { path: `/staff/agenda?date=${today}&view=calendar`, heading: 'Agenda' },
   { path: `/staff/deliveries?day=${today}`, heading: 'Deliveries' },
   { path: '/staff/sales/new?fresh=1', heading: 'New sale' },
   { path: '/staff/orders/order-review', heading: 'AWGREVIEW' },
@@ -87,7 +86,7 @@ for (const entry of pages) test(`phone hierarchy, controls and accessibility: ${
   await testInfo.attach(`staff-${testInfo.project.name}-${entry.heading}`, { body: await page.screenshot(), contentType: 'image/png' })
 })
 
-test('five equal navigation targets keep labels inside their borders at 320–440px', async ({ page }) => {
+test('two equal navigation targets keep labels inside their borders at 320–440px', async ({ page }) => {
   await httpFixture(page)
   await signedIn(page)
   await page.evaluate(() => document.fonts.ready.then(() => undefined))
@@ -96,14 +95,14 @@ test('five equal navigation targets keep labels inside their borders at 320–44
     for (const path of ['/staff/agenda', '/staff/deliveries', '/staff/sales/new?fresh=1', '/staff/search', '/staff/inventory']) {
       await navigation(page, path)
       const tabs = page.getByRole('navigation', { name: 'Staff tabs' })
-      await expect(tabs.locator('[data-selected="true"]')).toHaveCount(1)
+      await expect(tabs.locator('[aria-current="page"]')).toHaveCount(path.startsWith('/staff/search') || path.startsWith('/staff/agenda') ? 0 : 1)
       const sizes = await tabs.locator(':scope > *').evaluateAll(nodes => nodes.map(node => {
         const box = node.getBoundingClientRect(), range = document.createRange()
         range.selectNodeContents(node)
         const text = range.getBoundingClientRect()
         return { width: box.width, height: box.height, left: text.left - box.left, right: box.right - text.right }
       }))
-      expect(sizes).toHaveLength(5)
+      expect(sizes).toHaveLength(2)
       expect(Math.max(...sizes.map(row => row.width)) - Math.min(...sizes.map(row => row.width))).toBeLessThan(1)
       for (const row of sizes) {
         expect(row.width).toBeGreaterThanOrEqual(44)
@@ -113,6 +112,32 @@ test('five equal navigation targets keep labels inside their borders at 320–44
       }
     }
   }
+})
+
+test('the phone search icon reveals, dismisses and submits the header search field', async ({ page }) => {
+  const fixture = await httpFixture(page)
+  await signedIn(page)
+  const header = page.getByRole('banner')
+  const search = header.getByRole('searchbox', { name: 'Search orders', exact: true })
+  const trigger = header.getByRole('button', { name: 'Search orders', exact: true })
+  await expect(search).toHaveCount(0)
+  await trigger.tap()
+  await expect(search).toBeFocused()
+  await expect(trigger).toHaveCount(0)
+  const close = header.getByRole('button', { name: 'Close search', exact: true })
+  const closeBox = (await close.boundingBox())!
+  expect(closeBox.width).toBeGreaterThanOrEqual(44)
+  expect(closeBox.height).toBeGreaterThanOrEqual(44)
+  await close.tap()
+  await expect(search).toHaveCount(0)
+  await expect(trigger).toBeFocused()
+  await trigger.tap()
+  await expect(search).toBeFocused()
+  await search.fill('Alex & +43')
+  await search.press('Enter')
+  await expect(page.getByRole('heading', { name: 'Search orders', exact: true })).toBeVisible()
+  await expect.poll(() => fixture.searches).toContain('Alex & +43')
+  await expect(header.getByRole('searchbox')).toHaveCount(0)
 })
 
 test('phone deliveries show the first cart at 360×640 and disclose counted filters', async ({ page }) => {
@@ -135,14 +160,17 @@ test('phone deliveries show the first cart at 360×640 and disclose counted filt
   await mobileLayout(page)
 })
 
-test('phone sales show the first result at 360×640 with inline search and counted URL filters', async ({ page }) => {
+test('phone sales show the first result at 360×640 with counted URL filters', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 640 })
   await page.clock.setFixedTime(new Date('2026-11-28T12:00:00Z'))
-  await page.addInitScript(() => localStorage.setItem('awg-staff-token', 'mock.staff-gaby.phone-polish'))
-  await page.goto('/staff/sales')
+  await page.addInitScript(() => {
+    localStorage.setItem('awg-staff-token', 'mock.staff-gaby.phone-polish')
+    localStorage.setItem('awg-active-market-id', 'mkt-rathaus')
+  })
+  await page.goto('/staff/sales?q=Sarah')
   const results = page.getByRole('list', { name: 'Sales results' })
   await firstCardAboveFold(page, results.getByRole('link').first())
-  await page.getByLabel('Code, customer name or phone', { exact: true }).fill('Sarah')
+  await expect(page.locator('#staff-main').getByRole('searchbox')).toHaveCount(0)
   await expect(results.getByRole('link')).toHaveCount(1)
   await openFilters(page)
   await page.getByLabel('Source', { exact: true }).selectOption('stall')
@@ -152,6 +180,26 @@ test('phone sales show the first result at 360×640 with inline search and count
   await noOrphanSeparators(page)
   await mobileLayout(page)
   await axe(page)
+})
+
+test('phone New sale keeps the step markers and labels within the content width', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 })
+  await httpFixture(page)
+  await signedIn(page, '/staff/sales/new')
+  const progress = page.getByRole('navigation', { name: 'Sale progress' })
+  await expect(progress).toHaveCount(0)
+  await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await expect(progress.locator('[aria-current="step"]')).toContainText('Items')
+  const markers = await progress.locator('[aria-hidden="true"]').evaluateAll(nodes => {
+    const box = nodes[0].closest('nav')!.getBoundingClientRect()
+    return nodes.map(node => {
+      const marker = node.getBoundingClientRect()
+      return { contained: marker.left >= box.left && marker.right <= box.right, width: marker.width, height: marker.height }
+    })
+  })
+  expect(markers).toHaveLength(3)
+  expect(markers.every(marker => marker.contained && marker.width === marker.height)).toBe(true)
+  await mobileLayout(page)
 })
 
 test('stock groups accessible swatches and independent finish saves on a full-height neutral canvas', async ({ page }) => {
@@ -170,9 +218,7 @@ test('stock groups accessible swatches and independent finish saves on a full-he
     await expect(card.getByRole('spinbutton', { name: `Custom · ${color} · matte quantity`, exact: true })).toHaveValue('3')
   }
   expect(fixture.mutations.filter(row => row.path.startsWith('/api/inventory/'))).toHaveLength(3)
-  const finished = page.getByRole('article', { name: 'Finished ornaments', exact: true })
-  await finished.scrollIntoViewIfNeeded()
-  await expect(finished.getByRole('spinbutton')).toHaveValue('3')
+  await expect(page.getByRole('heading', { name: 'Unnumbered finished stock', exact: true })).toHaveCount(0)
   expect(await page.evaluate(() => {
     const shell = document.querySelector('div[data-staff-page]')!
     const color = getComputedStyle(shell).backgroundColor
@@ -205,31 +251,33 @@ test('Agenda keeps one date strip and edits the selected day hours from its gear
   await expect(main.getByText('Day', { exact: true })).toHaveCount(0)
   await expect(main.getByRole('link', { name: 'Painting days', exact: true })).toHaveCount(0)
   await expect(main.getByRole('button', { name: 'Painting days', exact: true })).toHaveCount(0)
-  const pickup = main.getByRole('button').filter({ has: page.getByText('AWGREVIEW · Luna', { exact: true }) })
+  const pickup = main.locator('#agenda-pickups').getByRole('button', { name: /AWGREVIEW/ })
   await expect(pickup.getByRole('img', { name: 'red ornament', exact: true })).toBeVisible()
-  await expect(pickup).not.toContainText(' · red · ')
+  await expect(pickup).toContainText('Alex Review')
+  await expect(pickup).not.toContainText('Luna')
   const chips = main.getByRole('group', { name: 'Agenda day', exact: true })
   await expect(chips.getByRole('button', { name: /Fri 6 Nov/ })).toHaveAttribute('aria-pressed', 'true')
   const gear = main.getByRole('button', { name: /^Painting hours for Fri,? 6 Nov$/, exact: true })
   await gear.click()
   const dialog = page.getByRole('dialog', { name: /^Painting hours · Fri,? 6 Nov$/, exact: true })
-  await expect(dialog.getByRole('spinbutton', { name: /^Max paintings for Fri,? 6 Nov$/, exact: true })).toHaveValue('2')
+  await expect(dialog.getByRole('spinbutton')).toHaveCount(0)
+  await expect(dialog.getByText('1 booked · room for 10', { exact: true })).toBeVisible()
   await dialog.getByLabel(/^Painting starts Fri,? 6 Nov$/, { exact: true }).fill('09:30')
   await dialog.getByLabel(/^Painting ends Fri,? 6 Nov$/, { exact: true }).fill('18:30')
-  await dialog.getByRole('spinbutton', { name: /^Max paintings for Fri,? 6 Nov$/, exact: true }).fill('4')
-  await expect.poll(() => fixture.mutations.filter(row => row.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: true, maxPaintings: 4, openHour: 9.5, closeHour: 18.5 })
+  await expect(dialog.getByText('1 booked · room for 9', { exact: true })).toBeVisible()
+  await expect.poll(() => fixture.mutations.filter(row => row.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: true, openHour: 9.5, closeHour: 18.5 })
   await dialog.getByRole('button', { name: 'Close', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   await chips.getByRole('button', { name: /Fri 4 Dec/ }).click()
   await main.getByRole('button', { name: /^Painting hours for Fri,? 4 Dec$/, exact: true }).click()
   const next = page.getByRole('dialog', { name: /^Painting hours · Fri,? 4 Dec$/, exact: true })
-  await expect(next.getByRole('spinbutton', { name: /^Max paintings for Fri,? 4 Dec$/, exact: true })).toHaveValue('2')
+  await expect(next.getByText('0 booked · room for 10', { exact: true })).toBeVisible()
   await expect(next.getByLabel(/^Painting starts Fri,? 4 Dec$/, { exact: true })).toHaveValue('10:00')
   await mobileLayout(page)
   await next.getByRole('button', { name: 'Close', exact: true }).click()
 })
 
-test('a calendar sale reserves visible paint cards in List and Calendar and opens its order', async ({ page }) => {
+test('a calendar sale appears in the calendar and opens its order from a legacy List URL', async ({ page }) => {
   const fixture = await httpFixture(page)
   await signedIn(page, `/staff/sales/new?date=${today}&start=13&end=14`)
   await expect(page.getByRole('heading', { name: /Custom 1/ })).toBeVisible()
@@ -260,17 +308,17 @@ test('a calendar sale reserves visible paint cards in List and Calendar and open
   await clearAction(markPaid)
   await markPaid.click()
   await expect(page.getByRole('heading', { name: 'Sale recorded', exact: true })).toBeVisible()
-  for (const view of ['list', 'calendar']) {
-    await navigation(page, `/staff/agenda?date=${today}&view=${view}`)
-    const card = page.getByRole('button', { name: new RegExp(`Custom ornament.*${code}`) })
-    await expect(card).toHaveCount(1)
-    await expect(card).toContainText(code)
-    await expect(card).toContainText('Custom ornament')
-    await clearAction(card)
-    await card.click()
-    await expect(page).toHaveURL(new RegExp(`/staff/orders/${sale.id}$`))
-    await expect(page.getByRole('heading', { name: code, exact: true })).toBeVisible()
-  }
+  await navigation(page, `/staff/agenda?date=${today}&view=list`)
+  await expect(page.locator('[data-calendar]')).toBeVisible()
+  const card = page.getByRole('button', { name: new RegExp(`^${code},`) })
+  await expect(card).toHaveCount(1)
+  await expect(card).toContainText(code)
+  await expect(card).toContainText('Pickup Fri 15:00')
+  await expect(card).not.toContainText('13:00–14:00')
+  await clearAction(card)
+  await card.click()
+  await expect(page).toHaveURL(new RegExp(`/staff/orders/${sale.id}$`))
+  await expect(page.getByRole('heading', { name: code, exact: true })).toBeVisible()
 })
 
 test('a delivery cart owns per-item handover and stays together after a partial handover', async ({ page }) => {
@@ -354,9 +402,9 @@ test('shrinking painting hours keeps an existing later booking visible and tappa
   await page.getByRole('button', { name: /^Painting hours for Fri,? 6 Nov$/, exact: true }).click()
   const dialog = page.getByRole('dialog', { name: /^Painting hours · Fri,? 6 Nov$/, exact: true })
   await dialog.getByLabel(/^Painting ends Fri,? 6 Nov$/, { exact: true }).fill('11:00')
-  await expect.poll(() => fixture.mutations.filter(row => row.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: true, maxPaintings: 2, openHour: 10, closeHour: 11 })
+  await expect.poll(() => fixture.mutations.filter(row => row.path === `/api/painting-days/${today}`).at(-1)?.body).toEqual({ open: true, openHour: 10, closeHour: 11 })
   await dialog.getByRole('button', { name: 'Close', exact: true }).click()
-  const painting = page.getByRole('button', { name: /Luna, paint 12:00–13:00, AWGREVIEW/ })
+  const painting = page.getByRole('button', { name: /^AWGREVIEW, .*Pickup Fri 17:00, paint 12:00–13:00/ })
   await expect(painting).toHaveCount(1)
   await expect(painting).toContainText('AWGREVIEW')
   await clearAction(painting)

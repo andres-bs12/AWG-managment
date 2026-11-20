@@ -25,6 +25,7 @@ public record OrderItemDto(
         List<PhotoDto> photos,
         boolean formComplete,
         boolean handedOver,
-        DeliveryDto delivery
+        DeliveryDto delivery,
+        String marketOrnamentId
 ) {
 }

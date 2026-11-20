@@ -34,6 +34,9 @@
 }
 
 .chip {
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
   flex: 0 0 auto;
   min-width: var(--size-date-card);
   min-height: var(--size-control-staff);
@@ -47,8 +50,10 @@
   white-space: nowrap;
 }
 
-.chip:hover {
-  background: var(--staff-hover);
+@media (hover: hover) {
+  .chip:hover {
+    background: var(--staff-hover);
+  }
 }
 
 .chip:active {
@@ -67,8 +72,23 @@
 .chip > span { font-size: var(--type-staff-meta-size); font-weight: 400; }
 .chip > strong { font-size: var(--type-staff-h2-size); }
 
-.tools { display: flex; justify-content: flex-end; align-items: center; gap: var(--space-2); margin-bottom: var(--space-1); }
-.tools select { min-height: var(--touch); max-width: 55%; padding: var(--space-2); border: 1px solid var(--color-control-border); border-radius: var(--radius); background: var(--staff-surface); color: var(--staff-ink); font: inherit; }
+.stall {
+  position: absolute;
+  inset-block-start: var(--space-1);
+  inset-inline-end: var(--space-1);
+  width: var(--size-icon-sm);
+  height: var(--size-icon-sm);
+  color: var(--staff-muted);
+  pointer-events: none;
+}
+
+.marketHint {
+  margin: var(--space-1) 0 0;
+  text-align: center;
+  color: var(--staff-muted);
+  font-size: var(--type-staff-meta-size);
+  overflow-wrap: anywhere;
+}
 
 .chip { flex: 0 0 calc((100cqi - (var(--chips) - 1) * var(--space-2)) / var(--chips)); min-width: 0; padding-inline: var(--space-2); }
 .chip[data-selected='true'], .chip[data-selected='true']:hover, .chip[data-selected='true']:active { padding-inline: calc(var(--space-2) - var(--border-thin)); }

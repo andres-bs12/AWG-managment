@@ -6,12 +6,14 @@ import type { Photo } from '../../domain/types'
 import { aggregateStats, demoWebMetrics, type MetricRow } from '../../lib/stats'
 import { viennaDate } from '../../lib/sales'
 import { paymentSummary } from '../../lib/paymentSummary'
+import { addUtcDays } from '../../lib/time'
+import { pickupTimes } from '../../lib/pickupTimes'
 import {
   searchOrders, attentionOrders, listSales, statsSource,
   createMockCheckout, abandonMockCheckout,
   currentPrices, updatePrices, listInventory, updateInventory, paintingDay, updatePaintingDay, joinWaitlist, confirmWaitlist, unsubscribeWaitlist,
   checkCapacity,
-  cancelOrder,
+  cancelStaffOrder,
   mockChangePassword,
   createSale,
   findMoveSuggestion,
@@ -24,7 +26,7 @@ import {
   listAgendaDays,
   deleteMarket,
   deleteMarketDay,
-  listMarketDays,
+  listMarketDays, marketDaysOn, webPickupDay,
   listMarkets,
   saveMarket,
   mockLogin,
@@ -47,7 +49,7 @@ declare global {
 /** Dated copies of the anonymous metrics sent in this tab, for the mock Statistics page. */
 const metricLog: MetricRow[] = []
 
-function later<T>(fn: () => T, ms = 180): Promise<T> {
+function later<T>(fn: () => T | PromiseLike<T>, ms = 180): Promise<T> {
   return new Promise((resolve, reject) => {
     window.setTimeout(() => {
       try {
@@ -74,16 +76,24 @@ async function fileToPhoto(file: File): Promise<Photo> {
   }
 }
 
+const deliveriesFrom = '2026-11-30'
+
+function firstDeliveryDay(): string {
+  const tomorrow = addUtcDays(viennaDate(new Date()), 1)
+  return tomorrow > deliveriesFrom ? tomorrow : deliveriesFrom
+}
+
 function nextDeliveryDates(itemCount: number) {
   const out: { date: string; weekday: string }[] = []
   const day = new Date(); day.setHours(12, 0, 0, 0)
+  const first = firstDeliveryDay()
   while (out.length < 6) {
     day.setDate(day.getDate() + 1)
     const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
     if (iso > '2026-12-24') break
-    if (iso < '2026-11-30') continue
+    if (iso < first) continue
     const stall = listMarketDays().some(row => row.date === iso && listMarkets().some(m => m.id === row.marketId && m.kind === 'market'))
-    if (iso === '2026-12-24' || day.getDay() === 3 || (day.getDay() === 5 && !stall)) {
+    if (!stall && (iso === '2026-12-24' || day.getDay() === 3 || day.getDay() === 5)) {
       let available = 0; const paint = new Date(); paint.setHours(12, 0, 0, 0)
       while (paint < day) {
         const date = `${paint.getFullYear()}-${String(paint.getMonth() + 1).padStart(2, '0')}-${String(paint.getDate()).padStart(2, '0')}`
@@ -102,26 +112,33 @@ const hhmm = (hour: number) => `${String(Math.floor(hour)).padStart(2, '0')}:${S
 function nextPickupDays(itemCount: number) {
   const today = new Date(); today.setHours(12, 0, 0, 0)
   const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  return listMarketDays()
-    .flatMap(row => { const market = listMarkets().find(m => m.id === row.marketId && m.kind === 'market'); return market ? [{ row, market }] : [] })
-    .filter(({ row }) => row.date > iso(today) && row.date <= '2026-12-24' && row.closeHour - row.openHour >= 1)
-    .sort((a, b) => a.row.date.localeCompare(b.row.date))
+  const dates = [...new Set(listMarketDays().map(day => day.date))].sort()
+  const first = firstDeliveryDay()
+  const markets = listMarkets()
+  return dates
+    .filter(date => date >= first && date <= '2026-12-24')
+    .flatMap(date => {
+      const row = webPickupDay(date)
+      const market = row && markets.find(m => m.id === row.marketId)
+      return row && market && pickupTimes({ openTime: hhmm(row.openHour), closeTime: hhmm(row.closeHour) }).length
+        ? [{ row, market }] : []
+    })
     .filter(({ row }) => {
       let available = 0; const paint = new Date(today)
       while (iso(paint) < row.date) { const setting = paintingDay(iso(paint)); if (setting.open) available += Math.max(0, setting.maxPaintings - setting.booked); paint.setDate(paint.getDate() + 1) }
       return available >= itemCount
     })
     .slice(0, 12)
-    .map(({ row, market }) => ({ date: row.date, weekday: new Intl.DateTimeFormat('en', { weekday: 'long' }).format(new Date(`${row.date}T12:00:00`)), marketName: market.name, stall: market.stall, openTime: hhmm(row.openHour), closeTime: hhmm(row.closeHour) }))
+    .map(({ row, market }) => ({ date: row.date, marketDayId: row.id, weekday: new Intl.DateTimeFormat('en', { weekday: 'long' }).format(new Date(`${row.date}T12:00:00`)), marketName: market.name, stall: market.stall, openTime: hhmm(row.openHour), closeTime: hhmm(row.closeHour) }))
 }
 
-const saleKeys = new Map<string, import('../../domain/types').Order>()
+const saleKeys = new Map<string, Promise<import('../../domain/types').Order>>()
 
 export const mockApi: Api = {
   prices: { get: () => later(() => currentPrices()), update: (input) => later(() => updatePrices(input)) },
   marketStock: mockMarketStock,
   inventory: { list: () => later(() => listInventory().map(row => ({ ...row }))), update: (id, quantity, expectedQuantity) => later(() => updateInventory(id, quantity, expectedQuantity)) },
-  paintingDays: { list: (from, to) => later(() => { const dates = []; const d = new Date(`${from}T12:00:00Z`); while (d.toISOString().slice(0, 10) <= to && dates.length < 63) { dates.push(paintingDay(d.toISOString().slice(0, 10))); d.setUTCDate(d.getUTCDate() + 1) } return dates }), update: (date, open, max, hours) => later(() => updatePaintingDay(date, open, max, hours)) },
+  paintingDays: { list: (from, to) => later(() => { const dates = []; const d = new Date(`${from}T12:00:00Z`); while (d.toISOString().slice(0, 10) <= to && dates.length < 63) { dates.push(paintingDay(d.toISOString().slice(0, 10))); d.setUTCDate(d.getUTCDate() + 1) } return dates }), update: (date, open, hours) => later(() => updatePaintingDay(date, open, hours)) },
   auth: {
     login: (email, password) => later(() => mockLogin(email, password), 280),
     me: (token) => later(() => mockMe(token), 40),
@@ -158,8 +175,17 @@ export const mockApi: Api = {
     getOrder: (id) => later(() => getOrder(id)),
     getOrderByCode: (code) => later(() => getOrderByCode(code)),
     getOrderBundle: (id) => later(() => getOrderBundle(id)),
-    createSale: (input, key) => later(() => { const existing = saleKeys.get(key); if (existing) return existing; const order = createSale(input); saleKeys.set(key, order); return order }, 320),
-    cancelOrder: (id, reason) => later(() => cancelOrder(id, reason)),
+    createSale: (input, key) => {
+      const existing = saleKeys.get(key)
+      if (existing) return existing
+      const pending = later(() => createSale(input), 320).catch(error => {
+        saleKeys.delete(key)
+        throw error
+      })
+      saleKeys.set(key, pending)
+      return pending
+    },
+    cancelOrder: (id, reason) => later(() => cancelStaffOrder(id, reason)),
     setItemStatus: (orderId, itemId, status) =>
       later(() => {
         setItemStatus(orderId, itemId, status)
@@ -214,7 +240,7 @@ export const mockApi: Api = {
       later(() => ({
         enabled: true,
         seasonEnd: '2026-12-24',
-        deliveriesFrom: '2026-11-30',
+        deliveriesFrom,
         deliveryWindowStart: '18:00',
         deliveryWindowEnd: '20:00',
         // The demo shows the confirmation line; no e-mail is actually sent in mock mode.
@@ -237,12 +263,16 @@ export const mockApi: Api = {
         if (!input.deliveryDate) throw new Error('Choose a delivery day.')
         if (input.deliveryKind === 'market') {
           const day = nextPickupDays(input.items.length).find(entry => entry.date === input.deliveryDate)
-          if (!day) throw Object.assign(new Error('Choose an available market day.'), { code: 'PICKUP_DAY_INVALID', field: 'deliveryDate' })
+          const wrongMarket = input.marketDayId ? day?.marketDayId !== input.marketDayId : marketDaysOn(input.deliveryDate).length > 1
+          if (!day || wrongMarket) throw Object.assign(new Error('Choose an available market day.'), { code: 'PICKUP_DAY_INVALID', field: 'deliveryDate', status: 400 })
           const time = input.pickupTime ?? ''
-          if (!/^\d{2}:(00|30)$/.test(time) || time < day.openTime || time > hhmm(Number(day.closeTime.slice(0, 2)) + Number(day.closeTime.slice(3)) / 60 - 0.5)) throw Object.assign(new Error('Choose an arrival time while the stall is open.'), { code: 'PICKUP_TIME_INVALID', field: 'pickupTime' })
-          return createMockCheckout(input)
+          if (!pickupTimes(day).includes(time)) throw Object.assign(new Error('Choose an arrival time while the stall is open.'), { code: 'PICKUP_TIME_INVALID', field: 'pickupTime', status: 400 })
+          return createMockCheckout({ ...input, marketDayId: day.marketDayId })
         }
         if (!input.address) throw Object.assign(new Error('Address is required.'), { code: 'VALIDATION', field: 'address' })
+        if (input.deliveryDate < firstDeliveryDay()) {
+          throw Object.assign(new Error('Choose an available delivery date.'), { code: 'DELIVERY_DAY_INVALID', field: 'deliveryDate', status: 400 })
+        }
         return createMockCheckout(input)
       }, 500),
   },

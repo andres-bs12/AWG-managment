@@ -23,7 +23,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /** Web shop: Vienna-only delivery days from real capacity, Stripe checkout and webhook (Stripe mocked). */
-@TestPropertySource(properties = "awg.shop.enabled=true")
+@TestPropertySource(properties = {
+        "awg.shop.enabled=true",
+        "awg.shop.primary-pickup-market-id=10000000-0000-0000-0000-000000000001"
+})
 class ShopApiTests extends ApiTestSupport {
     private static final byte[] JPEG = TestImages.jpeg();
 
@@ -41,6 +44,8 @@ class ShopApiTests extends ApiTestSupport {
     tools.jackson.databind.ObjectMapper objectMapper;
     @Autowired
     com.artwithgab.awg_tracking.config.AwgProperties props;
+    @Autowired
+    org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @BeforeEach
     void stripeOk() {
@@ -80,6 +85,79 @@ class ShopApiTests extends ApiTestSupport {
         return mvc.perform(req.with(r -> { r.setRemoteAddr(ip); return r; })).andReturn();
     }
 
+    private static final String PICKUP_SATURDAY = "2026-12-05";
+    private static final String PICKUP_SUNDAY = "2026-12-06";
+
+    @Test
+    void overlapOnlyOffersConfiguredPrimaryAndCheckoutPinsIt() throws Exception {
+        String staff = login();
+        String secondaryDayId = dayId(staff, PICKUP_SATURDAY);
+        UUID primaryId = props.shop().primaryPickupMarketId();
+        UUID primaryDayId = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
+        jdbc.update("insert into market (id, kind, name, total_cost, stall) values (?, 'MARKET', 'Primary stall', 0, 5)", primaryId);
+        jdbc.update("insert into market_day (id, market_id, date, open_time, close_time) values (?, ?, ?, ?, ?)",
+                primaryDayId, primaryId, java.time.LocalDate.parse(PICKUP_SATURDAY), java.time.LocalTime.of(13, 0), java.time.LocalTime.of(20, 0));
+        var list = mvc.perform(withIp(post("/api/shop/pickup-days")).contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("items", List.of(Map.of("kind", "custom", "withName", false))))))
+                .andExpect(status().isOk()).andReturn();
+        assertThat(this.<List<String>>read(list, "$[?(@.date=='" + PICKUP_SATURDAY + "')].marketDayId"))
+                .containsExactly(primaryDayId.toString());
+        assertThat(this.<List<String>>read(list, "$[?(@.date=='" + PICKUP_SUNDAY + "')].marketName"))
+                .containsExactly("Rathausplatz");
+
+        var mismatch = pickupCheckout(secondaryDayId, "14:00");
+        assertThat(mismatch.getResponse().getStatus()).isEqualTo(400);
+        assertThat(this.<String>read(mismatch, "$.code")).isEqualTo("PICKUP_DAY_INVALID");
+        var legacy = pickupCheckout(null, "14:00");
+        assertThat(legacy.getResponse().getStatus()).isEqualTo(400);
+        var invalidHour = pickupCheckout(primaryDayId.toString(), "12:30");
+        assertThat(invalidHour.getResponse().getStatus()).isEqualTo(400);
+        assertThat(this.<String>read(invalidHour, "$.code")).isEqualTo("PICKUP_TIME_INVALID");
+        var result = pickupCheckout(primaryDayId.toString(), "19:30");
+        assertThat(result.getResponse().getStatus()).isEqualTo(200);
+        String code = read(result, "$.orderCode");
+        var order = orderRepository.findByCodeIgnoreCase(code).orElseThrow();
+        var item = order.getOrderItems().getFirst();
+        assertThat(item.getHandoffDay().getId()).isEqualTo(primaryDayId);
+        assertThat(item.getPaintStart().toLocalDate()).isBefore(java.time.LocalDate.parse(PICKUP_SATURDAY));
+    }
+
+    @Test
+    void overlapWhenConfiguredPrimaryIsClosedOffersNoPickupAndRejectsCheckout() throws Exception {
+        String staff = login();
+        String rathausSatDay = dayId(staff, PICKUP_SATURDAY);
+        var market = new HashMap<>(MarketApiTests.marketBody("Second stall", PICKUP_SATURDAY, 13, 20));
+        market.put("startDate", PICKUP_SATURDAY);
+        market.put("finishDate", PICKUP_SATURDAY);
+        var second = mvc.perform(post("/api/markets").header("Authorization", bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(market)))
+                .andExpect(status().isOk()).andReturn();
+        String secondSatDay = read(second, "$.days[0].id");
+
+        var list = mvc.perform(withIp(post("/api/shop/pickup-days")).contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("items", List.of(Map.of("kind", "custom", "withName", false))))))
+                .andExpect(status().isOk()).andReturn();
+        assertThat(this.<List<String>>read(list, "$[*].date")).doesNotContain(PICKUP_SATURDAY).contains(PICKUP_SUNDAY);
+
+        for (String dayId : Arrays.asList(rathausSatDay, secondSatDay, null)) {
+            var res = pickupCheckout(dayId, "14:00");
+            assertThat(res.getResponse().getStatus()).isEqualTo(400);
+            assertThat(this.<String>read(res, "$.code")).isEqualTo("PICKUP_DAY_INVALID");
+        }
+    }
+
+    private MvcResult pickupCheckout(String marketDayId, String pickupTime) throws Exception {
+        var payload = new HashMap<>(Map.of("customerName", "Eva Gruber", "email", "eva@example.com", "phone", "+43 1 234",
+                "deliveryKind", "market", "deliveryDate", PICKUP_SATURDAY, "pickupTime", pickupTime, "acceptTerms", true,
+                "items", List.of(Map.of("kind", "custom", "color", "red", "finish", "shiny", "withName", false,
+                        "photos", List.of(Map.of("id", "p0", "name", "luna.jpg"))))));
+        if (marketDayId != null) payload.put("marketDayId", marketDayId);
+        return mvc.perform(withIp(multipart("/api/shop/checkout")
+                .file(new MockMultipartFile("payload", "", "application/json", json(payload).getBytes()))
+                .file(new MockMultipartFile("photo-p0", "luna.jpg", "image/jpeg", JPEG)))).andReturn();
+    }
+
     @Test
     void rejectsLetteringThatExpandsBeyondSixOnUppercase() throws Exception {
         var res = checkoutNamed("1070", "2026-12-02", 1, "eva@example.com", freshIp(), "Straße");
@@ -117,6 +195,9 @@ class ShopApiTests extends ApiTestSupport {
         List<String> d = dates(List.of(Map.of("kind", "custom", "withName", true)));
         assertThat(d).isNotEmpty().doesNotContain("2026-11-25");
         assertThat(d.getFirst()).isEqualTo("2026-12-02");
+        var early = checkout("1070", WED, 1);
+        assertThat(early.getResponse().getStatus()).isEqualTo(400);
+        assertThat(this.<String>read(early, "$.code")).isEqualTo("DELIVERY_DAY_INVALID");
         // Wed/Fri, plus 24 Dec (a Thursday) as the season's last delivery; nothing after it.
         assertThat(d).allSatisfy(x -> assertThat(x.equals("2026-12-24") || java.time.LocalDate.parse(x).getDayOfWeek() == java.time.DayOfWeek.WEDNESDAY
                 || java.time.LocalDate.parse(x).getDayOfWeek() == java.time.DayOfWeek.FRIDAY).isTrue());

@@ -1,3 +1,4 @@
+import { selectedPickupDay } from './shared'
 import { useLocale } from '../../../i18n/LocaleContext'
 import styles from '../BuyPage.module.css'
 import type { BuyStepProps } from './shared'
@@ -21,7 +22,7 @@ export function BuyReviewStep({ t, draft, config, itemPrice, formatDate, patch, 
   const { locale } = useLocale()
   const compactDate = useCompactDate()
   const pickup = draft.deliveryKind === 'market'
-  const day = pickup ? pickupDays.find(entry => entry.date === draft.deliveryDate) : undefined
+  const day = pickup ? selectedPickupDay(pickupDays, draft) : undefined
   return <>
     {draft.items.map((item, index) => {
       const title = reviewTitle(item, index, draft.items.length, t)

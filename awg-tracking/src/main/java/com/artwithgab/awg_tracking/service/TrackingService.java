@@ -73,7 +73,7 @@ public class TrackingService {
     }
 
     private static DeliveryDto withoutAddressUnless(DeliveryDto d, boolean include) {
-        return include ? d : new DeliveryDto(d.kind(), d.marketId(), d.marketDayId(), d.pickupHour(), null);
+        return include ? d : new DeliveryDto(d.kind(), d.marketId(), d.marketName(), d.marketDayId(), d.pickupHour(), null);
     }
 
     /** Codes generated before 2026-11-05 have fewer than 6 characters after "AWG". */

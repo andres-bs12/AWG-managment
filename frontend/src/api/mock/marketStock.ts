@@ -3,12 +3,30 @@ import type { Api } from '../contracts'
 import { seedMarketPhoto } from '../marketStockPhotos'
 
 type StoredOrnament = MarketOrnament & { photo?: Blob }
+type SaleLink = { orderId: string; orderCode: string; soldAt: string }
+
+function stockError(message: string, code: string, status: number) {
+  return Object.assign(new Error(message), { code, status })
+}
+
+function requireEditable(row: StoredOrnament, revision: number, target?: string) {
+  if (target === 'sold') {
+    throw stockError('Sell ornaments through New sale. Cancel the order to return a sold ornament.', 'MARKET_STOCK_SELL_IN_SALE', 400)
+  }
+  if (row.revision !== revision) {
+    throw stockError('Someone else updated this ornament. Check the current details and try again.', 'MARKET_STOCK_CHANGED', 409)
+  }
+  if (row.status === 'sold') {
+    throw stockError('Sell ornaments through New sale. Cancel the order to return a sold ornament.', 'MARKET_STOCK_SELL_IN_SALE', 400)
+  }
+}
 
 const seeds = new Map(marketColors.flatMap(color => marketFinishes.flatMap(finish =>
   Array.from({ length: color[finish.key] }, (_, index) => {
     const id = `${color.code}${finish.code}${String(index + 1).padStart(2, '0')}`
     const ornament: MarketOrnament = {
       id, status: seedMarketPhoto(id) ? 'painted' : 'unpainted', soldAt: null, revision: 0, hasUploadedPhoto: false,
+      orderId: null, orderCode: null,
     }
     return [id, ornament] as const
   }),
@@ -44,18 +62,14 @@ async function transact<T>(
   }
 }
 
-function update(id: string, revision: number, change: (row: StoredOrnament) => StoredOrnament): Promise<MarketOrnament> {
+function update(id: string, revision: number, change: (row: StoredOrnament) => StoredOrnament, target?: string): Promise<MarketOrnament> {
   return transact('readwrite', (store, done, fail) => {
     const request = store.get(id)
     request.onsuccess = () => {
       const current = (request.result as StoredOrnament | undefined) ?? seeds.get(id)
       try {
-        if (!current) throw new Error('Ornament not found.')
-        if (current.revision !== revision) {
-          throw Object.assign(new Error('Someone else updated this ornament. Check the current details and try again.'), {
-            code: 'MARKET_STOCK_CHANGED',
-          })
-        }
+        if (!current) throw stockError('Ornament not found.', 'NOT_FOUND', 404)
+        requireEditable(current, revision, target)
         const next = change(current)
         store.put(next)
         done(summary(next))
@@ -68,7 +82,47 @@ function update(id: string, revision: number, change: (row: StoredOrnament) => S
 
 function summary(row: StoredOrnament): MarketOrnament {
   const { id, status, soldAt, revision, hasUploadedPhoto } = row
-  return { id, status, soldAt, revision, hasUploadedPhoto }
+  return {
+    id, status, soldAt, revision, hasUploadedPhoto,
+    orderId: status === 'sold' ? row.orderId ?? null : null,
+    orderCode: status === 'sold' ? row.orderCode ?? null : null,
+  }
+}
+
+// IndexedDB serialises the read/check/write across tabs. One failing piece rolls back the whole cart.
+function updateSalePieces(ids: string[], change: (row: StoredOrnament) => StoredOrnament | null): Promise<void> {
+  if (!ids.length) return Promise.resolve()
+  return transact<void>('readwrite', (store, done, fail) => {
+    const request = store.getAll()
+    request.onsuccess = () => {
+      const saved = new Map((request.result as StoredOrnament[]).map(row => [row.id, row]))
+      try {
+        for (const id of ids) {
+          const current = saved.get(id) ?? seeds.get(id)
+          if (!current) throw stockError('Ornament not found.', 'NOT_FOUND', 404)
+          const next = change(current)
+          if (next) store.put(next)
+        }
+        done(undefined)
+      } catch (error) {
+        fail(error)
+      }
+    }
+  })
+}
+
+export function sellMarketPieces(ids: string[], sale: SaleLink): Promise<void> {
+  return updateSalePieces(ids, row => {
+    if (row.status === 'sold') throw stockError('This ornament was already sold.', 'MARKET_STOCK_SOLD', 409)
+    if (row.status !== 'painted') throw stockError('This ornament is not painted yet.', 'MARKET_STOCK_NOT_READY', 409)
+    return { ...row, ...sale, status: 'sold', revision: row.revision + 1 }
+  })
+}
+
+export function returnMarketPieces(ids: string[], orderId: string): Promise<void> {
+  return updateSalePieces(ids, row => row.status === 'sold' && row.orderId === orderId
+    ? { ...row, status: 'painted', soldAt: null, orderId: null, orderCode: null, revision: row.revision + 1 }
+    : null)
 }
 
 function dataUrl(file: Blob): Promise<string> {
@@ -97,11 +151,11 @@ export const mockMarketStock: Api['marketStock'] = {
   },
   changeStatus: (id, status, revision) => update(id, revision, current => {
     if (status === current.status) return current
-    if ((status === 'sold' && current.status !== 'painted') || (current.status === 'sold' && status !== 'painted')) {
-      throw new Error('Only a painted ornament can be sold. Undo the sale before changing its paint status.')
+    if (status !== 'unpainted' && status !== 'painted') {
+      throw stockError('Choose unpainted or painted.', 'VALIDATION', 400)
     }
-    return { ...current, status, soldAt: status === 'sold' ? new Date().toISOString() : null, revision: revision + 1 }
-  }),
+    return { ...current, status, soldAt: null, revision: revision + 1 }
+  }, status),
   savePhoto: (id, photo, revision) => update(id, revision, current => ({
     ...current, photo, hasUploadedPhoto: true, revision: revision + 1,
   })),

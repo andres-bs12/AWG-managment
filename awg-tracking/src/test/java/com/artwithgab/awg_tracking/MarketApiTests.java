@@ -49,15 +49,33 @@ class MarketApiTests extends ApiTestSupport {
     }
 
     @Test
-    void savingMarketHoursThatExcludeExistingPickupIs400() throws Exception {
+    void pickupHoursAndDeletionAreSpecificToTheStall() throws Exception {
         String token = login();
-        // Order picked up Sat 28 Nov 14:00 at Rathausplatz; a new market claiming that date is refused.
-        saleOk(token, customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0));
-        Map<String, Object> body = Map.of("name", "Other Markt", "startDate", "2026-11-27", "finishDate", "2026-11-30",
-                "totalCost", 100, "stall", 4,
-                "days", List.of(Map.of("date", SAT, "openHour", 9.0, "closeHour", 12.0)));
+        var booked = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/agenda/days/" + SAT)
+                        .header("Authorization", bearer(token))).andExpect(status().isOk()).andReturn();
+        String bookedMarket = read(booked, "$.market.id");
+        String bookedDay = read(booked, "$.marketDay.id");
+        saleOk(token, customItem(false, TUE, 10.0, 11.0, "market", bookedDay, 14.0));
+
+        var second = mvc.perform(post("/api/markets").header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON).content(json(marketBody("Other Markt", SAT, 9, 12))))
+                .andExpect(status().isOk()).andReturn();
+        String secondDay = read(second, "$.days[0].id");
+
+        var change = new java.util.HashMap<>(marketBody("Rathausplatz", SAT, 9, 12));
+        change.put("id", bookedMarket);
+        change.put("finishDate", "2026-12-21");
         mvc.perform(post("/api/markets").header("Authorization", bearer(token))
-                        .contentType(MediaType.APPLICATION_JSON).content(json(body)))
-                .andExpect(status().isBadRequest());
+                        .contentType(MediaType.APPLICATION_JSON).content(json(change)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("a pickup at 14:00")));
+        mvc.perform(delete("/api/market-days/" + secondDay).header("Authorization", bearer(token)))
+                .andExpect(status().isNoContent());
+    }
+
+    static Map<String, Object> marketBody(String name, String date, int open, int close) {
+        return Map.of("name", name, "startDate", "2026-11-25", "finishDate", "2026-11-29",
+                "totalCost", 100, "stall", 4,
+                "days", List.of(Map.of("date", date, "openHour", open, "closeHour", close)));
     }
 }

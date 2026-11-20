@@ -206,33 +206,42 @@ public class ShopService {
     }
 
     /**
-     * Stall days where a web order can be picked up: from the lead time on (pickups do not wait for
-     * the first Vienna delivery day), not after the season end, with painting time for every
-     * ornament on days before the stall day.
+     * Stall days on or after the first web handoff day, with time to paint every
+     * ornament before pickup.
      */
     public List<PickupDayDto> pickupDays(List<ShopItemShape> items) {
         requireCustomOnly(items);
         AgendaService.Snapshot s = agendaService.snapshot();
         List<Double> durations = durations(items);
         LocalDate today = s.index().today();
-        LocalDate first = today.plusDays(Math.max(1, props.shop().leadDays()));
+        LocalDate first = firstDeliveryDay(today);
         LocalDate last = today.plusDays(props.shop().maxDaysAhead());
         if (last.isAfter(seasonEnd())) last = seasonEnd();
         List<PickupDayDto> out = new ArrayList<>();
         for (LocalDate d = first; !d.isAfter(last); d = d.plusDays(1)) {
-            Optional<MarketDay> stall = s.index().marketDayOn(d);
+            Optional<MarketDay> stall = webPickupDay(s.index(), d);
             if (stall.isEmpty() || !hasPickupWindow(stall.get())) continue;
             if (plan(s, d, durations) == null) continue;
             MarketDay day = stall.get();
-            out.add(new PickupDayDto(d.toString(), d.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH).toLowerCase(Locale.ROOT),
+            out.add(new PickupDayDto(d.toString(), day.getId().toString(), d.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH).toLowerCase(Locale.ROOT),
                     day.getMarket().getName(), day.getMarket().getStall(), day.getOpenTime().toString(), day.getCloseTime().toString()));
         }
         return out;
     }
 
+    private Optional<MarketDay> webPickupDay(CalendarIndex index, LocalDate date) {
+        List<MarketDay> stalls = index.marketDaysOn(date);
+        if (stalls.size() <= 1) return stalls.stream().findFirst();
+        var primary = props.shop().primaryPickupMarketId();
+        return primary == null ? Optional.empty()
+                : stalls.stream().filter(day -> day.getMarket().getId().equals(primary)).findFirst();
+    }
+
     private static boolean hasPickupWindow(MarketDay day) {
-        return day.getOpenTime() != null && day.getCloseTime() != null
-                && !day.getOpenTime().plusMinutes(PICKUP_STEP_MINUTES).isAfter(day.getCloseTime());
+        if (day.getOpenTime() == null || day.getCloseTime() == null) return false;
+        int step = PICKUP_STEP_MINUTES * 60;
+        int firstArrival = Math.ceilDiv(day.getOpenTime().toSecondOfDay(), step) * step;
+        return firstArrival + step <= day.getCloseTime().toSecondOfDay();
     }
 
     /** Arrival times are on the half hour, from opening until 30 minutes before closing. */
@@ -328,14 +337,18 @@ public class ShopService {
         }
         AgendaService.Snapshot s = agendaService.snapshot();
         LocalDate today = s.index().today();
+        MarketDay pickupDay = null;
         if (pickup) {
-            Optional<MarketDay> stall = s.index().marketDayOn(req.deliveryDate());
-            if (stall.isEmpty() || req.deliveryDate().isBefore(today.plusDays(Math.max(1, props.shop().leadDays())))
+            pickupDay = webPickupDay(s.index(), req.deliveryDate()).orElse(null);
+            boolean wrongMarket = req.marketDayId() == null
+                    ? s.index().marketDaysOn(req.deliveryDate()).size() > 1
+                    : pickupDay == null || !pickupDay.getId().equals(req.marketDayId());
+            if (pickupDay == null || wrongMarket || req.deliveryDate().isBefore(firstDeliveryDay(today))
                     || req.deliveryDate().isAfter(today.plusDays(props.shop().maxDaysAhead()))
-                    || req.deliveryDate().isAfter(seasonEnd()) || !hasPickupWindow(stall.get())) {
+                    || req.deliveryDate().isAfter(seasonEnd()) || !hasPickupWindow(pickupDay)) {
                 throw new BadRequestException("Choose one of the offered market days.").code("PICKUP_DAY_INVALID").field("deliveryDate");
             }
-            if (!isPickupTimeAllowed(stall.get(), req.pickupTime())) {
+            if (!isPickupTimeAllowed(pickupDay, req.pickupTime())) {
                 throw new BadRequestException("Choose a pickup time while the stall is open.").code("PICKUP_TIME_INVALID").field("pickupTime");
             }
         } else if (req.deliveryDate().isBefore(firstDeliveryDay(today))
@@ -374,6 +387,10 @@ public class ShopService {
                 .sorted(Comparator.comparing((ShopItemRequest i) -> i.withName() ? 0 : 1)).toList();
         List<HourSpanDto> slots = plan(s, req.deliveryDate(), durations(customs));
         if (slots == null) throw new ConflictException("That delivery day just filled up. Choose another day.").code("DAY_FULL").field("deliveryDate");
+
+        for (HourSpanDto slot : slots) {
+            s.assertPaintingLocation(LocalDate.parse(slot.date()), pickupDay);
+        }
 
         Customer customer = new Customer();
         customer.setName(req.customerName().trim());
@@ -415,7 +432,10 @@ public class ShopService {
             item.setPosition(position++);
             item.setDeliveryKind(pickup ? DeliveryKind.MARKET : DeliveryKind.DELIVERY);
             item.setHandoffDate(req.deliveryDate());
-            if (pickup) item.setPickUpTime(req.pickupTime());
+            if (pickup) {
+                item.setHandoffDay(pickupDay);
+                item.setPickUpTime(req.pickupTime());
+            }
             item.setPetName(row.petName() == null ? "" : row.petName().trim());
             item.setNote(row.note() == null ? "" : row.note().trim());
             if (withName && row.backName() != null) {

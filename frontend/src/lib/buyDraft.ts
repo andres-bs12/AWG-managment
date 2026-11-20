@@ -26,6 +26,7 @@ export type BuyDraft = {
   deliveryKind: DeliveryKind
   deliveryDate: string
   /** Arrival time at the stall ('HH:mm'), market pickup only. */
+  pickupMarketDayId: string
   pickupTime: string
   acceptTerms: boolean
 }
@@ -35,7 +36,7 @@ export function newItem(): BuyItem {
 }
 
 const emptyDraft = (): BuyDraft => ({
-  items: [newItem()], customerName: '', email: '', phone: '', line1: '', line2: '', postalCode: '', deliveryKind: 'vienna', deliveryDate: '', pickupTime: '', acceptTerms: false,
+  items: [newItem()], customerName: '', email: '', phone: '', line1: '', line2: '', postalCode: '', deliveryKind: 'vienna', deliveryDate: '', pickupMarketDayId: '', pickupTime: '', acceptTerms: false,
 })
 
 export function loadBuyDraft(): BuyDraft {
@@ -52,6 +53,7 @@ export function loadBuyDraft(): BuyDraft {
       ...emptyDraft(), ...values,
       items: items.length ? items : [newItem()],
       deliveryKind: parsed.deliveryKind === 'market' ? 'market' : 'vienna',
+      pickupMarketDayId: typeof parsed.pickupMarketDayId === 'string' ? parsed.pickupMarketDayId : '',
       pickupTime: typeof parsed.pickupTime === 'string' && /^\d{2}:\d{2}$/.test(parsed.pickupTime) ? parsed.pickupTime : '',
       acceptTerms: false,
     }

@@ -1,7 +1,7 @@
 .section, .detail { display: grid; gap: var(--space-4); min-width: 0; }
 .heading { display: grid; gap: var(--space-1); justify-items: start; }
 .section h2, .section h3, .section h4, .section p, .detail p { margin: 0; }
-.heading p, .muted { color: var(--staff-muted); }
+.heading p { color: var(--staff-muted); }
 .totals {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -66,5 +66,7 @@ summary.cardHeader::-webkit-details-marker { display: none; }
 .status[data-status='sold'] { color: var(--color-cart-ink); background: var(--color-cart-surface); }
 .detailLine, .actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 .detailLine { justify-content: space-between; }
+.saleLink { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-1); overflow-wrap: anywhere; }
+.saleLink a { display: inline-flex; align-items: center; min-height: var(--touch); color: inherit; text-decoration: underline; text-underline-offset: var(--space-1); }
 .photo { display: block; width: 100%; max-height: 44dvh; object-fit: contain; background: var(--staff-bg); border-radius: var(--radius-control); }
 .error { color: var(--color-error); }

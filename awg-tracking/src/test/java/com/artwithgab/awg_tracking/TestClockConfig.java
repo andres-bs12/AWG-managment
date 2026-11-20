@@ -15,7 +15,7 @@ public class TestClockConfig {
 
     @Bean
     @Primary
-    Clock testClock() {
-        return Clock.fixed(Instant.parse("2026-11-24T08:00:00Z"), VIENNA);
+    Clock testClock(@org.springframework.beans.factory.annotation.Value("${awg.test.clock:2026-11-24T08:00:00Z}") String instant) {
+        return Clock.fixed(Instant.parse(instant), VIENNA);
     }
 }

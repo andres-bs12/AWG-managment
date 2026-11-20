@@ -17,8 +17,9 @@ export function handoffLabel(item: Pick<OrderItem, 'delivery'>, days: MarketDay[
   }
   const marketDay = days.find(day => day.id === item.delivery.marketDayId)
   const hour = item.delivery.pickupHour != null ? ` · ${formatHour(item.delivery.pickupHour)}` : marketDay ? ` · ${formatHour(marketDay.openHour)}–${formatHour(marketDay.closeHour)}` : ''
-  if (!date) return `Market${hour}`
-  return `Market · ${formatDateLabel(date)}${hour}`
+  const name = item.delivery.marketName ?? 'Market'
+  if (!date) return `${name}${hour}`
+  return `${name} · ${formatDateLabel(date)}${hour}`
 }
 
 export function paintSlotLabel(block: TimeBlock, days: MarketDay[]): string {

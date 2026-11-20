@@ -37,7 +37,7 @@ class SaleApiTests extends ApiTestSupport {
         assertEquals(0, new BigDecimal("102.97").compareTo(new BigDecimal(this.<Object>read(res, "$.total").toString())));
 
         assertEquals(redBefore - 1, inventory.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity());
-        assertEquals(genericBefore - 1, inventory.findFirstByItemKind(ItemKind.GENERIC).orElseThrow().getQuantity());
+        assertEquals(genericBefore, inventory.findFirstByItemKind(ItemKind.GENERIC).orElseThrow().getQuantity());
     }
 
     @Test
@@ -94,5 +94,31 @@ class SaleApiTests extends ApiTestSupport {
                         .header("Authorization", bearer(token)).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content(json(body)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void sameDayPickupRequiresFifteenMinutesAfterPaintEnd() throws Exception {
+        String token = login();
+        String sat = dayId(token, SAT);
+        // 13:00-14:00 with pickup at 14:00 leaves 0 min handling -> rejected.
+        MvcResult tooSoon = sale(token, customItem(false, SAT, 13.0, 14.0, "market", sat, 14.0));
+        assertEquals(400, tooSoon.getResponse().getStatus());
+        assertEquals("Choose a paint time before pickup, within working hours.", this.<String>read(tooSoon, "$.message"));
+
+        // 13:00-14:00 with pickup at 15:00 (or 12:45-13:45 with pickup at 14:00) -> accepted.
+        MvcResult okQuarter = sale(token, customItem(false, SAT, 12.75, 13.75, "market", sat, 14.0));
+        assertEquals(201, okQuarter.getResponse().getStatus(), okQuarter.getResponse().getContentAsString());
+    }
+
+    @Test
+    void viennaDeliveryMustBeAtLeastOneDayAfterPaintDate() throws Exception {
+        String token = login();
+        String wedDay = dayId(token, WED);
+        MvcResult sameDay = sale(token, customItem(false, WED, 10.0, 11.0, "vienna", wedDay, null));
+        assertEquals(400, sameDay.getResponse().getStatus());
+        assertEquals("Vienna orders must be painted before the handoff day", this.<String>read(sameDay, "$.message"));
+
+        MvcResult dayBefore = sale(token, customItem(false, TUE, 10.0, 11.0, "vienna", wedDay, null));
+        assertEquals(201, dayBefore.getResponse().getStatus(), dayBefore.getResponse().getContentAsString());
     }
 }

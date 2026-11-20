@@ -10,12 +10,15 @@ const messages: Record<string, [string, string]> = {
   FORM_LOCKED: ['Painting has started or the order was handed over. Changes are no longer possible.', 'Die Bemalung hat begonnen oder die Bestellung wurde übergeben. Änderungen sind nicht mehr möglich.'],
   POSTAL_OUTSIDE_VIENNA: ['Please enter a Vienna postal code (1010–1230).', 'Bitte gib eine Wiener Postleitzahl (1010–1230) ein.'],
   DELIVERY_DAY_INVALID: ['Please choose an available delivery date.', 'Bitte wähle einen verfügbaren Liefertermin.'],
+  PAINT_NOT_AT_THIS_MARKET: ['Gaby is painting at another market that day. Pick another day.', 'Gaby malt an diesem Tag auf einem anderen Markt. Bitte wähle einen anderen Tag.'],
   PICKUP_DAY_INVALID: ['Please choose an available market day.', 'Bitte wähle einen verfügbaren Markttag.'],
   PICKUP_TIME_INVALID: ['Please choose an arrival time while the stall is open.', 'Bitte wähle eine Uhrzeit, zu der der Stand geöffnet ist.'],
   DAY_FULL: ['This day is full. Please choose another date.', 'Dieser Tag ist ausgebucht. Bitte wähle einen anderen Termin.'],
   RATE_LIMITED: ['Too many requests. Please try again later.', 'Zu viele Anfragen. Bitte versuche es später erneut.'],
   STOCK_CHANGED: ['Stock changed. Please reload and review your selection.', 'Der Bestand hat sich geändert. Bitte lade die Seite neu und überprüfe deine Auswahl.'],
   OUT_OF_STOCK: ['This item is out of stock. Please choose another.', 'Dieser Artikel ist ausverkauft. Bitte wähle einen anderen.'],
+  MARKET_STOCK_SOLD: ['A selected ornament has already been sold. Choose another piece.', 'Eine ausgewählte Kugel wurde bereits verkauft. Bitte wähle eine andere.'],
+  MARKET_STOCK_NOT_READY: ['A selected ornament is no longer Ready. Choose a ready piece.', 'Eine ausgewählte Kugel ist nicht mehr bereit. Bitte wähle eine fertige Kugel.'],
   PAYMENT_PENDING: ['Payment is still pending. Please try again later.', 'Die Zahlung ist noch ausständig. Bitte versuche es später erneut.'],
   SHOP_CLOSED: ['The shop is currently closed.', 'Der Shop ist derzeit geschlossen.'],
   PENDING_CHECKOUT_LIMIT: ['You already have two unpaid orders open. Complete one or wait for it to expire before trying again.', 'Du hast bereits zwei unbezahlte Bestellungen offen. Schließe eine ab oder warte, bis sie abläuft, bevor du es erneut versuchst.'],
@@ -30,7 +33,7 @@ const messages: Record<string, [string, string]> = {
 export function apiError(error: unknown, locale: Locale, fallback: string): { text: string; field?: string } {
   const problem = error && typeof error === 'object' ? error as Problem : {}
   // Generic codes: the server's English message is more specific (e.g. "A photo is too large"), so prefer it in EN.
-  const generic = !problem.code || ['BAD_REQUEST', 'VALIDATION', 'CONFLICT'].includes(problem.code)
+  const generic = !problem.code || ['BAD_REQUEST', 'VALIDATION', 'CONFLICT', 'PAINT_NOT_AT_THIS_MARKET'].includes(problem.code)
   if (locale === 'en' && generic && problem.message) return { text: problem.message, field: problem.field }
   const translation = problem.code ? messages[problem.code] : undefined
   if (translation) return { text: translation[locale === 'de' ? 1 : 0], field: problem.field }

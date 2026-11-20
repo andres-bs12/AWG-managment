@@ -25,6 +25,7 @@ async function choosePickup(page: Page, locale: 'de' | 'en') {
   await expect(market).toBeChecked()
   const day = page.locator('input[name="pickup-day"]').first()
   await expect(day).toBeVisible()
+  await expect(page.getByText('Christkindlmarkt Spittelberg', { exact: false })).toHaveCount(0)
   await day.locator('..').click()
   await expect(day).toBeChecked()
   return day.getAttribute('value')
@@ -34,7 +35,8 @@ for (const locale of ['de', 'en'] as const) {
   test(`market pickup sends no address, no fee and the arrival time (${locale})`, async ({ page }) => {
     await open(page, locale); await recordCheckout(page)
     await choose(page); await pet(page); await next(page).click()
-    const date = await choosePickup(page, locale)
+    const marketDayId = await choosePickup(page, locale)
+    expect(marketDayId).toBe('md-04')
     const time = page.getByRole('radio', { name: '15:30', exact: true })
     await time.locator('..').click()
     await expect(time).toBeChecked()
@@ -57,7 +59,7 @@ for (const locale of ['de', 'en'] as const) {
     const sent = await page.evaluate(() => JSON.parse(sessionStorage.getItem('e2e-checkout') ?? 'null'))
     expect(sent).toEqual({
       customerName: 'Alex Example', email: 'alex@example.com', phone: '123456789',
-      deliveryKind: 'market', pickupTime: '15:30', deliveryDate: date, acceptTerms: true,
+      deliveryKind: 'market', marketDayId, pickupTime: '15:30', deliveryDate: '2026-12-04', acceptTerms: true,
       items: [{ kind: 'custom', withName: false, color: 'red', finish: 'shiny', petName: '', photos: 1 }],
     })
     // The handoff step shows what on one line and where/when on the next.

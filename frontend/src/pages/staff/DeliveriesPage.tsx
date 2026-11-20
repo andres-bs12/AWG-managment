@@ -1,6 +1,8 @@
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { useHandover } from '../../components/staff/useHandover'
 import { useStaffClock } from '../../lib/staffClock'
+import { useStaffMarket } from '../../lib/staffMarket'
+import { Field } from '../../components/ui/Field'
 import { Button } from '../../components/ui/Button'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -45,18 +47,25 @@ function byPostcode(a: DatedDelivery, b: DatedDelivery): number {
 }
 
 function flattenDays(days: AgendaDay[]): DatedDelivery[] {
-  return days.flatMap((day) =>
-    day.deliveries.map((row) => ({
+  return days.flatMap(day => day.deliveries.map(row => {
+    const stalls = day.marketDays ?? (day.market.kind === 'market' ? [day.marketDay] : [])
+    const pickup = row.deliveryKind !== 'market' ? undefined
+      : row.marketDayId ? stalls.find(stall => stall.id === row.marketDayId)
+        : row.marketId ? stalls.find(stall => stall.marketId === row.marketId)
+          : stalls.length === 1 ? stalls[0] : undefined
+    return {
       ...row,
       date: day.marketDay.date,
-      marketHours: row.deliveryKind === 'market' ? `${formatHour(day.marketDay.openHour)}–${formatHour(day.marketDay.closeHour)}` : undefined,
-    })),
-  )
+      marketHours: pickup ? `${formatHour(pickup.openHour)}–${formatHour(pickup.closeHour)}` : undefined,
+    }
+  }))
 }
 
 export function DeliveriesPage() {
   const version = useStaffRefresh()
   const clock = useStaffClock()
+  const { activeMarket, stalls } = useStaffMarket()
+  const [stallFilter, setStallFilter] = useState<{ activeId: string | undefined; value: string }>()
   const [includePast, setIncludePast] = useState(false)
   const [params, setParams] = useSearchParams()
   const routeMode = params.get('mode') === 'route'
@@ -70,7 +79,14 @@ export function DeliveriesPage() {
   // never moves another order's button under the finger. New rows go after the known ones.
   const positions = useRef({ view: '', order: new Map<string, number>() })
   const [handoverStatus, setHandoverStatus] = useState('')
-  const view = [dayFilter, statusFilter, kindFilter, routeMode, includePast].join('|')
+  const marketOptions = useMemo(() => [...new Map(
+    days.flatMap(day => day.markets ?? (day.market.kind === 'market' ? [day.market] : [])).map(market => [market.id, market]),
+  ).values()].sort((a, b) => a.name.localeCompare(b.name)), [days])
+  const activeId = activeMarket?.id
+  const stallDefault = stalls.length > 1 ? activeId ?? 'all' : 'all'
+  const requestedStall = stallFilter && stallFilter.activeId === activeId ? stallFilter.value : stallDefault
+  const marketFilter = marketOptions.some(market => market.id === requestedStall) ? requestedStall : 'all'
+  const view = [dayFilter, statusFilter, kindFilter, marketFilter, routeMode, includePast].join('|')
   useEffect(() => { setHandoverStatus('') }, [view])
   function stableOrder(rows: DatedDelivery[]): DatedDelivery[] {
     if (positions.current.view !== view) positions.current = { view, order: new Map() }
@@ -121,18 +137,17 @@ export function DeliveriesPage() {
   }
 
   const dated = useMemo(() => flattenDays(days), [days])
-  const filtered = useMemo(() => {
-    return dated.filter((row) => {
-      if (!includePast && dayFilter === 'all' && row.date < todayDate) return false
-      if (routeMode && row.deliveryKind !== 'vienna') return false
-      if (dayFilter !== 'all' && row.date !== dayFilter) return false
-      if (kindFilter !== 'all' && row.deliveryKind !== kindFilter) return false
-      if (statusFilter !== 'all' && row.productionStatus !== statusFilter) return false
-      return true
-    })
-  }, [dated, dayFilter, kindFilter, statusFilter, routeMode, includePast, todayDate])
+  const filtered = dated.filter(row => {
+    if (!includePast && dayFilter === 'all' && row.date < todayDate) return false
+    if (routeMode && row.deliveryKind !== 'vienna') return false
+    if (dayFilter !== 'all' && row.date !== dayFilter) return false
+    if (kindFilter !== 'all' && row.deliveryKind !== kindFilter) return false
+    if (!routeMode && kindFilter !== 'vienna' && marketFilter !== 'all' && row.marketId !== marketFilter) return false
+    if (statusFilter !== 'all' && row.productionStatus !== statusFilter) return false
+    return true
+  })
 
-  const grouped = useMemo(() => groupDeliveryOrders(filtered, dated), [filtered, dated])
+  const grouped = groupDeliveryOrders(filtered, dated)
   // The run follows the route, not the order of first sight. A postcode never changes on handover, so the list stays put.
   const orders = routeMode ? [...grouped].sort(byPostcode) : stableOrder(grouped)
   const activeIds = new Set(filtered.map(item => item.itemId))
@@ -147,7 +162,7 @@ export function DeliveriesPage() {
   )
 
   const emptyMessage = (() => {
-    if (statusFilter !== 'all' || kindFilter !== 'all') return 'No deliveries match these filters.'
+    if (statusFilter !== 'all' || kindFilter !== 'all' || marketFilter !== 'all') return 'No deliveries match these filters.'
     if (dayFilter !== 'all') return 'No deliveries for this day.'
     return 'No deliveries in the agenda.'
   })()
@@ -172,12 +187,18 @@ export function DeliveriesPage() {
       </div>
 
       <div className={styles.panel}>
-        <StaffFilters mobileInline count={Number(dayFilter !== 'all') + Number(statusFilter !== 'all') + Number(kindFilter !== 'all') + Number(includePast)} inline={<label className={styles.quickDay}>Day<select aria-label="Delivery day" value={dayFilter} onChange={event => setDayFilter(event.target.value)}>{dayOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}>
+        <StaffFilters mobileInline count={Number(dayFilter !== 'all') + Number(statusFilter !== 'all') + Number(kindFilter !== 'all') + Number(!routeMode && kindFilter !== 'vienna' && marketFilter !== 'all') + Number(includePast)} inline={<label className={styles.quickDay}>Day<select aria-label="Delivery day" value={dayFilter} onChange={event => setDayFilter(event.target.value)}>{dayOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}>
         <div className={styles.filters}>
           <div className={styles.dayFilters}><SegmentedControl legend="Day" name="delivery-day" value={dayFilter} onChange={setDayFilter} options={dayOptions} /></div>
           {!routeMode ? <>
             <SegmentedControl legend="Production" name="delivery-status" value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
             <SegmentedControl legend="Handoff" name="delivery-kind" value={kindFilter} onChange={setKindFilter} options={KIND_OPTIONS} />
+            {marketOptions.length > 1 && kindFilter !== 'vienna' && <Field label="Pickup market" htmlFor="deliveries-market">
+              <select id="deliveries-market" value={marketFilter} onChange={event => setStallFilter({ activeId, value: event.target.value })}>
+                <option value="all">Any market</option>
+                {marketOptions.map(market => <option key={market.id} value={market.id}>{market.name}</option>)}
+              </select>
+            </Field>}
           </> : <Button tone="staff" variant="secondary" onClick={() => { const next = new URLSearchParams(params); next.delete('mode'); setParams(next) }}>Exit delivery run</Button>}
           <label className={styles.past}><input type="checkbox" checked={includePast} onChange={event => setIncludePast(event.target.checked)} /> Include past days</label>
         </div>

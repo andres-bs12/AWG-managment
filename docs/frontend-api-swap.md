@@ -70,13 +70,15 @@ These Task 11 DTO changes were additive. Deploy the matching backend before the 
 
 - `orders.listSales(filters)` → staff-authenticated `GET /api/orders` without the `code` parameter. Optional filters: `state=unpaid|deposit|paid|pending|review`, `source=stall|web`, `from`/`to` calendar dates, `query` (code, customer name or at least three phone digits), zero-based `page` and `size` (default 20, maximum 50).
 - The response is `{ orders: OrderSummary[], page, size, totalElements, totalPages }`, ordered by creation time and id descending. `from` and `to` include the whole selected calendar days in Europe/Vienna. Filters apply before pagination. A pending/review checkout has that displayed state and is excluded from `state=unpaid`.
-- Summaries also include `source` (`stall` for legacy null sources) and `status` (`ACTIVE`/`CANCELLED`). Cancelled sales remain visible; erased orders are omitted, as in staff search. Form/track tokens, addresses and photos are excluded from the summary.
-- `/staff/sales` provides quick periods Today / 7 days / All, payment/source filters, the existing code/name/phone search semantics, and a link to each order. Filter and page parameters survive the return from the order detail. No database migration is needed for this endpoint.
+- Summaries include `source` (`stall` for legacy null sources), `status` (`ACTIVE`/`CANCELLED`) and nullable `soldAtMarketName`, read from the selling market day. Sales results also include `saleItems` with the item ID, kind, colour, first reference photo URL and numbered ornament ID where present. Cancelled sales remain visible and erased orders are omitted, as in staff search.
+- `/staff/sales` provides Today / 7 days / All, payment/source filters and a link to each order. The staff header handles interactive search. Sales still accepts `q` in the URL, and filter and page parameters survive the return from order detail. These fields use existing records and require no migration.
 
 
 ### Per-day painting hours (v1.1)
 
 `GET /api/painting-days?from=&to=` returns effective numeric `openHour` / `closeHour` with the existing date/open/maxPaintings/booked fields. Staff PATCH accepts both optional hour values together, in quarter-hour steps from 00:00 through 23:45, end after start. Omitting both preserves any override. V11 stores nullable overrides; unset dates inherit the preferred market/home painting window. These values never modify market pickup times. Existing bookings remain when the owner narrows a window or capacity. Automatic suggestions, manual sales and moves use the painting hours; manual bookings retain the existing ability to exceed the daily count/closed suggestion limit. Agenda derives its board extent from the effective window plus all existing slots.
+
+On the painting date, marking an item `finished` can shorten the recorded session to the current Vienna time rounded up to the next quarter-hour. Completion before the start records a 15-minute session ending at that time. The daily `booked` count tracks active sessions, while finished sessions still occupy the recorded interval. Reopening an item keeps the recorded interval.
 
 ### Item handover, cancellation and QR receipt (v1.1)
 

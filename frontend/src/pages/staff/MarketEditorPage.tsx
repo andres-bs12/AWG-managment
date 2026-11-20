@@ -51,9 +51,13 @@ function seasonDates(start: string, finish: string, removed: Set<string>): strin
 function busyDayIds(agenda: AgendaDay[], marketId: string): Set<string> {
   const ids = new Set<string>()
   for (const day of agenda) {
-    for (const slot of day.slots) ids.add(slot.block.marketDayId)
-    if (day.market.id === marketId && day.deliveries.some((row) => row.deliveryKind === 'market')) {
-      ids.add(day.marketDay.id)
+    const stalls = day.marketDays ?? (day.market.kind === 'market' ? [day.marketDay] : [])
+    const stall = stalls.find(row => row.marketId === marketId)
+    if (!stall) continue
+    const hasPickup = day.deliveries.some(row => row.deliveryKind === 'market'
+      && (row.marketDayId ? row.marketDayId === stall.id : row.marketId ? row.marketId === marketId : stalls.length === 1))
+    if (hasPickup || (stalls.length === 1 && day.slots.length > 0)) {
+      ids.add(stall.id)
     }
   }
   return ids
@@ -251,7 +255,7 @@ function MarketEditor() {
     if (start && finish && !marketPickupDates(start, finish).length) {
       return 'No Friday, Saturday, or Sunday in this range.'
     }
-    return 'Pickup days are Friday, Saturday, and Sunday. New days open 12:00–19:00.'
+    return 'Pickup days are Friday to Sunday, plus 25–26 Nov 2026. New days open 12:00–19:00.'
   })()
 
   if (!ready) return <p>Loading market…</p>

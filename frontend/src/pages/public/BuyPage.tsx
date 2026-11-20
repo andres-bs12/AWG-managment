@@ -18,7 +18,7 @@ import { keepFormFocusVisible } from '../../lib/publicFormFocus'
 import { petNameFromBack } from '../../lib/petName'
 import { phoneValid } from '../../lib/phone'
 import styles from './BuyPage.module.css'
-import { MAX_PHOTOS, pickupTimes } from './buy/shared'
+import { MAX_PHOTOS, pickupTimes, selectedPickupDay } from './buy/shared'
 import { OrnamentOverview } from '../../components/public/OrnamentOverview'
 import { BuyItemsStep } from './buy/BuyItemsStep'
 import { BuyPetStep } from './buy/BuyPetStep'
@@ -159,7 +159,13 @@ export function BuyPage() {
       if (!active) return
       setPickupDays(list)
       setPickupState('ready')
-      setDraft((current) => current.deliveryKind === 'market' && current.deliveryDate && !list.some((day) => day.date === current.deliveryDate) ? { ...current, deliveryDate: '', pickupTime: '' } : current)
+      setDraft(current => {
+        if (current.deliveryKind !== 'market' || !current.deliveryDate) return current
+        const day = selectedPickupDay(list, current)
+        if (!day) return { ...current, deliveryDate: '', pickupMarketDayId: '', pickupTime: '' }
+        const pickupMarketDayId = day.marketDayId ?? ''
+        return pickupMarketDayId === current.pickupMarketDayId ? current : { ...current, pickupMarketDayId }
+      })
     }).catch(() => {
       window.clearTimeout(timer)
       if (!active) return
@@ -209,7 +215,7 @@ export function BuyPage() {
     }
     if (currentStep === 2 && draft.deliveryKind === 'vienna' && (datesState !== 'ready' || !dates.some((date) => date.date === draft.deliveryDate))) found['buy-date'] = 'shopNeedDate'
     if (currentStep === 2 && draft.deliveryKind === 'market') {
-      const day = pickupState === 'ready' ? pickupDays.find((entry) => entry.date === draft.deliveryDate) : undefined
+      const day = pickupState === 'ready' ? selectedPickupDay(pickupDays, draft) : undefined
       if (!day) found['buy-date'] = 'shopNeedPickupDay'
       else if (!pickupTimes(day).includes(draft.pickupTime)) found['buy-time'] = 'shopNeedPickupTime'
     }
@@ -272,17 +278,27 @@ export function BuyPage() {
     try {
       const wanted = draft.items.map(item => ({ kind: 'custom' as const, withName: item.withName }))
       let stillAvailable: boolean
+      let pickupMarketDayId: string | undefined
       if (pickup) {
         const days = await api.shop.listPickupDays(wanted)
         setPickupDays(days); setPickupState('ready')
-        stillAvailable = days.some(day => day.date === draft.deliveryDate)
+        const selected = selectedPickupDay(days, draft)
+        pickupMarketDayId = selected?.marketDayId
+        stillAvailable = !!selected
+        if (selected && !pickupTimes(selected).includes(draft.pickupTime)) {
+          setDraft(current => ({ ...current, pickupTime: '' }))
+          go(1)
+          showErrors({ 'buy-time': 'shopNeedPickupTime' })
+          busyRef.current = false; setBusy(false)
+          return
+        }
       } else {
         const availableDates = await api.shop.listDeliveryDates(wanted)
         setDates(availableDates); setDatesState('ready')
         stillAvailable = availableDates.some(date => date.date === draft.deliveryDate)
       }
       if (!stillAvailable) {
-        setDraft(current => ({ ...current, deliveryDate: '', pickupTime: '' }))
+        setDraft(current => ({ ...current, deliveryDate: '', pickupMarketDayId: '', pickupTime: '' }))
         go(1)
         showErrors({ 'buy-date': 'shopDateUnavailable' })
         busyRef.current = false; setBusy(false)
@@ -291,7 +307,7 @@ export function BuyPage() {
       const result = await api.shop.checkout({
         customerName: draft.customerName.trim(), email: draft.email.trim(), phone: draft.phone.trim(),
         ...(pickup
-          ? { deliveryKind: 'market' as const, pickupTime: draft.pickupTime }
+          ? { deliveryKind: 'market' as const, marketDayId: pickupMarketDayId, pickupTime: draft.pickupTime }
           : { address: { line1: draft.line1.trim(), line2: draft.line2.trim() || undefined, postalCode: draft.postalCode.trim(), city: 'Wien' } }),
         deliveryDate: draft.deliveryDate, acceptTerms: draft.acceptTerms,
         items: draft.items.map((item) => ({ kind: 'custom', withName: item.withName, color: item.color || undefined, finish: item.finish || undefined, petName: item.withName ? petNameFromBack(item.backName) : '', backName: item.withName ? item.backName.trim() : undefined, note: item.note.trim() || undefined, photos: item.photos })),

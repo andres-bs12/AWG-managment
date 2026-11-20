@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
 })
 class NotificationServiceTests {
     @Autowired OrderService orders;
+    @Autowired com.artwithgab.awg_tracking.repository.MarketOrnamentRepository marketStock;
     @Autowired TransactionTemplate transactions;
     @Autowired com.artwithgab.awg_tracking.repository.InvoiceRepository invoices;
     @Autowired com.artwithgab.awg_tracking.repository.InvoiceCounterRepository counters;
@@ -44,8 +45,12 @@ class NotificationServiceTests {
     }
 
     @Test void salePaymentAndCancellationAreSentAfterCommit() {
-        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null);
-        var order = orders.createSale(new CreateSaleRequest(null, "<b>Customer</b>", "", "customer@example.com", List.of(item)));
+        var piece = new com.artwithgab.awg_tracking.model.MarketOrnament();
+        piece.setId("RM" + UUID.randomUUID().toString().substring(0, 6));
+        piece.setStatus("painted");
+        marketStock.saveAndFlush(piece);
+        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null, piece.getId());
+        var order = orders.createSale(new CreateSaleRequest(null, "<b>Customer</b>", "", "customer@example.com", List.of(item), null));
         UUID id = UUID.fromString(order.id());
         try {
             orders.updatePaymentState(id, PaymentState.PAID, PaymentMethod.CASH, null);
@@ -75,11 +80,15 @@ class NotificationServiceTests {
                 .allMatch(m -> m.getText().contains("/track/" + order.code()) && m.getText().contains("Hallo") && m.getText().contains("Hello")));
     }
     @Test void rolledBackSaleDoesNotSend() {
-        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null);
+        var piece = new com.artwithgab.awg_tracking.model.MarketOrnament();
+        piece.setId("RM" + UUID.randomUUID().toString().substring(0, 6));
+        piece.setStatus("painted");
+        marketStock.saveAndFlush(piece);
+        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null, piece.getId());
         long before = invoices.count();
         long numberBefore = counters.findById(1L).orElseThrow().getLastNumber();
         transactions.executeWithoutResult(status -> {
-            var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(item)));
+            var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(item), null));
             orders.updatePaymentState(UUID.fromString(order.id()), PaymentState.DEPOSIT, PaymentMethod.CASH, null);
             assertEquals(before + 1, invoices.count());
             status.setRollbackOnly();

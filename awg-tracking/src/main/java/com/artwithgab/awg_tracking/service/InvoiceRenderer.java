@@ -79,7 +79,7 @@ public class InvoiceRenderer {
                 line(b, en ? "   Vienna delivery" : "   Lieferung in Wien", date + " "
                         + TIME.format(props.shop().deliveryWindowStart()) + "–" + TIME.format(props.shop().deliveryWindowEnd()));
             } else {
-                var day = calendar.marketDayOn(item.getHandoffDate());
+                var day = calendar.pickupDay(item);
                 String market = day.map(d -> d.getMarket().getName()).orElse(en ? "Market" : "Markt");
                 // Finished ornaments can be handed over immediately without a separately booked pickup time.
                 String time = item.getPickUpTime() != null ? TIME.format(item.getPickUpTime())

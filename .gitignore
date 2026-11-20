@@ -17,3 +17,7 @@ tasks/.agent-heartbeat
 *.dump
 awg-uploads*.tar.gz
 awg-backups/
+
+# agent run logs and status (may contain code and paths)
+.agents/
+.claude/settings.local.json

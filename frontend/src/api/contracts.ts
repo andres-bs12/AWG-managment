@@ -1,4 +1,4 @@
-import type { MarketOrnament, MarketOrnamentStatus } from '../domain/marketStock'
+import type { MarketOrnament, MarketPaintStatus } from '../domain/marketStock'
 import type {
   InventoryItem, PaintingDay, Prices, PricesUpdate,
   AgendaDay,
@@ -54,12 +54,14 @@ export type AgendaService = {
     afterHour?: number
     beforeHour?: number
     extraBusy?: { startHour: number; endHour: number }[]
+    handoffMarketDayId?: string
   }) => Promise<CapacityResult>
   findMoveSuggestion: (input: {
     date: string
     durationHours: number
     handoffDate: string
     beforeHour?: number
+    handoffMarketDayId?: string
   }) => Promise<MoveSuggestion | null>
 }
 
@@ -130,12 +132,12 @@ export type Api = {
   marketStock: {
     list: () => Promise<MarketOrnament[]>
     photo: (id: string) => Promise<string | null>
-    changeStatus: (id: string, status: MarketOrnamentStatus, revision: number) => Promise<MarketOrnament>
+    changeStatus: (id: string, status: MarketPaintStatus, revision: number) => Promise<MarketOrnament>
     savePhoto: (id: string, photo: Blob, revision: number) => Promise<MarketOrnament>
   }
   inventory: { list: () => Promise<InventoryItem[]>; update: (id: string, quantity: number, expectedQuantity?: number) => Promise<InventoryItem> }
   prices: { get: () => Promise<Prices>; update: (input: PricesUpdate) => Promise<Prices> }
-  paintingDays: { list: (from: string, to: string) => Promise<PaintingDay[]>; update: (date: string, open: boolean, maxPaintings: number, hours?: { openHour: number; closeHour: number }) => Promise<PaintingDay> }
+  paintingDays: { list: (from: string, to: string) => Promise<PaintingDay[]>; update: (date: string, open: boolean | undefined, settings?: { openHour?: number; closeHour?: number; paintingMarketId?: string | null }) => Promise<PaintingDay> }
   auth: AuthService
   markets: MarketService
   agenda: AgendaService

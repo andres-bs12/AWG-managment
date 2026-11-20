@@ -8,26 +8,46 @@ import { CustomerHandoff } from '../../components/staff/CustomerHandoff'
 import { InsetNote } from '../../components/public/PublicForm'
 import { HelpTip } from '../../components/ui/HelpTip'
 import { useStaffClock } from '../../lib/staffClock'
+import { useStaffMarket } from '../../lib/staffMarket'
 import { useStaffRefresh } from '../../lib/useStaffRefresh'
 import { useOrderFormStatus } from '../../lib/useOrderFormStatus'
+import { DEMO_NOW_HOUR } from 'demo-source'
 import { QrCode } from '../../components/staff/QrCode'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
 import { ChoiceList } from '../../components/ui/ChoiceList'
 import { Field } from '../../components/ui/Field'
+import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
+import { marketOrnamentLabel, marketOrnamentParts, type MarketOrnament } from '../../domain/marketStock'
 import type { AgendaDay, CapacityResult, Market, MarketDay, MoveSuggestion, OrnamentColor, PaymentMethod, PaymentState, InventoryItem, PaintingDay } from '../../domain/types'
 import { isMarketPickupWeekday, isViennaWeekday, paintDatesToTry } from '../../lib/calendar'
-import { formatDateLabel, formatHour, hoursOverlap, minutesToHours, pickupHourOptions } from '../../lib/time'
+import {
+  isMarketDayValidForItems,
+  isPickupInPast,
+  isViennaDayValidForItems,
+  latestLockedPaintDate,
+  PAINT_HANDLING_HOURS,
+  paintDatesForPickup,
+  paintFitsHandoff,
+  paintingMarketOn,
+  reconcileDraftWithClockAndAgenda,
+  syncSharedDelivery,
+  validMarketPickupHours,
+} from '../../lib/newSaleRules'
+import { addUtcDays, formatDateLabel, formatHour, hoursOverlap, minutesToHours } from '../../lib/time'
 import { formatEur, itemCost, type Pricing } from '../../lib/money'
 import { OrderSummaryPanel } from './OrderSummaryPanel'
+import { MarketOrnamentPicker, MarketPiecePhoto } from './MarketOrnamentPicker'
 import {
   draftTotal,
   buildDraftFromParams,
   clearStoredDraft,
+  duplicateMarketPiece,
   itemLabel,
   makeCustom,
   makeFinished,
+  marketPieceShortSpec,
   saleErrorMessage,
   SLOT_TAKEN_COPY,
   slotLabel,
@@ -42,8 +62,8 @@ import {
 import styles from './NewSalePage.module.css'
 import { uid } from '../../lib/uid'
 import { upcomingWindows } from '../../lib/dateWindows'
-import { viennaClock } from '../../lib/viennaClock'
 import { finishForColor, firstAvailableCustom, remainingColor, remainingStock, stockLabel } from '../../lib/saleStock'
+import { apiError } from '../../lib/apiError'
 
 const MIN_PAINT_MINUTES = 15
 const MAX_PAINT_MINUTES = 8 * 60
@@ -61,7 +81,14 @@ function clampPaintMinutes(value: number): number {
   return Math.min(MAX_PAINT_MINUTES, Math.max(MIN_PAINT_MINUTES, Math.round(value)))
 }
 
-function fillDayRefs(item: DraftItem, days: MarketDay[], markets: Market[], seasonEnd: string): DraftItem {
+function fillDayRefs(
+  item: DraftItem,
+  days: MarketDay[],
+  markets: Market[],
+  seasonEnd: string,
+  activeMarket?: Market | null,
+  currentDate?: string,
+): DraftItem {
   if (item.delivery.mode === 'now') return item
   if (item.delivery.mode === 'vienna') {
     const date = item.delivery.pickupDate
@@ -80,15 +107,37 @@ function fillDayRefs(item: DraftItem, days: MarketDay[], markets: Market[], seas
   }
   const date = item.delivery.pickupDate || item.paintDate
   // Pickups happen at a stall: never on a home (painting) day.
-  const pickupDays = days.filter(
-    (d) => isMarketPickupWeekday(d.date) && markets.find((m) => m.id === d.marketId)?.kind === 'market',
-  )
+  const pickupDays = days
+    .filter((d) => isMarketPickupWeekday(d.date) && markets.find((m) => m.id === d.marketId)?.kind === 'market')
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date))
+  if (item.delivery.manualDay && item.delivery.marketDayId) {
+    const chosen = pickupDays.find((d) => d.id === item.delivery.marketDayId)
+    if (chosen) {
+      return {
+        ...item,
+        delivery: {
+          ...item.delivery,
+          marketDayId: chosen.id,
+          marketId: chosen.marketId,
+          pickupDate: chosen.date,
+        },
+      }
+    }
+  }
+  const preferredMarketId = activeMarket?.id ?? item.delivery.marketId
+  const preferredDays = preferredMarketId ? pickupDays.filter((d) => d.marketId === preferredMarketId) : []
+  const matchDate = (pool: MarketDay[]) =>
+    date ? pool.find((d) => d.date === date) ?? pool.find((d) => d.date >= date) : undefined
+  const pickDefault = (pool: MarketDay[]) =>
+    (currentDate ? pool.find((d) => d.date === currentDate) ?? pool.find((d) => d.date >= currentDate) : undefined) ??
+    pool.find((d) => d.isToday) ??
+    pool[0]
   const md =
-    pickupDays.find((d) => d.id === item.delivery.marketDayId) ??
-    pickupDays.find((d) => d.date === date) ??
-    pickupDays.find((d) => date && d.date >= date) ??
-    pickupDays.find((d) => d.isToday) ??
-    pickupDays[0]
+    (item.delivery.marketDayId ? pickupDays.find((d) => d.id === item.delivery.marketDayId) : undefined) ??
+    (date
+      ? matchDate(preferredDays) ?? matchDate(pickupDays) ?? pickDefault(preferredDays) ?? pickDefault(pickupDays)
+      : pickDefault(preferredDays) ?? pickDefault(pickupDays))
   if (!md) return item
   return {
     ...item,
@@ -96,25 +145,50 @@ function fillDayRefs(item: DraftItem, days: MarketDay[], markets: Market[], seas
       ...item.delivery,
       marketDayId: md.id,
       marketId: md.marketId,
-      pickupDate: item.delivery.pickupDate && isMarketPickupWeekday(item.delivery.pickupDate) ? item.delivery.pickupDate : md.date,
+      pickupDate: md.date,
     },
   }
 }
 
-function paintFitsHandoff(item: DraftItem, delivery: DraftItem['delivery']): boolean {
-  if (item.kind !== 'custom' || !item.paintDate || item.paintEnd == null || !delivery.pickupDate) return false
-  if (delivery.mode === 'vienna') return item.paintDate < delivery.pickupDate
-  if (delivery.mode !== 'market' || item.paintDate > delivery.pickupDate) return false
-  if (item.paintDate < delivery.pickupDate) return true
-  return delivery.pickupHour == null || item.paintEnd <= delivery.pickupHour
+function nextMarketPickup(days: MarketDay[], firstPaintDate: string, agenda: AgendaDay[], currentDate: string, nowHour: number, preferredMarketId?: string, minDate = currentDate) {
+  return days
+    .filter(day => day.date >= minDate && isMarketDayValidForItems(day, [], currentDate, nowHour, firstPaintDate, agenda))
+    .sort((a, b) => a.date.localeCompare(b.date) || Number(b.marketId === preferredMarketId) - Number(a.marketId === preferredMarketId))[0]
+}
+
+function marketPickup(day: MarketDay | undefined): DraftItem['delivery'] {
+  return { mode: 'market', pickupDate: day?.date, marketDayId: day?.id, marketId: day?.marketId, pickupHour: null, manualDay: false }
+}
+
+function paintingAtOtherMarket(item: DraftItem, agenda: AgendaDay[], delivery = item.delivery) {
+  if (item.kind !== 'custom' || delivery.mode !== 'market' || !item.paintDate || item.paintDate !== delivery.pickupDate) return undefined
+  const market = paintingMarketOn(agenda, item.paintDate)
+  return market && delivery.marketId && market.id !== delivery.marketId ? market : undefined
+}
+
+function paintedElsewhereLabel(
+  paintDate: string | undefined,
+  agendaDays: AgendaDay[],
+  marketDays: MarketDay[],
+  activeMarket: Market | null,
+  pickupMarketId?: string,
+): string | null {
+  if (!paintDate) return null
+  if (marketDays.filter(d => d.date === paintDate).length <= 1) return null
+  const market = paintingMarketOn(agendaDays, paintDate)
+  if (!market || market.id === (activeMarket?.id ?? pickupMarketId)) return null
+  return `Painted at ${market.name}`
 }
 
 export function NewSalePage() {
   const navigate = useNavigate()
   const clock = useStaffClock()
+  const { activeMarket, activeMarketDay, stalls } = useStaffMarket()
   const version = useStaffRefresh()
   const [prices, setPrices] = useState<Pricing | null>(null)
   const [inventory, setInventory] = useState<InventoryItem[]>([])
+  const [marketStock, setMarketStock] = useState<{ key: string; rows: MarketOrnament[] | null; error: string } | null>(null)
+  const [stockRetry, setStockRetry] = useState(0)
   const [paintingDays, setPaintingDays] = useState<PaintingDay[]>([])
   const [configError, setConfigError] = useState('')
   const [configRetry, setConfigRetry] = useState(0)
@@ -130,6 +204,7 @@ export function NewSalePage() {
   const submitLock = useRef(false)
   const saleKey = useRef(draft.idempotencyKey ?? uid())
   const [error, setError] = useState('')
+  const [staleNotice, setStaleNotice] = useState('')
   const [copied, setCopied] = useState(false)
   const [payMethod, setPayMethod] = useState<PaymentMethod | null>(null)
   const [payState, setPayState] = useState<PaymentState>('paid')
@@ -137,12 +212,25 @@ export function NewSalePage() {
   const [paidNote, setPaidNote] = useState('')
   // What this screen recorded, so the done screen can show the balance after a deposit.
   const [paidAmount, setPaidAmount] = useState<number | null>(null)
+  const [mixedHandedNote, setMixedHandedNote] = useState('')
   const [doneQrOpen, setDoneQrOpen] = useState(false)
   const [finishedHandoff, setFinishedHandoff] = useState(false)
+  const [discardOpen, setDiscardOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
   // null = closed. The order is re-read first: a paid order must not be deleted, and a sent form means a cancellation e-mail.
   const [changeDate, setChangeDate] = useState<{ state: 'checking' | 'ready' | 'unknown' | 'paid'; formSent: boolean } | null>(null)
   const [planRetry, setPlanRetry] = useState(0)
+  const initialClockDate = useRef(clock.date)
+  const stockKey = `${version}:${stockRetry}`
+  const stock = marketStock?.key === stockKey ? marketStock : null
+
+  useEffect(() => {
+    let active = true
+    void api.marketStock.list()
+      .then(rows => { if (active) setMarketStock({ key: stockKey, rows, error: '' }) })
+      .catch(() => { if (active) setMarketStock({ key: stockKey, rows: null, error: 'Could not load ready ornaments.' }) })
+    return () => { active = false }
+  }, [stockKey])
 
   // One-shot commands are consumed before reload or a remembered back link can replay them.
   const paramKey = params.toString()
@@ -154,7 +242,7 @@ export function NewSalePage() {
     next.idempotencyKey = saleKey.current
     setDraft(next)
     if (params.has('fresh') || params.has('start') || params.has('placeItem')) {
-      setPayMethod(null); setPayState('paid'); setDepositAmount(''); setPaidNote(''); setPaidAmount(null); setDoneQrOpen(false); setCopied(false); setError('')
+      setPayMethod(null); setPayState('paid'); setDepositAmount(''); setPaidNote(''); setPaidAmount(null); setMixedHandedNote(''); setDoneQrOpen(false); setCopied(false); setError(''); setStaleNotice(''); setSuggestions({}); setMoveSuggestions({}); setFinishedHandoff(false); setDiscardOpen(false); setLeaveOpen(false); setChangeDate(null)
       const cleaned = new URLSearchParams(params)
       for (const command of ['fresh', 'date', 'start', 'end', 'kind', 'placeItem']) cleaned.delete(command)
       consumedParams.current = cleaned.toString()
@@ -170,19 +258,58 @@ export function NewSalePage() {
     void Promise.all([api.markets.listMarkets(), api.markets.listMarketDays(), api.agenda.listDays(), api.shop.getConfig(), api.inventory.list()]).then(async ([m, d, agenda, config, stock]) => {
       if (!active) return
       if (![config.customPrice, config.finishedPrice, config.nameExtra].every(Number.isFinite)) throw new Error('Server prices are unavailable. Retry before creating a sale.')
-      setPrices(config); setConfigError(''); setInventory(stock); setSeasonEnd(config.seasonEnd)
+      setPrices(config); setConfigError(''); setInventory(stock.filter(row => row.kind === 'custom')); setSeasonEnd(config.seasonEnd)
       setMarkets(m); setDays(d); setAgendaDays(agenda)
       if (d.length) {
-        setDraft(current => ({ ...current, items: current.items.map(item => fillDayRefs(item, d, m, config.seasonEnd)) }))
+        const refDate = DEMO_NOW_HOUR == null || clock.date !== initialClockDate.current ? clock.date : (d.find(day => day.isToday)?.date ?? clock.date)
+        setDraft(current => ({ ...current, items: current.items.map(item => fillDayRefs(item, d, m, config.seasonEnd, activeMarket, refDate)) }))
         // The endpoint caps ranges at 62 days: load only upcoming days, in API-sized ranges, so an
         // old market day or a long season can no longer block the whole sale screen.
-        const ranges = upcomingWindows(d.map(day => day.date), viennaClock().date)
+        const ranges = upcomingWindows(d.map(day => day.date), refDate)
         const rules = (await Promise.all(ranges.map(([from, to]) => api.paintingDays.list(from, to)))).flat()
         if (active) setPaintingDays(rules)
       }
     }).catch(err => { if (active) setConfigError(err instanceof Error && err.message ? err.message : 'Check the connection.') })
     return () => { active = false }
-  }, [version, configRetry])
+  }, [version, configRetry, clock.date])
+
+  const clockRolled = clock.date !== initialClockDate.current
+  const useClockToday = DEMO_NOW_HOUR == null || clockRolled
+  const isDayToday = (d: MarketDay) => (useClockToday ? d.date === clock.date : d.isToday)
+  const marketTodayDays = days.filter(d => isDayToday(d) && markets.find(m => m.id === d.marketId)?.kind === 'market')
+  const activeMatch = activeMarketDay && (!useClockToday || activeMarketDay.date === clock.date)
+    ? (days.find(d => d.id === activeMarketDay.id) ?? activeMarketDay)
+    : undefined
+  const today = activeMatch
+    ?? (activeMarket ? marketTodayDays.find(d => d.marketId === activeMarket.id) : undefined)
+    ?? marketTodayDays[0]
+    ?? days.find(d => isDayToday(d))
+  const currentDate = useClockToday ? clock.date : (today?.date ?? clock.date)
+  const nowHour = clock.hour
+  const paintingMarketToday = paintingMarketOn(agendaDays, currentDate)
+  const gabyAway = today && paintingMarketToday && paintingMarketToday.id !== today.marketId ? paintingMarketToday : undefined
+  const firstPaintDate = gabyAway ? addUtcDays(currentDate, 1) : currentDate
+
+  // Reconcile draft against current Vienna time, calendar rules, active stall, and agenda changes.
+  useEffect(() => {
+    if (!days.length || !markets.length || draft.order || draft.phase === 'done' || !draft.items.length) return
+    const aligned = draft.items.map(item => {
+      if (item.delivery.mode !== 'market' || item.delivery.manualDay || item.slotLocked) return item
+      if (!activeMarket || !item.delivery.pickupDate) return item
+      const activeDayOnDate = days.find(d => d.date === item.delivery.pickupDate && d.marketId === activeMarket.id && isMarketPickupWeekday(d.date))
+      if (!activeDayOnDate || activeDayOnDate.id === item.delivery.marketDayId) return item
+      if (!isMarketDayValidForItems(activeDayOnDate, item.kind === 'custom' ? [item] : [], currentDate, nowHour, firstPaintDate, agendaDays)) return item
+      return { ...item, delivery: { ...item.delivery, marketDayId: activeDayOnDate.id, marketId: activeDayOnDate.marketId } }
+    })
+    const base = aligned.some((row, idx) => row !== draft.items[idx]) ? { ...draft, items: aligned } : draft
+    const { draft: nextDraft, changed, notice } = reconcileDraftWithClockAndAgenda(base, {
+      currentDate, nowHour, firstPaintDate, days, markets, agendaDays, activeMarket, seasonEnd,
+    })
+    if (notice) setStaleNotice(notice)
+    if (changed || base !== draft) setDraft(nextDraft)
+    // Reconcile when external state (clock, calendar, active stall, item count/phase) changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days, markets, agendaDays, seasonEnd, activeMarket, currentDate, nowHour, firstPaintDate, draft.order, draft.phase, draft.items.length])
 
   // Stock arrives after a calendar or restored draft was built: move an unsellable colour/finish to the
   // first combination still in stock, in item order, so the draft never starts on a sold-out base.
@@ -205,20 +332,23 @@ export function NewSalePage() {
 
   useEffect(() => {
     if (draft.phase === 'done' || (!draft.items.length && !draft.placingItemId)) {
-      if (draft.phase === 'done') clearStoredDraft()
+      clearStoredDraft()
       return
     }
     writeStoredDraft({ ...draft, idempotencyKey: saleKey.current })
   }, [draft])
-
-  const today = days.find(d => d.isToday && markets.find(m => m.id === d.marketId)?.kind === 'market') ?? days.find(d => d.isToday)
-  const currentDate = today?.date ?? clock.date
   const marketDays = days.filter(
     (d) => markets.find((m) => m.id === d.marketId)?.kind === 'market' && isMarketPickupWeekday(d.date),
   )
   const onlyFinished = draft.items.length > 0 && draft.items.every((item) => item.kind === 'finished')
   const hasCustom = draft.items.some((item) => item.kind === 'custom')
   const mixed = hasCustom && draft.items.some((item) => item.kind === 'finished')
+  const readyPieces = (stock?.rows ?? []).filter(piece => piece.status === 'painted')
+  const readyIds = new Set(readyPieces.map(piece => piece.id))
+  const availablePieces = readyPieces.filter(piece => !draft.items.some(item => item.marketOrnamentId === piece.id))
+  const unavailable = draft.items.filter(item => item.kind === 'finished' && (
+    !item.marketOrnamentId || (stock?.rows && !readyIds.has(item.marketOrnamentId))
+  ))
   const phase = draft.phase
   const order = draft.order
   const formUrl = order ? `${window.location.origin}/form/${order.formToken}` : ''
@@ -235,6 +365,7 @@ export function NewSalePage() {
         item.slotLocked,
         item.paintDate ?? '',
         item.paintStart ?? '',
+        item.delivery.marketDayId ?? '',
         item.delivery.pickupDate ?? '',
         item.delivery.pickupHour ?? '',
         item.delivery.mode,
@@ -267,7 +398,10 @@ export function NewSalePage() {
         if (!handoff) continue
         if (item.delivery.mode === 'market' && item.delivery.pickupHour == null) continue
         if (item.delivery.mode === 'vienna' && !item.delivery.pickupDate) continue
-        const dates = paintDatesToTry(handoff, currentDate).filter((date) => item.delivery.mode !== 'vienna' || date < handoff)
+        const handoffMarketDayId = item.delivery.mode === 'market' ? item.delivery.marketDayId : undefined
+        const dates = handoffMarketDayId
+          ? paintDatesForPickup(handoff, item.delivery.marketId, firstPaintDate, agendaDays)
+          : paintDatesToTry(handoff, firstPaintDate).filter(date => date < handoff)
         let result: CapacityResult = {
           ok: false,
           slot: null,
@@ -277,8 +411,9 @@ export function NewSalePage() {
         const candidates = await Promise.all(dates.map(date => api.agenda.checkCapacity({
           date,
           durationHours: minutesToHours(item.durationMinutes),
-          beforeHour: date === handoff && item.delivery.mode === 'market' ? item.delivery.pickupHour ?? undefined : undefined,
+          beforeHour: date === handoff && item.delivery.mode === 'market' && item.delivery.pickupHour != null ? item.delivery.pickupHour - PAINT_HANDLING_HOURS : undefined,
           extraBusy: busyOn(date, item.id),
+          handoffMarketDayId,
         })))
         if (cancelled) return
         result = candidates.find(candidate => candidate.ok && candidate.slot) ?? candidates.at(-1) ?? result
@@ -295,8 +430,8 @@ export function NewSalePage() {
         if (!result.ok) {
           let move: MoveSuggestion | null = null
           const moves = await Promise.all((customCount === 1 ? dates : []).map(date => api.agenda.findMoveSuggestion({
-            date, durationHours: minutesToHours(item.durationMinutes), handoffDate: handoff,
-            beforeHour: date === handoff && item.delivery.mode === 'market' ? item.delivery.pickupHour ?? undefined : undefined,
+            date, durationHours: minutesToHours(item.durationMinutes), handoffDate: handoff, handoffMarketDayId,
+            beforeHour: date === handoff && item.delivery.mode === 'market' && item.delivery.pickupHour != null ? item.delivery.pickupHour - PAINT_HANDLING_HOURS : undefined,
           })))
           move = moves.find(Boolean) ?? null
           if (!cancelled) setMoveSuggestions((previous) => ({ ...previous, [item.id]: move }))
@@ -319,7 +454,7 @@ export function NewSalePage() {
     return () => {
       cancelled = true
     }
-  }, [phase, suggestKey, currentDate, hasCustom, planRetry])
+  }, [phase, suggestKey, currentDate, firstPaintDate, hasCustom, planRetry, agendaDays])
 
   useEffect(() => {
     if (phase !== 'delivery' || !hasCustom) return
@@ -380,17 +515,27 @@ export function NewSalePage() {
   function patchDelivery(id: string, delivery: DraftItem['delivery']) {
     setMoveSuggestions({})
     setSuggestions({})
+    setStaleNotice('')
     setDraft((current) => {
       const different = current.differentPickups || mixed
       return {
         ...current,
         differentPickups: different,
         items: current.items.map((item) => {
-          const apply = item.id === id || !different
-          if (!apply) return item
+          const isTarget = item.id === id
+          if (!isTarget && different) {
+            if (item.kind !== 'custom') return item
+            if (!item.slotLocked || item.plannedMove) {
+              return { ...item, paintDate: undefined, paintStart: undefined, paintEnd: undefined, slotLocked: false, plannedMove: undefined }
+            }
+            return item
+          }
           const next = { ...item.delivery, ...delivery }
-          const handoffChanged = next.pickupDate !== item.delivery.pickupDate || next.pickupHour !== item.delivery.pickupHour || next.mode !== item.delivery.mode
-          const keepChosenSlot = item.slotLocked && !item.plannedMove && paintFitsHandoff(item, next)
+          const handoffChanged = next.pickupDate !== item.delivery.pickupDate || next.pickupHour !== item.delivery.pickupHour || next.mode !== item.delivery.mode || next.marketDayId !== item.delivery.marketDayId
+          const keepChosenSlot = item.slotLocked && !item.plannedMove && (
+            !next.pickupDate ||
+            (paintFitsHandoff(item, next) && !paintingAtOtherMarket(item, agendaDays, next))
+          )
           return {
             ...item,
             delivery: next,
@@ -403,20 +548,57 @@ export function NewSalePage() {
     })
   }
 
-  function addItem(kind: 'custom' | 'finished') {
+  function addItem(kind: 'custom' | 'finished' = 'custom') {
     if (!draft.items.length && !draft.order) saleKey.current = uid()
     setDraft((current) => {
       // A new custom ornament starts on the first combination still in stock (counting this draft).
-      const combo = kind === 'custom' ? firstAvailableCustom(inventory, current.items) : null
-      const next = kind === 'custom' ? makeCustom({ ...(combo ?? {}), delivery: { mode: 'market', pickupDate: todayPaintingFull(paintingDays, today) ? undefined : today?.date } }) : makeFinished()
-      const items = [...current.items.map((item) => item.plannedMove ? { ...item, plannedMove: undefined, slotLocked: false, paintDate: undefined, paintStart: undefined, paintEnd: undefined } : item), fillDayRefs(next, days, markets, seasonEnd)]
+      const combo = kind === 'finished' ? null : firstAvailableCustom(inventory, current.items)
+      const todayIsMarketDay = Boolean(today && marketDays.some(day => day.id === today.id))
+      const todayFull = kind === 'custom' && todayIsMarketDay && Boolean(todayPaintingFull(paintingDays, today))
+      const todayNoHours = Boolean(todayIsMarketDay && today && validMarketPickupHours(today, [], currentDate, nowHour).length === 0)
+      const next = kind === 'finished'
+        ? makeFinished()
+        : makeCustom({
+            ...(combo ?? {}),
+            delivery: todayFull
+              ? { mode: 'market', marketId: today?.marketId }
+              : { mode: 'market', pickupDate: today?.date, marketDayId: today?.id, marketId: today?.marketId },
+          })
+      const resolved = kind === 'custom' && (gabyAway || todayNoHours)
+        ? { ...next, delivery: marketPickup(nextMarketPickup(marketDays, firstPaintDate, agendaDays, currentDate, nowHour, today?.marketId, todayNoHours ? addUtcDays(currentDate, 1) : currentDate)) }
+        : kind === 'custom' && todayFull ? next : fillDayRefs(next, days, markets, seasonEnd, activeMarket, currentDate)
+      const items = [...current.items.map((item) => item.plannedMove ? { ...item, plannedMove: undefined, slotLocked: false, paintDate: undefined, paintStart: undefined, paintEnd: undefined } : item), resolved]
       const mixedNow = items.some((i) => i.kind === 'custom') && items.some((i) => i.kind === 'finished')
       return { ...current, items, differentPickups: current.differentPickups || mixedNow }
     })
   }
 
+  function addFinishedItem() {
+    setError('')
+    setStockRetry(value => value + 1)
+    addItem('finished')
+  }
+
+  function selectPiece(itemId: string, pieceId: string) {
+    if (!availablePieces.some(piece => piece.id === pieceId)) return
+    setDraft((current) => {
+      if (current.items.some((item) => item.id !== itemId && item.marketOrnamentId === pieceId)) return current
+      return { ...current, items: current.items.map((item) => (item.id === itemId ? { ...item, marketOrnamentId: pieceId } : item)) }
+    })
+    setError('')
+  }
+
+  function changePiece(itemId: string) {
+    setError('')
+    setStockRetry(value => value + 1)
+    patchItem(itemId, { marketOrnamentId: undefined })
+  }
+
   function removeItem(id: string) {
-    setDraft((current) => ({ ...current, items: current.items.filter((item) => item.id !== id) }))
+    setDraft((current) => {
+      const items = current.items.filter((item) => item.id !== id)
+      return { ...current, items, differentPickups: items.length > 1 ? current.differentPickups : false }
+    })
   }
 
   function setDuration(item: DraftItem, preset: DurationPreset, customMinutes?: number) {
@@ -451,7 +633,9 @@ export function NewSalePage() {
   function placeOnBoard(item: DraftItem) {
     writeStoredDraft({ ...draft, idempotencyKey: saleKey.current, placingItemId: item.id, phase: 'delivery' })
     const handoff = item.delivery.pickupDate
-    const date = item.paintDate || (handoff ? paintDatesToTry(handoff, currentDate)[0] : today?.date)
+    const date = item.paintDate || (handoff && item.delivery.mode === 'market'
+      ? paintDatesForPickup(handoff, item.delivery.marketId, firstPaintDate, agendaDays)[0]
+      : firstPaintDate)
     const query = new URLSearchParams({ place: item.id })
     if (date) query.set('date', date)
     navigate(`/staff/agenda?${query.toString()}`)
@@ -496,10 +680,18 @@ export function NewSalePage() {
     setPayState('paid')
     setPaidNote('')
     setPaidAmount(null)
+    setMixedHandedNote('')
     setDoneQrOpen(false)
+    setFinishedHandoff(false)
+    setDiscardOpen(false)
+    setLeaveOpen(false)
+    setChangeDate(null)
+    setSuggestions({})
+    setMoveSuggestions({})
     setDepositAmount('')
     setCopied(false)
     setError('')
+    setStaleNotice('')
     setDraft({ items: [], differentPickups: false, phase: 'items' })
     navigate('/staff/sales/new', { replace: true })
   }
@@ -507,14 +699,37 @@ export function NewSalePage() {
   async function createOrder(): Promise<NonNullable<SaleDraft['order']>> {
     if (draft.order) return draft.order
     if (!prices) throw new Error('Load server prices before creating a sale.')
+    if (draft.items.some(item => item.kind === 'finished' && !item.marketOrnamentId)) {
+      setPhase('items')
+      throw new Error('Choose a numbered piece for each finished ornament.')
+    }
+    const duplicatePiece = duplicateMarketPiece(draft.items)
+    if (duplicatePiece) {
+      setPhase('items')
+      throw new Error(`${marketOrnamentLabel(duplicatePiece)} is already in this sale. Remove the duplicate or choose another piece.`)
+    }
     writeStoredDraft({ ...draft, idempotencyKey: saleKey.current })
+    const soldOnMarketDayId = activeMarketDay?.id ?? (stalls.length <= 1 ? today?.id : undefined)
     const created = await api.orders.createSale({
+      soldOnMarketDayId,
       items: toCreateItems(draft.items, days, today),
       plannedMove: draft.items.find((item) => item.plannedMove)?.plannedMove,
     }, saleKey.current)
     const ref = { id: created.id, code: created.code, formToken: created.formToken, total: created.total }
     setDraft((current) => ({ ...current, order: ref }))
     return ref
+  }
+
+  function showCreateError(err: unknown, fallback: string) {
+    const code = (err as { code?: string } | null)?.code
+    if (code === 'MARKET_STOCK_SOLD' || code === 'MARKET_STOCK_NOT_READY') {
+      setFinishedHandoff(false)
+      setPhase('items')
+      setStockRetry(value => value + 1)
+      setError(apiError(err, 'en', fallback).text)
+      return
+    }
+    setError(saleErrorMessage(err, fallback))
   }
 
   async function finishFinishedSale(state: PaymentState, handOver = true) {
@@ -543,7 +758,7 @@ export function NewSalePage() {
       setFinishedHandoff(false)
       setDraft((current) => ({ ...current, order: created, phase: 'done' }))
     } catch (err) {
-      setError(saleErrorMessage(err, 'Could not record sale'))
+      showCreateError(err, 'Could not record sale')
     } finally {
       submitLock.current = false
       setBusy(false)
@@ -556,11 +771,28 @@ export function NewSalePage() {
       await finishFinishedSale(payState)
       return
     }
+    const wrongMarket = draft.items.map(item => paintingAtOtherMarket(item, agendaDays)).find(Boolean)
+    if (wrongMarket) {
+      setError(`Gaby is painting at ${wrongMarket.name} that day. Pick another day.`)
+      return
+    }
     const missing = draft.items.filter(
       (item) => item.kind === 'custom' && (item.paintStart == null || item.paintEnd == null || !item.paintDate),
     )
     if (missing.length) {
       setError('Assign a paint slot — use the suggestion or place on the board.')
+      return
+    }
+    const invalidHandoff = draft.items.find(item =>
+      isPickupInPast(item.delivery, currentDate, nowHour) ||
+      (item.kind === 'custom' && (
+        (item.delivery.mode === 'market' && (item.delivery.pickupHour == null || !item.delivery.marketDayId)) ||
+        (item.delivery.mode === 'vienna' && !item.delivery.pickupDate) ||
+        !paintFitsHandoff(item, item.delivery)
+      )),
+    )
+    if (invalidHandoff) {
+      setError('Choose a valid pickup or delivery date and hour after painting finishes.')
       return
     }
     if (submitLock.current) return
@@ -571,7 +803,7 @@ export function NewSalePage() {
       const created = await createOrder()
       setDraft((current) => ({ ...current, order: created, phase: 'qr' }))
     } catch (err) {
-      setError(saleErrorMessage(err, 'Could not create sale'))
+      showCreateError(err, 'Could not create sale')
     } finally {
       submitLock.current = false
       setBusy(false)
@@ -646,6 +878,18 @@ export function NewSalePage() {
     setError('')
     try {
       if (state !== 'unpaid') await api.payments.setPaymentState(order.id, state, payMethod, amount)
+      const nowPieces = draft.items.filter(item => item.kind === 'finished' && item.delivery.mode === 'now' && item.marketOrnamentId)
+      if (state === 'paid' && hasCustom && nowPieces.length) {
+        const bundle = await api.orders.getOrderBundle(order.id)
+        const nowPieceIds = new Set(nowPieces.map(item => item.marketOrnamentId!))
+        const handOverIds = bundle.items
+          .filter(row => row.kind === 'finished' && row.marketOrnamentId && nowPieceIds.has(row.marketOrnamentId) && !row.handedOver)
+          .map(row => row.id)
+        if (handOverIds.length) {
+          await api.orders.setHandedOver(order.id, true, handOverIds)
+          setMixedHandedNote('Ready-made ornaments handed over now · custom ornaments wait.')
+        }
+      }
       setPaidNote(state === 'unpaid' ? 'Not paid yet' : `${formatEur(amount, 'en')} received · ${payMethod === 'cash' ? 'cash' : 'card'}`)
       setPaidAmount(state === 'unpaid' ? 0 : amount)
       setPhase('done')
@@ -666,19 +910,10 @@ export function NewSalePage() {
     done: 'Sale recorded',
   }
 
-  // Plain step names: "1 Item" read like a quantity.
-  const stepLabels = !draft.items.length
-    ? ['Items']
-    : onlyFinished
-      ? ['Items', 'Hand over & pay']
-      : ['Items', allVienna ? 'Delivery' : 'Pickup', 'QR & payment']
-
-  function stepOn(index: number) {
-    if (!draft.items.length || phase === 'items') return index === 0
-    if (onlyFinished) return index === 1
-    if (phase === 'delivery') return index === 1
-    return index === 2
-  }
+  const stepLabels = onlyFinished
+    ? ['Items', 'Hand over & pay']
+    : ['Items', allVienna ? 'Delivery' : 'Pickup', 'QR & pay']
+  const currentStep = phase === 'done' ? stepLabels.length : phase === 'items' ? 0 : phase === 'delivery' ? 1 : 2
 
   const sharedItem = draft.items[0]
   const deliveryItems = draft.differentPickups || mixed ? draft.items : sharedItem ? [sharedItem] : []
@@ -686,23 +921,25 @@ export function NewSalePage() {
   return (
     <section className={styles.page}>
       <div className={styles.head}>
-        <div>
+        <div className={styles.headingRow}>
+          {phase !== 'done' && (order || draft.items.length > 0) ? (
+            <Button tone="staff" variant="secondary" disabled={busy} onClick={() => { if (order) setLeaveOpen(true); else setDiscardOpen(true) }}>
+              <span aria-hidden="true">‹</span> Back
+            </Button>
+          ) : null}
           <h1 ref={pageHeading} tabIndex={-1} className={styles.focusHeading}>New sale</h1>
-          <p className={styles.steps}>
-            {stepLabels.map((label, index) => (
-              <span key={label} data-on={stepOn(index) ? 'true' : 'false'} aria-current={stepOn(index) && phase !== 'done' ? 'step' : undefined}>
-                {label}
-              </span>
-            ))}
-          </p>
         </div>
-        {phase !== 'done' && (order || draft.items.length > 0) ? (
-          <Button tone="staff" variant="ghost" onClick={() => { if (order) setLeaveOpen(true); else startOver() }}>
-            {order ? 'New sale' : 'Start over'}
-          </Button>
-        ) : null}
+        {draft.items.length > 0 && <ProgressSteps labels={stepLabels} current={currentStep} label="Sale progress" tone="staff" />}
       </div>
 
+      {discardOpen && <StaffDialog title="Discard this sale?" onClose={() => setDiscardOpen(false)}>
+        <p>The ornaments you added are removed.</p>
+        <Button tone="staff" variant="danger" onClick={() => {
+          setDiscardOpen(false)
+          startOver()
+          requestAnimationFrame(() => pageHeading.current?.focus())
+        }}>Discard</Button>
+      </StaffDialog>}
       {leaveOpen && order && <StaffDialog title="Leave this sale?" onClose={() => setLeaveOpen(false)}>
         <p>{order.code} stays saved and unpaid, with its paint time reserved. Open it later from Search to show the QR or take payment.</p>
         <Button tone="staff" variant="secondary" onClick={() => { clearStoredDraft(); navigate(`/staff/orders/${order.id}`, { state: { from: '/staff/sales/new' } }) }}>Open order</Button>
@@ -731,9 +968,10 @@ export function NewSalePage() {
         <Button tone="staff" variant="ghost" disabled={busy} onClick={() => void finishFinishedSale(payState)}>Hand over with balance due</Button>
         {error && <p role="alert">{error}</p>}
       </StaffDialog>}
-      <div className={styles.workspace}>
+      <div className={styles.workspace} data-empty={!draft.items.length || undefined}>
         <div className={styles.main}>
           {phase !== 'items' && <h2 ref={stepHeading} tabIndex={-1} className={styles.focusHeading}>{title[phase]}</h2>}
+          {staleNotice ? <p className={styles.hint} role="status">{staleNotice}</p> : null}
           {configError ? <div role="alert"><p>Could not load prices, stock and calendar, so sales are paused. {configError}</p><Button tone="staff" variant="secondary" onClick={() => setConfigRetry(n => n + 1)}>Try again</Button></div> : null}
           {error ? (
             <p className={styles.err} role="alert">
@@ -747,8 +985,17 @@ export function NewSalePage() {
               items={draft.items}
               prices={prices}
               inventory={inventory}
+              marketPieces={stock?.rows ?? undefined}
+              availablePieces={availablePieces}
+              stockLoading={!stock}
+              stockError={stock?.error ?? ''}
               stockReady={Boolean(prices)}
-              onAdd={addItem}
+              unavailable={unavailable}
+              onRetryStock={() => setStockRetry(value => value + 1)}
+              onAddCustom={() => addItem()}
+              onAddFinished={addFinishedItem}
+              onSelectPiece={selectPiece}
+              onChangePiece={changePiece}
               onRemove={removeItem}
               onToggleName={toggleName}
               onColor={setColor}
@@ -757,8 +1004,24 @@ export function NewSalePage() {
               onContinue={() => {
                 if (!draft.items.length) return
                 if (!prices || configError) { setError('Prices and stock are still loading. Wait a moment or tap Try again.'); return }
-                const shortage = draft.items.find(item => { const quantity = inventory.find(row => row.kind === item.kind && (item.kind === 'finished' || (row.color === item.color && row.finish === item.finish)))?.quantity ?? 0; const count = draft.items.filter(other => other.kind === item.kind && (item.kind === 'finished' || (other.color === item.color && other.finish === item.finish))).length; return count > quantity })
-                if (shortage) { setError(`Out of stock: ${shortage.kind === 'finished' ? 'finished ornaments' : `${shortage.finish} ${shortage.color} ornaments`}. Reduce the quantity or choose another combination.`); return }
+                if (unavailable.length) {
+                  const id = unavailable[0].marketOrnamentId
+                  setError(id ? `${marketOrnamentLabel(id)} is unavailable. Change the piece or remove it.` : 'Choose a numbered piece for each finished ornament.')
+                  return
+                }
+                const duplicatePiece = duplicateMarketPiece(draft.items)
+                if (duplicatePiece) {
+                  setError(`${marketOrnamentLabel(duplicatePiece)} is already in this sale. Remove the duplicate or choose another piece.`)
+                  return
+                }
+                if (draft.items.some(item => item.kind === 'finished') && !stock?.rows) {
+                  setError(stock?.error ? 'Could not check ready ornaments. Tap Try again in the piece list.' : 'Checking ready ornaments. Try again in a moment.')
+                  return
+                }
+                const shortage = draft.items.find(item => item.kind === 'custom' &&
+                  draft.items.filter(other => other.kind === 'custom' && other.color === item.color && other.finish === item.finish).length >
+                    remainingStock(inventory, [], 'custom', item.color, item.finish))
+                if (shortage) { setError(`Out of stock: ${shortage.finish} ${shortage.color} ornaments. Reduce the quantity or choose another combination.`); return }
                 setPhase('delivery')
               }}
             />
@@ -771,7 +1034,21 @@ export function NewSalePage() {
                   <input
                     type="checkbox"
                     checked={draft.differentPickups || mixed}
-                    onChange={(e) => setDraft((current) => ({ ...current, differentPickups: e.target.checked || mixed }))}
+                    onChange={(e) => {
+                      const nextDifferent = e.target.checked || mixed
+                      setSuggestions({})
+                      setMoveSuggestions({})
+                      setDraft((current) => {
+                        if (nextDifferent || !current.items.length) return { ...current, differentPickups: nextDifferent }
+                        return {
+                          ...current,
+                          differentPickups: false,
+                          items: syncSharedDelivery(current.items, {
+                            currentDate, nowHour, firstPaintDate, days, markets, agendaDays, activeMarket, seasonEnd,
+                          }),
+                        }
+                      })
+                    }}
                   />
                   Different pickup times
                 </label>
@@ -785,17 +1062,22 @@ export function NewSalePage() {
                     key={item.id}
                     item={item}
                     title={shared && draft.items.length > 1 ? 'Whole order' : itemLabel(item, draft.items.findIndex((row) => row.id === item.id))}
+                    shared={shared && draft.items.length > 1}
+                    marketPieces={stock?.rows ?? undefined}
                     allItems={draft.items}
                     paintItems={paintItems}
                     markets={markets}
                     marketDays={marketDays}
                     allDays={days}
+                    activeMarket={activeMarket}
                     seasonEnd={seasonEnd}
                     agendaDays={agendaDays}
                     paintingDays={paintingDays}
-                    nowHour={clock.hour}
+                    nowHour={nowHour}
                     currentDate={currentDate}
+                    firstPaintDate={firstPaintDate}
                     today={today}
+                    gabyAway={gabyAway}
                     suggestions={suggestions}
                     moveSuggestion={moveSuggestions[item.id]}
                     slotTaken={Boolean(error && /hour is taken|overlap/i.test(error))}
@@ -821,7 +1103,7 @@ export function NewSalePage() {
                 <Button
                   tone="staff"
                   size="lg"
-                  disabled={busy || !prices || Boolean(configError) || !draft.items.length || draft.items.some(item => item.kind === 'custom' && item.paintStart == null) || (onlyFinished && payState !== 'unpaid' && !payMethod) || (onlyFinished && payState === 'deposit' && !validDeposit(depositAmount, prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0) : 0))}
+                  disabled={busy || !prices || Boolean(configError) || !draft.items.length || draft.items.some(item => item.kind === 'custom' && (item.paintStart == null || (item.delivery.mode === 'market' && (!item.delivery.marketDayId || item.delivery.pickupHour == null)) || (item.delivery.mode === 'vienna' && !item.delivery.pickupDate) || !paintFitsHandoff(item, item.delivery) || Boolean(paintingAtOtherMarket(item, agendaDays)))) || draft.items.some(item => isPickupInPast(item.delivery, currentDate, nowHour)) || (onlyFinished && payState !== 'unpaid' && !payMethod) || (onlyFinished && payState === 'deposit' && !validDeposit(depositAmount, prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0) : 0))}
                   onClick={() => void continueFromDelivery()}
                 >
                   {busy ? 'Saving…' : onlyFinished ? 'Done' : draft.items.some((item) => item.plannedMove) ? 'Save change & create order' : 'Create order & show QR'}
@@ -882,6 +1164,7 @@ export function NewSalePage() {
                     <div>
                       <strong>{order.code} · {formatEur(order.total, 'en')}</strong>
                       {paidNote ? <p>{paidNote}</p> : null}
+                      {mixedHandedNote ? <p>{mixedHandedNote}</p> : null}
                       {paidAmount != null && paidAmount > 0 && balanceDue != null && balanceDue > 0 ? <p className={styles.balance}>Balance due · {formatEur(balanceDue, 'en')}</p> : null}
                     </div>
                   </div>
@@ -907,7 +1190,7 @@ export function NewSalePage() {
             </div>
           ) : null}
         </div>
-        <OrderSummaryPanel prices={prices} items={draft.items} markets={markets} days={days} orderCode={order?.code} showHandoff={phase !== 'items'} />
+        {draft.items.length > 0 && <OrderSummaryPanel prices={prices} items={draft.items} markets={markets} days={days} marketPieces={stock?.rows ?? undefined} orderCode={order?.code} showHandoff={phase !== 'items'} />}
       </div>
     </section>
   )
@@ -959,12 +1242,38 @@ function CustomMinutesField({
   )
 }
 
+function SaleKindIcon({ kind }: { kind: DraftItem['kind'] }) {
+  return (
+    <svg className={styles.saleKindIcon} data-kind={kind} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d="M10 9V6h6v3m-3-3V3" />
+      <circle cx="13" cy="18" r="9" />
+      {kind === 'custom' ? (
+        <path fill="var(--sale-icon-surface)" d="m19 17 8-9a1.4 1.4 0 0 1 2 2l-7 10m-3-3 3 3c0 4-4 7-9 7 2-2 1-5 3-8a4 4 0 0 1 3-2Z" />
+      ) : (
+        <g>
+          <path fill="var(--sale-icon-surface)" d="M19 14h6l5 5-6 6-5-5Z" />
+          <circle cx="22" cy="17" r="1" fill="currentColor" stroke="none" />
+        </g>
+      )}
+    </svg>
+  )
+}
+
 function ItemsStep({
   items,
   prices,
   inventory,
+  marketPieces,
+  availablePieces,
+  stockLoading,
+  stockError,
   stockReady,
-  onAdd,
+  unavailable,
+  onRetryStock,
+  onAddCustom,
+  onAddFinished,
+  onSelectPiece,
+  onChangePiece,
   onRemove,
   onToggleName,
   onColor,
@@ -974,9 +1283,18 @@ function ItemsStep({
 }: {
   prices: Pricing | null
   inventory: InventoryItem[]
+  marketPieces?: MarketOrnament[]
+  availablePieces: MarketOrnament[]
+  stockLoading: boolean
+  stockError: string
   stockReady: boolean
   items: DraftItem[]
-  onAdd: (kind: 'custom' | 'finished') => void
+  unavailable: DraftItem[]
+  onRetryStock: () => void
+  onAddCustom: () => void
+  onAddFinished: () => void
+  onSelectPiece: (itemId: string, pieceId: string) => void
+  onChangePiece: (itemId: string) => void
   onRemove: (id: string) => void
   onToggleName: (item: DraftItem) => void
   onColor: (item: DraftItem, color: OrnamentColor) => void
@@ -984,75 +1302,128 @@ function ItemsStep({
   onDuration: (item: DraftItem, preset: DurationPreset, customMinutes?: number) => void
   onContinue: () => void
 }) {
-  const finishedLeft = remainingStock(inventory, items, 'finished')
-  const finishedHint = stockReady ? `Finished stock: ${stockLabel(finishedLeft)}` : 'Checking stock…'
   const customSoldOut = stockReady && !firstAvailableCustom(inventory, items)
   return (
     <>
       {items.length === 0 ? (
-        // Empty sale: the two starting choices sit right under the question, with no €0.00 total.
         <div className={styles.startChoices}>
-          <Button tone="staff" variant="choice" size="lg" onClick={() => onAdd('custom')}>
+          <Button tone="staff" variant="choice" size="lg" onClick={onAddCustom}>
+            <SaleKindIcon kind="custom" />
             <span><strong>+ Add custom ornament</strong><small>{customSoldOut ? 'Sold out · update Stock first' : "Painted from the customer's photos"}</small></span>
           </Button>
-          <Button tone="staff" variant="choice" size="lg" disabled={stockReady && finishedLeft === 0} onClick={() => onAdd('finished')}>
-            <span><strong>+ Add finished product</strong><small>{finishedHint}</small></span>
+          <Button tone="staff" variant="choice" size="lg" onClick={onAddFinished}>
+            <SaleKindIcon kind="finished" />
+            <span><strong>+ Add finished product</strong><small>Choose a numbered ornament</small></span>
           </Button>
         </div>
       ) : (
         <>
-          {items.map((item, index) => (
-            <article key={item.id} className={styles.card}>
-              <div className={styles.cardHead}>
-                <h3>
-                  <StaffText>{`${itemLabel(item, index)} · ${prices ? formatEur(itemCost(item.kind, item.withName, prices), 'en') : 'Price unavailable'}`}</StaffText>
-                </h3>
-                <Button tone="staff" variant="ghost" onClick={() => onRemove(item.id)}>
-                  Remove
-                </Button>
-              </div>
-              {item.slotLocked && slotLabel(item) ? (
-                <p className={styles.lead}>Paint {slotLabel(item)} (from the board)</p>
-              ) : null}
-              {item.kind === 'custom' ? (() => {
-                // Hints show what is left for this ornament after the other ornaments in the draft.
-                const comboLeft = stockReady ? remainingStock(inventory, items, 'custom', item.color, item.finish, item.id) : 1
-                const soldOut = comboLeft === 0 && !firstAvailableCustom(inventory, items, item.id)
-                return <>
-                  <label className={styles.check}>
-                    <input type="checkbox" aria-describedby={`name-hint-${item.id}`} checked={item.withName} onChange={() => onToggleName(item)} />
-                    {`Name on the back · +${prices ? formatEur(prices.nameExtra, 'en') : 'price unavailable'}`}
-                  </label>
-                  <p className={styles.hint} id={`name-hint-${item.id}`}>The customer types the name in the form.</p>
-                  {soldOut ? <p className={styles.soldOut} role="status">Sold out: no unpainted bases left. Update Stock or remove this ornament.</p> : null}
-                  <SegmentedControl
-                    legend="Colour"
-                    name={`colour-${item.id}`}
-                    value={soldOut ? null : item.color}
-                    onChange={(color) => onColor(item, color)}
-                    options={(['red', 'green', 'beige'] as const).map(color => { const left = remainingColor(inventory, items, color, item.id); return { value: color, color, label: color[0].toUpperCase() + color.slice(1), hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })}
+          {items.map((item, index) => {
+            const priceText = prices ? formatEur(itemCost(item.kind, item.withName, prices), 'en') : 'Price unavailable'
+            if (item.kind === 'finished' && item.marketOrnamentId) {
+              const pieceId = item.marketOrnamentId
+              const piece = marketPieces?.find(row => row.id === pieceId)
+              const parts = marketOrnamentParts(pieceId)
+              const shortSpec = marketPieceShortSpec(pieceId)
+              return (
+                <article key={item.id} className={styles.card}>
+                  <div className={styles.finishedRow}>
+                    <MarketPiecePhoto
+                      id={pieceId}
+                      piece={piece}
+                      probeUploaded={!marketPieces}
+                      className={styles.salePhoto}
+                      alt={`Ornament ${pieceId}`}
+                    />
+                    <div className={styles.finishedBody}>
+                      <div className={styles.cardHead}>
+                        <h3 className={styles.pieceHeading} aria-label={`${marketOrnamentLabel(pieceId)} · ${priceText}`}>
+                          <span className={styles.pieceCode}>{pieceId}</span>
+                          <span className={styles.piecePrice}>{priceText}</span>
+                        </h3>
+                        <Button tone="staff" variant="ghost" onClick={() => onRemove(item.id)}>
+                          Remove
+                        </Button>
+                      </div>
+                      {shortSpec ? (
+                        <p className={styles.pieceSpec}>
+                          {parts ? <span className={styles.swatchDot} style={{ background: parts.color.swatch }} aria-hidden="true" /> : null}
+                          <StaffText>{shortSpec}</StaffText>
+                        </p>
+                      ) : null}
+                      {unavailable.includes(item) && <p className={styles.soldOut}>Piece no longer available.</p>}
+                      <div className={styles.pieceActions}>
+                        <Button tone="staff" variant="secondary" onClick={() => onChangePiece(item.id)}>
+                          Change piece
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              )
+            }
+            return (
+              <article key={item.id} className={styles.card}>
+                <div className={styles.cardHead}>
+                  <h3>
+                    <StaffText>{`${itemLabel(item, index)} · ${priceText}`}</StaffText>
+                  </h3>
+                  <Button tone="staff" variant="ghost" onClick={() => onRemove(item.id)}>
+                    Remove
+                  </Button>
+                </div>
+                {item.slotLocked && slotLabel(item) ? (
+                  <p className={styles.lead}>Paint {slotLabel(item)} (from the board)</p>
+                ) : null}
+                {item.kind === 'custom' ? (() => {
+                  // Hints show what is left for this ornament after the other ornaments in the draft.
+                  const comboLeft = stockReady ? remainingStock(inventory, items, 'custom', item.color, item.finish, item.id) : 1
+                  const soldOut = comboLeft === 0 && !firstAvailableCustom(inventory, items, item.id)
+                  return <>
+                    <label className={styles.check}>
+                      <input type="checkbox" aria-describedby={`name-hint-${item.id}`} checked={item.withName} onChange={() => onToggleName(item)} />
+                      {`Name on the back · +${prices ? formatEur(prices.nameExtra, 'en') : 'price unavailable'}`}
+                    </label>
+                    <p className={styles.hint} id={`name-hint-${item.id}`}>The customer types the name in the form.</p>
+                    {soldOut ? <p className={styles.soldOut} role="status">Sold out: no unpainted bases left. Update Stock or remove this ornament.</p> : null}
+                    <SegmentedControl
+                      legend="Colour"
+                      name={`colour-${item.id}`}
+                      value={soldOut ? null : item.color}
+                      onChange={(color) => onColor(item, color)}
+                      options={(['red', 'green', 'beige'] as const).map(color => { const left = remainingColor(inventory, items, color, item.id); return { value: color, color, label: color[0].toUpperCase() + color.slice(1), hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })}
+                    />
+                    <SegmentedControl legend="Finish" help={<HelpTip label="Explain finishes">Shiny reflects light. Matte has no glossy reflection. Stock refers to unpainted bases.</HelpTip>} name={`finish-${item.id}`} value={soldOut ? null : item.finish ?? 'shiny'} onChange={finish => onFinish(item, finish)} options={(['shiny', 'matte'] as const).map(finish => { const left = remainingStock(inventory, items, 'custom', item.color, finish, item.id); return { value: finish, label: finish === 'shiny' ? 'Shiny' : 'Matte', hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })} />
+                    <SegmentedControl
+                      legend="Paint time"
+                      name={`duration-${item.id}`}
+                      value={item.durationPreset}
+                      onChange={(preset) => onDuration(item, preset)}
+                      options={DURATION_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+                    />
+                    {item.durationPreset === 'custom' ? <CustomMinutesField item={item} onDuration={onDuration} /> : null}
+                  </>
+                })() : (
+                  <MarketOrnamentPicker
+                    pieces={availablePieces}
+                    loading={stockLoading}
+                    error={stockError}
+                    onRetry={onRetryStock}
+                    onPick={(pieceId) => onSelectPiece(item.id, pieceId)}
                   />
-                  <SegmentedControl legend="Finish" help={<HelpTip label="Explain finishes">Shiny reflects light. Matte has no glossy reflection. Stock refers to unpainted bases.</HelpTip>} name={`finish-${item.id}`} value={soldOut ? null : item.finish ?? 'shiny'} onChange={finish => onFinish(item, finish)} options={(['shiny', 'matte'] as const).map(finish => { const left = remainingStock(inventory, items, 'custom', item.color, finish, item.id); return { value: finish, label: finish === 'shiny' ? 'Shiny' : 'Matte', hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })} />
-                  <SegmentedControl
-                    legend="Paint time"
-                    name={`duration-${item.id}`}
-                    value={item.durationPreset}
-                    onChange={(preset) => onDuration(item, preset)}
-                    options={DURATION_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-                  />
-                  {item.durationPreset === 'custom' ? <CustomMinutesField item={item} onDuration={onDuration} /> : null}
-                </>
-              })() : null}
-            </article>
-          ))}
+                )}
+              </article>
+            )
+          })}
           <div className={styles.addRow}>
-            <Button tone="staff" variant="secondary" onClick={() => onAdd('custom')}>
+            <Button tone="staff" variant="secondary" size="lg" onClick={onAddCustom}>
+              <SaleKindIcon kind="custom" />
               + Add custom
             </Button>
-            <Button tone="staff" variant="secondary" disabled={stockReady && finishedLeft === 0} onClick={() => onAdd('finished')}>
+            <Button tone="staff" variant="secondary" size="lg" onClick={onAddFinished}>
+              <SaleKindIcon kind="finished" />
               + Add finished
             </Button>
-            <span className={styles.hint}>{finishedHint}</span>
           </div>
           <StaffActions className={styles.actions} total={prices ? draftTotal(items, prices) : null}>
             <Button tone="staff" size="lg" onClick={onContinue}>
@@ -1068,17 +1439,22 @@ function ItemsStep({
 function DeliveryCard({
   item,
   title,
+  shared = false,
+  marketPieces,
   allItems,
   paintItems,
   markets,
   marketDays,
   allDays,
+  activeMarket,
   seasonEnd,
   agendaDays,
   paintingDays,
   nowHour,
   currentDate,
+  firstPaintDate,
   today,
+  gabyAway,
   suggestions,
   moveSuggestion,
   slotTaken,
@@ -1090,17 +1466,22 @@ function DeliveryCard({
 }: {
   item: DraftItem
   title: string
+  shared?: boolean
+  marketPieces?: MarketOrnament[]
   allItems: DraftItem[]
   paintItems: DraftItem[]
   markets: Market[]
   marketDays: MarketDay[]
   allDays: MarketDay[]
+  activeMarket: Market | null
   seasonEnd: string
   agendaDays: AgendaDay[]
   paintingDays: PaintingDay[]
   nowHour: number
   currentDate: string
+  firstPaintDate: string
   today?: MarketDay
+  gabyAway?: Market
   suggestions: Record<string, CapacityResult>
   moveSuggestion?: MoveSuggestion | null
   slotTaken?: boolean
@@ -1115,33 +1496,51 @@ function DeliveryCard({
   const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [viennaPickerOpen, setViennaPickerOpen] = useState(false)
   const todayIsMarket = Boolean(today && marketDays.some(day => day.id === today.id))
-  const todayFull = item.kind === 'custom' && todayIsMarket ? todayPaintingFull(paintingDays, today) : null
-  const needsOtherDay = Boolean(todayFull && item.delivery.mode === 'market' && !item.delivery.pickupDate)
+  const todayFull = showPaint && todayIsMarket ? todayPaintingFull(paintingDays, today) : null
+  const away = showPaint ? gabyAway : undefined
+  const lockedDate = latestLockedPaintDate(paintItems)
+  const anyLockedNotToday = paintItems.some(row => row.slotLocked && row.paintDate && row.paintDate !== currentDate)
+  const allPaintLocked = showPaint && paintItems.every(row => row.slotLocked)
+  const todayValidHours = today ? validMarketPickupHours(today, paintItems, currentDate, nowHour) : []
+  const todayCanPickup = Boolean(todayIsMarket && !away && !anyLockedNotToday && todayValidHours.length > 0)
+  const todayBlockedFull = Boolean(todayFull && !allPaintLocked)
+  const needsOtherDay = Boolean((todayBlockedFull || away) && item.delivery.mode === 'market' && !item.delivery.pickupDate)
+  const unavailablePickup = showPaint && item.delivery.mode === 'market' && item.delivery.pickupDate
+    && !paintDatesForPickup(item.delivery.pickupDate, item.delivery.marketId, firstPaintDate, agendaDays).length
+  useEffect(() => {
+    if (unavailablePickup) onDelivery(marketPickup(nextMarketPickup(marketDays, firstPaintDate, agendaDays, currentDate, nowHour, today?.marketId)))
+  }, [unavailablePickup, firstPaintDate, currentDate, nowHour, today?.marketId]) // eslint-disable-line react-hooks/exhaustive-deps
   // When today cannot take another painting, go straight to the market-day choice instead of a dead end.
   useEffect(() => { if (needsOtherDay) setDatePickerOpen(true) }, [needsOtherDay])
   // Capacity can arrive after the draft picked today: release that unplannable choice once (a board placement stays).
-  const staleToday = Boolean(todayFull && item.delivery.mode === 'market' && item.delivery.pickupDate === today?.date && !item.slotLocked)
+  const staleToday = Boolean(!away && todayBlockedFull && item.delivery.mode === 'market' && item.delivery.pickupDate === today?.date && !item.slotLocked)
   useEffect(() => {
-    if (staleToday) onDelivery({ ...item.delivery, pickupDate: undefined, marketDayId: undefined, pickupHour: null })
+    if (staleToday) onDelivery({ ...item.delivery, pickupDate: undefined, marketDayId: undefined, pickupHour: null, manualDay: false })
   }, [staleToday]) // eslint-disable-line react-hooks/exhaustive-deps
+  const isThisToday = Boolean(
+    today && (item.delivery.marketDayId ? item.delivery.marketDayId === today.id : item.delivery.pickupDate === today.date),
+  )
   const pickupWhen: 'today' | 'another_day' | 'vienna' | 'now' =
     item.kind === 'finished' && item.delivery.mode === 'now'
       ? 'now'
       : item.delivery.mode === 'vienna'
         ? 'vienna'
-        : item.delivery.pickupDate && today && item.delivery.pickupDate !== today.date
+        : !todayCanPickup
           ? 'another_day'
-          : todayIsMarket && (!todayFull || item.delivery.pickupDate === today?.date)
-            ? 'today'
-            : 'another_day'
+          : (item.delivery.marketDayId || item.delivery.pickupDate) && !isThisToday
+            ? 'another_day'
+            : !todayBlockedFull || isThisToday
+              ? 'today'
+              : 'another_day'
 
   const pickupDay =
-    marketDays.find((d) => d.id === item.delivery.marketDayId) ??
-    marketDays.find((d) => d.date === item.delivery.pickupDate) ??
+    (item.delivery.marketDayId ? marketDays.find((d) => d.id === item.delivery.marketDayId) : undefined) ??
+    (today && item.delivery.pickupDate === today.date && todayCanPickup ? today : undefined) ??
+    (item.delivery.pickupDate ? marketDays.find((d) => d.date === item.delivery.pickupDate) : undefined) ??
     (pickupWhen === 'today' ? today : undefined)
 
   const hours = pickupDay
-    ? pickupHourOptions(pickupDay.openHour, pickupDay.closeHour, pickupDay.isToday ? nowHour : undefined)
+    ? validMarketPickupHours(pickupDay, paintItems, currentDate, nowHour)
     : []
   // Ornaments the planner will place for this pickup; board-chosen ones count as busy time.
   const previewItems = paintItems.filter((row) => !row.slotLocked)
@@ -1150,19 +1549,36 @@ function DeliveryCard({
     : [])
   // Agenda refreshes (another device booking or freeing time) re-run the preview.
   const agendaKey = agendaDays.map((day) => `${day.marketDay.date}:${day.slots.map((slot) => `${slot.block.id}@${slot.block.startHour}`).join(',')}`).join(';')
-  const hourPreview = usePickupHourPreview(item.delivery.mode === 'market' && pickupDay && previewItems.length ? pickupDay.date : null, hours, previewItems, previewBusy, currentDate, agendaKey)
+  const paintingMarket = paintingMarketOn(agendaDays, pickupDay?.date)
+  const canPaintOnPickup = !paintingMarket || paintingMarket.id === pickupDay?.marketId
+  const hourPreview = usePickupHourPreview(item.delivery.mode === 'market' && pickupDay && previewItems.length ? pickupDay : null,
+    hours, previewItems, previewBusy, firstPaintDate, agendaKey, canPaintOnPickup)
   const [hintHour, setHintHour] = useState<number | null>(null)
 
   const chosenMarketId = item.delivery.mode === 'market'
     ? item.delivery.marketId ?? today?.marketId
     : today?.marketId
-  const daysOfMarket = marketDays.filter((d) => !chosenMarketId || d.marketId === chosenMarketId)
-  const futureDays = marketDays.filter(d => d.date > currentDate)
-  const viennaDays = allDays.filter((d) => (isViennaWeekday(d.date) || d.date === seasonEnd) && d.date <= seasonEnd && d.date >= currentDate && !marketDays.some(m => m.date === d.date) && (item.kind === 'finished' || paintDatesToTry(d.date, today?.date).some(date => date < d.date)))
+  const marketNameById = new Map(markets.map(m => [m.id, m.name]))
+  const datesWithMultipleMarkets = new Set<string>()
+  const seenMarketDates = new Set<string>()
+  for (const d of marketDays) {
+    if (seenMarketDates.has(d.date)) datesWithMultipleMarkets.add(d.date)
+    else seenMarketDates.add(d.date)
+  }
+  const activeMarketId = activeMarket?.id ?? today?.marketId
+  const includeOtherToday = !showPaint || (!todayCanPickup && paintItems.some(row => row.slotLocked && row.paintDate === currentDate))
+  const dayChoices = marketDays
+    .filter(d => d.date > currentDate || (includeOtherToday && d.date === currentDate && d.id !== today?.id))
+    .filter(d => isMarketDayValidForItems(d, paintItems, currentDate, nowHour, firstPaintDate, agendaDays))
+    .slice()
+    .sort((a, b) =>
+      a.date.localeCompare(b.date) ||
+      (a.marketId === activeMarketId ? -1 : b.marketId === activeMarketId ? 1 : (marketNameById.get(a.marketId) ?? '').localeCompare(marketNameById.get(b.marketId) ?? '')),
+    )
+  const viennaDays = allDays.filter(d => isViennaDayValidForItems(d, paintItems, currentDate, firstPaintDate, seasonEnd, marketDays))
   const viennaDay = viennaDays.find((d) => d.id === item.delivery.marketDayId) ??
     viennaDays.find((d) => d.date === item.delivery.pickupDate)
-  const mixedMarkets = new Set(futureDays.map((d) => d.marketId)).size > 1
-  const dayChoices = futureDays
+  const mixedMarkets = new Set(dayChoices.map((d) => d.marketId)).size > 1
 
   function capacityLabel(date: string): string {
     const agenda = agendaDays.find((row) => row.marketDay.date === date)
@@ -1184,6 +1600,7 @@ function DeliveryCard({
         marketDayId: today?.id,
         marketId: today?.marketId,
         pickupHour: null,
+        manualDay: false,
       })
       return
     }
@@ -1191,10 +1608,10 @@ function DeliveryCard({
       setDatePickerOpen(false)
       setViennaPickerOpen(true)
       // The choice is the handoff itself: summary, hints and labels follow it before a day is picked.
-      if (item.delivery.mode !== 'vienna') onDelivery({ ...item.delivery, mode: 'vienna', pickupDate: undefined, marketDayId: undefined, marketId: undefined, pickupHour: null })
+      if (item.delivery.mode !== 'vienna') onDelivery({ ...item.delivery, mode: 'vienna', pickupDate: undefined, marketDayId: undefined, marketId: undefined, pickupHour: null, manualDay: false })
       return
     }
-    if (mode === 'today' && todayIsMarket && !todayFull) {
+    if (mode === 'today' && todayCanPickup && !todayBlockedFull) {
       setDatePickerOpen(false)
       setViennaPickerOpen(false)
       onDelivery({
@@ -1203,17 +1620,23 @@ function DeliveryCard({
         marketDayId: today?.id,
         marketId: today?.marketId ?? chosenMarketId,
         pickupHour: null,
+        manualDay: false,
       })
       return
     }
     setViennaPickerOpen(false)
     setDatePickerOpen(true)
-    if (item.delivery.mode !== 'market') onDelivery({ ...item.delivery, mode: 'market', pickupDate: undefined, marketDayId: undefined, marketId: today?.marketId, pickupHour: null })
+    if (item.delivery.mode !== 'market') onDelivery({ ...item.delivery, mode: 'market', pickupDate: undefined, marketDayId: undefined, marketId: today?.marketId, pickupHour: null, manualDay: false })
   }
 
   const slot = slotLabel(item)
+  const paintedAt = paintedElsewhereLabel(item.paintDate, agendaDays, marketDays, activeMarket, pickupDay?.marketId)
+  const showMarketOnSelected = Boolean(
+    pickupDay && ((today?.marketId && pickupDay.marketId !== today.marketId) || datesWithMultipleMarkets.has(pickupDay.date)),
+  )
+  const pickupMarketName = pickupDay ? marketNameById.get(pickupDay.marketId) : undefined
   const pickupOptions = [
-    ...(todayIsMarket ? [{ value: 'today' as const, label: todayFull ? 'Today · full' : 'Today', disabled: Boolean(todayFull) }] : []),
+    ...(todayCanPickup ? [{ value: 'today' as const, label: todayBlockedFull ? 'Today · full' : 'Today', disabled: todayBlockedFull }] : []),
     { value: 'another_day' as const, label: 'Market day' },
     { value: 'vienna' as const, label: 'Delivery' },
   ]
@@ -1224,9 +1647,73 @@ function DeliveryCard({
     (pickupWhen === 'another_day' || item.kind === 'finished'),
   )
 
+  const cardFinishedItems = shared
+    ? allItems.filter((row): row is DraftItem & { marketOrnamentId: string } => row.kind === 'finished' && Boolean(row.marketOrnamentId))
+    : item.kind === 'finished' && item.marketOrnamentId
+      ? [item as DraftItem & { marketOrnamentId: string }]
+      : []
+
   return (
     <article className={styles.card}>
-      <h3>{title}</h3>
+      {cardFinishedItems.length === 1 ? (() => {
+        const pieceId = cardFinishedItems[0].marketOrnamentId
+        const piece = marketPieces?.find(row => row.id === pieceId)
+        const parts = marketOrnamentParts(pieceId)
+        const shortSpec = marketPieceShortSpec(pieceId)
+        return (
+          <div className={styles.deliveryPiece}>
+            <MarketPiecePhoto
+              id={pieceId}
+              piece={piece}
+              probeUploaded={!marketPieces}
+              className={styles.deliveryPhoto}
+              alt={`Ornament ${pieceId}`}
+            />
+            <div className={styles.deliveryPieceMeta}>
+              <h3 aria-label={title}>{pieceId}</h3>
+              {shortSpec ? (
+                <p className={styles.pieceSpec}>
+                  {parts ? <span className={styles.swatchDot} style={{ background: parts.color.swatch }} aria-hidden="true" /> : null}
+                  <StaffText>{shortSpec}</StaffText>
+                </p>
+              ) : null}
+            </div>
+          </div>
+        )
+      })() : (
+        <>
+          <h3><StaffText>{title}</StaffText></h3>
+          {cardFinishedItems.length > 1 ? (
+            <ul className={styles.deliveryPieces} aria-label="Selected ornaments">
+              {cardFinishedItems.map(entry => {
+                const piece = marketPieces?.find(row => row.id === entry.marketOrnamentId)
+                const parts = marketOrnamentParts(entry.marketOrnamentId)
+                const shortSpec = marketPieceShortSpec(entry.marketOrnamentId)
+                return (
+                  <li key={entry.id} className={styles.deliveryChip}>
+                    <MarketPiecePhoto
+                      id={entry.marketOrnamentId}
+                      piece={piece}
+                      probeUploaded={!marketPieces}
+                      className={styles.deliveryPhoto}
+                      alt={`Ornament ${entry.marketOrnamentId}`}
+                    />
+                    <div className={styles.deliveryPieceMeta}>
+                      <strong>{entry.marketOrnamentId}</strong>
+                      {shortSpec ? (
+                        <span className={styles.pieceSpec}>
+                          {parts ? <span className={styles.swatchDot} style={{ background: parts.color.swatch }} aria-hidden="true" /> : null}
+                          <StaffText>{shortSpec}</StaffText>
+                        </span>
+                      ) : null}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : null}
+        </>
+      )}
 
       {item.kind === 'finished' ? (
         <SegmentedControl
@@ -1254,9 +1741,13 @@ function DeliveryCard({
         />
       )}
 
-      {todayFull && item.delivery.mode !== 'vienna' ? (
+      {away && !anyLockedNotToday && item.delivery.mode !== 'vienna' ? (
+        <p className={styles.hint} role="status">Gaby is painting at {away.name} today.</p>
+      ) : null}
+
+      {!away && todayBlockedFull && todayCanPickup && item.delivery.mode !== 'vienna' ? (
         <p className={styles.hint} role="status">
-          {todayFull.open ? `Today is full (${todayFull.booked}/${todayFull.maxPaintings} paintings booked).` : 'Painting is closed today.'} Automatic planning cannot add one: choose another market day, or place it on the board by hand.
+          {todayFull!.open ? `Today is full (${todayFull!.booked}/${todayFull!.maxPaintings} paintings booked).` : 'Painting is closed today.'} Automatic planning cannot add one: choose another market day, or place it on the board by hand.
         </p>
       ) : null}
 
@@ -1270,7 +1761,7 @@ function DeliveryCard({
         >
           <CalendarIcon />
           <span>
-            <strong>{formatDateLabel(pickupDay.date)}</strong>
+            <strong>{showMarketOnSelected && pickupMarketName ? `${pickupMarketName} · ${formatDateLabel(pickupDay.date)}` : formatDateLabel(pickupDay.date)}</strong>
             <small>{capacityLabel(pickupDay.date)}</small>
           </span>
           <ChevronIcon open={datePickerOpen} />
@@ -1292,28 +1783,38 @@ function DeliveryCard({
             <ChoiceList
               legend="Market day"
               name={`day-${item.id}`}
-              value={item.delivery.pickupDate ?? null}
-              onChange={(date) => {
-                const md = daysOfMarket.find((d) => d.date === date) ?? marketDays.find((d) => d.date === date)
+              value={pickupDay?.id ?? item.delivery.marketDayId ?? null}
+              onChange={(marketDayId) => {
+                const md = marketDays.find((d) => d.id === marketDayId)
+                if (!md) return
                 onDelivery({
                   ...item.delivery,
                   mode: 'market',
-                  pickupDate: date,
-                  marketDayId: md?.id,
-                  marketId: md?.marketId ?? chosenMarketId,
+                  pickupDate: md.date,
+                  marketDayId: md.id,
+                  marketId: md.marketId,
                   pickupHour: null,
+                  manualDay: true,
                 })
                 setDatePickerOpen(false)
               }}
               compact
-              choices={dayChoices.map((d) => ({
-                value: d.date,
-                title: formatDateLabel(d.date),
-                body: [mixedMarkets ? markets.find((m) => m.id === d.marketId)?.name : null, capacityLabel(d.date)].filter(Boolean).join(' · '),
-              }))}
+              choices={dayChoices.map((d) => {
+                const marketName = marketNameById.get(d.marketId)
+                const showMarketTitle = Boolean((today?.marketId && d.marketId !== today.marketId) || datesWithMultipleMarkets.has(d.date))
+                return {
+                  value: d.id,
+                  title: showMarketTitle && marketName ? `${marketName} · ${formatDateLabel(d.date)}` : formatDateLabel(d.date),
+                  body: [!showMarketTitle && mixedMarkets ? marketName : null, capacityLabel(d.date)].filter(Boolean).join(' · '),
+                }
+              })}
             />
           ) : (
-            <p className={styles.emptyDates}>No future market pickup days available.</p>
+            <p className={styles.emptyDates}>
+              {lockedDate
+                ? 'No market pickup days left after the chosen paint date. Choose Delivery instead or change the paint time.'
+                : 'No future market pickup days available.'}
+            </p>
           )}
         </div>
       ) : null}
@@ -1385,7 +1886,7 @@ function DeliveryCard({
           <p className={styles.legend}>Pickup hour</p>
           <div className={styles.hours} onMouseLeave={() => setHintHour(null)}>
             {hours.map((hour) => {
-              const tooEarly = paintItems.some((row) => row.slotLocked && row.paintDate === pickupDay.date && row.paintEnd != null && hour < row.paintEnd)
+              const tooEarly = paintItems.some((row) => row.slotLocked && row.paintDate === pickupDay.date && row.paintEnd != null && hour < row.paintEnd + PAINT_HANDLING_HOURS - 0.001)
               const plan = hourPreview?.[hour]
               const checking = previewItems.length > 0 && !hourPreview
               const noTime = plan?.ok === false
@@ -1425,7 +1926,16 @@ function DeliveryCard({
       {showPaint && !datePickerOpen && !viennaPickerOpen ? (
         <div className={styles.slotBox}>
           <h4 className={styles.planTitle}>Painting plan</h4>
-          {item.delivery.mode === 'vienna' && !item.delivery.pickupDate ? (
+          {paintItems.length === 1 && item.slotLocked && slot && !slotTaken ? (
+            <div className={styles.planSelected} role="status">
+              {item.plannedMove && <strong>Change added to this sale</strong>}
+              {item.plannedMove ? <p>{item.plannedMove.orderCode} → {formatDateLabel(item.plannedMove.to.date)} · {formatHour(item.plannedMove.to.startHour)}–{formatHour(item.plannedMove.to.endHour)}</p> : null}
+              <strong><StaffText>{slot}</StaffText></strong>
+              {paintedAt ? <small>{paintedAt}</small> : null}
+              {item.plannedMove ? <small>Saved together with the order.</small> : null}
+              <button type="button" className={styles.textBtn} onClick={() => onChangeSlot(item)}>{item.plannedMove ? 'Undo change' : 'Change'}</button>
+            </div>
+          ) : item.delivery.mode === 'vienna' && !item.delivery.pickupDate ? (
             <p className={styles.planPrompt}>Choose the delivery day to calculate a safe painting time.</p>
           ) : item.delivery.mode === 'market' && item.delivery.pickupHour == null ? (
             <p className={styles.planPrompt}>Choose the pickup hour to calculate a safe painting time.</p>
@@ -1434,6 +1944,7 @@ function DeliveryCard({
               <ul className={styles.sessionList}>
                 {paintItems.map((row) => {
                   const rowSlot = slotLabel(row)
+                  const rowPaintedAt = paintedElsewhereLabel(row.paintDate, agendaDays, marketDays, activeMarket, pickupDay?.marketId)
                   const failed = !rowSlot && suggestions[row.id] && !suggestions[row.id].ok
                   return (
                     <li key={row.id} data-state={rowSlot ? 'ok' : failed ? 'missing' : 'pending'}>
@@ -1444,6 +1955,7 @@ function DeliveryCard({
                             ? <StaffText>{rowSlot}</StaffText>
                             : failed ? 'No free time before pickup' : 'Checking paint times…'}
                         </p>
+                        {rowSlot && rowPaintedAt ? <small>{rowPaintedAt}</small> : null}
                       </div>
                       <Button tone="staff" variant={failed ? 'secondary' : 'ghost'} onClick={() => onPlace(row)}>
                         {failed ? 'Place on agenda' : 'Change'}
@@ -1471,12 +1983,14 @@ function DeliveryCard({
               {item.plannedMove && <strong>Change added to this sale</strong>}
               {item.plannedMove ? <p>{item.plannedMove.orderCode} → {formatDateLabel(item.plannedMove.to.date)} · {formatHour(item.plannedMove.to.startHour)}–{formatHour(item.plannedMove.to.endHour)}</p> : null}
               <strong><StaffText>{slot}</StaffText></strong>
+              {paintedAt ? <small>{paintedAt}</small> : null}
               {item.plannedMove ? <small>Saved together with the order.</small> : null}
               <button type="button" className={styles.textBtn} onClick={() => onChangeSlot(item)}>{item.plannedMove ? 'Undo change' : 'Change'}</button>
             </div>
           ) : slot ? (
             <div className={styles.planSelected}>
               <strong><StaffText>{slot}</StaffText></strong>
+              {paintedAt ? <small>{paintedAt}</small> : null}
               <button type="button" className={styles.textBtn} onClick={() => onPlace(item)}>Change</button>
             </div>
           ) : (
@@ -1509,7 +2023,8 @@ type PaintSlot = { date: string; startHour: number; endHour: number }
 type HourPreview = Record<number, { ok: boolean; slots: PaintSlot[] }>
 
 /** For each pickup hour, the paint times the automatic planner would choose (same order and rules). */
-async function previewPickupHours(date: string, hours: number[], items: DraftItem[], busy: PaintSlot[], currentDate: string): Promise<HourPreview> {
+async function previewPickupHours(pickup: MarketDay, hours: number[], items: DraftItem[], busy: PaintSlot[], currentDate: string, canPaintOnPickup: boolean): Promise<HourPreview> {
+  const { date, id: handoffMarketDayId } = pickup
   const cache = new Map<string, Promise<CapacityResult>>()
   const check = (input: Parameters<typeof api.agenda.checkCapacity>[0]) => {
     const key = JSON.stringify(input)
@@ -1517,7 +2032,7 @@ async function previewPickupHours(date: string, hours: number[], items: DraftIte
     if (!result) { result = api.agenda.checkCapacity(input); cache.set(key, result) }
     return result
   }
-  const dates = paintDatesToTry(date, currentDate)
+  const dates = paintDatesToTry(date, currentDate).filter(day => day < date || canPaintOnPickup)
   const out: HourPreview = {}
   await Promise.all(hours.map(async (hour) => {
     const planned = [...busy]
@@ -1526,7 +2041,8 @@ async function previewPickupHours(date: string, hours: number[], items: DraftIte
       const candidates = await Promise.all(dates.map((day) => check({
         date: day,
         durationHours: minutesToHours(item.durationMinutes),
-        beforeHour: day === date ? hour : undefined,
+        beforeHour: day === date ? hour - PAINT_HANDLING_HOURS : undefined,
+        handoffMarketDayId,
         extraBusy: planned.filter((slot) => slot.date === day).map(({ startHour, endHour }) => ({ startHour, endHour })),
       })))
       const hit = candidates.find((candidate) => candidate.ok && candidate.slot)?.slot
@@ -1539,16 +2055,16 @@ async function previewPickupHours(date: string, hours: number[], items: DraftIte
   return out
 }
 
-function usePickupHourPreview(date: string | null, hours: number[], items: DraftItem[], busy: PaintSlot[], currentDate: string, refreshKey: string): HourPreview | null {
-  const key = date
-    ? [refreshKey, date, currentDate, hours.join(','), items.map((row) => `${row.id}:${row.durationMinutes}`).join(','), busy.map((slot) => `${slot.date}@${slot.startHour}-${slot.endHour}`).join(',')].join('|')
+function usePickupHourPreview(pickup: MarketDay | null, hours: number[], items: DraftItem[], busy: PaintSlot[], currentDate: string, refreshKey: string, canPaintOnPickup: boolean): HourPreview | null {
+  const key = pickup
+    ? [refreshKey, pickup.id, pickup.date, canPaintOnPickup, currentDate, hours.join(','), items.map((row) => `${row.id}:${row.durationMinutes}`).join(','), busy.map((slot) => `${slot.date}@${slot.startHour}-${slot.endHour}`).join(',')].join('|')
     : ''
   const [state, setState] = useState<{ key: string; value: HourPreview } | null>(null)
   useEffect(() => {
-    if (!date) return
+    if (!pickup) return
     let cancelled = false
     // On a failed check nothing is disabled; the normal planner still reports the problem.
-    previewPickupHours(date, hours, items, busy, currentDate)
+    previewPickupHours(pickup, hours, items, busy, currentDate, canPaintOnPickup)
       .then((value) => { if (!cancelled) setState({ key, value }) })
       .catch(() => { if (!cancelled) setState({ key, value: {} }) })
     return () => { cancelled = true }

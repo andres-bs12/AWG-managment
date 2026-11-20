@@ -14,6 +14,7 @@ import { QrCode } from '../../components/staff/QrCode'
 import { StaffBackLink } from '../../components/staff/StaffBackLink'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
+import { marketOrnamentLabel } from '../../domain/marketStock'
 import type { MarketDay } from '../../domain/types'
 import { handoffLabel } from '../../lib/handoff'
 import { formatEur } from '../../lib/money'
@@ -121,7 +122,26 @@ function OrderDetail({ id }: { id: string }) {
   if (order.status === 'CANCELLED') return <article className={styles.page}>
     <StaffBackLink />
     <header className={styles.hero}><div><h1>{order.code}</h1><p>{customer.name}</p></div><span className={styles.status}>Cancelled</span></header>
-    <section className={styles.panel}><h2>Cancelled order</h2><p>This order is read-only. Painting time was released and eligible stock returned.</p>{order.cancelledAt && <p>Cancelled: {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(new Date(order.cancelledAt))} (Vienna)</p>}{order.cancellationReason && <p>Reason: {order.cancellationReason}</p>}<p>Total: {formatEur(order.total, 'en')} · Received: {formatEur(paymentSummary(order).paid, 'en')}</p><p>{items.length} {items.length === 1 ? 'ornament' : 'ornaments'}</p>{items.map(item => <div key={item.id}><h3>{item.petName || 'Ornament'}</h3><p>{item.kind} · {item.color} · {item.finish} · {item.productionStatus.replaceAll('_', ' ')} · {formatEur(item.cost, 'en')}</p>{item.backName && <p>Name: {item.backName}</p>}{item.note && <p>Note: {item.note}</p>}{item.photos.map(photo => <img key={photo.id} src={photo.dataUrl} alt={`Reference for ${item.petName || 'ornament'}`} width={120} />)}</div>)}<p>{customer.email} {customer.phone}</p></section>
+    <section className={styles.panel}>
+      <h2>Cancelled order</h2>
+      <p>This order is read-only. Painting time was released and eligible stock returned.</p>
+      {order.cancelledAt && <p>Cancelled: {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(new Date(order.cancelledAt))} (Vienna)</p>}
+      {order.cancellationReason && <p>Reason: {order.cancellationReason}</p>}
+      <p>Total: {formatEur(order.total, 'en')} · Received: {formatEur(paymentSummary(order).paid, 'en')}</p>
+      <p>{items.length} {items.length === 1 ? 'ornament' : 'ornaments'}</p>
+      {items.map(item => {
+        const piece = item.kind === 'finished' && item.marketOrnamentId ? marketOrnamentLabel(item.marketOrnamentId) : null
+        const facts = [item.kind, !piece && item.color, !piece && item.finish, item.productionStatus.replaceAll('_', ' '), formatEur(item.cost, 'en')]
+        return <div key={item.id}>
+          <h3><StaffText>{piece || item.petName || 'Ornament'}</StaffText></h3>
+          <p><StaffText>{facts.filter(Boolean).join(' · ')}</StaffText></p>
+          {item.backName && <p>Name: {item.backName}</p>}
+          {item.note && <p>Note: {item.note}</p>}
+          {item.photos.map(photo => <img key={photo.id} src={photo.dataUrl} alt={`Reference for ${item.petName || 'ornament'}`} width={120} />)}
+        </div>
+      })}
+      <p>{customer.email} {customer.phone}</p>
+    </section>
     <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
   </article>
 

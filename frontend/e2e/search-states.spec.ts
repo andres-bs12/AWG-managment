@@ -1,7 +1,10 @@
 import { test, expect, type Page } from '@playwright/test'
 
 async function openSearch(page: Page) {
-  await page.addInitScript(() => localStorage.setItem('awg-staff-token', 'mock.staff-gaby.search-test'))
+  await page.addInitScript(() => {
+    localStorage.setItem('awg-staff-token', 'mock.staff-gaby.search-test')
+    localStorage.setItem('awg-active-market-id', 'mkt-rathaus')
+  })
   await page.goto('/staff/search')
   await expect(page.getByRole('heading', { name: 'Search orders', exact: true })).toBeVisible()
 }

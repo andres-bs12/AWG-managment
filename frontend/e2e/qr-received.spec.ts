@@ -6,6 +6,7 @@ async function staff(page: Page, clockInstalled = false) {
   await page.addInitScript(() => {
     localStorage.setItem('awg-staff-token', 'mock.staff-gaby.qr-test')
     localStorage.setItem('awg-locale', 'en')
+    localStorage.setItem('awg-active-market-id', 'mkt-rathaus')
   })
   await page.goto('/staff/agenda')
   await expect(page.getByRole('heading', { name: 'Agenda', exact: true })).toBeVisible()

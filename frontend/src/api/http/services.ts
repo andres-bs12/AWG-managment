@@ -31,7 +31,7 @@ export class HttpError extends Error {
   }
 }
 
-type RequestOptions = { auth?: boolean; token?: string; handle401?: boolean }
+type RequestOptions = { auth?: boolean; token?: string; handle401?: boolean; notify?: boolean }
 
 function storedToken(): string | null {
   try {
@@ -92,7 +92,7 @@ async function request<T>(path: string, init: RequestInit = {}, opts: RequestOpt
     throw new HttpError(message || `Request failed (${response.status}).`, response.status, code, field)
   }
 
-  if (opts.auth && init.method && !['GET', 'HEAD'].includes(init.method)) {
+  if (opts.auth && opts.notify !== false && init.method && !['GET', 'HEAD'].includes(init.method)) {
     window.dispatchEvent(new Event('awg-staff-data-changed'))
   }
   if (response.status === 204) return undefined as T
@@ -112,11 +112,17 @@ function fixPhotos(photos: Photo[] | undefined): void {
 }
 
 function fixItems(items: OrderItem[] | undefined): void {
-  for (const item of items ?? []) fixPhotos(item.photos)
+  for (const item of items ?? []) {
+    item.marketOrnamentId ??= null
+    fixPhotos(item.photos)
+  }
 }
 
 function fixDay(day: AgendaDay): AgendaDay {
-  for (const slot of day.slots ?? []) fixPhotos(slot.item?.photos)
+  for (const slot of day.slots ?? []) {
+    slot.photoUrl = slot.held ? null : absUrl(slot.photoUrl ?? slot.item?.photos?.[0]?.dataUrl) ?? null
+    fixPhotos(slot.item?.photos)
+  }
   for (const delivery of day.deliveries ?? []) delivery.photoUrl = absUrl(delivery.photoUrl)
   return day
 }
@@ -188,7 +194,7 @@ export const httpApi: Api = {
   },
   inventory: { list: () => request('/api/inventory', {}, staff), update: (id, quantity, expectedQuantity) => request(`/api/inventory/${enc(id)}`, jsonInit('PATCH', { quantity, expectedQuantity }), staff) },
   prices: { get: () => request('/api/prices', {}, staff), update: (input) => request('/api/prices', jsonInit('PUT', input), staff) },
-  paintingDays: { list: (from, to) => request(`/api/painting-days?from=${enc(from)}&to=${enc(to)}`, {}, staff), update: (date, open, maxPaintings, hours) => request(`/api/painting-days/${enc(date)}`, jsonInit('PATCH', { open, maxPaintings, ...hours }), staff) },
+  paintingDays: { list: (from, to) => request(`/api/painting-days?from=${enc(from)}&to=${enc(to)}`, {}, staff), update: (date, open, settings) => request(`/api/painting-days/${enc(date)}`, jsonInit('PATCH', { open, ...settings }), staff) },
   auth: {
     login: (email, password) =>
       request('/api/staff/login', jsonInit('POST', { email, password })),
@@ -209,15 +215,19 @@ export const httpApi: Api = {
     getDay: async (date) => fixDay(await request<AgendaDay>(`/api/agenda/days/${enc(date)}`, {}, staff)),
     moveBlock: (blockId, date, startHour) =>
       request(`/api/agenda/blocks/${enc(blockId)}`, jsonInit('PATCH', { date, startHour }), staff),
-    checkCapacity: (input) => request('/api/agenda/capacity', jsonInit('POST', input), staff),
+    checkCapacity: (input) => request('/api/agenda/capacity', jsonInit('POST', input), { ...staff, notify: false }),
     findMoveSuggestion: async (input) =>
-      (await request('/api/agenda/move-suggestion', jsonInit('POST', input), staff)) ?? null,
+      (await request('/api/agenda/move-suggestion', jsonInit('POST', input), { ...staff, notify: false })) ?? null,
   },
   orders: {
-    listSales: (filters) => {
+    listSales: async (filters) => {
       const params = new URLSearchParams()
       for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== '') params.set(key, String(value))
-      return request(`/api/orders?${params}`, {}, staff)
+      const result = await request<Awaited<ReturnType<Api['orders']['listSales']>>>(`/api/orders?${params}`, {}, staff)
+      for (const order of result.orders) {
+        for (const item of order.saleItems ?? []) item.photoUrl = absUrl(item.photoUrl ?? undefined) ?? null
+      }
+      return result
     },
     search: (query) => request(`/api/orders/search?q=${enc(query)}`, {}, staff),
     attention: () => request('/api/orders/attention', {}, staff),

@@ -6,9 +6,11 @@ import com.artwithgab.awg_tracking.enums.DeliveryKind;
 import com.artwithgab.awg_tracking.enums.ItemKind;
 import com.artwithgab.awg_tracking.enums.ProductionStatus;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.proxy.HibernateProxy;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -104,6 +106,10 @@ public class OrderItem {
     @Column(nullable = false)
     private LocalDate handoffDate;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "handoff_day_id")
+    private MarketDay handoffDay;
+
     private LocalTime pickUpTime;
 
     @Column(nullable = false)
@@ -137,6 +143,32 @@ public class OrderItem {
     private String note;
 
     // ─── Inventory ───────────────────────────────────────────────────────────
+
+    /** Numbered market piece; retained when an order is cancelled as sales history. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "market_ornament_id")
+    private MarketOrnament marketOrnament;
+
+    @Column(name = "market_ornament_id", insertable = false, updatable = false, length = 8)
+    @Setter(AccessLevel.NONE)
+    private String marketOrnamentId;
+
+    public void setMarketOrnament(MarketOrnament marketOrnament) {
+        this.marketOrnament = marketOrnament;
+        this.marketOrnamentId = identifierOf(marketOrnament);
+    }
+
+    public String getMarketOrnamentId() {
+        return marketOrnamentId != null ? marketOrnamentId : identifierOf(marketOrnament);
+    }
+
+    private static String identifierOf(MarketOrnament ornament) {
+        if (ornament == null) return null;
+        if (ornament instanceof HibernateProxy proxy) {
+            return (String) proxy.getHibernateLazyInitializer().getIdentifier();
+        }
+        return ornament.getId();
+    }
 
     /** Stock this ornament was deducted from; used to restock it on a future return. */
     @JoinColumn(name = "inventory_id")

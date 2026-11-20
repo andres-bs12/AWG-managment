@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Agentes</title>
+  <style>
+    :root {
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --radius: 10px;
+
+      --bg: #f5f6f8;
+      --surface: #ffffff;
+      --surface-hover: #f1f3f6;
+      --surface-tail: #f8f9fb;
+      --border: #dfe3ea;
+      --border-strong: #c8cfd9;
+
+      --text: #14181f;
+      --text-muted: #525c6a;
+      --text-subtle: #5d6775;
+
+      --pill-bg: #e8ecf1;
+      --pill-hover: #dce2ea;
+      --pill-active-bg: #14181f;
+      --pill-active-text: #ffffff;
+
+      --focus-ring: #2563eb;
+
+      --banner-bg: #fef2f2;
+      --banner-border: #fecaca;
+      --banner-text: #991b1b;
+
+      --dot-working: #16a34a;
+      --text-working: #15803d;
+
+      --dot-stalled: #d97706;
+      --text-stalled: #92400e;
+
+      --dot-done: #6b7280;
+      --text-done: #4b5563;
+
+      --dot-failed: #dc2626;
+      --text-failed: #b91c1c;
+
+      --dot-limit: #ea580c;
+      --text-limit: #c2410c;
+
+      --conn-ok: #16a34a;
+      --conn-err: #dc2626;
+      --conn-wait: #6b7280;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1216;
+        --surface: #171b22;
+        --surface-hover: #1e242d;
+        --surface-tail: #12161c;
+        --border: #2a313c;
+        --border-strong: #3a4352;
+
+        --text: #f0f3f7;
+        --text-muted: #9aa5b4;
+        --text-subtle: #9aa5b4;
+
+        --pill-bg: #212731;
+        --pill-hover: #2a313e;
+        --pill-active-bg: #f0f3f7;
+        --pill-active-text: #0f1216;
+
+        --focus-ring: #60a5fa;
+
+        --banner-bg: #2c1517;
+        --banner-border: #5c2327;
+        --banner-text: #fca5a5;
+
+        --dot-working: #22c55e;
+        --text-working: #4ade80;
+
+        --dot-stalled: #f59e0b;
+        --text-stalled: #fbbf24;
+
+        --dot-done: #8b95a5;
+        --text-done: #9aa5b4;
+
+        --dot-failed: #ef4444;
+        --text-failed: #f87171;
+
+        --dot-limit: #f97316;
+        --text-limit: #fb923c;
+
+        --conn-ok: #22c55e;
+        --conn-err: #ef4444;
+        --conn-wait: #8b95a5;
+      }
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      font-size: 14px;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 16px 16px 24px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .conn-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      flex-shrink: 0;
+      background-color: var(--conn-wait);
+      transition: background-color 150ms ease;
+    }
+
+    .conn-dot[data-status="ok"] {
+      background-color: var(--conn-ok);
+    }
+
+    .conn-dot[data-status="error"] {
+      background-color: var(--conn-err);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      background-color: var(--banner-bg);
+      border: 1px solid var(--banner-border);
+      border-radius: var(--radius);
+      color: var(--banner-text);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .banner[hidden] {
+      display: none;
+    }
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .filter-pill {
+      appearance: none;
+      border: 1px solid transparent;
+      background-color: var(--pill-bg);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
+      padding: 7px 11px;
+      min-height: 36px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background-color 120ms ease, color 120ms ease;
+    }
+
+    .filter-pill:hover {
+      background-color: var(--pill-hover);
+    }
+
+    .filter-pill[aria-pressed="true"] {
+      background-color: var(--pill-active-bg);
+      color: var(--pill-active-text);
+    }
+
+    .filter-pill:focus-visible,
+    .run-button:focus-visible {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: 2px;
+    }
+
+    .content {
+      transition: opacity 180ms ease;
+    }
+
+    .content.is-dimmed {
+      opacity: 0.55;
+    }
+
+    .run-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .run-item {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .run-button {
+      appearance: none;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      margin: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font-family: inherit;
+      font-size: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color 120ms ease;
+    }
+
+    .run-button:hover {
+      background-color: var(--surface-hover);
+    }
+
+    .run-dot-wrap {
+      position: relative;
+      width: 10px;
+      height: 10px;
+      margin-top: 5px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .run-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background-color: var(--dot-done);
+      position: relative;
+      z-index: 1;
+    }
+
+    .run-item[data-state="working"] .run-dot {
+      background-color: var(--dot-working);
+    }
+
+    .run-item[data-state="working"] .run-dot-wrap::after {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border-radius: 999px;
+      background-color: var(--dot-working);
+      opacity: 0.35;
+      animation: pulse-dot 2s ease-out infinite;
+    }
+
+    .run-item[data-state="stalled"] .run-dot {
+      background-color: var(--dot-stalled);
+    }
+
+    .run-item[data-state="done"] .run-dot {
+      background-color: var(--dot-done);
+    }
+
+    .run-item[data-state="failed"] .run-dot {
+      background-color: var(--dot-failed);
+    }
+
+    .run-item[data-state="limit"] .run-dot {
+      background-color: var(--dot-limit);
+    }
+
+    @keyframes pulse-dot {
+      0% {
+        transform: scale(0.8);
+        opacity: 0.45;
+      }
+      70% {
+        transform: scale(1.9);
+        opacity: 0;
+      }
+      100% {
+        transform: scale(1.9);
+        opacity: 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .run-item[data-state="working"] .run-dot-wrap::after {
+        animation: none;
+        display: none;
+      }
+    }
+
+    .run-main {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .run-model {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .run-title {
+      margin-top: 2px;
+      font-size: 13px;
+      color: var(--text-muted);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+    }
+
+    .run-note {
+      margin-top: 5px;
+      font-size: 12.5px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .run-file {
+      margin-top: 4px;
+      font-size: 12px;
+      line-height: 1.35;
+      color: var(--text-subtle);
+      overflow-wrap: anywhere;
+    }
+
+    .run-item[data-state="failed"] .run-note {
+      color: var(--text-failed);
+    }
+
+    .run-item[data-state="limit"] .run-note {
+      color: var(--text-limit);
+    }
+
+    .run-meta {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      text-align: right;
+      max-width: 44%;
+    }
+
+    .run-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .run-check {
+      width: 12px;
+      height: 12px;
+      flex-shrink: 0;
+    }
+
+    .run-item[data-state="working"] .run-state {
+      color: var(--text-working);
+    }
+
+    .run-item[data-state="stalled"] .run-state {
+      color: var(--text-stalled);
+    }
+
+    .run-item[data-state="done"] .run-state {
+      color: var(--text-done);
+    }
+
+    .run-item[data-state="failed"] .run-state {
+      color: var(--text-failed);
+    }
+
+    .run-item[data-state="limit"] .run-state {
+      color: var(--text-limit);
+    }
+
+    .run-elapsed {
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-subtle);
+      white-space: nowrap;
+    }
+
+    .run-tail {
+      border-top: 1px solid var(--border);
+      background-color: var(--surface-tail);
+      padding: 10px 12px;
+    }
+
+    .run-tail[hidden] {
+      display: none;
+    }
+
+    .tail-pre {
+      margin: 0;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.45;
+      color: var(--text);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      max-height: 240px;
+      overflow-y: auto;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tail-status {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .pending { margin-bottom: 12px; }
+    .pending[hidden] { display: none; }
+    .pending h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+    .pending ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .pending li {
+      padding: 10px 12px; background-color: var(--surface); border: 1px dashed var(--border);
+      border-radius: var(--radius); font-size: 13px; line-height: 1.4;
+    }
+    .pending-title { display: block; color: var(--text); }
+    .pending-meta { display: block; margin-top: 2px; font-size: 11.5px; color: var(--text-subtle); }
+
+    .empty-state {
+      padding: 28px 16px;
+      text-align: center;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-muted);
+      font-size: 13.5px;
+      line-height: 1.5;
+    }
+
+    .empty-state[hidden] {
+      display: none;
+    }
+
+    .usage { margin: 0 0 16px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    .usage-svc + .usage-svc { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .usage-name { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .usage-name small { font-weight: 400; color: var(--text-subtle); font-size: 12px; }
+    .usage-row { display: grid; grid-template-columns: 112px 1fr 38px; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .usage-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+    .usage-fill { display: block; height: 100%; border-radius: 3px; background: var(--text-working); transition: width .4s ease; }
+    .usage-fill[data-level="mid"] { background: var(--text-stalled); }
+    .usage-fill[data-level="hi"] { background: var(--text-failed); }
+    .usage-pct { text-align: right; color: var(--text); }
+    .usage-reset { grid-column: 2 / 4; margin-top: -4px; font-size: 11px; color: var(--text-subtle); }
+    .usage-foot { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .usage-foot .clear-btn { width: 100%; }
+    .usage-note { font-size: 12px; color: var(--text-subtle); }
+    @media (prefers-reduced-motion: reduce) { .usage-fill { transition: none; } }
+
+    .clear-row { display: flex; align-items: center; gap: 8px; margin: -4px 0 14px; font-size: 13px; color: var(--text-muted); }
+    .clear-row[hidden], .clear-row [hidden] { display: none; }
+    .clear-btn { appearance: none; min-height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-muted); font: inherit; cursor: pointer; }
+    .clear-btn:hover { background: var(--surface-hover); color: var(--text); }
+    .clear-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+    .clear-btn.danger { border-color: var(--text-failed); color: var(--text-failed); }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="title-wrap">
+        <h1>Agentes</h1>
+        <span id="conn-dot" class="conn-dot" data-status="waiting" aria-hidden="true"></span>
+        <span id="conn-sr" class="sr-only" role="status" aria-live="polite">Conectando con el panel</span>
+      </div>
+    </header>
+
+    <section id="usage" class="usage" aria-label="Uso de suscripciones" hidden></section>
+
+    <div id="offline-banner" class="banner" role="alert" hidden>
+      <span>Sin conexión con el panel</span>
+    </div>
+
+    <div class="filters" role="group" aria-label="Filtrar agentes">
+      <button type="button" class="filter-pill" data-filter="working" aria-pressed="false">Trabajando (0)</button>
+      <button type="button" class="filter-pill" data-filter="finished" aria-pressed="false">Terminados (0)</button>
+      <button type="button" class="filter-pill" data-filter="all" aria-pressed="false">Todos (0)</button>
+    </div>
+
+    <div id="clear-row" class="clear-row" hidden>
+      <button type="button" id="clear-btn" class="clear-btn">Limpiar terminados</button>
+      <span id="clear-confirm" hidden>
+        <span id="clear-ask" role="alert"></span>
+        <button type="button" id="clear-yes" class="clear-btn danger">Eliminar</button>
+        <button type="button" id="clear-no" class="clear-btn">Cancelar</button>
+      </span>
+    </div>
+
+    <section id="pending" class="pending" aria-labelledby="pending-title" hidden>
+      <h2 id="pending-title">Pendiente</h2>
+      <ul id="pending-list"></ul>
+    </section>
+
+    <section id="content" class="content" aria-label="Lista de agentes">
+      <ul id="run-list" class="run-list"></ul>
+      <div id="empty-state" class="empty-state" hidden></div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var POLL_MS = 1500;
+      var STALL_MS = 300000;
+      var STORAGE_KEY = "awg.agents.filter";
+      var VALID_FILTERS = { working: true, finished: true, all: true };
+
+      var connDot = document.getElementById("conn-dot");
+      var connSr = document.getElementById("conn-sr");
+      var offlineBanner = document.getElementById("offline-banner");
+      var contentEl = document.getElementById("content");
+      var runListEl = document.getElementById("run-list");
+      var emptyStateEl = document.getElementById("empty-state");
+      var filterButtons = Array.prototype.slice.call(document.querySelectorAll(".filter-pill"));
+
+      var runsById = Object.create(null);
+      var orderedRuns = [];
+      var rowMap = Object.create(null);
+      var domSeq = 0;
+
+      var clockOffsetMs = 0;
+      var hasLoadedOnce = false;
+      var isDisconnected = false;
+      var expandedId = null;
+      var tailCache = Object.create(null);
+      var tailState = Object.create(null); // "loading" | "ready" | "error"
+      var tailController = null;
+      var pollTimer = null;
+
+      var savedFilter = readSavedFilter();
+      var activeFilter = savedFilter || "all";
+
+      function readSavedFilter() {
+        try {
+          var val = window.localStorage.getItem(STORAGE_KEY);
+          return val && VALID_FILTERS[val] ? val : null;
+        } catch (_err) {
+          return null;
+        }
+      }
+
+      function writeSavedFilter(filter) {
+        try {
+          window.localStorage.setItem(STORAGE_KEY, filter);
+        } catch (_err) {
+          // Ignore storage errors (private mode / disabled storage).
+        }
+      }
+
+      function normalizeGroup(run) {
+        if (run.group === "working" || run.group === "finished") {
+          return run.group;
+        }
+        return run.displayState === "working" || run.displayState === "stalled" ? "working" : "finished";
+      }
+
+      function normalizeState(state) {
+        if (
+          state === "working" ||
+          state === "stalled" ||
+          state === "done" ||
+          state === "failed" ||
+          state === "limit"
+        ) {
+          return state;
+        }
+        return "done";
+      }
+
+      function getServerNowMs() {
+        return Date.now() + clockOffsetMs;
+      }
+
+      function formatElapsed(run, serverNowMs) {
+        var startMs = Date.parse(run.startedAt);
+        if (Number.isNaN(startMs)) {
+          return "00:00";
+        }
+        var endMs = run.endedAt ? Date.parse(run.endedAt) : serverNowMs;
+        if (Number.isNaN(endMs)) {
+          endMs = serverNowMs;
+        }
+        var totalSeconds = Math.max(0, Math.floor((endMs - startMs) / 1000));
+        if (totalSeconds < 3600) {
+          var mins = Math.floor(totalSeconds / 60);
+          var secs = totalSeconds % 60;
+          return String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+        }
+        var hours = Math.floor(totalSeconds / 3600);
+        var remMins = Math.floor((totalSeconds % 3600) / 60);
+        return String(hours) + ":" + String(remMins).padStart(2, "0");
+      }
+
+      function getFileChangeAtMs(run) {
+        if (!run || !run.lastFileChange || run.lastFileChange.at == null) {
+          return NaN;
+        }
+        return typeof run.lastFileChange.at === "number"
+          ? run.lastFileChange.at
+          : Date.parse(run.lastFileChange.at);
+      }
+
+      function isRecentFileChange(run, serverNowMs) {
+        var atMs = getFileChangeAtMs(run);
+        return Number.isFinite(atMs) && serverNowMs - atMs <= STALL_MS;
+      }
+
+      function fileBasename(filePath) {
+        if (typeof filePath !== "string") {
+          return "";
+        }
+        var parts = filePath.split(/[\\/]/);
+        for (var i = parts.length - 1; i >= 0; i -= 1) {
+          if (parts[i]) {
+            return parts[i];
+          }
+        }
+        return filePath;
+      }
+
+      function formatRelativeTime(atMs, serverNowMs) {
+        var diffSec = Math.max(0, Math.floor((serverNowMs - atMs) / 1000));
+        if (diffSec < 60) {
+          return "hace unos segundos";
+        }
+        var mins = Math.floor(diffSec / 60);
+        if (mins < 60) {
+          return "hace " + mins + " min";
+        }
+        var hours = Math.floor(mins / 60);
+        if (hours < 24) {
+          return "hace " + hours + " h";
+        }
+        return "hace " + Math.floor(hours / 24) + " d";
+      }
+
+      function formatFileChangeText(run, serverNowMs, sharedRepo) {
+        if (normalizeGroup(run) !== "working" || !run.lastFileChange || !run.lastFileChange.path) {
+          return "";
+        }
+        var atMs = getFileChangeAtMs(run);
+        if (Number.isNaN(atMs)) {
+          return "";
+        }
+        var base = fileBasename(run.lastFileChange.path);
+        if (!base) {
+          return "";
+        }
+        var prefix = sharedRepo ? "Último cambio en el repo: " : "Último cambio: ";
+        return prefix + base + " · " + formatRelativeTime(atMs, serverNowMs);
+      }
+
+      function getStateLabel(run, state) {
+        if (state === "working") {
+          return "Trabajando";
+        }
+        if (state === "stalled") {
+          var idleMin = Math.max(1, Math.floor((Number(run.idleMs) || 0) / 60000));
+          return "Sin actividad " + idleMin + " min";
+        }
+        if (state === "done") {
+          return "Terminado";
+        }
+        if (state === "failed") {
+          return "Falló";
+        }
+        if (state === "limit") {
+          return "Límite de uso";
+        }
+        return "Terminado";
+      }
+
+      function sortRuns(runs) {
+        return runs
+          .map(function (run, idx) {
+            return { run: run, idx: idx };
+          })
+          .sort(function (a, b) {
+            var ga = normalizeGroup(a.run) === "working" ? 0 : 1;
+            var gb = normalizeGroup(b.run) === "working" ? 0 : 1;
+            if (ga !== gb) {
+              return ga - gb;
+            }
+            var ta = Date.parse(a.run.startedAt);
+            var tb = Date.parse(b.run.startedAt);
+            if (!Number.isNaN(ta) && !Number.isNaN(tb) && ta !== tb) {
+              return tb - ta;
+            }
+            return a.idx - b.idx;
+          })
+          .map(function (entry) {
+            return entry.run;
+          });
+      }
+
+      function createCheckIcon() {
+        var ns = "http://www.w3.org/2000/svg";
+        var svg = document.createElementNS(ns, "svg");
+        svg.setAttribute("viewBox", "0 0 16 16");
+        svg.setAttribute("fill", "none");
+        svg.setAttribute("aria-hidden", "true");
+        svg.setAttribute("class", "run-check");
+        var path = document.createElementNS(ns, "path");
+        path.setAttribute("d", "M3.5 8.5L6.5 11.5L12.5 5");
+        path.setAttribute("stroke", "currentColor");
+        path.setAttribute("stroke-width", "1.8");
+        path.setAttribute("stroke-linecap", "round");
+        path.setAttribute("stroke-linejoin", "round");
+        svg.appendChild(path);
+        return svg;
+      }
+
+      function createRowElements(runId) {
+        domSeq += 1;
+        var tailId = "tail-" + domSeq;
+
+        var item = document.createElement("li");
+        item.className = "run-item";
+
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "run-button";
+        button.setAttribute("aria-expanded", "false");
+        button.setAttribute("aria-controls", tailId);
+        button.addEventListener("click", function () {
+          toggleExpand(runId);
+        });
+
+        var dotWrap = document.createElement("span");
+        dotWrap.className = "run-dot-wrap";
+        dotWrap.setAttribute("aria-hidden", "true");
+        var dot = document.createElement("span");
+        dot.className = "run-dot";
+        dotWrap.appendChild(dot);
+
+        var main = document.createElement("span");
+        main.className = "run-main";
+
+        var modelEl = document.createElement("span");
+        modelEl.className = "run-model";
+        modelEl.style.display = "block";
+
+        var titleEl = document.createElement("span");
+        titleEl.className = "run-title";
+
+        var fileEl = document.createElement("span");
+        fileEl.className = "run-file";
+        fileEl.style.display = "none";
+
+        var noteEl = document.createElement("span");
+        noteEl.className = "run-note";
+        noteEl.style.display = "none";
+
+        main.appendChild(modelEl);
+        main.appendChild(titleEl);
+        main.appendChild(fileEl);
+        main.appendChild(noteEl);
+
+        var meta = document.createElement("span");
+        meta.className = "run-meta";
+
+        var stateEl = document.createElement("span");
+        stateEl.className = "run-state";
+        var checkIcon = createCheckIcon();
+        checkIcon.style.display = "none";
+        var stateText = document.createElement("span");
+        stateEl.appendChild(checkIcon);
+        stateEl.appendChild(stateText);
+
+        var elapsedEl = document.createElement("span");
+        elapsedEl.className = "run-elapsed";
+
+        meta.appendChild(stateEl);
+        meta.appendChild(elapsedEl);
+
+        button.appendChild(dotWrap);
+        button.appendChild(main);
+        button.appendChild(meta);
+
+        var tailWrap = document.createElement("div");
+        tailWrap.id = tailId;
+        tailWrap.className = "run-tail";
+        tailWrap.hidden = true;
+
+        var tailStatus = document.createElement("p");
+        tailStatus.className = "tail-status";
+
+        var tailPre = document.createElement("pre");
+        tailPre.className = "tail-pre";
+        tailPre.hidden = true;
+
+        tailWrap.appendChild(tailStatus);
+        tailWrap.appendChild(tailPre);
+
+        item.appendChild(button);
+        item.appendChild(tailWrap);
+
+        return {
+          id: runId,
+          item: item,
+          button: button,
+          modelEl: modelEl,
+          titleEl: titleEl,
+          fileEl: fileEl,
+          noteEl: noteEl,
+          checkIcon: checkIcon,
+          stateText: stateText,
+          elapsedEl: elapsedEl,
+          tailWrap: tailWrap,
+          tailStatus: tailStatus,
+          tailPre: tailPre,
+          lastElapsed: "",
+          lastState: "",
+          lastModel: "",
+          lastTitle: "",
+          lastFileText: "",
+          lastFilePath: "",
+          sharedRepo: false,
+          lastNote: "",
+          lastStateText: "",
+          lastExpanded: false,
+          lastTailKey: ""
+        };
+      }
+
+      function updateTailView(refs) {
+        var isExpanded = expandedId === refs.id;
+        if (refs.lastExpanded !== isExpanded) {
+          refs.button.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+          refs.tailWrap.hidden = !isExpanded;
+          refs.lastExpanded = isExpanded;
+        }
+        if (!isExpanded) {
+          return;
+        }
+
+        var status = tailState[refs.id] || "loading";
+        var lines = tailCache[refs.id];
+        var key = status + "|" + (Array.isArray(lines) ? lines.join("\n") : "");
+        if (refs.lastTailKey === key) {
+          return;
+        }
+        refs.lastTailKey = key;
+
+        if (Array.isArray(lines) && lines.length > 0) {
+          refs.tailStatus.hidden = true;
+          refs.tailPre.hidden = false;
+          refs.tailPre.textContent = lines.join("\n");
+          return;
+        }
+
+        refs.tailPre.hidden = true;
+        refs.tailStatus.hidden = false;
+        if (status === "error") {
+          refs.tailStatus.textContent = "No se pudo cargar el registro.";
+        } else if (status === "ready") {
+          refs.tailStatus.textContent = "Sin líneas de registro todavía.";
+        } else {
+          refs.tailStatus.textContent = "Cargando registro...";
+        }
+      }
+
+      function updateRow(refs, run, serverNowMs, sharedRepo) {
+        var state = normalizeState(run.displayState);
+        if (state === "stalled" && isRecentFileChange(run, serverNowMs)) {
+          state = "working";
+        }
+        var model = run.model || run.name || "Agente";
+        var title = run.title || run.name || run.id || "";
+        var fileText = formatFileChangeText(run, serverNowMs, sharedRepo);
+        var filePath = fileText && run.lastFileChange ? run.lastFileChange.path : "";
+        var showNote = (state === "failed" || state === "limit") && typeof run.note === "string" && run.note.trim() !== "";
+        var note = showNote ? run.note.trim() : "";
+        var stateLabel = getStateLabel(run, state);
+        var elapsed = formatElapsed(run, serverNowMs);
+
+        refs.sharedRepo = Boolean(sharedRepo);
+
+        if (refs.lastState !== state) {
+          refs.item.setAttribute("data-state", state);
+          refs.checkIcon.style.display = state === "done" ? "inline-block" : "none";
+          refs.lastState = state;
+        }
+        if (refs.lastModel !== model) {
+          refs.modelEl.textContent = model;
+          refs.lastModel = model;
+        }
+        if (refs.lastTitle !== title) {
+          refs.titleEl.textContent = title;
+          refs.lastTitle = title;
+        }
+        if (refs.lastFileText !== fileText) {
+          refs.fileEl.textContent = fileText;
+          refs.fileEl.style.display = fileText ? "block" : "none";
+          refs.lastFileText = fileText;
+        }
+        if (refs.lastFilePath !== filePath) {
+          if (filePath) {
+            refs.fileEl.title = filePath;
+          } else {
+            refs.fileEl.removeAttribute("title");
+          }
+          refs.lastFilePath = filePath;
+        }
+        if (refs.lastNote !== note) {
+          refs.noteEl.textContent = note;
+          refs.noteEl.style.display = note ? "block" : "none";
+          refs.lastNote = note;
+        }
+        if (refs.lastStateText !== stateLabel) {
+          refs.stateText.textContent = stateLabel;
+          refs.lastStateText = stateLabel;
+        }
+        if (refs.lastElapsed !== elapsed) {
+          refs.elapsedEl.textContent = elapsed;
+          refs.lastElapsed = elapsed;
+        }
+
+        updateTailView(refs);
+      }
+
+      function getFilteredRuns(runs) {
+        if (activeFilter === "all") {
+          return runs;
+        }
+        return runs.filter(function (run) {
+          return normalizeGroup(run) === activeFilter;
+        });
+      }
+
+      function updateFilterUI(workingCount, finishedCount, totalCount) {
+        var counts = {
+          working: "Trabajando (" + workingCount + ")",
+          finished: "Terminados (" + finishedCount + ")",
+          all: "Todos (" + totalCount + ")"
+        };
+        filterButtons.forEach(function (btn) {
+          var filter = btn.getAttribute("data-filter");
+          var pressed = filter === activeFilter;
+          if (btn.getAttribute("aria-pressed") !== String(pressed)) {
+            btn.setAttribute("aria-pressed", String(pressed));
+          }
+          if (counts[filter] && btn.textContent !== counts[filter]) {
+            btn.textContent = counts[filter];
+          }
+        });
+      }
+
+      function updateDocumentTitle(workingCount) {
+        var nextTitle = workingCount > 0 ? "(" + workingCount + ") Agentes" : "Agentes";
+        if (document.title !== nextTitle) {
+          document.title = nextTitle;
+        }
+      }
+
+      function renderEmptyState(totalCount, visibleCount) {
+        if (!hasLoadedOnce) {
+          emptyStateEl.textContent = "Cargando agentes...";
+          emptyStateEl.hidden = false;
+          return;
+        }
+        if (totalCount === 0) {
+          emptyStateEl.textContent = "Todavía no hay agentes. Aparecerán aquí cuando empiece una tarea.";
+          emptyStateEl.hidden = false;
+          return;
+        }
+        if (visibleCount === 0) {
+          if (activeFilter === "working") {
+            emptyStateEl.textContent = "No hay agentes trabajando ahora mismo.";
+          } else if (activeFilter === "finished") {
+            emptyStateEl.textContent = "Todavía no hay agentes terminados.";
+          } else {
+            emptyStateEl.textContent = "No hay agentes para mostrar.";
+          }
+          emptyStateEl.hidden = false;
+          return;
+        }
+        emptyStateEl.hidden = true;
+      }
+
+      function render() {
+        var workingCount = 0;
+        var finishedCount = 0;
+        var cwdCounts = Object.create(null);
+        for (var i = 0; i < orderedRuns.length; i += 1) {
+          if (normalizeGroup(orderedRuns[i]) === "working") {
+            workingCount += 1;
+            if (typeof orderedRuns[i].cwd === "string" && orderedRuns[i].cwd) {
+              cwdCounts[orderedRuns[i].cwd] = (cwdCounts[orderedRuns[i].cwd] || 0) + 1;
+            }
+          } else {
+            finishedCount += 1;
+          }
+        }
+
+        updateFilterUI(workingCount, finishedCount, orderedRuns.length);
+        updateDocumentTitle(workingCount);
+
+        var visibleRuns = getFilteredRuns(orderedRuns);
+        var visibleIds = Object.create(null);
+        var serverNowMs = getServerNowMs();
+
+        for (var j = 0; j < visibleRuns.length; j += 1) {
+          visibleIds[visibleRuns[j].id] = true;
+        }
+
+        Object.keys(rowMap).forEach(function (id) {
+          if (!visibleIds[id]) {
+            var oldRefs = rowMap[id];
+            if (oldRefs.item.parentNode === runListEl) {
+              runListEl.removeChild(oldRefs.item);
+            }
+            if (!runsById[id]) {
+              delete rowMap[id];
+            }
+          }
+        });
+
+        for (var k = 0; k < visibleRuns.length; k += 1) {
+          var run = visibleRuns[k];
+          var refs = rowMap[run.id];
+          if (!refs) {
+            refs = createRowElements(run.id);
+            rowMap[run.id] = refs;
+          }
+          var sharedRepo = Boolean(run.cwd && cwdCounts[run.cwd] > 1);
+          updateRow(refs, run, serverNowMs, sharedRepo);
+
+          var currentChild = runListEl.children[k] || null;
+          if (currentChild !== refs.item) {
+            runListEl.insertBefore(refs.item, currentChild);
+          }
+        }
+
+        renderEmptyState(orderedRuns.length, visibleRuns.length);
+      }
+
+      function tickElapsedTimes() {
+        if (!hasLoadedOnce || orderedRuns.length === 0) {
+          return;
+        }
+        var serverNowMs = getServerNowMs();
+        for (var i = 0; i < orderedRuns.length; i += 1) {
+          var run = orderedRuns[i];
+          if (run.endedAt) {
+            continue;
+          }
+          var refs = rowMap[run.id];
+          if (!refs || refs.item.parentNode !== runListEl) {
+            continue;
+          }
+          var nextElapsed = formatElapsed(run, serverNowMs);
+          if (refs.lastElapsed !== nextElapsed) {
+            refs.elapsedEl.textContent = nextElapsed;
+            refs.lastElapsed = nextElapsed;
+          }
+          var nextFileText = formatFileChangeText(run, serverNowMs, refs.sharedRepo);
+          if (refs.lastFileText !== nextFileText) {
+            refs.fileEl.textContent = nextFileText;
+            refs.fileEl.style.display = nextFileText ? "block" : "none";
+            refs.lastFileText = nextFileText;
+          }
+        }
+      }
+
+      function setConnectionStatus(ok) {
+        if (ok) {
+          if (isDisconnected || connDot.getAttribute("data-status") !== "ok") {
+            isDisconnected = false;
+            connDot.setAttribute("data-status", "ok");
+            connSr.textContent = "Conectado con el panel";
+            offlineBanner.hidden = true;
+            contentEl.classList.remove("is-dimmed");
+          }
+        } else if (!isDisconnected) {
+          isDisconnected = true;
+          connDot.setAttribute("data-status", "error");
+          connSr.textContent = "Sin conexión con el panel";
+          offlineBanner.hidden = false;
+          contentEl.classList.add("is-dimmed");
+        }
+      }
+
+      function fetchTail(runId) {
+        if (!runId) {
+          return;
+        }
+        if (tailController) {
+          tailController.abort();
+        }
+        tailController = typeof AbortController !== "undefined" ? new AbortController() : null;
+        if (!tailCache[runId]) {
+          tailState[runId] = "loading";
+          if (rowMap[runId]) {
+            updateTailView(rowMap[runId]);
+          }
+        }
+
+        var url = "/api/runs/" + encodeURIComponent(runId) + "/tail?n=12";
+        var opts = { cache: "no-store" };
+        if (tailController) {
+          opts.signal = tailController.signal;
+        }
+
+        fetch(url, opts)
+          .then(function (res) {
+            if (!res.ok) {
+              throw new Error("HTTP " + res.status);
+            }
+            return res.json();
+          })
+          .then(function (data) {
+            if (expandedId !== runId) {
+              return;
+            }
+            tailCache[runId] = Array.isArray(data && data.lines) ? data.lines : [];
+            tailState[runId] = "ready";
+            if (rowMap[runId]) {
+              updateTailView(rowMap[runId]);
+            }
+          })
+          .catch(function (err) {
+            if (err && err.name === "AbortError") {
+              return;
+            }
+            if (expandedId !== runId) {
+              return;
+            }
+            if (!tailCache[runId]) {
+              tailState[runId] = "error";
+              if (rowMap[runId]) {
+                updateTailView(rowMap[runId]);
+              }
+            }
+          });
+      }
+
+      function toggleExpand(runId) {
+        var previousId = expandedId;
+        if (expandedId === runId) {
+          expandedId = null;
+          if (tailController) {
+            tailController.abort();
+            tailController = null;
+          }
+          if (rowMap[previousId]) {
+            updateTailView(rowMap[previousId]);
+          }
+          return;
+        }
+
+        expandedId = runId;
+        if (previousId && rowMap[previousId]) {
+          updateTailView(rowMap[previousId]);
+        }
+        if (rowMap[runId]) {
+          updateTailView(rowMap[runId]);
+        }
+        fetchTail(runId);
+      }
+
+      function isExpandedVisible() {
+        if (!expandedId || !runsById[expandedId]) {
+          return false;
+        }
+        if (activeFilter === "all") {
+          return true;
+        }
+        return normalizeGroup(runsById[expandedId]) === activeFilter;
+      }
+
+      var pendingItems = [];
+      function renderPending(items) {
+        pendingItems = items;
+        var section = document.getElementById("pending");
+        var list = document.getElementById("pending-list");
+        var show = items.length > 0 && activeFilter !== "finished";
+        section.hidden = !show;
+        document.getElementById("pending-title").textContent = "Pendiente (" + items.length + ")";
+        list.textContent = "";
+        if (!show) return;
+        items.forEach(function (p) {
+          var li = document.createElement("li");
+          var title = document.createElement("span");
+          title.className = "pending-title";
+          title.textContent = p.title;
+          li.appendChild(title);
+          var meta = [p.model, p.after ? "después de: " + p.after : ""].filter(Boolean).join(" · ");
+          if (meta) {
+            var m = document.createElement("span");
+            m.className = "pending-meta";
+            m.textContent = meta;
+            li.appendChild(m);
+          }
+          list.appendChild(li);
+        });
+      }
+
+      function pollRuns() {
+        fetch("/api/runs", { cache: "no-store" })
+          .then(function (res) {
+            if (!res.ok) {
+              throw new Error("HTTP " + res.status);
+            }
+            return res.json();
+          })
+          .then(function (data) {
+            var fetchTimeMs = Date.now();
+            if (data && typeof data.now === "string") {
+              var serverNowMs = Date.parse(data.now);
+              if (!Number.isNaN(serverNowMs)) {
+                clockOffsetMs = serverNowMs - fetchTimeMs;
+              }
+            }
+
+            renderPending(Array.isArray(data && data.pending) ? data.pending : []);
+            var rawRuns = Array.isArray(data && data.runs) ? data.runs : [];
+            orderedRuns = sortRuns(rawRuns);
+
+            var nextById = Object.create(null);
+            var workingCount = 0;
+            for (var i = 0; i < orderedRuns.length; i += 1) {
+              var run = orderedRuns[i];
+              nextById[run.id] = run;
+              if (normalizeGroup(run) === "working") {
+                workingCount += 1;
+              }
+            }
+            runsById = nextById;
+
+            if (!hasLoadedOnce) {
+              hasLoadedOnce = true;
+              if (!savedFilter) {
+                activeFilter = workingCount > 0 ? "working" : "all";
+              }
+            }
+
+            if (expandedId && !runsById[expandedId]) {
+              expandedId = null;
+            }
+
+            setConnectionStatus(true);
+            render();
+
+            if (isExpandedVisible()) {
+              fetchTail(expandedId);
+            }
+          })
+          .catch(function () {
+            setConnectionStatus(false);
+            if (!hasLoadedOnce) {
+              render();
+            }
+          })
+          .finally(function () {
+            pollTimer = window.setTimeout(pollRuns, POLL_MS);
+          });
+      }
+
+      filterButtons.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var nextFilter = btn.getAttribute("data-filter");
+          if (!nextFilter || !VALID_FILTERS[nextFilter] || nextFilter === activeFilter) {
+            return;
+          }
+          activeFilter = nextFilter;
+          savedFilter = nextFilter;
+          writeSavedFilter(nextFilter);
+          renderPending(pendingItems);
+          render();
+          if (isExpandedVisible()) {
+            fetchTail(expandedId);
+          }
+        });
+      });
+
+      render();
+      pollRuns();
+      window.setInterval(tickElapsedTimes, 1000);
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var box = document.getElementById("usage");
+      function level(p) { return p >= 90 ? "hi" : p >= 70 ? "mid" : "ok"; }
+      function span(cls, text) { var e = document.createElement("span"); if (cls) e.className = cls; e.textContent = text; return e; }
+      function reset(ms) {
+        if (!ms) { return ""; }
+        var m = Math.max(0, Math.round((ms - Date.now()) / 60000));
+        if (m < 60) { return "reinicia en " + m + " min"; }
+        var h = Math.floor(m / 60);
+        return h < 48 ? "reinicia en " + h + " h " + (m % 60) + " min" : "reinicia en " + Math.round(h / 24) + " d";
+      }
+      // Visible clock time of the reset: "hoy 18:30", "mañana 09:15" or "jue 26 nov 14:00".
+      function resetAt(ms) {
+        if (!ms) { return ""; }
+        var d = new Date(ms), now = new Date();
+        var time = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+        var day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        var diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - day) / 86400000);
+        var when = diff === 0 ? "hoy" : diff === 1 ? "mañana" : d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
+        return "Se reinicia " + when + " a las " + time + " (" + reset(ms).replace("reinicia ", "") + ")";
+      }
+      function age(ms) {
+        var m = Math.round((Date.now() - ms) / 60000);
+        return m < 30 ? "" : "dato de hace " + (m < 120 ? m + " min" : Math.round(m / 60) + " h");
+      }
+      function row(label, w) {
+        var r = document.createElement("div"); r.className = "usage-row";
+        r.title = reset(w.resetsAt);
+        var bar = span("usage-bar", ""); var fill = span("usage-fill", "");
+        var pct = Math.max(0, Math.min(100, Math.round(w.pct)));
+        fill.style.width = pct + "%"; fill.dataset.level = level(pct);
+        bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-label", label);
+        bar.setAttribute("aria-valuenow", String(pct)); bar.setAttribute("aria-valuemin", "0"); bar.setAttribute("aria-valuemax", "100");
+        bar.appendChild(fill);
+        r.appendChild(span("", label)); r.appendChild(bar); r.appendChild(span("usage-pct", pct + "%"));
+        if (w.resetsAt) { r.appendChild(span("usage-reset", resetAt(w.resetsAt))); }
+        return r;
+      }
+      function render(data) {
+        box.textContent = "";
+        data.services.forEach(function (s) {
+          var d = document.createElement("div"); d.className = "usage-svc";
+          var name = document.createElement("div"); name.className = "usage-name";
+          name.appendChild(span("", s.name));
+          var hint = s.updatedAt ? age(s.updatedAt) : "";
+          if (hint) { name.appendChild(span("", "")).appendChild(Object.assign(document.createElement("small"), { textContent: hint })); }
+          d.appendChild(name);
+          if (s.windows && s.windows.length) { s.windows.forEach(function (w) { d.appendChild(row(w.label, w)); }); }
+          else { d.appendChild(span("usage-note", s.note || "Sin datos")); }
+          
+          box.appendChild(d);
+        });
+        var foot = document.createElement("div"); foot.className = "usage-foot";
+        var b = document.createElement("button"); b.type = "button"; b.className = "clear-btn";
+        b.id = "usage-refresh"; b.textContent = refreshing ? "Actualizando…" : "Actualizar uso"; b.disabled = refreshing;
+        b.addEventListener("click", refresh);
+        foot.appendChild(b); box.appendChild(foot);
+        box.hidden = false;
+      }
+      var refreshing = false, lastData = null;
+      function refresh() {
+        refreshing = true; if (lastData) { render(lastData); }
+        fetch("/api/usage/refresh", { method: "POST", headers: { "X-Agents-Action": "refresh-usage" } })
+          .then(function (r) { if (!r.ok) { throw new Error("HTTP " + r.status); } return r.json(); })
+          .then(function (d) { lastData = d; })
+          .catch(function () { /* keep the previous reading */ })
+          .then(function () { refreshing = false; if (lastData) { render(lastData); } });
+      }
+      function poll() {
+        fetch("/api/usage", { cache: "no-store" })
+          .then(function (r) { if (!r.ok) { throw new Error("HTTP " + r.status); } return r.json(); })
+          .then(function (d) { lastData = d; if (!refreshing) { render(d); } })
+          .catch(function () { /* keep the last reading; the main banner already reports a lost connection */ });
+      }
+      poll(); window.setInterval(poll, 30000);
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var row = document.getElementById("clear-row");
+      var btn = document.getElementById("clear-btn");
+      var box = document.getElementById("clear-confirm");
+      var ask = document.getElementById("clear-ask");
+      var pill = document.querySelector('[data-filter="finished"]');
+      var count = 0;
+      function sync() {
+        var m = /\((\d+)\)/.exec(pill.textContent || "");
+        count = m ? Number(m[1]) : 0;
+        row.hidden = count === 0;
+        if (count === 0) { box.hidden = true; btn.hidden = false; }
+        if (!box.hidden) { ask.textContent = "¿Eliminar " + count + (count === 1 ? " terminado?" : " terminados?"); }
+      }
+      new MutationObserver(sync).observe(pill, { childList: true, characterData: true, subtree: true });
+      btn.addEventListener("click", function () { btn.hidden = true; box.hidden = false; sync(); document.getElementById("clear-no").focus(); });
+      document.getElementById("clear-no").addEventListener("click", function () { box.hidden = true; btn.hidden = false; btn.focus(); });
+      document.getElementById("clear-yes").addEventListener("click", function () {
+        fetch("/api/clear-finished", { method: "POST", headers: { "X-Agents-Action": "clear-finished" } })
+          .then(function (r) { if (!r.ok) { throw new Error("HTTP " + r.status); } return r.json(); })
+          .then(function () { box.hidden = true; btn.hidden = false; })
+          .catch(function () { ask.textContent = "No se pudo limpiar"; });
+      });
+      sync();
+    })();
+  </script>
+</body>
+</html>

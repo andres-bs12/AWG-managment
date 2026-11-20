@@ -1,7 +1,11 @@
+import { useEffect, useRef, useState } from 'react'
 import { StaffText } from './StaffText'
 import { Link } from 'react-router-dom'
+import { api } from '../../api/client'
+import { seedMarketPhoto } from '../../api/marketStockPhotos'
 import { Button } from '../ui/Button'
 import { ButtonLink } from '../ui/ButtonLink'
+import { marketOrnamentLabel, marketOrnamentParts } from '../../domain/marketStock'
 import type { MarketDay, OrderItem, ProductionStatus, TimeBlock } from '../../domain/types'
 import { agendaSlotPath, handoffLabel, paintSlotLabel } from '../../lib/handoff'
 import { formatEur } from '../../lib/money'
@@ -22,7 +26,11 @@ type Props = {
 }
 
 export function OrderItemCard({ item, block, days, selected, navigationState, busy, held = false, onHandover, onStatus }: Props) {
-  const title = item.petName || (item.kind === 'custom' ? 'Custom ornament' : 'Finished ornament')
+  const marketId = item.kind === 'finished' ? item.marketOrnamentId : null
+  const marketParts = marketId ? marketOrnamentParts(marketId) : null
+  const title = marketId
+    ? marketOrnamentLabel(marketId)
+    : item.petName || (item.kind === 'custom' ? 'Custom ornament' : 'Finished ornament')
   const photo = item.photos[0]
   const paintTo = `/staff/orders/${item.orderId}/paint/${item.id}`
   const blocker = handoverBlocker({ kind: item.kind, productionStatus: item.productionStatus, handedOver: Boolean(item.handedOver),
@@ -31,10 +39,28 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
   return (
     <article className={styles.card} data-selected={selected} aria-label={title}>
       <div className={styles.identity}>
-        {photo ? <Link to={paintTo} state={navigationState} className={styles.photo} aria-label={`View ${title} reference`}><img src={photo.dataUrl} alt="" /></Link> : <div className={styles.placeholder} aria-hidden="true">✧</div>}
+        {marketId ? (
+          <MarketItemPhoto id={marketId} />
+        ) : photo ? (
+          <Link to={paintTo} state={navigationState} className={styles.photo} aria-label={`View ${title} reference`}><img src={photo.dataUrl} alt="" /></Link>
+        ) : (
+          <div className={styles.placeholder} aria-hidden="true">✧</div>
+        )}
         <div className={styles.title}>
           <span className={styles.status} data-status={item.productionStatus}>{status}</span>
-          <h3 title={title}>{title}</h3>
+          {marketId ? (
+            <>
+              <h3 className={styles.marketCode} title={title} aria-label={title}>{marketId}</h3>
+              {marketParts ? (
+                <p className={styles.marketSpec}>
+                  <span className={styles.marketSwatch} style={{ background: marketParts.color.swatch }} aria-hidden="true" />
+                  <StaffText>{`${marketParts.color.label} · ${marketParts.finish.code}`}</StaffText>
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <h3 title={title}><StaffText>{title}</StaffText></h3>
+          )}
           <p><StaffText>{`${item.kind === 'custom' ? 'Personalised' : 'Ready-made'} · ${formatEur(item.cost, 'en')}`}</StaffText></p>
         </div>
       </div>
@@ -62,5 +88,44 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
         {onHandover ? <Button tone="staff" variant="secondary" disabled={busy || held || (!item.handedOver && item.productionStatus !== 'finished')} onClick={onHandover}>{item.handedOver ? 'Undo handover' : 'Hand over this one'}</Button> : null}
       </section>
     </article>
+  )
+}
+
+function MarketItemPhoto({ id }: { id: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [loaded, setLoaded] = useState<{ id: string; url: string | null } | null>(null)
+  const seeded = seedMarketPhoto(id)
+  const parts = marketOrnamentParts(id)
+
+  useEffect(() => {
+    if (!ref.current) return
+    let active = true
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return
+      observer.disconnect()
+      void api.marketStock.photo(id).then(url => {
+        if (active) setLoaded({ id, url })
+      }).catch(() => {
+        // Keep the reference photo or placeholder if the uploaded photo cannot be read.
+      })
+    }, { rootMargin: '120px' })
+    observer.observe(ref.current)
+    return () => { active = false; observer.disconnect() }
+  }, [id])
+
+  const uploaded = loaded?.id === id ? loaded.url : null
+  const src = uploaded ?? seeded
+
+  return (
+    <div ref={ref} className={styles.marketPhoto}>
+      {src ? (
+        <img src={src} alt={`Ornament ${id}`} loading="lazy" />
+      ) : (
+        <div className={styles.marketPlaceholder} aria-hidden="true">
+          {parts ? <span className={styles.marketPlaceholderSwatch} style={{ background: parts.color.swatch }} /> : null}
+          <span className={styles.marketPlaceholderCode}>{id}</span>
+        </div>
+      )}
+    </div>
   )
 }

@@ -46,3 +46,12 @@ Every non-2xx body: `{ status, message, code?, field? }`.
 - Missing/blank Stripe signature remains **400** with no body; signature verification still precedes JSON parsing. Webhook input over 256 KiB returns **413 `TOO_LARGE`**, including streamed input without Content-Length. nginx imposes its smaller 64 KiB edge limit on this path, with its standard 413 response.
 - Global Track missing-order budget: after 300 misses/hour, all further lookups return **429 `RATE_LIMITED`** before querying the order until the failure window expires. Only actual misses consume that global budget; blocking all lookups after exhaustion prevents distinguishing valid codes from invalid ones. IPv6 limiter clients share a /64.
 - Existing checkout caps are unchanged: **429 `PENDING_CHECKOUT_LIMIT`** for two pending checkouts sharing normalized email or stored client IP hash; **429 `TOO_MANY_OPEN_CHECKOUTS`** for the global pending-order cap. No migration numbers or existing error codes are replaced.
+
+## Numbered market stock and sales (2026-11-20)
+
+- New staff sale finished items require `marketOrnamentId`; custom items forbid it. Missing/duplicate IDs or IDs on custom items return **400 `VALIDATION`**, field `marketOrnamentId`. Existing order items may have null IDs.
+- Only painted pieces can be sold, atomically in the sale transaction. **409 `MARKET_STOCK_SOLD`** means another sale owns the piece; **409 `MARKET_STOCK_NOT_READY`** means it is unpainted. Unknown IDs return **404 `NOT_FOUND`**. The legacy generic stock count is untouched.
+- Stock PATCH accepts only unpainted/painted. Requesting sold or editing a sold piece (including its photo) returns **400 `MARKET_STOCK_SELL_IN_SALE`**. Stale revisions return **409 `MARKET_STOCK_CHANGED`**. Status, photo, sale and cancellation writes increment the shared revision; same-status PATCH is a no-op.
+- Stock JSON includes `orderId`/`orderCode` (null unless currently sold through an active order). Soft cancellation returns linked sold pieces to painted and clears `soldAt`; the item keeps its ID as history.
+- `OrderItemDto.marketOrnamentId`: string or null. `StatsDto.marketSales`: `{ color, finish, count }[]`, finished numbered sales grouped by red/wine/green/beige and shiny/matte, descending count; same dates and exclusions as other sales statistics.
+- JPEG photos: at most 5 MiB, decoded on the server; nginx photo route permits 6m for multipart overhead.

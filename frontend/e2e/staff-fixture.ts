@@ -1,5 +1,6 @@
 import { expect, type Page, type Route } from '@playwright/test'
 import type { AgendaDay, CreateSaleInput, Market, Order, OrderItem, TimeBlock } from '../src/domain/types'
+import type { MarketOrnament } from '../src/domain/marketStock'
 import { formatHour } from '../src/lib/time'
 
 export const staffUser = { id: 'staff-gaby', name: 'Gaby', email: 'gaby@artwithgab.com' }
@@ -15,7 +16,7 @@ export function order(id = 'order-review', overrides: Partial<Order> = {}): Orde
   return { id, customerId: `customer-${id}`, code: id === 'order-review' ? 'AWGREVIEW' : `AWG${id.toUpperCase()}`, trackToken: `track-${id}`, formToken: `form-${id}`, paymentState: 'deposit', paymentMethod: 'cash', total: 57, amountPaid: 20, createdAt: `${today}T08:00:00`, itemIds: [`item-${id}`], handedOver: false, ...overrides }
 }
 export function item(parent: Order, overrides: Partial<OrderItem> = {}): OrderItem {
-  return { id: parent.itemIds[0], orderId: parent.id, kind: 'custom', petName: 'Luna', withName: false, color: 'red', finish: 'matte', backName: '', note: '', cost: parent.total, productionStatus: 'not_started', photos: [], formComplete: true, delivery: { kind: 'market', marketId: market.id, marketDayId: marketDay.id, pickupHour: 17 }, ...overrides }
+  return { id: parent.itemIds[0], orderId: parent.id, kind: 'custom', marketOrnamentId: null, petName: 'Luna', withName: false, color: 'red', finish: 'matte', backName: '', note: '', cost: parent.total, productionStatus: 'not_started', photos: [], formComplete: true, delivery: { kind: 'market', marketId: market.id, marketDayId: marketDay.id, pickupHour: 17 }, ...overrides }
 }
 export function summary(parent: Order, checkoutStatus: string | null = null) {
   return { id: parent.id, code: parent.code, customerName: 'Alex Review', phone: '+43 660 1234567', createdAt: parent.createdAt, paymentState: parent.paymentState, checkoutStatus, total: parent.total, items: parent.itemIds.length, nextHandoffDate: today, handedOver: parent.handedOver }
@@ -58,7 +59,10 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
   let agendaStatus = 200
   let mutationError: { code: string; message: string } | null = null
   const prices = { customPrice: config.customPrice, finishedPrice: config.finishedPrice, nameExtra: config.nameExtra, revision: 0 }
-  const inventory = [...config.colors.map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, quantity: 3 })), { id: 'stock-finished', kind: 'finished', color: null, finish: null, quantity: 3 }]
+  const inventory = [...config.colors.map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, quantity: 3 })), { id: 'stock-finished', kind: 'finished', color: null, finish: null, quantity: 0 }]
+  const marketPieces: MarketOrnament[] = ['RM01', 'RM02'].map(id => ({
+    id, status: 'painted', soldAt: null, revision: 0, hasUploadedPhoto: false, orderId: null, orderCode: null,
+  }))
   let allMarkets = [market, spareMarket, ...(options.mixedHandoff ? [{ ...market, id: 'market-home', name: 'Home', kind: 'home' as const }] : [])]
   let allDays = [marketDay, ...(options.mixedHandoff ? [{ ...marketDay, id: 'day-vienna', marketId: 'market-home', date: '2026-12-02', isToday: false }] : []), ...spareDays]
   let paintingDays = [{ date: '2026-11-05', open: true, maxPaintings: 2, booked: 0, openHour: 10, closeHour: 20 }, { date: today, open: true, maxPaintings: 2, booked: 1, openHour: 10, closeHour: 20 }, { date: '2026-11-07', open: true, maxPaintings: 2, booked: 3, openHour: 10, closeHour: 20 }, ...spareDays.map(day => ({ date: day.date, open: true, maxPaintings: 2, booked: 0, openHour: 10, closeHour: 20 }))]
@@ -70,9 +74,9 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
   const day = (selectedDay = marketDay): AgendaDay => {
     const slots = [...records.values()].flatMap(parent => {
       const currentItem = items.get(parent.id), block = blocks.get(parent.id)
-      return currentItem && block?.marketDayId === selectedDay.id && parent.status !== 'CANCELLED' ? [{ block, order: parent, item: currentItem, customer: bundle(parent.id).customer }] : []
+      return currentItem && block?.marketDayId === selectedDay.id && parent.status !== 'CANCELLED' ? [{ block, order: parent, item: currentItem, customer: bundle(parent.id).customer, photoUrl: currentItem.photos[0]?.dataUrl ?? null }] : []
     })
-    const held = options.held && selectedDay.id === marketDay.id ? [{ block: { id: 'web-checkout-hold', marketDayId: marketDay.id, orderItemId: null, startHour: 15, endHour: 16, status: 'not_started' as const }, order: null, item: null, customer: null, held: true }] : []
+    const held = options.held && selectedDay.id === marketDay.id ? [{ block: { id: 'web-checkout-hold', marketDayId: marketDay.id, orderItemId: null, startHour: 15, endHour: 16, status: 'not_started' as const }, order: null, item: null, customer: null, held: true, photoUrl: null }] : []
     // The paid back name doubles as petName (v3.1), so rows are labelled by the same name as the order detail.
     const deliveries = [...records.values()].flatMap(parent => {
       const list = [items.get(parent.id)!, ...(parent.id === original.id && extraItem ? [extraItem] : [])]
@@ -96,7 +100,7 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
       return route.fulfill({ status: 204 })
     }
     if (path === '/api/shop/config') return json(route, config)
-    if (path === '/api/market-stock') return json(route, [])
+    if (path === '/api/market-stock') return json(route, marketPieces)
     if (path === '/api/inventory') return json(route, inventory)
     if (path === '/api/prices' && method === 'GET') return json(route, prices)
     if (path === '/api/markets' && method === 'GET') return json(route, allMarkets)
@@ -126,11 +130,15 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
       const input = request.postDataJSON() as CreateSaleInput
       if (mutationError) return json(route, mutationError, 409)
       const previous = createdByKey.get(key)
+      const soldPieces = marketPieces.filter(piece => input.items.some(row => row.marketOrnamentId === piece.id))
+      const unavailable = !previous && soldPieces.find(piece => piece.status !== 'painted')
+      if (unavailable) return json(route, { code: unavailable.status === 'sold' ? 'MARKET_STOCK_SOLD' : 'MARKET_STOCK_NOT_READY', message: 'Piece unavailable.' }, 409)
       const created = previous ?? order(`sale-${createdByKey.size + 1}`, { total: input.items.reduce((sum, row) => sum + (row.kind === 'custom' ? config.customPrice + (row.withName ? config.nameExtra : 0) : config.finishedPrice), 0), paymentState: 'unpaid', paymentMethod: null, amountPaid: 0 })
       if (!previous) {
+        for (const piece of soldPieces) Object.assign(piece, { status: 'sold', soldAt: new Date().toISOString(), orderId: created.id, orderCode: created.code, revision: piece.revision + 1 })
         records.set(created.id, created)
         const first = input.items[0]
-        items.set(created.id, item(created, { kind: first.kind, petName: '', formComplete: false, color: first.color, finish: first.finish, productionStatus: first.kind === 'finished' ? 'finished' : 'not_started', delivery: { kind: first.deliveryKind === 'vienna' ? 'vienna' : 'market', marketDayId: first.marketDayId ?? marketDay.id, marketId: market.id, pickupHour: first.pickupHour } }))
+        items.set(created.id, item(created, { kind: first.kind, marketOrnamentId: first.marketOrnamentId ?? null, petName: '', formComplete: false, color: first.color, finish: first.finish, productionStatus: first.kind === 'finished' ? 'finished' : 'not_started', delivery: { kind: first.deliveryKind === 'vienna' ? 'vienna' : 'market', marketDayId: first.marketDayId ?? marketDay.id, marketId: market.id, pickupHour: first.pickupHour } }))
         if (first.kind === 'custom' && first.paintStart != null && first.paintEnd != null) blocks.set(created.id, { id: `block-${created.id}`, marketDayId: allDays.find(day => day.date === first.paintDate)?.id ?? marketDay.id, orderItemId: created.itemIds[0], startHour: first.paintStart, endHour: first.paintEnd, status: 'not_started' })
         createdByKey.set(key, created)
       }
@@ -181,7 +189,7 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
     }
     return json(route, { message: `Unstubbed staff request: ${method} ${path}` }, 501)
   })
-  return { original, records, items, mutations, saleRequests, searches, get dayReads() { return dayReads }, setMeStatus(value: typeof meStatus) { meStatus = value }, setLogoutOffline() { logoutOffline = true }, expireAgenda() { agendaStatus = 401 }, rejectMutations(code: string, message: string) { mutationError = { code, message } } }
+  return { original, records, items, mutations, saleRequests, searches, marketPieces, get dayReads() { return dayReads }, setMeStatus(value: typeof meStatus) { meStatus = value }, setLogoutOffline() { logoutOffline = true }, expireAgenda() { agendaStatus = 401 }, rejectMutations(code: string, message: string) { mutationError = { code, message } } }
 }
 
 export async function navigation(page: Page, to: string) {
@@ -192,8 +200,13 @@ export async function signedIn(page: Page, to = '/staff/agenda') {
   await page.goto(to)
   await expect(page.locator('div[data-staff-page]')).toBeVisible()
 }
+export async function addFinishedPiece(page: Page, id = 'RM01') {
+  await page.getByRole('button', { name: /Add finished/ }).click()
+  await page.getByRole('dialog', { name: 'Choose a finished ornament' }).getByRole('button', { name: new RegExp(`^${id} ·`) }).click()
+}
+
 export async function newFinishedSale(page: Page) {
-  await page.getByRole('button', { name: /Add finished product/ }).click()
+  await addFinishedPiece(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.getByRole('radio', { name: 'Paid', exact: true }).locator('..').click()
   await page.getByRole('radio', { name: 'Cash', exact: true }).locator('..').click()
