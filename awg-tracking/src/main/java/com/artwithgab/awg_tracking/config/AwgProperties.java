@@ -63,7 +63,11 @@ public record AwgProperties(
     }
 
     public record Post(List<DayOfWeek> collectionWeekdays, int transitMinDays, int transitMaxDays,
-                       LocalDate lastArrival, boolean finishedWithCustom) {
+                       LocalDate lastArrival, boolean finishedWithCustom,
+                       /* First possible Post collection day; null = no floor (independent of the shop's deliveries-from). */
+                       LocalDate collectionFrom,
+                       /* No Post/web-shipping ornament is painted before this day (owner: first market, 25 Nov 2026); null = no floor. */
+                       LocalDate paintFrom) {
         public Post {
             collectionWeekdays = List.copyOf(collectionWeekdays);
             if (collectionWeekdays.isEmpty() || collectionWeekdays.stream().anyMatch(day -> day.getValue() > 5)

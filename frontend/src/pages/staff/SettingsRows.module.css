@@ -62,10 +62,87 @@
 .euroBox input[aria-invalid='true'] { color: var(--color-error); }
 .euroBox:has(input[aria-invalid='true']) { border-color: var(--color-error); }
 .fieldError { margin: 0; font-size: var(--type-staff-meta-size); color: var(--color-error); }
-.priceActions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .priceStatus { margin: 0; font-size: var(--type-staff-meta-size); color: var(--staff-muted); }
+.priceStatus:empty { display: none; }
 
 /* Stock flags: sold out is unmistakable (red), the last bottle is a warning (amber). */
 .flag { margin: 0; justify-self: start; width: fit-content; padding: var(--space-1) var(--space-2); border: var(--border-thin) solid transparent; border-radius: var(--radius-small); font-weight: 600; }
 .name .soldOut { color: var(--color-error); background: var(--color-error-surface); border-color: var(--color-error); }
 .name .lowStock { color: var(--color-warning); background: var(--color-warning-surface); border-color: var(--color-warning); }
+
+/* Post collection weekdays (C1 selection) & collection-day overrides. */
+.weekdayGroup { border: 0; margin: 0; padding: 0; display: grid; gap: var(--space-2); min-width: 0; }
+.weekdayGroup legend { padding: 0; font-size: var(--type-staff-meta-size); font-weight: 600; color: var(--staff-ink); }
+.weekdayChips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.weekdayChip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch);
+  min-height: var(--size-control-staff);
+  padding: calc(var(--space-2) + var(--border-thin)) calc(var(--space-3) + var(--border-thin));
+  border: var(--border-thin) solid var(--color-control-border);
+  border-radius: var(--radius-pill);
+  background: var(--staff-surface);
+  color: var(--staff-ink);
+  font-size: var(--type-staff-body-size);
+  font-weight: 400;
+  cursor: pointer;
+}
+.weekdayChip input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.weekdayChip[data-selected] {
+  border: var(--border-control) solid var(--color-selected);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-selected-surface);
+  color: var(--color-text);
+  font-weight: 600;
+}
+@media (hover: hover) {
+  .weekdayChip:hover:not([data-selected]) {
+    background: var(--color-selection-hover);
+    border-color: var(--color-selected);
+  }
+}
+.weekdayChip:has(input:focus-visible) {
+  box-shadow: var(--focus);
+}
+
+.overrideForm { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); }
+.dateInput {
+  min-height: var(--size-control);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-thin) solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--staff-surface);
+  color: var(--staff-ink);
+  font: inherit;
+}
+.overrideButtons { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.overrideList { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.overrideRow {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-thin) solid var(--staff-line);
+  border-radius: var(--radius-control);
+  background: var(--staff-bg);
+}
+.overrideInfo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+.overrideTag {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-staff-meta-size);
+  font-weight: 600;
+}
+.overrideTag[data-open='true'] { background: var(--color-success-surface); color: var(--color-success); }
+.overrideTag[data-open='false'] { background: var(--color-warning-surface); color: var(--color-warning); }

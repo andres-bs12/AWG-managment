@@ -23,7 +23,7 @@ for (const locale of ['de', 'en']) test(`checkout captures complete ${locale.toU
     customerName: 'Alex Example', email: 'alex@example.com', phone: '123456789',
     deliveryKind: 'post',
     address: { line1: 'Hauptstraße 1', postalCode: '1010', city: 'Wien' },
-    expectedArrivalTo: '2026-12-04',
+    expectedArrivalTo: '2026-12-02',
     acceptTerms: true,
     items: [{ color: 'red', finish: 'shiny', withName: true, backName: 'LUNA', petName: 'Luna', photos: [expect.anything()] }],
   })

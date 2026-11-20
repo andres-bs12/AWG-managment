@@ -14,7 +14,6 @@ const {
   isMarketDayValidForItems,
   isPickupInPast,
   isSlotInPast,
-  isViennaDayValidForItems,
   latestLockedPaintDate,
   lockedPaintMinHourOnDate,
   PAINT_HANDLING_HOURS,
@@ -23,7 +22,7 @@ const {
   syncSharedDelivery,
   validMarketPickupHours,
 } = await server.ssrLoadModule('/src/lib/newSaleRules.ts')
-const { applySlot, makeCustom, makeCustomFromSlot, makeFinished } = await server.ssrLoadModule('/src/pages/staff/saleDraft.ts')
+const { applySlot, buildDraftFromParams, makeCustom, makeCustomFromSlot, makeFinished, SALE_DRAFT_KEY, toCreateItems } = await server.ssrLoadModule('/src/pages/staff/saleDraft.ts')
 const { viennaClock } = await server.ssrLoadModule('/src/lib/viennaClock.ts')
 
 const rathaus = { id: 'mkt-rathaus', name: 'Rathausplatz', kind: 'market', totalCost: 2400, startDate: '2026-11-25', finishDate: '2026-12-06', stall: 12 }
@@ -108,24 +107,44 @@ test('Rule 2 & 9: past paint slots and past pickups are dropped with a notice an
   assert.equal(res.draft.items[0].delivery.pickupDate, '2026-11-28')
 })
 
-test('Rule 3 & 5: same-day paint requires >= 15 min before pickup and Vienna requires paintDate + 1', () => {
+test('Rule 3 & 5: same-day paint requires >= 15 min before pickup and legacy Vienna drafts migrate to Post', () => {
   const item = makeCustom({ paintDate: '2026-11-29', paintStart: 13, paintEnd: 14, slotLocked: true })
   assert.equal(paintFitsHandoff(item, { mode: 'market', pickupDate: '2026-11-29', pickupHour: 14 }), false)
   assert.equal(paintFitsHandoff(item, { mode: 'market', pickupDate: '2026-11-29', pickupHour: 15 }), true)
 
   const qtrItem = makeCustom({ paintDate: '2026-11-29', paintStart: 12.75, paintEnd: 13.75, slotLocked: true })
   assert.equal(paintFitsHandoff(qtrItem, { mode: 'market', pickupDate: '2026-11-29', pickupHour: 14 }), true)
+  assert.equal(paintFitsHandoff(item, { mode: 'post' }), true)
 
-  assert.equal(paintFitsHandoff(item, { mode: 'vienna', pickupDate: '2026-11-29' }), false)
-  assert.equal(paintFitsHandoff(item, { mode: 'vienna', pickupDate: '2026-12-02' }), true)
-  const monSlot = makeCustomFromSlot('2026-11-30', 10, 11)
-  const wedBefore = { id: 'v-past', marketId: 'mkt-casa', date: '2026-11-25', openHour: 10, closeHour: 12, isToday: false }
-  const wedAfter = { id: 'v-ok', marketId: 'mkt-casa', date: '2026-12-02', openHour: 10, closeHour: 12, isToday: false }
-  assert.equal(isViennaDayValidForItems(wedBefore, [monSlot], '2026-11-28', '2026-11-28', '2026-12-24', [satRathaus, sunRathaus]), false)
-  assert.equal(isViennaDayValidForItems(wedAfter, [monSlot], '2026-11-28', '2026-11-28', '2026-12-24', [satRathaus, sunRathaus]), true)
+  const postApplied = applySlot(makeCustom({ delivery: { mode: 'post' } }), '2026-12-02', 10, 11)
+  assert.equal(postApplied.delivery.mode, 'post')
+  assert.equal(postApplied.delivery.pickupDate, undefined)
 
-  const viennaApplied = applySlot(makeCustom({ delivery: { mode: 'vienna', pickupDate: '2026-12-02' } }), '2026-12-02', 10, 11)
-  assert.equal(viennaApplied.delivery.pickupDate, undefined)
+  // Legacy Vienna draft in sessionStorage migrates to Post, keeps address, drops Vienna date, and never submits vienna.
+  const store = new Map()
+  globalThis.sessionStorage = {
+    getItem: key => store.get(key) ?? null,
+    setItem: (key, val) => store.set(key, val),
+    removeItem: key => store.delete(key),
+  }
+  const legacyAddress = { line1: 'Mariahilfer Str. 10', postalCode: '1070', city: 'Wien' }
+  store.set(SALE_DRAFT_KEY, JSON.stringify({
+    differentPickups: false,
+    phase: 'delivery',
+    items: [{
+      ...makeCustom({ paintDate: '2026-11-30', paintStart: 10, paintEnd: 11, slotLocked: true }),
+      delivery: { mode: 'vienna', pickupDate: '2026-12-02', marketDayId: 'md-wed', address: legacyAddress },
+    }],
+  }))
+  const restored = buildDraftFromParams(new URLSearchParams())
+  assert.equal(restored.items[0].delivery.mode, 'post')
+  assert.equal(restored.items[0].delivery.pickupDate, undefined)
+  assert.equal(restored.items[0].delivery.marketDayId, undefined)
+  assert.deepEqual(restored.postAddress, legacyAddress)
+
+  const payload = toCreateItems(restored.items, days, satRathaus, restored.postAddress)
+  assert.equal(payload[0].deliveryKind, 'post')
+  assert.deepEqual(payload[0].address, legacyAddress)
 })
 
 test('Rule 4: multi-item shared pickup uses latest locked paint end and syncing merges cleanly', () => {

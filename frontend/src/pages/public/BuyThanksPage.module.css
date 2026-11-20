@@ -14,8 +14,6 @@
 .copyStatus:empty { display: none; }
 
 .next { display: grid; }
-.handoff { display: grid; gap: var(--space-1); }
-.when { font-size: var(--type-hint-size); line-height: var(--type-hint-line); font-weight: var(--type-body-weight); color: var(--color-text-muted); }
 
 .actions { display: grid; gap: var(--space-3); }
 

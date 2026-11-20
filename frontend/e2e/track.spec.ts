@@ -63,7 +63,7 @@ for (const locale of ['de', 'en'] as const) {
     await expect(card.getByRole('heading', { level: 1 })).toBeVisible()
     await card.evaluate(node => Promise.all(node.getAnimations().map(animation => animation.finished)))
     await expect(card).toContainText(locale === 'de' ? 'Versand per Post' : 'Shipping by post')
-    await expect(card).toContainText(locale === 'de' ? 'Zustellung voraussichtlich 3.–4. Dezember' : 'Estimated delivery 3–4 December')
+    await expect(card).toContainText(locale === 'de' ? 'Zustellung voraussichtlich 1.–2. Dezember' : 'Estimated delivery 1–2 December')
     await expect(card.getByRole('link', { name: locale === 'de' ? 'Sendung verfolgen' : 'Track parcel' })).toHaveCount(0)
     await axe(page)
 
@@ -77,8 +77,45 @@ for (const locale of ['de', 'en'] as const) {
     await expect(card.getByRole('heading', { level: 1 })).toBeVisible()
     await card.evaluate(node => Promise.all(node.getAnimations().map(animation => animation.finished)))
     await expect(card.locator('[class*="chipDone"]')).toHaveText(locale === 'de' ? 'Versendet' : 'Shipped')
+    // No repeated text on one screen: Versendet/Shipped appears once (chip only), progress step uses Versand/Shipping.
+    await expect(card.getByText(locale === 'de' ? 'Versendet' : 'Shipped', { exact: true })).toHaveCount(1)
+    await expect(card.getByRole('navigation').getByText(locale === 'de' ? 'Versand' : 'Shipping', { exact: true })).toBeVisible()
     const parcelLink = card.getByRole('link', { name: locale === 'de' ? 'Sendung verfolgen' : 'Track parcel', exact: true })
     await expect(parcelLink).toHaveAttribute('href', 'https://www.post.at/s/sendungsdetails?snr=10123456789012345678')
+    await axe(page)
+  })
+
+  test(`market pickup on Track links the market to Google Maps (${locale})`, async ({ page }) => {
+    await page.addInitScript(lang => localStorage.setItem('awg-locale', lang), locale)
+    await page.goto('/track')
+    const code = await page.evaluate(async () => {
+      const path = '/src/api/client.ts'; const { api } = await import(path)
+      const items = [{ kind: 'custom' as const, withName: false }]
+      const [day] = await api.shop.listPickupDays(items)
+      const created = await api.shop.checkout({
+        customerName: 'Mia Markt', email: 'mia@example.at', phone: '+43 660 1234567', deliveryKind: 'market',
+        marketDayId: day.marketDayId, deliveryDate: day.date, pickupTime: day.openTime, acceptTerms: true,
+        items: [{ kind: 'custom', color: 'red', finish: 'shiny', withName: false, petName: '', photos: [{ id: 'p1', name: 'pet.png', dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' }] }],
+      })
+      return created.orderCode
+    })
+    await page.goto(`/track/${code}`)
+    const card = page.locator('section[aria-live]')
+    await expect(card.getByRole('heading', { level: 1 })).toBeVisible()
+    await card.evaluate(node => Promise.all(node.getAnimations().map(animation => animation.finished)))
+    const link = card.getByRole('link', { name: locale === 'de' ? /^Rathausplatz.* auf Google Maps öffnen$/ : /^Open Rathausplatz.* in Google Maps$/ })
+    await expect(link).toHaveAttribute('href', `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('Rathausplatz, Wien')}`)
+    await expect(link).toHaveAttribute('target', '_blank')
+    await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    // Inside a sentence the link keeps the line height, but its hit area is still 44px tall.
+    // The link may wrap on narrow screens: probe the first line box, 20px above and below its centre.
+    await link.scrollIntoViewIfNeeded()
+    const hits = await link.evaluate(node => {
+      const rect = node.getClientRects()[0]
+      const at = (dy: number) => document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2 + dy)?.closest('a') === node
+      return [at(0), at(-20), at(20)]
+    })
+    expect(hits).toEqual([true, true, true])
     await axe(page)
   })
 }

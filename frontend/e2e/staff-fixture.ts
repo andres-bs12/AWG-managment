@@ -1,7 +1,8 @@
 import { expect, type Page, type Route } from '@playwright/test'
-import type { AgendaDay, CreateSaleInput, Market, Order, OrderItem, TimeBlock } from '../src/domain/types'
+import type { AgendaDay, CreateSaleInput, Market, Order, OrderItem, PostCollectionWeekday, TimeBlock } from '../src/domain/types'
 import type { MarketOrnament } from '../src/domain/marketStock'
-import { formatHour } from '../src/lib/time'
+import { isCollectionOn, isWorkingDay, postTrackingUrl, shippingWindowAfter } from '../src/lib/postShipping'
+import { addUtcDays, formatHour } from '../src/lib/time'
 
 export const staffUser = { id: 'staff-gaby', name: 'Gaby', email: 'gaby@artwithgab.com' }
 export const today = '2026-11-06'
@@ -22,7 +23,7 @@ export function summary(parent: Order, checkoutStatus: string | null = null) {
   return { id: parent.id, code: parent.code, customerName: 'Alex Review', phone: '+43 660 1234567', createdAt: parent.createdAt, paymentState: parent.paymentState, checkoutStatus, total: parent.total, items: parent.itemIds.length, nextHandoffDate: today, handedOver: parent.handedOver }
 }
 
-type FixtureOptions = { multi?: boolean; mixedHandoff?: boolean; finished?: boolean; handedOver?: boolean; held?: boolean; attention?: boolean; missingForm?: boolean; controlledClock?: boolean; checkoutStatus?: 'pending' | 'review' }
+type FixtureOptions = { multi?: boolean; mixedHandoff?: boolean; finished?: boolean; handedOver?: boolean; held?: boolean; attention?: boolean; missingForm?: boolean; controlledClock?: boolean; checkoutStatus?: 'pending' | 'review'; extraAgendaDays?: AgendaDay[] }
 
 /**
  * Serve the actual HTTP entry in the existing Vite test server. Only the selected
@@ -58,7 +59,24 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
   let logoutOffline = false
   let agendaStatus = 200
   let mutationError: { code: string; message: string } | null = null
-  const prices = { customPrice: config.customPrice, finishedPrice: config.finishedPrice, nameExtra: config.nameExtra, revision: 0 }
+  const prices: {
+    customPrice: number
+    finishedPrice: number
+    nameExtra: number
+    shippingFee: number
+    postCollectionDays: PostCollectionWeekday[]
+    finishedWithCustom: boolean
+    revision: number
+  } = {
+    customPrice: config.customPrice,
+    finishedPrice: config.finishedPrice,
+    nameExtra: config.nameExtra,
+    shippingFee: 5,
+    postCollectionDays: ['tuesday', 'friday'],
+    finishedWithCustom: true,
+    revision: 0,
+  }
+  const collectionOverrides: Record<string, boolean> = {}
   const inventory = [...config.colors.map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, quantity: 3 })), { id: 'stock-finished', kind: 'finished', color: null, finish: null, quantity: 0 }]
   const marketPieces: MarketOrnament[] = ['RM01', 'RM02'].map(id => ({
     id, status: 'painted', soldAt: null, revision: 0, hasUploadedPhoto: false, orderId: null, orderCode: null,
@@ -103,6 +121,32 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
     if (path === '/api/market-stock') return json(route, marketPieces)
     if (path === '/api/inventory') return json(route, inventory)
     if (path === '/api/prices' && method === 'GET') return json(route, prices)
+    if (path === '/api/shipping/window' && method === 'POST') {
+      const body = request.postDataJSON() as { readyOn: string }
+      return json(route, shippingWindowAfter(body.readyOn, { collectionDays: prices.postCollectionDays, overrides: collectionOverrides }))
+    }
+    if (path === '/api/shipping/collection-days' && method === 'GET') {
+      const from = url.searchParams.get('from') ?? today
+      const to = url.searchParams.get('to') ?? '2026-12-24'
+      const list = []
+      for (let cursor = from; cursor <= to; cursor = addUtcDays(cursor, 1)) {
+        const open = isCollectionOn(cursor, { collectionDays: prices.postCollectionDays, overrides: collectionOverrides })
+        const override = collectionOverrides[cursor] ?? null
+        if (open || override !== null) list.push({ date: cursor, open, override })
+      }
+      return json(route, list)
+    }
+    if (path.startsWith('/api/shipping/collection-days/') && method === 'PUT') {
+      const date = decodeURIComponent(path.split('/').pop()!)
+      const body = request.postDataJSON() as { open: boolean | null }
+      mutations.push({ path, body })
+      if (body.open === true && !isWorkingDay(date)) {
+        return json(route, { code: 'VALIDATION', field: 'open', message: 'Post collections must be on a working day.' }, 400)
+      }
+      if (body.open == null) delete collectionOverrides[date]
+      else collectionOverrides[date] = body.open
+      return route.fulfill({ status: 204 })
+    }
     if (path === '/api/markets' && method === 'GET') return json(route, allMarkets)
     if (path === '/api/market-days') return json(route, allDays.filter(row => !url.searchParams.has('marketId') || row.marketId === url.searchParams.get('marketId')))
     if (path === '/api/painting-days') return json(route, paintingDays.filter(row => row.date >= (url.searchParams.get('from') ?? '') && row.date <= (url.searchParams.get('to') ?? '9999')))
@@ -116,7 +160,13 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
     if (path === '/api/agenda/days' || path.startsWith('/api/agenda/days/')) {
       dayReads++
       if (agendaStatus !== 200) return json(route, { code: 'UNAUTHORIZED', message: 'Session expired.' }, agendaStatus)
-      return json(route, path === '/api/agenda/days' ? allDays.map(selectedDay => day(selectedDay)) : day())
+      if (path === '/api/agenda/days') {
+        const base = allDays.map(selectedDay => day(selectedDay))
+        const extras = options.extraAgendaDays ?? []
+        const extraDates = new Set(extras.map(d => d.marketDay.date))
+        return json(route, [...base.filter(d => !extraDates.has(d.marketDay.date)), ...extras])
+      }
+      return json(route, day())
     }
     if (path === '/api/agenda/capacity') return json(route, { ok: true, slot: { date: today, startHour: 13, endHour: 14 }, remainingHours: 4, message: 'Available' })
     if (path === '/api/agenda/move-suggestion') return json(route, null)
@@ -133,12 +183,15 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
       const soldPieces = marketPieces.filter(piece => input.items.some(row => row.marketOrnamentId === piece.id))
       const unavailable = !previous && soldPieces.find(piece => piece.status !== 'painted')
       if (unavailable) return json(route, { code: unavailable.status === 'sold' ? 'MARKET_STOCK_SOLD' : 'MARKET_STOCK_NOT_READY', message: 'Piece unavailable.' }, 409)
-      const created = previous ?? order(`sale-${createdByKey.size + 1}`, { total: input.items.reduce((sum, row) => sum + (row.kind === 'custom' ? config.customPrice + (row.withName ? config.nameExtra : 0) : config.finishedPrice), 0), paymentState: 'unpaid', paymentMethod: null, amountPaid: 0 })
+      const hasPost = input.items.some(row => row.deliveryKind === 'post')
+      const baseTotal = input.items.reduce((sum, row) => sum + (row.kind === 'custom' ? config.customPrice + (row.withName ? config.nameExtra : 0) : config.finishedPrice), 0)
+      const created = previous ?? order(`sale-${createdByKey.size + 1}`, { total: Math.round((baseTotal + (hasPost ? prices.shippingFee : 0)) * 100) / 100, deliveryFee: hasPost ? prices.shippingFee : 0, paymentState: 'unpaid', paymentMethod: null, amountPaid: 0 })
       if (!previous) {
         for (const piece of soldPieces) Object.assign(piece, { status: 'sold', soldAt: new Date().toISOString(), orderId: created.id, orderCode: created.code, revision: piece.revision + 1 })
         records.set(created.id, created)
         const first = input.items[0]
-        items.set(created.id, item(created, { kind: first.kind, marketOrnamentId: first.marketOrnamentId ?? null, petName: '', formComplete: false, color: first.color, finish: first.finish, productionStatus: first.kind === 'finished' ? 'finished' : 'not_started', delivery: { kind: first.deliveryKind === 'vienna' ? 'vienna' : 'market', marketDayId: first.marketDayId ?? marketDay.id, marketId: market.id, pickupHour: first.pickupHour } }))
+        const win = first.deliveryKind === 'post' ? shippingWindowAfter(first.paintDate ?? today, { collectionDays: prices.postCollectionDays, overrides: collectionOverrides }) : null
+        items.set(created.id, item(created, { kind: first.kind, marketOrnamentId: first.marketOrnamentId ?? null, petName: '', formComplete: false, color: first.color, finish: first.finish, productionStatus: first.kind === 'finished' ? 'finished' : 'not_started', delivery: first.deliveryKind === 'post' ? { kind: 'post', deliveryDate: win?.collectionDate ?? undefined, arrivalFrom: win?.arrivalFrom ?? null, arrivalTo: win?.arrivalTo ?? null, address: first.address ?? null } : { kind: first.deliveryKind === 'vienna' ? 'vienna' : 'market', marketDayId: first.marketDayId ?? marketDay.id, marketId: market.id, pickupHour: first.pickupHour } }))
         if (first.kind === 'custom' && first.paintStart != null && first.paintEnd != null) blocks.set(created.id, { id: `block-${created.id}`, marketDayId: allDays.find(day => day.date === first.paintDate)?.id ?? marketDay.id, orderItemId: created.itemIds[0], startHour: first.paintStart, endHour: first.paintEnd, status: 'not_started' })
         createdByKey.set(key, created)
       }
@@ -151,7 +204,14 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
       if (mutationError) return json(route, mutationError, 409)
       if (method === 'PUT' && path === '/api/prices') {
         if (body.expectedRevision !== prices.revision) return json(route, { code: 'PRICES_CHANGED', message: 'Someone changed the prices meanwhile.' }, 409)
-        Object.assign(prices, { customPrice: body.customPrice, finishedPrice: body.finishedPrice, nameExtra: body.nameExtra, revision: prices.revision + 1 })
+        Object.assign(prices, {
+          customPrice: body.customPrice,
+          finishedPrice: body.finishedPrice,
+          nameExtra: body.nameExtra,
+          shippingFee: body.shippingFee ?? prices.shippingFee,
+          postCollectionDays: body.postCollectionDays ?? prices.postCollectionDays,
+          revision: prices.revision + 1,
+        })
         return json(route, prices)
       }
       if (method === 'PATCH' && path.startsWith('/api/inventory/')) {
@@ -172,7 +232,18 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
         return json(route, parent)
       }
       const handed = /^\/api\/orders\/([^/]+)\/handed-over$/.exec(path)
-      if (handed) { const parent = records.get(handed[1])!; const list = [items.get(handed[1])!, ...(handed[1] === original.id && extraItem ? [extraItem] : [])]; for (const row of list) if (!body.itemIds || body.itemIds.includes(row.id)) row.handedOver = body.handedOver; parent.handedOver = list.every(row => row.handedOver); return route.fulfill({ status: 204 }) }
+      if (handed) {
+        const parent = records.get(handed[1])!
+        const list = [items.get(handed[1])!, ...(handed[1] === original.id && extraItem ? [extraItem] : [])]
+        if (body.trackingNumber !== undefined) {
+          const clean = (body.trackingNumber ?? '').trim() || null
+          parent.trackingNumber = clean
+          parent.trackingUrl = postTrackingUrl(clean)
+        }
+        for (const row of list) if (!body.itemIds || body.itemIds.includes(row.id)) row.handedOver = body.handedOver
+        parent.handedOver = list.every(row => row.handedOver)
+        return route.fulfill({ status: 204 })
+      }
       const cancelled = /^\/api\/orders\/([^/]+)\/cancel$/.exec(path)
       if (cancelled) { Object.assign(records.get(cancelled[1])!, { status: 'CANCELLED', cancelledAt: new Date().toISOString(), cancellationReason: body.reason }); return route.fulfill({ status: 204 }) }
       const status = /^\/api\/orders\/([^/]+)\/items\/[^/]+\/status$/.exec(path)

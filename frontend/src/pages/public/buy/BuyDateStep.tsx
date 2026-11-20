@@ -2,6 +2,7 @@ import styles from '../BuyPage.module.css'
 import { pickupTimes, selectedPickupDay, type BuyStepProps } from './shared'
 import { useLocale } from '../../../i18n/LocaleContext'
 import { Button } from '../../../components/ui/Button'
+import { MarketMapLink } from '../../../components/public/MarketMapLink'
 import { formatEur } from '../../../lib/money'
 import { formatArrivalWithWeekdays } from '../../../lib/postShipping'
 import type { DeliveryKind, ShopPickupDay } from '../../../domain/types'
@@ -82,14 +83,13 @@ function PickupSection({ t, draft, pickupDays, pickupState, setDatesRetry, patch
   const summary = day ? [day.marketName, compactDate(day.date), draft.pickupTime && t('timeOClock', { time: draft.pickupTime })].filter(Boolean).join(' · ') : ''
   const emptyReady = pickupState === 'ready' && pickupDays.length === 0
   return <>
-    {!emptyReady && <p className={styles.sectionLead}>{t('pickupLead')}</p>}
     <p id={emptyReady ? 'buy-date' : undefined} tabIndex={emptyReady ? -1 : undefined} className={styles.muted} role="status" hidden={pickupState === 'ready' && pickupDays.length > 0}>{pickupState === 'loading' ? t('pickupDaysLoading') : pickupState === 'error' ? t('pickupDaysError') : emptyReady ? t('pickupDaysNone') : ''}</p>
     {pickupState === 'error' && <Button variant="secondary" onClick={() => setDatesRetry(value => value + 1)}>{t('shopRetry')}</Button>}
     {!emptyReady && <div className={styles.pickupDayGroup}>
     <fieldset id="buy-date" tabIndex={-1} className={styles.chips} aria-busy={pickupState === 'loading'} aria-describedby={described('buy-date')}><legend>{t('pickupDayHeading')}</legend>
       {(pickupState === 'loading' || pickupState === 'idle') && <div className={styles.pickupDays} aria-hidden="true"><div className={styles.dateSkeleton} /><div className={styles.dateSkeleton} /></div>}
       {pickupState === 'ready' && markets.map(place => <div key={place} className={styles.pickupMarket}>
-        <h3>{place}</h3>
+        <h3><MarketMapLink name={pickupDays.find(entry => pickupPlace(entry, t) === place)!.marketName} label={place} /></h3>
         <div className={styles.pickupDays}>{pickupDays.filter(entry => pickupPlace(entry, t) === place).map(entry => <label key={entry.marketDayId ?? entry.date} className={styles.choiceCard} data-selected={day === entry}>
           <input className={styles.choiceInput} type="radio" name="pickup-day" value={entry.marketDayId ?? entry.date} aria-label={`${formatDate(entry.date)}, ${hours(entry)}, ${place}`} checked={day === entry} onChange={() => patch({
             deliveryDate: entry.date,

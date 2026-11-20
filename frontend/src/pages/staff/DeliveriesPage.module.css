@@ -75,6 +75,7 @@
 .filters > * { min-width: 0; }
 .group { display: grid; gap: var(--space-3); margin-top: 0; }
 .group h2 { margin-bottom: var(--space-1); font-size: var(--type-staff-h2-size); }
+.shipGroups { display: grid; gap: var(--space-5); }
 .quickDay { display: grid; gap: var(--space-1); font-size: var(--type-staff-meta-size); font-weight: 600; }
 .quickDay select { width: 100%; min-width: 0; padding: var(--space-2); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control); background: var(--staff-surface); color: var(--staff-ink); }
 @media (min-width: 768px) { .quickDay { display: none; } }

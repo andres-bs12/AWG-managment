@@ -10,6 +10,7 @@ import { ornamentName, reviewTitle } from '../../../lib/ornamentTitle'
 import { CartRows } from './CartRows'
 import { colorKeys } from './shared'
 import { pickupPlace, useCompactDate } from './BuyDateStep'
+import { MarketMapLink } from '../../../components/public/MarketMapLink'
 
 type Props = Pick<BuyStepProps, 't' | 'draft' | 'config' | 'itemPrice' | 'formatDate' | 'patch' | 'err' | 'described' | 'serverError' | 'shippingQuote' | 'pickupDays'> & {
   go: (step: number, uid?: string, substep?: number, field?: string) => void
@@ -45,7 +46,7 @@ export function BuyReviewStep({ t, draft, config, itemPrice, formatDate, patch, 
     <ReviewCard title={pickup ? t('methodMarket') : t('methodPost')} changed={changed === 'delivery'}
       action={{ label: t('change'), ariaLabel: t('editDeliveryShort'), onClick: () => go(2, undefined, undefined, 'buy-date') }}
       rows={pickup ? [
-        ...(day ? [{ label: t('pickupWhere'), value: pickupPlace(day, t) }] : []),
+        ...(day ? [{ label: t('pickupWhere'), value: <MarketMapLink name={day.marketName} label={pickupPlace(day, t)} /> }] : []),
         { label: t('yourDate'), value: day ? `${compactDate(day.date)} · ${t('timeOClock', { time: draft.pickupTime })}` : formatDate(draft.deliveryDate) },
       ] : [
         { label: t('estimatedDelivery'), value: range },

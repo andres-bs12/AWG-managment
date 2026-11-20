@@ -15,6 +15,7 @@ import { StaffFilters } from '../../components/staff/StaffFilters'
 import { StaffText } from '../../components/staff/StaffText'
 import type { AgendaDay, DeliveryKind, ProductionStatus } from '../../domain/types'
 import { formatHour } from '../../lib/time'
+import { formatStaffShortDate } from '../../lib/postShipping'
 import { groupDeliveryOrders, remainingDeliveries, type DatedDelivery } from '../../lib/staffDeliveries'
 import styles from './DeliveriesPage.module.css'
 
@@ -31,11 +32,9 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: 'finished', label: 'Finished' },
 ]
 
-const KIND_OPTIONS: { value: KindFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'market', label: 'Market' },
-  { value: 'vienna', label: 'Vienna' },
-]
+function parseKindParam(raw: string | null): KindFilter {
+  return raw === 'market' || raw === 'post' || raw === 'vienna' ? raw : 'all'
+}
 
 /** Route order: Vienna postcode, falling back to the address line when no postcode is stored. */
 function routeKey(row: DatedDelivery): string {
@@ -73,8 +72,10 @@ export function DeliveriesPage() {
   const dayFilter: DayFilter = dayParam || 'all'
   const [days, setDays] = useState<AgendaDay[]>([])
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [kindFilter, setKindFilter] = useState<KindFilter>('all')
+  const kindFilter: KindFilter = parseKindParam(params.get('kind'))
   const [handoffError, setHandoffError] = useState('')
+  const [shipBusy, setShipBusy] = useState(false)
+  const shipLock = useRef(false)
   // Rows keep the position they were first shown in until the filters change: a handover or an undo
   // never moves another order's button under the finger. New rows go after the known ones.
   const positions = useRef({ view: '', order: new Map<string, number>() })
@@ -102,6 +103,13 @@ export function DeliveriesPage() {
     const next = new URLSearchParams(params)
     if (value === 'all') next.delete('day')
     else next.set('day', value)
+    setParams(next)
+  }
+
+  function setKindFilter(value: KindFilter) {
+    const next = new URLSearchParams(params)
+    if (value === 'all') next.delete('kind')
+    else next.set('kind', value)
     setParams(next)
   }
 
@@ -136,13 +144,48 @@ export function DeliveriesPage() {
     void handover.request(row.orderId, target, row.count ? undefined : row.itemId, row.count ? matchingIds : undefined)
   }
 
+  async function handToPost(row: DatedDelivery, trackingNumber: string) {
+    setHandoverStatus('')
+    setHandoffError('')
+    const postItems = (row.members ?? [row]).filter(item => item.deliveryKind === 'post')
+    const allPostFinished = postItems.length > 0 && postItems.every(item => item.productionStatus === 'finished')
+    const postIds = postItems.filter(item => !item.handedOver).map(item => item.itemId)
+    if (!allPostFinished || !postIds.length) return
+    if ((row.remaining ?? 0) > 0) {
+      void handover.request(row.orderId, true, undefined, postIds, trackingNumber)
+      return
+    }
+    if (shipLock.current) return
+    shipLock.current = true
+    setShipBusy(true)
+    try {
+      await api.orders.setHandedOver(row.orderId, true, postIds, trackingNumber || undefined)
+      setHandoverStatus(`${row.orderCode} · handed to Post.`)
+      setReload(n => n + 1)
+    } catch (err) {
+      setHandoffError(err instanceof Error ? err.message : 'Could not mark parcel as handed to Post.')
+    } finally {
+      shipLock.current = false
+      setShipBusy(false)
+    }
+  }
+
   const dated = useMemo(() => flattenDays(days), [days])
+  const hasLegacyVienna = useMemo(() => dated.some(row => row.deliveryKind === 'vienna'), [dated])
+  const kindOptions: { value: KindFilter; label: string }[] = useMemo(() => [
+    { value: 'all', label: 'All' },
+    { value: 'market', label: 'Market' },
+    { value: 'post', label: 'Post' },
+    ...(hasLegacyVienna ? [{ value: 'vienna' as const, label: 'Vienna' }] : []),
+  ], [hasLegacyVienna])
+  const effectiveKind: KindFilter = kindFilter === 'vienna' && !hasLegacyVienna ? 'all' : kindFilter
+  const shipView = !routeMode && effectiveKind === 'post'
   const filtered = dated.filter(row => {
     if (!includePast && dayFilter === 'all' && row.date < todayDate) return false
     if (routeMode && row.deliveryKind !== 'vienna') return false
     if (dayFilter !== 'all' && row.date !== dayFilter) return false
-    if (kindFilter !== 'all' && row.deliveryKind !== kindFilter) return false
-    if (!routeMode && kindFilter !== 'vienna' && marketFilter !== 'all' && row.marketId !== marketFilter) return false
+    if (effectiveKind !== 'all' && row.deliveryKind !== effectiveKind) return false
+    if (!routeMode && effectiveKind !== 'vienna' && effectiveKind !== 'post' && marketFilter !== 'all' && row.marketId !== marketFilter) return false
     if (statusFilter !== 'all' && row.productionStatus !== statusFilter) return false
     return true
   })
@@ -150,6 +193,17 @@ export function DeliveriesPage() {
   const grouped = groupDeliveryOrders(filtered, dated)
   // The run follows the route, not the order of first sight. A postcode never changes on handover, so the list stays put.
   const orders = routeMode ? [...grouped].sort(byPostcode) : stableOrder(grouped)
+  const shipGroups = useMemo(() => {
+    if (!shipView) return []
+    const byDate = new Map<string, DatedDelivery[]>()
+    for (const order of orders) {
+      const date = (order.members?.find(item => item.deliveryKind === 'post') ?? order).date
+      const bucket = byDate.get(date) ?? []
+      bucket.push(order)
+      byDate.set(date, bucket)
+    }
+    return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [shipView, orders])
   const activeIds = new Set(filtered.map(item => item.itemId))
   const remainingCount = remainingDeliveries(orders, routeMode, activeIds)
 
@@ -162,7 +216,8 @@ export function DeliveriesPage() {
   )
 
   const emptyMessage = (() => {
-    if (statusFilter !== 'all' || kindFilter !== 'all' || marketFilter !== 'all') return 'No deliveries match these filters.'
+    if (shipView) return 'No Post parcels match these filters.'
+    if (statusFilter !== 'all' || effectiveKind !== 'all' || marketFilter !== 'all') return 'No deliveries match these filters.'
     if (dayFilter !== 'all') return 'No deliveries for this day.'
     return 'No deliveries in the agenda.'
   })()
@@ -178,22 +233,30 @@ export function DeliveriesPage() {
   }
   if (loading && !days.length) return <p role="status">Loading deliveries…</p>
 
+  const activeMarketFilterCount = Number(!routeMode && effectiveKind !== 'vienna' && effectiveKind !== 'post' && marketFilter !== 'all')
+
   return (
     <section>
       <StaffBackLink to="/staff/agenda" label="Agenda" />
       <div className={styles.head}>
-        <h1>{routeMode ? 'Delivery run' : 'Deliveries'}</h1>
-        {routeMode ? <p className={styles.hint}>{remainingCount} {remainingCount === 1 ? 'ornament' : 'ornaments'} remaining</p> : <Button tone="staff" onClick={() => { const next = new URLSearchParams(params); next.set('mode', 'route'); if (!dayParam) { const today = days.find(day => day.marketDay.isToday); if (today) next.set('day', today.marketDay.date) } setParams(next); setKindFilter('all'); setStatusFilter('all') }}>Open delivery run</Button>}
+        <h1>{routeMode ? 'Delivery run' : shipView ? 'Ship · Post' : 'Deliveries'}</h1>
+        {routeMode ? (
+          <p className={styles.hint}>{remainingCount} {remainingCount === 1 ? 'ornament' : 'ornaments'} remaining</p>
+        ) : shipView && orders.length > 0 ? (
+          <p className={styles.hint}>{orders.filter(order => !order.handedOver).length} of {orders.length} {orders.length === 1 ? 'parcel' : 'parcels'} to hand to Post</p>
+        ) : !shipView && hasLegacyVienna ? (
+          <Button tone="staff" onClick={() => { const next = new URLSearchParams(params); next.set('mode', 'route'); next.delete('kind'); if (!dayParam) { const today = days.find(day => day.marketDay.isToday); if (today) next.set('day', today.marketDay.date) } setParams(next); setStatusFilter('all') }}>Open delivery run</Button>
+        ) : null}
       </div>
 
       <div className={styles.panel}>
-        <StaffFilters mobileInline count={Number(dayFilter !== 'all') + Number(statusFilter !== 'all') + Number(kindFilter !== 'all') + Number(!routeMode && kindFilter !== 'vienna' && marketFilter !== 'all') + Number(includePast)} inline={<label className={styles.quickDay}>Day<select aria-label="Delivery day" value={dayFilter} onChange={event => setDayFilter(event.target.value)}>{dayOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}>
+        <StaffFilters mobileInline count={Number(dayFilter !== 'all') + Number(statusFilter !== 'all') + Number(effectiveKind !== 'all') + activeMarketFilterCount + Number(includePast)} inline={<label className={styles.quickDay}>Day<select aria-label="Delivery day" value={dayFilter} onChange={event => setDayFilter(event.target.value)}>{dayOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}>
         <div className={styles.filters}>
           <div className={styles.dayFilters}><SegmentedControl legend="Day" name="delivery-day" value={dayFilter} onChange={setDayFilter} options={dayOptions} /></div>
           {!routeMode ? <>
             <SegmentedControl legend="Production" name="delivery-status" value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
-            <SegmentedControl legend="Handoff" name="delivery-kind" value={kindFilter} onChange={setKindFilter} options={KIND_OPTIONS} />
-            {marketOptions.length > 1 && kindFilter !== 'vienna' && <Field label="Pickup market" htmlFor="deliveries-market">
+            <SegmentedControl legend="Handoff" name="delivery-kind" value={effectiveKind} onChange={setKindFilter} options={kindOptions} />
+            {marketOptions.length > 1 && effectiveKind !== 'vienna' && effectiveKind !== 'post' && <Field label="Pickup market" htmlFor="deliveries-market">
               <select id="deliveries-market" value={marketFilter} onChange={event => setStallFilter({ activeId, value: event.target.value })}>
                 <option value="all">Any market</option>
                 {marketOptions.map(market => <option key={market.id} value={market.id}>{market.name}</option>)}
@@ -209,9 +272,22 @@ export function DeliveriesPage() {
 
         {orders.length === 0 ? (
           <p className={styles.empty}>{emptyMessage}</p>
+        ) : shipView ? (
+          <div className={styles.shipGroups}>
+            {shipGroups.map(([date, groupOrders]) => (
+              <section key={date} className={styles.group} aria-labelledby={`ship-day-${date}`}>
+                <h2 id={`ship-day-${date}`}>
+                  <StaffText>{`Post · ${formatStaffShortDate(date)}`}</StaffText>
+                </h2>
+                {groupOrders.map(row => (
+                  <DeliveryOrderCard key={row.orderId} row={row} from={`/staff/deliveries?${params}`} routeMode={false} busy={handover.busy || shipBusy} activeIds={activeIds} hideDueDate onToggle={toggle} onHandToPost={(r, t) => void handToPost(r, t)} />
+                ))}
+              </section>
+            ))}
+          </div>
         ) : (
           <div className={styles.group}>
-            {orders.map(row => <DeliveryOrderCard key={row.orderId} row={row} from={`/staff/deliveries?${params}`} routeMode={routeMode} busy={handover.busy} activeIds={activeIds} onToggle={toggle} />)}
+            {orders.map(row => <DeliveryOrderCard key={row.orderId} row={row} from={`/staff/deliveries?${params}`} routeMode={routeMode} busy={handover.busy || shipBusy} activeIds={activeIds} onToggle={toggle} onHandToPost={(r, t) => void handToPost(r, t)} />)}
           </div>
         )}
       </div>

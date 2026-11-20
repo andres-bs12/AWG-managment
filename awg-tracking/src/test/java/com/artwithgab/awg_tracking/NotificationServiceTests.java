@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @Import(TestClockConfig.class)
 @TestPropertySource(properties = {
+        "awg.post.collection-from=2026-11-30",
+        "awg.post.paint-from=",
     "spring.datasource.url=jdbc:h2:mem:notifications;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
     "spring.datasource.driver-class-name=org.h2.Driver", "spring.datasource.username=sa", "spring.datasource.password=",
     "spring.jpa.hibernate.ddl-auto=create-drop", "spring.flyway.enabled=false",

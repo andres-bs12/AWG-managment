@@ -1,0 +1,9 @@
+/* Market name → Google Maps. Plain text colour with an underline (never the selection colour); 44px target. */
+.link { display: inline-flex; align-items: center; gap: var(--space-1); min-height: var(--touch); color: var(--color-text); font-weight: var(--type-button-weight); text-decoration: underline; text-underline-offset: var(--space-1); overflow-wrap: anywhere; }
+.pin { flex: none; width: var(--size-icon-sm); height: var(--size-icon-sm); fill: none; stroke: currentColor; stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; }
+.link:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--radius-control); }
+
+/* Inside a sentence the line height stays; an invisible band around the link still gives a 44px target. */
+.inline { position: relative; display: inline; min-height: 0; }
+.inline .pin { display: inline-block; vertical-align: -2px; margin-inline-end: var(--space-1); }
+.inline::after { content: ''; position: absolute; inset: calc((1lh - var(--touch)) / 2) 0; }

@@ -1,4 +1,5 @@
-import { OrderTimeline } from '../../components/public/OrderTimeline'
+import { OrderTimeline, type TimelineStep } from '../../components/public/OrderTimeline'
+import { MarketMapLink } from '../../components/public/MarketMapLink'
 import { PublicPage, PageHeader } from '../../components/public/PublicForm'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -81,18 +82,32 @@ export function BuyThanksPage() {
   const arrivalFrom = when?.arrivalFrom ?? view?.delivery?.arrivalFrom ?? null
   const arrivalTo = when?.arrivalTo ?? view?.delivery?.arrivalTo ?? null
   const isPost = when?.kind === 'post' || view?.delivery?.kind === 'post'
-  // The handoff step: what on the first line, when on the second.
+  // The handoff step: the title on one line, the range or the pickup slot (and its map link) below.
+  const isMarket = !isPost && when?.kind === 'market'
   const handoffWhen = isPost
     ? arrivalFrom && arrivalTo
       ? t('estimatedArrivalPhrase', { range: formatArrivalRange(arrivalFrom, arrivalTo, locale) })
       : null
     : when?.date
-      ? when.kind === 'market'
-        ? [when.marketName, longDate(when.date), when.fromHour != null && t('timeOClock', { time: clock(when.fromHour) })].filter(Boolean).join(' · ')
+      ? isMarket
+        ? [longDate(when.date), when.fromHour != null && t('timeOClock', { time: clock(when.fromHour) })].filter(Boolean).join(' · ')
         : deliveryDatePhrase(when.date, locale)
       : null
-  const handoffTitle = isPost ? t('methodPost') : t(when?.kind === 'market' ? 'pickupTimeline' : 'deliveryTimeline')
-  const handoffLabel = <span className={thanks.handoff}><span>{handoffTitle}</span>{handoffWhen && <small className={thanks.when}>{handoffWhen}</small>}</span>
+  const handoffTitle = isPost ? t('methodPost') : t(isMarket ? 'pickupTimeline' : 'deliveryTimeline')
+  // Painting is the current step until the order is ready; the handoff is current from then on.
+  const progress = view?.status === 'shipped' || view?.status === 'delivered' ? 3 : view?.status === 'ready' ? 2 : 1
+  const stateOf = (index: number): TimelineStep['state'] => index < progress ? 'done' : index === progress ? 'current' : 'upcoming'
+  const steps: TimelineStep[] = [
+    { icon: 'check', title: t('paidTimeline'), state: stateOf(0) },
+    { icon: 'paint', title: t('paintingTimeline'), state: stateOf(1) },
+    {
+      icon: isPost ? 'parcel' : isMarket ? 'stall' : 'parcel', title: handoffTitle, state: stateOf(2),
+      detail: handoffWhen || (isMarket && when?.marketName) ? <>
+        {handoffWhen && <span>{handoffWhen}</span>}
+        {isMarket && when?.marketName && <MarketMapLink name={when.marketName} />}
+      </> : undefined,
+    },
+  ]
   const copy = () => { void navigator.clipboard.writeText(code).then(() => setCopyMessage(t('copiedCode'))).catch(() => setCopyMessage(t('copyFailed'))) }
   const codeCard = <section className={thanks.codeCard} aria-labelledby="thanks-code-label">
     <p id="thanks-code-label" className={thanks.codeLabel}>{t('trackCode')}</p>
@@ -113,7 +128,7 @@ export function BuyThanksPage() {
     {codeCard}
     <section className={thanks.next} aria-labelledby="thanks-next">
       <h2 id="thanks-next" className={thanks.sectionTitle}>{t('thanksNext')}</h2>
-      <OrderTimeline labels={[t('paidTimeline'), t('paintingTimeline'), handoffLabel]} />
+      <OrderTimeline steps={steps} doneLabel={t('stepDone')} />
     </section>
     <div className={thanks.actions}>
       <ButtonLink to={`/track/${encodeURIComponent(code)}`} fullWidth>{t('goTrack')}</ButtonLink>

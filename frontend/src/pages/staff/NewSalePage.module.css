@@ -655,3 +655,57 @@
 
 .formStatus { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius-panel); background: var(--staff-surface); color: var(--staff-muted); }
 .formStatus[data-received] { background: var(--color-success-surface); color: var(--color-success); font-weight: var(--type-label-weight); }
+
+.postWindow {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3);
+  border: var(--border-thin) solid var(--color-selected);
+  border-radius: var(--radius-control);
+  background: var(--color-selected-surface);
+  color: var(--staff-ink);
+  font-weight: 600;
+}
+
+.postUnavailable {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3);
+  border-inline-start: var(--border-inset) solid var(--staff-warn);
+  border-radius: var(--radius-small);
+  background: var(--color-warning-surface);
+  color: var(--staff-warn);
+  font-weight: 600;
+}
+
+.makeRoomBlock {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.makeRoomBlock > p {
+  margin: 0;
+}
+
+.addressFields {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.addressFields > *,
+.addressRow > * {
+  margin: 0;
+  min-width: 0;
+}
+
+.addressRow {
+  display: grid;
+  grid-template-columns: var(--layout-postcode-max) minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+@media (max-width: 479px) {
+  .addressRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

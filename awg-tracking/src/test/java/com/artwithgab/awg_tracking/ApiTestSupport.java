@@ -45,6 +45,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         // Tests run on H2; the PostgreSQL migrations are checked against a real database instead.
         "spring.flyway.enabled=false",
         "awg.bootstrap.demo-markets=true",
+        // Most tests were written for the first Post collection on Tue 1 Dec; PostPaintFloorTests covers the 25 Nov floor.
+        "awg.post.collection-from=2026-11-30",
+        "awg.post.paint-from=",
         // Fictitious seller data for tests only; production values come from INVOICE_* env vars.
         "awg.invoice.business-name=Test Seller",
         "awg.invoice.address=Teststrasse 1, 1010 Wien",

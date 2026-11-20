@@ -56,6 +56,19 @@
 .colorDot[data-color='red'] { background: var(--ornament-red); }
 .colorDot[data-color='grey'] { background: var(--ornament-grey); }
 
+.feeRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: var(--border-thin) solid var(--staff-line);
+  font-size: var(--type-staff-meta-size);
+  color: var(--staff-ink);
+  font-variant-numeric: tabular-nums;
+}
+
 .total {
   display: flex;
   justify-content: space-between;

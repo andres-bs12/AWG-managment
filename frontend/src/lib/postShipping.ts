@@ -9,6 +9,8 @@ export const TRACKING_BASE_URL = 'https://www.post.at/s/sendungsdetails?snr='
 export type PostShippingConfig = {
   collectionDays: PostCollectionWeekday[]
   collectionsFrom: string | null
+  /** No Post ornament is painted before this day (owner: first market, 25 Nov 2026); null = no floor. */
+  paintFrom: string | null
   transitMinDays: number
   transitMaxDays: number
   lastArrival: string
@@ -18,7 +20,8 @@ export type PostShippingConfig = {
 
 export const DEFAULT_POST_CONFIG: PostShippingConfig = {
   collectionDays: ['tuesday', 'friday'],
-  collectionsFrom: '2026-11-30',
+  collectionsFrom: null,
+  paintFrom: '2026-11-25',
   transitMinDays: 2,
   transitMaxDays: 3,
   lastArrival: '2026-12-23',
@@ -150,6 +153,8 @@ export function arrivalFor(
 /** Computes the Post shipping window for ornaments ready on `readyOn`, enforcing `arrivalTo <= lastArrival`. */
 export function shippingWindowAfter(readyOn: string, options?: Partial<PostShippingConfig>): ShippingQuote {
   const config = resolveConfig(options)
+  // A Post parcel is never ready before the paint floor.
+  if (config.paintFrom && readyOn < config.paintFrom) readyOn = config.paintFrom
   if (readyOn >= config.lastArrival) {
     return { available: false, collectionDate: null, arrivalFrom: null, arrivalTo: null }
   }
@@ -185,7 +190,8 @@ export function planPostShipping(input: {
   const leadDays = Math.max(1, input.leadDays ?? 1)
   const maxDaysAhead = input.maxDaysAhead ?? 60
   const lastCollection = addUtcDays(input.today, maxDaysAhead)
-  const notBefore = addUtcDays(input.today, leadDays)
+  const leadFloor = addUtcDays(input.today, leadDays)
+  const notBefore = config.paintFrom && config.paintFrom > leadFloor ? config.paintFrom : leadFloor
   const readyFloor = addUtcDays(input.today, leadDays - 1)
   const durations = input.items
     .filter(item => item.kind === 'custom')
@@ -294,4 +300,40 @@ export function formatArrivalRange(from: string, to: string, locale: Locale, wit
   }
   const startYear = withYear && a.year !== b.year ? ` ${a.year}` : ''
   return `${a.day} ${a.monthName}${startYear} – ${b.day} ${b.monthName}${tail}`
+}
+
+function staffDateParts(isoDate: string) {
+  const [year, month, day] = isoDate.split('-').map(Number)
+  const utc = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+  const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' }).format(utc).replace(/,/g, '')
+  const monthShort = new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' }).format(utc).replace(/,/g, '')
+  return { year, month, day, weekday, monthShort }
+}
+
+/** Staff short date without comma, e.g. `2026-12-01` → `Tue 1 Dec`. */
+export function formatStaffShortDate(isoDate: string): string {
+  const p = staffDateParts(isoDate)
+  return `${p.weekday} ${p.day} ${p.monthShort}`
+}
+
+/** Staff arrival range with short weekdays and short month, e.g. `Thu 3 – Fri 4 Dec`. */
+export function formatStaffArrivalRange(from: string, to: string): string {
+  const a = staffDateParts(from)
+  const b = staffDateParts(to)
+  if (from === to) return `${a.weekday} ${a.day} ${b.monthShort}`
+  if (a.year === b.year && a.month === b.month) {
+    return `${a.weekday} ${a.day} – ${b.weekday} ${b.day} ${b.monthShort}`
+  }
+  return `${a.weekday} ${a.day} ${a.monthShort} – ${b.weekday} ${b.day} ${b.monthShort}`
+}
+
+/** Staff New sale line: `Post collection Tue 1 Dec · Arrives Thu 3 – Fri 4 Dec`. */
+export function formatStaffPostWindow(quote: ShippingQuote): string | null {
+  if (!quote.available || !quote.collectionDate || !quote.arrivalFrom || !quote.arrivalTo) return null
+  return `Post collection ${formatStaffShortDate(quote.collectionDate)} · Arrives ${formatStaffArrivalRange(quote.arrivalFrom, quote.arrivalTo)}`
+}
+
+/** Compact fee suffix for staff delivery choice: `5` → `+€5`, `5.5` → `+€5.50`. */
+export function formatStaffFeeTag(fee: number): string {
+  return Number.isInteger(fee) ? `+€${fee}` : `+€${fee.toFixed(2)}`
 }

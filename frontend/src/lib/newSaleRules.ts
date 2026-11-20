@@ -1,5 +1,5 @@
 import type { AgendaDay, Market, MarketDay } from '../domain/types'
-import { isMarketPickupWeekday, isViennaWeekday, paintDatesToTry } from './calendar'
+import { isMarketPickupWeekday, paintDatesToTry } from './calendar'
 import { pickupHourOptions } from './time'
 import type { DraftDelivery, DraftItem, SaleDraft } from '../pages/staff/saleDraft'
 
@@ -26,8 +26,9 @@ export function paintFitsHandoff(
   item: Pick<DraftItem, 'kind' | 'paintDate' | 'paintEnd'>,
   delivery: DraftDelivery,
 ): boolean {
-  if (item.kind !== 'custom' || !item.paintDate || item.paintEnd == null || !delivery.pickupDate) return false
-  if (delivery.mode === 'vienna') return item.paintDate < delivery.pickupDate
+  if (item.kind !== 'custom' || !item.paintDate || item.paintEnd == null) return false
+  if (delivery.mode === 'post') return true
+  if (!delivery.pickupDate) return false
   if (delivery.mode !== 'market' || item.paintDate > delivery.pickupDate) return false
   if (item.paintDate < delivery.pickupDate) return true
   return delivery.pickupHour == null || item.paintEnd + PAINT_HANDLING_HOURS <= delivery.pickupHour + EPS
@@ -93,25 +94,6 @@ export function isMarketDayValidForItems(
   return true
 }
 
-export function isViennaDayValidForItems(
-  day: MarketDay,
-  paintItems: readonly DraftItem[],
-  currentDate: string,
-  firstPaintDate: string,
-  seasonEnd: string,
-  marketDays: MarketDay[],
-): boolean {
-  if (!(isViennaWeekday(day.date) || day.date === seasonEnd) || day.date > seasonEnd || day.date < currentDate) return false
-  if (marketDays.some(m => m.date === day.date)) return false
-  const lockedMax = latestLockedPaintDate(paintItems)
-  if (lockedMax && day.date <= lockedMax) return false
-  if (paintItems.some(row => row.kind === 'custom' && !row.slotLocked) &&
-      !paintDatesToTry(day.date, firstPaintDate).some(date => date < day.date)) {
-    return false
-  }
-  return true
-}
-
 export function isSlotInPast(
   item: Pick<DraftItem, 'kind' | 'paintDate' | 'paintStart'>,
   currentDate: string,
@@ -123,7 +105,7 @@ export function isSlotInPast(
 }
 
 export function isPickupInPast(delivery: DraftDelivery, currentDate: string, nowHour: number): boolean {
-  if (delivery.mode === 'now') return false
+  if (delivery.mode === 'now' || delivery.mode === 'post') return false
   if (delivery.pickupDate && delivery.pickupDate < currentDate) return true
   if (delivery.mode === 'market' && delivery.pickupDate === currentDate && delivery.pickupHour != null && delivery.pickupHour < nowHour - EPS) {
     return true
@@ -192,23 +174,7 @@ function reconcileGroupDelivery(
   ctx: ReconcileContext,
   options: { requireDayIfLocked?: boolean; hadPastDate?: boolean },
 ): DraftDelivery {
-  if (delivery.mode === 'now') return delivery
-
-  if (delivery.mode === 'vienna') {
-    if (!delivery.pickupDate) return delivery
-    const marketDays = ctx.days.filter(d => ctx.markets.find(m => m.id === d.marketId)?.kind === 'market')
-    const validVienna = ctx.days.find(d =>
-      (d.id === delivery.marketDayId || d.date === delivery.pickupDate) &&
-      isViennaDayValidForItems(d, paintItems, ctx.currentDate, ctx.firstPaintDate, ctx.seasonEnd, marketDays),
-    )
-    if (validVienna) {
-      if (delivery.marketDayId === validVienna.id && delivery.marketId === validVienna.marketId && delivery.pickupDate === validVienna.date) {
-        return delivery
-      }
-      return { ...delivery, pickupDate: validVienna.date, marketDayId: validVienna.id, marketId: validVienna.marketId, pickupHour: null }
-    }
-    return { ...delivery, pickupDate: undefined, marketDayId: undefined, marketId: undefined, pickupHour: null, manualDay: false }
-  }
+  if (delivery.mode === 'now' || delivery.mode === 'post') return delivery
 
   // Market mode
   const marketDays = ctx.days.filter(d => ctx.markets.find(m => m.id === d.marketId)?.kind === 'market')

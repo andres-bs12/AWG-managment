@@ -142,7 +142,7 @@ test.describe('desktop keyboard checkout', () => {
     await expect(page.locator('#buy-heading')).toHaveText('Lieferung')
     await expect(page.locator('#buy-heading')).toBeFocused()
 
-    await expect(page.locator('#buy-date')).toContainText('Do, 3. – Fr, 4. Dezember')
+    await expect(page.locator('#buy-date')).toContainText('Di, 1. – Mi, 2. Dezember')
     await expect(page.locator('#buy-date-error')).toHaveCount(0)
     for (const [id, value] of Object.entries({
       'buy-name': 'Alex Example', 'buy-email': 'alex@example.com', 'buy-phone': '+43 123456789',

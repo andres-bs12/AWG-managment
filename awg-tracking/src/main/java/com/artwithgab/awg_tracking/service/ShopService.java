@@ -200,11 +200,14 @@ public class ShopService {
         LocalDate today = snapshot.index().today();
         LocalDate last = today.plusDays(props.shop().maxDaysAhead());
         LocalDate readyOn = today.plusDays(Math.max(1, props.shop().leadDays()) - 1L);
+        LocalDate paintFrom = props.post().paintFrom();
+        // Painting starts on paintFrom at the earliest, so the parcel is ready that day at the soonest.
+        if (paintFrom != null && readyOn.isBefore(paintFrom)) readyOn = paintFrom;
         for (var candidate = shipping.windowAfter(readyOn); candidate.isPresent();
              candidate = shipping.windowAfter(candidate.get().collectionDate())) {
             var window = candidate.get();
             if (window.collectionDate().isAfter(last)) break;
-            List<HourSpanDto> slots = plan(snapshot, window.collectionDate(), durations);
+            List<HourSpanDto> slots = plan(snapshot, window.collectionDate(), durations, paintFrom);
             if (slots != null) return Optional.of(new ShippingPlan(window, slots));
         }
         return Optional.empty();
@@ -268,7 +271,13 @@ public class ShopService {
      * not before tomorrow. Returns null when they do not all fit.
      */
     List<HourSpanDto> plan(AgendaService.Snapshot s, LocalDate delivery, List<Double> durations) {
+        return plan(s, delivery, durations, null);
+    }
+
+    /** Same as {@link #plan(AgendaService.Snapshot, LocalDate, List)}, never painting before paintFrom (when set). */
+    List<HourSpanDto> plan(AgendaService.Snapshot s, LocalDate delivery, List<Double> durations, LocalDate paintFrom) {
         LocalDate notBefore = s.index().today().plusDays(1);
+        if (paintFrom != null && notBefore.isBefore(paintFrom)) notBefore = paintFrom;
         Map<LocalDate, List<AgendaService.Busy>> taken = new HashMap<>();
         List<HourSpanDto> slots = new ArrayList<>();
         for (double duration : durations) {

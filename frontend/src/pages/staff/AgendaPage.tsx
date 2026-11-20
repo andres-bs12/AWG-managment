@@ -9,6 +9,7 @@ import { useStaffClock } from '../../lib/staffClock'
 import { useStaffMarket, STAFF_MARKET_KEY } from '../../lib/staffMarket'
 import { agendaBounds, layoutAgendaSlots } from '../../lib/agendaLayout'
 import { StaffDialog } from '../../components/staff/StaffDialog'
+import { MakeRoomDialog, type MakeRoomDialogMove } from '../../components/staff/MakeRoomDialog'
 import { Field } from '../../components/ui/Field'
 import { dayChipLabel } from '../../components/staff/DeliveryRow'
 import { DayStrip } from '../../components/staff/DayStrip'
@@ -16,6 +17,7 @@ import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
 import type { AgendaDay, AgendaDelivery, AgendaSlot, Market, MarketDay, OrderItem, PaintingDay, ProductionStatus } from '../../domain/types'
 import { handoffLabel } from '../../lib/handoff'
+import { formatStaffShortDate } from '../../lib/postShipping'
 import { bookedPaintRange, hasPaintOverlap, paintElapsedUntil } from '../../lib/slots'
 import { formatDateLabel, formatHour, formatMinutes, parseHour, hourToY, weekdayShort, yToHour } from '../../lib/time'
 import styles from './AgendaPage.module.css'
@@ -41,9 +43,10 @@ const STATUS_LABELS = {
   in_progress: 'Painting',
   finished: 'Ready',
   delivered: 'Delivered',
+  shipped: 'Shipped',
 }
 
-function StatusTag({ status }: { status: ProductionStatus | 'delivered' }) {
+function StatusTag({ status }: { status: ProductionStatus | 'delivered' | 'shipped' }) {
   return <span className={styles.statusTag} data-status={status}>{STATUS_LABELS[status]}</span>
 }
 
@@ -63,16 +66,41 @@ function canMove(slot: AgendaSlot) {
   return Boolean(slot.item && !slot.held && slot.block.status === 'not_started' && !(slot.item.handedOver ?? slot.order?.handedOver))
 }
 
+function slotHandoffDate(item: OrderItem, days: MarketDay[]): string | null {
+  return days.find(row => row.id === item.delivery.marketDayId)?.date ?? item.delivery.deliveryDate ?? null
+}
+
+/** Movable via Make room: not started, not handed over, and its handoff day is strictly after its paint day. */
+function isMakeRoomMovable(slot: AgendaSlot, paintDate: string, days: MarketDay[]): boolean {
+  if (!canMove(slot) || !slot.item) return false
+  const handoff = slotHandoffDate(slot.item, days)
+  return Boolean(handoff && handoff > paintDate)
+}
+
+function makeRoomBlockError(err: unknown): string {
+  const problem = err && typeof err === 'object' ? (err as { code?: string; message?: string }) : {}
+  if (problem.code === 'SESSION_NOT_MOVABLE') {
+    return problem.message || 'This session cannot be moved: it is handed over the day it is painted.'
+  }
+  if (problem.code === 'NO_SLOT_KEEPS_PROMISE') {
+    return problem.message || 'No free slot before the handoff day. Move the session by hand.'
+  }
+  return err instanceof Error && err.message ? err.message : 'Could not move this session.'
+}
+
 function shortWindowHour(hour: number): string {
   const whole = Math.floor(hour)
   const mins = Math.round((hour - whole) * 60)
   return mins === 0 ? String(whole) : formatHour(hour)
 }
 
-/** Concise delivery/pickup line for a calendar block, e.g. "Pickup Sat 15:30" or "Vienna Wed 18–20". */
+/** Concise delivery/pickup line for a calendar block, e.g. "Pickup Sat 15:30", "Post Tue 1 Dec" or "Vienna Wed 18–20". */
 function compactHandoff(item: OrderItem, days: MarketDay[]): string {
   const marketDay = days.find(row => row.id === item.delivery.marketDayId)
   const handoffDate = marketDay?.date ?? item.delivery.deliveryDate ?? null
+  if (item.delivery.kind === 'post') {
+    return handoffDate ? `Post ${formatStaffShortDate(handoffDate)}` : 'Post · date pending'
+  }
   const dayPart = handoffDate ? weekdayShort(handoffDate) : ''
   if (item.delivery.kind === 'vienna') {
     return dayPart ? `Vienna ${dayPart} 18–20` : 'Vienna · date pending'
@@ -211,6 +239,7 @@ export function AgendaPage() {
   const pending = useRef<PendingDrag | null>(null)
   const [moveError, setMoveError] = useState('')
   const [moving, setMoving] = useState(false)
+  const [makeRoomResult, setMakeRoomResult] = useState<MakeRoomDialogMove[] | null>(null)
   const [loadError, setLoadError] = useState('')
   const [retry, setRetry] = useState(0)
   const currentDay = days.find(row => row.marketDay.isToday)?.marketDay.date ?? clockDate
@@ -329,7 +358,7 @@ export function AgendaPage() {
     const { delivery } = item
     const handoffDate = marketDays.find(row => row.id === delivery.marketDayId)?.date ?? delivery.deliveryDate
     if (!handoffDate || date > handoffDate ||
-      (delivery.kind === 'vienna' && date === handoffDate) ||
+      ((delivery.kind === 'vienna' || delivery.kind === 'post') && date === handoffDate) ||
       (date === handoffDate && delivery.pickupHour != null && end > delivery.pickupHour)) {
       return `This session must stay before ${handoffLabel(item, marketDays)}.`
     }
@@ -397,7 +426,7 @@ export function AgendaPage() {
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (gabyAway || !e.isPrimary || e.button !== 0 || drag.current || pending.current) return
     suppressClick.current = false
-    if ((e.target as Element).closest('[data-slot-move]')) return
+    if ((e.target as Element).closest('[data-slot-move], [data-slot-make-room]')) return
     const grid = e.currentTarget
     const slotElement = (e.target as Element).closest<HTMLElement>('[data-slot-id]')
     const slot = slotElement && boardSlots.find(row => row.block.id === slotElement.dataset.slotId)
@@ -505,6 +534,31 @@ export function AgendaPage() {
     navigate(`/staff/orders/${slot.order.id}`, { state: { from: `/staff/agenda?${backQuery}`, itemId: slot.item?.id } })
   }
 
+  async function runMakeRoomForBlock(slot: AgendaSlot) {
+    if (moving || !slot.item) return
+    setMoving(true)
+    setMoveError('')
+    try {
+      const result = await api.agenda.makeRoomForBlock(slot.item.id)
+      const slotIndex = new Map(days.flatMap(d => d.slots).filter(s => s.item).map(s => [s.item!.id, s]))
+      const rows: MakeRoomDialogMove[] = result.moved.map(move => {
+        const match = slotIndex.get(move.itemId) ?? (slot.item?.id === move.itemId ? slot : undefined)
+        return {
+          ...move,
+          photoUrl: match?.photoUrl ?? null,
+          color: match?.item?.color ?? null,
+        }
+      })
+      setMoveProposal(null)
+      setMakeRoomResult(rows)
+      setRetry(value => value + 1)
+    } catch (err) {
+      setMoveError(makeRoomBlockError(err))
+    } finally {
+      setMoving(false)
+    }
+  }
+
   async function confirmMove() {
     if (!moveProposal) return
     if (moveProposal.startHour === moveProposal.slot.block.startHour) {
@@ -542,8 +596,18 @@ export function AgendaPage() {
     ? pickupFilter.marketId : stallToday?.id ?? markets[0]?.id
   const marketDeliveries = deliveries.filter(row => row.deliveryKind === 'market'
     && (markets.length <= 1 || !row.marketId || row.marketId === pickupMarket))
+  const postDeliveries = deliveries.filter((row) => row.deliveryKind === 'post')
+  const postParcelCount = new Set(postDeliveries.map(row => row.orderId)).size
+  const postStatus: ProductionStatus | 'shipped' = postDeliveries.length > 0 && postDeliveries.every(row => row.handedOver)
+    ? 'shipped'
+    : postDeliveries.every(row => row.productionStatus === 'finished')
+      ? 'finished'
+      : postDeliveries.some(row => row.productionStatus !== 'not_started')
+        ? 'in_progress'
+        : 'not_started'
   const viennaDeliveries = deliveries.filter((row) => row.deliveryKind === 'vienna')
   const allDeliveries = [...marketDeliveries, ...viennaDeliveries]
+  const hasAnyDeliveries = allDeliveries.length > 0 || postParcelCount > 0
   const capacitySummary = rule ? agendaCapacitySummary(rule) : null
   const automaticMarket = !day.paintingMarketId && day.market.kind === 'market' ? day.market.name : undefined
   const dayOptions = days.map(row => ({
@@ -579,18 +643,31 @@ export function AgendaPage() {
         </div> : paintingError ? <div role="alert"><p>{paintingError}</p><Button tone="staff" onClick={() => setRetry(value => value + 1)}>Retry</Button></div> : <p role="status">Loading painting hours…</p>}
       </StaffDialog>}
 
-      {(!gabyAway || allDeliveries.length > 0) && (
+      {(!gabyAway || hasAnyDeliveries) && (
         <div className={styles.toolbar}>
           {!gabyAway && (
             <p className={styles.createHint}>
               {placeItem ? 'Hold and drag to choose a time.' : <StaffText>Hold a session to move · Hold free time for a new sale.</StaffText>}
             </p>
           )}
-          {allDeliveries.length > 0 && <a href="#agenda-pickups" className={styles.jump}>{marketDeliveries.length ? `${marketDeliveries.length} ${marketDeliveries.length === 1 ? 'pickup' : 'pickups'}` : `${viennaDeliveries.length} ${viennaDeliveries.length === 1 ? 'delivery' : 'deliveries'}`} ↓</a>}
+          {hasAnyDeliveries && <a href="#agenda-pickups" className={styles.jump}>
+            {marketDeliveries.length
+              ? `${marketDeliveries.length} ${marketDeliveries.length === 1 ? 'pickup' : 'pickups'}`
+              : postParcelCount
+                ? `${postParcelCount} Post ${postParcelCount === 1 ? 'parcel' : 'parcels'}`
+                : `${viennaDeliveries.length} ${viennaDeliveries.length === 1 ? 'delivery' : 'deliveries'}`} ↓
+          </a>}
         </div>
       )}
 
       {moveError && !moveProposal ? <p className={styles.moveError} role="alert">{moveError}</p> : null}
+      {makeRoomResult ? (
+        <MakeRoomDialog
+          moved={makeRoomResult}
+          todayDate={currentDay}
+          onClose={() => setMakeRoomResult(null)}
+        />
+      ) : null}
 
       {moveProposal ? (
         <StaffDialog title="Confirm schedule change" busy={moving} onClose={() => { setMoveProposal(null); setMoveError('') }}>
@@ -622,6 +699,11 @@ export function AgendaPage() {
             <Button tone="staff" size="lg" onClick={confirmMove} disabled={moving}>
               {moving ? 'Saving…' : 'Save move'}
             </Button>
+            {moveProposal.slot.item && (
+              <Button tone="staff" variant="secondary" size="lg" onClick={() => void runMakeRoomForBlock(moveProposal.slot)} disabled={moving}>
+                Make room
+              </Button>
+            )}
           </div>
         </StaffDialog>
       ) : null}
@@ -722,8 +804,10 @@ export function AgendaPage() {
                     const density = height >= 4.75 * REM ? 'full' : height >= 3.5 * REM ? 'compact' : 'short'
                     const slotHeight = density === 'short' ? height : height - 4
                     const movable = !gabyAway && !placeItem && canMove(slot)
+                    const roomMovable = !gabyAway && !placeItem && isMakeRoomMovable(slot, day.marketDay.date, marketDays)
                     const { lane = 0, lanes = 1 } = slotLayout.get(slot.block.id) ?? {}
                     const slotLeft = `${100 * lane / lanes}%`
+                    const slotRight = `${100 * (lanes - lane - 1) / lanes}%`
                     const slotTop = hourToY(slot.block.startHour, HOUR_H, boardStart)
                     const holdUntil = slot.held && slot.holdUntil
                       ? `Held until ${new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Vienna', hour: '2-digit', minute: '2-digit' }).format(new Date(slot.holdUntil))}`
@@ -738,6 +822,7 @@ export function AgendaPage() {
                           disabled={slot.held}
                           data-slot-id={slot.block.id}
                           data-movable={movable}
+                          data-make-room={roomMovable ? 'true' : undefined}
                           data-moving={draggingBlockId === slot.block.id ? 'true' : undefined}
                           data-density={density}
                           data-selected={selectedBlockId === slot.block.id ? 'true' : 'false'}
@@ -781,6 +866,19 @@ export function AgendaPage() {
                             Move
                           </button>
                         )}
+                        {roomMovable && (
+                          <button
+                            type="button"
+                            className={styles.slotMakeRoom}
+                            data-slot-make-room="true"
+                            disabled={moving}
+                            aria-label={`Make room · ${title}`}
+                            style={{ right: `calc(${slotRight} + var(--space-3))`, top: slotTop + Math.max(0, Math.round((slotHeight - 44) / 2)) }}
+                            onClick={() => void runMakeRoomForBlock(slot)}
+                          >
+                            Make room
+                          </button>
+                        )}
                       </Fragment>
                     )
                   })}
@@ -818,10 +916,24 @@ export function AgendaPage() {
               {markets.map(market => <option key={market.id} value={market.id}>{market.name}</option>)}
             </select>
           </Field>}
-          {allDeliveries.length === 0 ? (
+          {!hasAnyDeliveries ? (
             <p className={styles.sideMeta}>No deliveries for this day.</p>
           ) : (
             <div className={styles.deliveryList}>
+              {postParcelCount > 0 ? (
+                <button
+                  type="button"
+                  className={styles.deliveryCard}
+                  data-thumbnail="false"
+                  onClick={() => navigate(`/staff/deliveries?${new URLSearchParams({ day: day.marketDay.date, kind: 'post' })}`)}
+                >
+                  <span className={styles.cardText}>
+                    <strong><StaffText>{`Post · ${formatStaffShortDate(day.marketDay.date)}`}</StaffText></strong>
+                    <StatusTag status={postStatus} />
+                    <span className={styles.handoff}>{`${postParcelCount} ${postParcelCount === 1 ? 'parcel' : 'parcels'}`}</span>
+                  </span>
+                </button>
+              ) : null}
               {allDeliveries.map((row) => (
                 <AgendaDeliveryCard
                   key={`${row.orderId}-${row.itemId}`}

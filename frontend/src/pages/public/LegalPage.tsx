@@ -8,7 +8,6 @@ export function LegalPage({ title }: { title: LegalPageTitle }) {
 
   return (
     <article className={styles.page}>
-      <p className={styles.notice}>{document.notice}</p>
       <h1>{t(title)}</h1>
       <p className={styles.language}>{document.language}</p>
       {document.sections.map(section => (

@@ -82,7 +82,16 @@ test('confirms only after Track changes from unpaid to paid, then copies and lin
   await expect(page.getByRole('heading', { name: 'Deine Zahlung wird geprüft' })).toHaveCount(0)
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('awg-buy-draft'))).toBeNull()
   const timeline = page.getByRole('list').filter({ has: page.getByRole('listitem').filter({ hasText: /^Bezahlt/ }) })
-  await expect(timeline.getByRole('listitem')).toHaveText(['Bezahlt ✓', 'Wird gemalt', /Versand per Post.*Zustellung voraussichtlich 3\.–4\.\sDezember/])
+  const steps = timeline.getByRole('listitem')
+  await expect(steps).toHaveCount(3)
+  await expect(steps.nth(0).locator('strong')).toHaveText(/^Bezahlt/)
+  await expect(steps.nth(1)).toHaveAttribute('aria-current', 'step')
+  await expect(steps.nth(2).locator('strong')).toHaveText('Versand per Post')
+  // Title on one line, the range on its own line below (never glued to the title).
+  await expect(steps.nth(2).locator('span').last()).toHaveText(/^Zustellung voraussichtlich 3\.–4\.\sDezember$/)
+  const [titleTop, detailTop] = await steps.nth(2).evaluate(item => [item.querySelector('strong')!.getBoundingClientRect().bottom, item.querySelector('strong + span')!.getBoundingClientRect().top])
+  expect(detailTop).toBeGreaterThanOrEqual(titleTop)
+  await expect(timeline.getByRole('link')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /Kalender/ })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Bestellung verfolgen', exact: true })).toHaveAttribute('href', `/track/${code}`)
   await page.getByRole('button', { name: 'Code kopieren', exact: true }).click()
@@ -205,7 +214,7 @@ test('cancelled checkout says nothing was charged and restores the saved design'
   await expect(page.locator('#buy-email')).toHaveValue('alex@example.com')
   await expect(page.locator('#buy-line1')).toHaveValue('Hauptstraße 1')
   await expect(page.locator('#buy-city')).toHaveValue('Wien')
-  await expect(page.locator('#buy-date')).toContainText('Do, 3. – Fr, 4. Dezember')
+  await expect(page.locator('#buy-date')).toContainText('Di, 1. – Mi, 2. Dezember')
 })
 
 for (const transport of ['http', 'mock'] as const) {

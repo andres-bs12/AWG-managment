@@ -142,6 +142,11 @@ Every brief is short and contains exactly:
 | 2026-11-20 | Two markets part 1 (V16, ~15 one-market-per-date places, I'm-at stall, Agenda/Deliveries/Track/invoices/shop) | Codex gpt-6.2-sol high | B (pending fixes) | 194 Java tests green; V16 applied on a PostgreSQL clone (HOME-day pickups stay unmatched, by design). Neon found 2 P1 (painting hours from the lowest-UUID stall on overlap dates; edits/deletes strand bookings) + fail-open web pickup. ChatGPT 5 h: 48 % → 71 %. |
 | 2026-11-20 | Read-only audit of two-markets backend | Gemini 4 Neon medium via `agy` | A (pending fix verification) | 5 concrete findings with scenarios; listed what it verified clean. Medium effort was enough. |
 | 2026-11-20 | Agy start failure | Gemini 4 Hydrogen | — | `failed to start conversation: backend returned an empty conversation id` (exit 0, nothing done); transient, relaunch worked. The wrapper should classify this as failed. |
+| 2026-11-20 | Post shipping design (read-only) | Gemini 4 Argon high via `agy` | A− | Sound algorithm and data model; missed the Post tracking link and needed owner corrections (holiday shift, cut-off). |
+| 2026-11-20 | Post shipping backend (3 runs: core, final decisions, generic make-room) + merge conflicts | Codex gpt-6.2-sol high | A | 205 → 268 tests; Opus cross-audit found 0 P0/P1, 3 P2. Sandbox blocks PostgreSQL and `git add` (Claude did both). |
+| 2026-11-20 | Post shipping public frontend | Gemini 4 Argon high → Gemini 4 Neon high | B+ | Argon ran out of weekly quota mid-E2E; Neon finished, E2E green, 14 screenshots. Selection style misused on an info box (PM fixed). |
+| 2026-11-20 | Post shipping staff phase + make-room popup + audit fixes | Gemini 4 Neon high | B | Complete flows, 80/80 specs; Codex audit then found 4 P1 (parcel partial handover, stale handover resend, make-room minutes, mock reservations), all fixed by Neon. |
+| 2026-11-20 | Read-only frontend audit (post shipping) | Codex gpt-6.2-sol medium | A | 7 real findings, 0 false positives; 144k tokens. |
 
 ## Routing changes
 

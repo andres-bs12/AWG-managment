@@ -5,7 +5,7 @@ export function formatEur(n: number, locale: 'de' | 'en' = 'de'): string {
   }).format(n)
 }
 
-export type Pricing = { customPrice: number; finishedPrice: number; nameExtra: number }
+export type Pricing = { customPrice: number; finishedPrice: number; nameExtra: number; shippingFee?: number }
 
 export function itemCost(kind: 'custom' | 'finished', withName: boolean, prices: Pricing): number {
   return Math.round((kind === 'finished' ? prices.finishedPrice : prices.customPrice + (withName ? prices.nameExtra : 0)) * 100) / 100

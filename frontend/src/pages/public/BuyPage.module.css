@@ -520,7 +520,6 @@ form.shop > .actions { margin-top: var(--space-5); }
 /* ── Delivery screen: method choice, pickup days, arrival time (docs/design-system.md C1) ── */
 .methodGroup { min-width: 0; margin: 0 0 var(--space-6); padding: 0; border: 0; }
 .groupLegend { margin: 0 0 var(--space-3); padding: 0; font-weight: var(--type-label-weight); }
-.sectionLead { margin: 0 0 var(--space-4); max-width: var(--measure-prose); color: var(--color-text-muted); text-wrap: pretty; }
 /* Two-line selectable card. Inset 16px from the outer edge; padding = inset − border, so the
    1px → 2px selected border never shifts the text. */
 .choiceCards, .pickupDays { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
@@ -554,6 +553,8 @@ form.shop > .actions { margin-top: var(--space-5); }
 .selectedDate small { font-size: var(--type-hint-size); font-weight: var(--type-label-weight); }
 .selectedDate[data-selected='true'] { padding: calc(var(--space-4) - var(--border-control)); border: var(--border-control) solid var(--color-selected); background: var(--color-selected-surface); color: var(--color-text); font-weight: var(--type-label-weight); }
 .selectedDate[aria-invalid='true'] { border-color: var(--color-error); }
+/* The Post arrival range is information, not a choice: neutral surface, never the selection style. */
+.postRange[data-selected='true'] { padding: calc(var(--space-4) - var(--border-thin)); border: var(--border-thin) solid var(--color-border); background: transparent; }
 
 /* Task B: visible order overview and an explicit per-ornament name decision. */
 .ornamentOverview { margin-bottom: var(--space-5); min-width: 0; }

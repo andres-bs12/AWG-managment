@@ -14,11 +14,13 @@ import { QrCode } from '../../components/staff/QrCode'
 import { StaffBackLink } from '../../components/staff/StaffBackLink'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
+import { Field } from '../../components/ui/Field'
 import { marketOrnamentLabel } from '../../domain/marketStock'
 import type { MarketDay } from '../../domain/types'
-import { handoffLabel } from '../../lib/handoff'
+import { handoffArrivalLabel, handoffLabel } from '../../lib/handoff'
 import { formatEur } from '../../lib/money'
 import { paymentSummary } from '../../lib/paymentSummary'
+import { TRACKING_NUMBER_REGEX } from '../../lib/postShipping'
 import styles from './OrderDetailPage.module.css'
 
 type Bundle = Awaited<ReturnType<typeof api.orders.getOrderBundle>>
@@ -43,6 +45,8 @@ function OrderDetail({ id }: { id: string }) {
   const [cancelOpen, setCancelOpen] = useState(false)
   const actionLock = useRef(false)
   const [copied, setCopied] = useState(false)
+  const [addressCopied, setAddressCopied] = useState(false)
+  const [trackingDraft, setTrackingDraft] = useState<string | null>(null)
   const [retry, setRetry] = useState(0)
 
   useEffect(() => {
@@ -90,17 +94,36 @@ function OrderDetail({ id }: { id: string }) {
   const allFinished = items.length > 0 && finishedCount === items.length
   const formWaiting = items.some(item => item.kind === 'custom' && !item.formComplete)
   const hasForm = items.some(item => item.kind === 'custom')
-  const deliveryItem = items.find(item => item.delivery.kind === 'vienna')
+  const postItem = items.find(item => item.delivery.kind === 'post')
+  const viennaItem = items.find(item => item.delivery.kind === 'vienna')
+  const deliveryItem = postItem ?? viennaItem
   const deliveryAddress = deliveryItem?.delivery.address
   const addressText = deliveryAddress ? [
     [deliveryAddress.line1, deliveryAddress.line2].filter(Boolean).join(', '),
     [deliveryAddress.postalCode, deliveryAddress.city].filter(Boolean).join(' '),
   ].filter(Boolean).join(' · ') : ''
+  const arrivalText = postItem ? handoffArrivalLabel(postItem) : null
+  const postItems = items.filter(item => item.delivery.kind === 'post')
+  const postShipped = postItems.length > 0 && postItems.every(item => item.handedOver ?? order.handedOver)
+  const trackingValue = trackingDraft ?? order.trackingNumber ?? ''
+  const trimmedTracking = trackingValue.trim()
+  const trackingInvalid = Boolean(trimmedTracking && !TRACKING_NUMBER_REGEX.test(trimmedTracking))
+  const trackingDirty = trimmedTracking !== (order.trackingNumber ?? '')
   const handoffs = [...new Set(items.map(item => handoffLabel(item, days)))]
   const formUrl = `${window.location.origin}/form/${order.formToken}`
   // Unconfirmed online payments hold their slot but are not ready for painting or delivery yet.
   const paymentHeld = !order.handedOver && (order.checkoutStatus === 'pending' || order.checkoutStatus === 'review' || Boolean(order.paymentReview))
-  const production = paymentHeld ? (order.checkoutStatus === 'pending' ? 'Waiting for online payment' : 'Payment review') : order.handedOver ? (deliveryItem ? 'Delivered' : 'Handed over') : allFinished ? (deliveryItem ? 'Ready for delivery' : 'Ready for pickup') : formWaiting ? 'Waiting for form' : 'In the workshop'
+  const production = paymentHeld
+    ? (order.checkoutStatus === 'pending' ? 'Waiting for online payment' : 'Payment review')
+    : postShipped
+      ? 'Shipped'
+      : order.handedOver
+        ? (viennaItem ? 'Delivered' : 'Handed over')
+        : allFinished
+          ? (postItem ? 'Ready to ship' : viennaItem ? 'Ready for delivery' : 'Ready for pickup')
+          : formWaiting
+            ? 'Waiting for form'
+            : 'In the workshop'
 
   async function cancelOrder(reason: string) {
     if (actionLock.current) return
@@ -166,9 +189,22 @@ function OrderDetail({ id }: { id: string }) {
     {order.paymentReview ? <InsetNote tone="warning"><p role="alert">Stripe reported a payment that does not match this order. Check it in Stripe, then record it as paid or deposit (or cancel the order). It remains held on the agenda until resolved.</p></InsetNote> : null}
     <details className={styles.panel}><summary>Order info</summary><p>{order.source === 'web' || order.checkoutStatus ? 'Web order' : 'Stall order'} · Created {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(new Date(order.createdAt.endsWith('Z') || /[+-]\d\d:\d\d$/.test(order.createdAt) ? order.createdAt : `${order.createdAt}Z`))} (Vienna)</p><p>Payment method: {order.paymentMethod ?? 'Not recorded'}</p></details>
     <div className={styles.overview} data-delivery={Boolean(deliveryItem)}>
-      <div><span>{deliveryItem ? 'Delivery' : 'Pickup'}</span><strong><StaffText>{handoffs.join(' / ') || 'Not scheduled'}</StaffText></strong>
+      <div><span>{postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</span><strong><StaffText>{handoffs.join(' / ') || 'Not scheduled'}</StaffText></strong>
+        {arrivalText ? <span className={styles.arrivalLine}>{arrivalText}</span> : null}
         {deliveryItem ? <div className={styles.handoffActions}>
-          {addressText ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText)}`} target="_blank" rel="noreferrer">{addressText} ↗</a> : <span>Address pending</span>}
+          {addressText ? (
+            postItem ? (
+              <>
+                <span>{addressText}</span>
+                <button type="button" className={styles.inlineCopy} onClick={() => {
+                  const full = [customer.name, deliveryAddress?.line1, deliveryAddress?.line2, `${deliveryAddress?.postalCode ?? ''} ${deliveryAddress?.city ?? ''}`.trim()].filter(Boolean).join('\n')
+                  void navigator.clipboard.writeText(full).then(() => setAddressCopied(true)).catch(() => setActionError('Could not copy address.'))
+                }}>{addressCopied ? 'Address copied' : 'Copy address'}</button>
+              </>
+            ) : (
+              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText)}`} target="_blank" rel="noreferrer">{addressText} ↗</a>
+            )
+          ) : <span>Address pending</span>}
           {customer.phone ? <a href={`tel:${customer.phone}`}>{customer.phone}</a> : null}
         </div> : null}
       </div>
@@ -185,13 +221,60 @@ function OrderDetail({ id }: { id: string }) {
         </span>
       </h2>
       <section aria-labelledby="order-items" className={styles.items}>
-        {items.map(item => <OrderItemCard key={item.id} item={{ ...item, handedOver: item.handedOver ?? order.handedOver }} onHandover={items.length > 1 ? () => { void handover.request(id, !(item.handedOver ?? order.handedOver), item.id) } : undefined} block={blocks.find(block => block.orderItemId === item.id)} days={days} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />)}
+        {items.map(item => {
+          const allPostOrder = postItems.length > 0 && postItems.length === items.length
+          const canItemHandover = items.length > 1 && !(allPostOrder && !(item.handedOver ?? order.handedOver))
+          return <OrderItemCard key={item.id} item={{ ...item, handedOver: item.handedOver ?? order.handedOver }} onHandover={canItemHandover ? () => { void handover.request(id, !(item.handedOver ?? order.handedOver), item.id) } : undefined} block={blocks.find(block => block.orderItemId === item.id)} days={days} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />
+        })}
       </section>
       <aside className={styles.support} aria-label="Order management">
         <section className={styles.panel} aria-labelledby="handoff-heading">
-          <h2 id="handoff-heading">{deliveryItem ? 'Delivery' : 'Pickup'}</h2>
-          {order.handedOver ? <p className={styles.muted}>{deliveryItem ? 'Delivered to the customer.' : 'Picked up at the stall.'}</p> : <p className={styles.muted}>{allFinished ? (deliveryItem ? 'Ready to deliver.' : 'Ready for pickup.') : `${items.filter(item => item.productionStatus !== 'finished').length} still to finish.`}</p>}
-          {paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished && !order.handedOver ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || (!order.handedOver && !allFinished)} onClick={() => { void handover.request(id, !order.handedOver) }}>{order.handedOver ? 'Undo handover' : (deliveryItem ? 'Mark delivered' : 'Mark picked up')}</Button>}
+          <h2 id="handoff-heading">{postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</h2>
+          {arrivalText ? <p className={styles.arrivalMeta}>{arrivalText}</p> : null}
+          {order.handedOver ? <p className={styles.muted}>{postItem ? 'Handed to Austrian Post.' : deliveryItem ? 'Delivered to the customer.' : 'Picked up at the stall.'}</p> : <p className={styles.muted}>{allFinished ? (postItem ? 'Ready to hand to Post.' : deliveryItem ? 'Ready to deliver.' : 'Ready for pickup.') : `${items.filter(item => item.productionStatus !== 'finished').length} still to finish.`}</p>}
+          {postItem && !paymentHeld ? (
+            <div className={styles.trackingBox}>
+              {order.trackingUrl && order.trackingNumber ? (
+                <a className={styles.trackingLink} href={order.trackingUrl} target="_blank" rel="noreferrer">
+                  Track parcel ({order.trackingNumber}) ↗
+                </a>
+              ) : null}
+              <div className={styles.trackingRow}>
+                <Field label="Post tracking number" htmlFor="order-tracking-number" error={trackingInvalid ? 'Enter 8–40 letters or digits.' : undefined}>
+                  <input
+                    id="order-tracking-number"
+                    value={trackingValue}
+                    autoComplete="off"
+                    disabled={busy}
+                    onChange={event => setTrackingDraft(event.target.value)}
+                  />
+                </Field>
+                <Button
+                  tone="staff"
+                  variant="secondary"
+                  disabled={busy || trackingInvalid || !trackingDirty}
+                  onClick={async () => {
+                    const ok = await runAction(async () => {
+                      // Refetch first so we merge against the latest server handedOver state instead of resending stale loaded state.
+                      const fresh = await api.orders.getOrderBundle(order.id)
+                      if (fresh.order.status === 'CANCELLED') {
+                        setBundle(fresh)
+                        throw new Error('This order is cancelled.')
+                      }
+                      const freshPost = fresh.items.find(item => item.id === postItem.id) ?? fresh.items.find(item => item.delivery.kind === 'post')
+                      if (!freshPost) throw new Error('This order has no Post shipment.')
+                      const freshHandedOver = Boolean(freshPost.handedOver ?? fresh.order.handedOver)
+                      await api.orders.setHandedOver(order.id, freshHandedOver, [freshPost.id], trimmedTracking)
+                    }, trimmedTracking ? 'Tracking number saved.' : 'Tracking number cleared.')
+                    if (ok) setTrackingDraft(null)
+                  }}
+                >
+                  Save
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished && !order.handedOver ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || (!order.handedOver && !allFinished)} onClick={() => { void handover.request(id, !order.handedOver, undefined, undefined, postItem ? trimmedTracking : undefined) }}>{order.handedOver ? 'Undo handover' : (postItem ? 'Handed to Post' : deliveryItem ? 'Mark delivered' : 'Mark picked up')}</Button>}
         </section>
         <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method, amount) => runAction(() => api.payments.setPaymentState(id, state, method, amount), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} />
         <details className={styles.panel}>

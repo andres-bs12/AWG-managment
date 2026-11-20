@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import { axe, choose, expectActionClearance, mobile, next, open, pet } from './helpers'
 
 const copy = {
@@ -19,12 +19,30 @@ async function recordCheckout(page: Page) {
   })
 }
 
+const mapName = {
+  de: /^Rathausplatz.* auf Google Maps öffnen$/,
+  en: /^Open Rathausplatz.* in Google Maps$/,
+} as const
+
+/** Link to Google Maps for the market name: new tab, no opener, 44px target, pin icon hidden from AT. */
+async function expectMapLink(link: Locator) {
+  await expect(link).toBeVisible()
+  await expect(link).toHaveAttribute('href', `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('Rathausplatz, Wien')}`)
+  await expect(link).toHaveAttribute('target', '_blank')
+  await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  await expect(link.locator('svg')).toHaveAttribute('aria-hidden', 'true')
+  expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+}
+
 async function choosePickup(page: Page, locale: 'de' | 'en') {
   const market = page.getByRole('radio', { name: new RegExp(`^${copy[locale].market}`) })
   await market.locator('..').click()
   await expect(market).toBeChecked()
   const day = page.locator('input[name="pickup-day"]').first()
   await expect(day).toBeVisible()
+  // The lead sentence is gone; the market name is a Google Maps link.
+  await expect(page.getByText(locale === 'de' ? 'Wähle einen Markttag und wann du vorbeikommst' : 'Choose a market day and when you will come by')).toHaveCount(0)
+  await expectMapLink(page.getByRole('heading', { level: 3 }).getByRole('link', { name: mapName[locale] }))
   await expect(page.getByText('Christkindlmarkt Spittelberg', { exact: false })).toHaveCount(0)
   await day.locator('..').click()
   await expect(day).toBeChecked()
@@ -52,6 +70,7 @@ for (const locale of ['de', 'en'] as const) {
     await expect(page.locator('#buy-terms')).toBeVisible()
     await expect(page.getByRole('heading', { level: 3, name: copy[locale].market })).toBeVisible()
     await expect(page.getByRole('button', { name: copy[locale].edit, exact: true })).toBeVisible()
+    await expectMapLink(page.getByRole('link', { name: mapName[locale] }))
     await axe(page)
     await page.locator('#buy-terms').check()
     await page.locator('form button[type=submit]').click()
@@ -63,7 +82,11 @@ for (const locale of ['de', 'en'] as const) {
       items: [{ kind: 'custom', withName: false, color: 'red', finish: 'shiny', petName: '', photos: 1 }],
     })
     // The handoff step shows what on one line and where/when on the next.
-    await expect(page.locator('main li').filter({ hasText: copy[locale].pickup })).toContainText('Rathausplatz')
+    const handoff = page.locator('main li').filter({ hasText: copy[locale].pickup })
+    await expectMapLink(handoff.getByRole('link', { name: locale === 'de' ? 'Rathausplatz auf Google Maps öffnen' : 'Open Rathausplatz in Google Maps' }))
+    // Title and detail are separate blocks (the title never runs into the date).
+    const [title, detail] = await handoff.locator('strong, span:not([aria-hidden])').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().top))
+    expect(detail).toBeGreaterThan(title)
   })
 
   test(`pickup asks for the arrival time before continuing (${locale})`, async ({ page }) => {

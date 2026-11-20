@@ -39,14 +39,20 @@ public class ShippingService {
                 .collect(Collectors.toSet());
         var byDate = overrides.findAll().stream()
                 .collect(Collectors.toMap(PostCollectionDay::getDate, PostCollectionDay::isOpen));
-        return new PostShipping(weekdays, props.shop().deliveriesFrom(), config.transitMinDays(),
+        return new PostShipping(weekdays, config.collectionFrom(), config.transitMinDays(),
                 config.transitMaxDays(), lastArrival, byDate);
     }
 
     @Transactional(readOnly = true)
     public ShippingWindowDto window(LocalDate readyOn) {
         LocalDate today = LocalDate.now(clock);
-        return ShippingWindowDto.from(calendar(pricing.current()).windowAfter(readyOn.isBefore(today) ? today : readyOn));
+        return ShippingWindowDto.from(calendar(pricing.current()).windowAfter(withPaintFloor(readyOn.isBefore(today) ? today : readyOn)));
+    }
+
+    /** A Post parcel is never ready before awg.post.paint-from (no Post painting before the first market). */
+    LocalDate withPaintFloor(LocalDate readyOn) {
+        LocalDate floor = props.post().paintFrom();
+        return floor != null && readyOn.isBefore(floor) ? floor : readyOn;
     }
 
     @Transactional

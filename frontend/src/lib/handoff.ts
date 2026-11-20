@@ -1,4 +1,5 @@
 import type { MarketDay, OrderItem, TimeBlock } from '../domain/types'
+import { formatStaffArrivalRange, formatStaffShortDate } from './postShipping'
 import { formatDateLabel, formatHour } from './time'
 
 type Delivery = OrderItem['delivery']
@@ -13,7 +14,7 @@ export function handoffDate(delivery: Delivery, days: MarketDay[]): string | nul
 export function handoffLabel(item: Pick<OrderItem, 'delivery'>, days: MarketDay[]): string {
   const date = handoffDate(item.delivery, days) ?? item.delivery.deliveryDate ?? null
   if (item.delivery.kind === 'post') {
-    return date ? `Post · ${formatDateLabel(date)}` : 'Post · Date pending'
+    return date ? `Post · ${formatStaffShortDate(date)}` : 'Post · Date pending'
   }
   if (item.delivery.kind === 'vienna') {
     return date ? `Vienna · ${formatDateLabel(date)}` : 'Vienna · Date pending'
@@ -23,6 +24,11 @@ export function handoffLabel(item: Pick<OrderItem, 'delivery'>, days: MarketDay[
   const name = item.delivery.marketName ?? 'Market'
   if (!date) return `${name}${hour}`
   return `${name} · ${formatDateLabel(date)}${hour}`
+}
+
+export function handoffArrivalLabel(item: Pick<OrderItem, 'delivery'>): string | null {
+  if (item.delivery.kind !== 'post' || !item.delivery.arrivalFrom || !item.delivery.arrivalTo) return null
+  return `Arrives ${formatStaffArrivalRange(item.delivery.arrivalFrom, item.delivery.arrivalTo)}`
 }
 
 export function paintSlotLabel(block: TimeBlock, days: MarketDay[]): string {

@@ -374,8 +374,10 @@ export function getShippingWindow(readyOn: string): ShippingQuote {
   return shippingWindowAfter(effective, postConfig())
 }
 
-export function getShippingQuote(items: Pick<ShopItemInput, 'kind' | 'withName'>[]): ShippingQuote {
-  if (!items.length) return { available: false, collectionDate: null, arrivalFrom: null, arrivalTo: null }
+function planMockPostShipping(items: Pick<ShopItemInput, 'kind' | 'withName'>[]) {
+  if (!items.length) {
+    return { quote: { available: false, collectionDate: null, arrivalFrom: null, arrivalTo: null }, slots: [] }
+  }
   if (items.some(item => item.kind !== 'custom')) {
     throw Object.assign(new Error('Only custom pet ornaments can be ordered online.'), { status: 400 })
   }
@@ -387,7 +389,11 @@ export function getShippingQuote(items: Pick<ShopItemInput, 'kind' | 'withName'>
       const res = findFreeSlot(date, durationHours, undefined, undefined, extraBusy)
       return res.ok ? res.slot : null
     },
-  }).quote
+  })
+}
+
+export function getShippingQuote(items: Pick<ShopItemInput, 'kind' | 'withName'>[]): ShippingQuote {
+  return planMockPostShipping(items).quote
 }
 
 export function listInventory(): InventoryItem[] {
@@ -616,6 +622,7 @@ export function createMockCheckout(input: ShopCheckoutInput) {
     throw Object.assign(new Error('Choose Post shipping or market pickup.'), { code: 'VALIDATION', field: 'deliveryKind', status: 400 })
   }
   let postQuote: ShippingQuote | null = null
+  let postSlots: { date: string; startHour: number; endHour: number }[] = []
   if (!pickup) {
     if (!input.address?.line1?.trim() || !input.address?.city?.trim()) {
       throw Object.assign(new Error('Add the shipping address.'), { code: 'VALIDATION', field: 'address', status: 400 })
@@ -626,7 +633,9 @@ export function createMockCheckout(input: ShopCheckoutInput) {
     if (!input.expectedArrivalTo) {
       throw Object.assign(new Error('Confirm the estimated arrival date.'), { code: 'VALIDATION', field: 'expectedArrivalTo', status: 400 })
     }
-    postQuote = getShippingQuote(input.items)
+    const planned = planMockPostShipping(input.items)
+    postQuote = planned.quote
+    postSlots = planned.slots
     if (!postQuote.available || !postQuote.collectionDate || !postQuote.arrivalFrom || !postQuote.arrivalTo) {
       throw Object.assign(new Error('Post shipping is no longer available.'), { code: 'SHIPPING_UNAVAILABLE', field: 'delivery', status: 409 })
     }
@@ -659,13 +668,32 @@ export function createMockCheckout(input: ShopCheckoutInput) {
       ? { kind: 'market', marketDayId: pickupDay?.id, marketId: market?.id, marketName: market?.name, deliveryDate: input.deliveryDate ?? pickupDay?.date, pickupHour: input.pickupTime ? Number(input.pickupTime.slice(0, 2)) + Number(input.pickupTime.slice(3)) / 60 : null }
       : { kind: 'post', address: cleanAddress, deliveryDate: postQuote!.collectionDate!, arrivalFrom: postQuote!.arrivalFrom, arrivalTo: postQuote!.arrivalTo },
   }))
+  const createdBlocks: TimeBlock[] = []
+  if (!pickup && postSlots.length) {
+    // Pair planned slots longest-first to match planPostShipping's duration ordering.
+    const orderedItems = [...items].sort((a, b) => Number(b.withName) - Number(a.withName))
+    for (let i = 0; i < orderedItems.length && i < postSlots.length; i += 1) {
+      const slot = postSlots[i]
+      const day = dayByDate(slot.date)
+      if (!day) continue
+      if (!state.marketDays.some(row => row.id === day.id)) state.marketDays.push(day)
+      createdBlocks.push({
+        id: uid('blk'),
+        marketDayId: day.id,
+        orderItemId: orderedItems[i].id,
+        startHour: slot.startHour,
+        endHour: slot.endHour,
+        status: 'not_started',
+      })
+    }
+  }
   const deliveryFee = pickup ? 0 : prices.shippingFee
   const total = Math.round((items.reduce((sum, item) => sum + item.cost, 0) + deliveryFee) * 100) / 100
   const order: Order = { id: orderId, customerId: customer.id, code, trackToken: uid('trk'), formToken: token,
     source: 'web', checkoutStatus: 'confirmed', paymentState: 'paid', paymentMethod: 'card', deliveryFee, amountPaid: total, total,
     createdAt: new Date().toISOString(), itemIds: items.map(item => item.id), handedOver: false, paymentEntries: [] }
   for (const [id, count] of counts) inventory.find(row => row.id === id)!.quantity -= count
-  state.customers.push(customer); state.orders.push(order); state.items.push(...items)
+  state.customers.push(customer); state.orders.push(order); state.items.push(...items); state.blocks.push(...createdBlocks)
   // The mock checkout redirects directly to success, so it simulates confirmed payment.
   emit()
   rememberFormToken(code, token)
@@ -1053,7 +1081,10 @@ export function getAgendaDay(date: string): AgendaDay {
 }
 
 export function listAgendaDays(): AgendaDay[] {
-  const dates = [...new Set(state.marketDays.map((d) => d.date))].sort()
+  const postDates = state.items
+    .filter(item => item.delivery.kind === 'post' && item.delivery.deliveryDate)
+    .map(item => item.delivery.deliveryDate!)
+  const dates = [...new Set([...state.marketDays.map((d) => d.date), ...postDates])].sort()
   return dates.map((date) => getAgendaDay(date))
 }
 
@@ -1470,6 +1501,10 @@ function createSaleOrder(input: CreateSaleInput, orderId: string, code: string):
     }
   }
   if (destination && !state.marketDays.some(day => day.id === destination.id)) state.marketDays.push(destination)
+  if (postWindow?.collectionDate && !state.marketDays.some(day => day.date === postWindow!.collectionDate)) {
+    const postDay = dayByDate(postWindow.collectionDate)
+    if (postDay) state.marketDays.push(postDay)
+  }
   const deliveryFee = hasPost ? prices.shippingFee : 0
   const order: Order = {
     id: orderId,

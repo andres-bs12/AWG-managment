@@ -7,7 +7,7 @@ import { Button } from '../ui/Button'
 import { ButtonLink } from '../ui/ButtonLink'
 import { marketOrnamentLabel, marketOrnamentParts } from '../../domain/marketStock'
 import type { MarketDay, OrderItem, ProductionStatus, TimeBlock } from '../../domain/types'
-import { agendaSlotPath, handoffLabel, paintSlotLabel } from '../../lib/handoff'
+import { agendaSlotPath, handoffArrivalLabel, handoffLabel, paintSlotLabel } from '../../lib/handoff'
 import { formatEur } from '../../lib/money'
 import { handoverBlocker } from '../../lib/deliveryFacts'
 import styles from './OrderItemCard.module.css'
@@ -82,10 +82,13 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
       </details>
       </section>
       <section className={styles.handover} aria-label="Handover">
-        <div><h4>Handover</h4><p><StaffText>{handoffLabel(item, days)}</StaffText></p></div>
+        <div>
+          <h4>Handover</h4>
+          <p><StaffText>{[handoffLabel(item, days), handoffArrivalLabel(item)].filter(Boolean).join(' · ')}</StaffText></p>
+        </div>
         {!item.handedOver && blocker ? <p className={styles.blocked}>{`Can't hand over yet: ${blocker.toLowerCase()}.`}</p> : null}
         {/* With one ornament the order panel owns the handover: one control, not two. */}
-        {onHandover ? <Button tone="staff" variant="secondary" disabled={busy || held || (!item.handedOver && item.productionStatus !== 'finished')} onClick={onHandover}>{item.handedOver ? 'Undo handover' : 'Hand over this one'}</Button> : null}
+        {onHandover ? <Button tone="staff" variant="secondary" disabled={busy || held || (!item.handedOver && item.productionStatus !== 'finished')} onClick={onHandover}>{item.handedOver ? 'Undo handover' : item.delivery.kind === 'post' ? 'Handed to Post' : 'Hand over this one'}</Button> : null}
       </section>
     </article>
   )

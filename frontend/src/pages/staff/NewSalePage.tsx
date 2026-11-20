@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { StaffActions } from '../../components/staff/StaffActions'
 import { StaffDialog } from '../../components/staff/StaffDialog'
+import { MakeRoomDialog, type MakeRoomDialogMove } from '../../components/staff/MakeRoomDialog'
 import { CustomerHandoff } from '../../components/staff/CustomerHandoff'
 import { InsetNote } from '../../components/public/PublicForm'
 import { HelpTip } from '../../components/ui/HelpTip'
@@ -20,12 +21,12 @@ import { Field } from '../../components/ui/Field'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { marketOrnamentLabel, marketOrnamentParts, type MarketOrnament } from '../../domain/marketStock'
-import type { AgendaDay, CapacityResult, Market, MarketDay, MoveSuggestion, OrnamentColor, PaymentMethod, PaymentState, InventoryItem, PaintingDay } from '../../domain/types'
-import { isMarketPickupWeekday, isViennaWeekday, paintDatesToTry } from '../../lib/calendar'
+import type { Address, AgendaDay, CapacityResult, HourSpan, Market, MarketDay, OrnamentColor, PaymentMethod, PaymentState, InventoryItem, PaintingDay, ShippingQuote } from '../../domain/types'
+import { isMarketPickupWeekday, paintDatesToTry } from '../../lib/calendar'
 import {
+  earliestPickupHourAfterPaint,
   isMarketDayValidForItems,
   isPickupInPast,
-  isViennaDayValidForItems,
   latestLockedPaintDate,
   PAINT_HANDLING_HOURS,
   paintDatesForPickup,
@@ -35,7 +36,8 @@ import {
   syncSharedDelivery,
   validMarketPickupHours,
 } from '../../lib/newSaleRules'
-import { addUtcDays, formatDateLabel, formatHour, hoursOverlap, minutesToHours } from '../../lib/time'
+import { AUSTRIAN_POSTAL_REGEX, formatStaffFeeTag, formatStaffPostWindow } from '../../lib/postShipping'
+import { addUtcDays, datesInRange, formatDateLabel, formatHour, hoursOverlap, minutesToHours } from '../../lib/time'
 import { formatEur, itemCost, type Pricing } from '../../lib/money'
 import { OrderSummaryPanel } from './OrderSummaryPanel'
 import { MarketOrnamentPicker, MarketPiecePhoto } from './MarketOrnamentPicker'
@@ -85,26 +87,10 @@ function fillDayRefs(
   item: DraftItem,
   days: MarketDay[],
   markets: Market[],
-  seasonEnd: string,
   activeMarket?: Market | null,
   currentDate?: string,
 ): DraftItem {
-  if (item.delivery.mode === 'now') return item
-  if (item.delivery.mode === 'vienna') {
-    const date = item.delivery.pickupDate
-    const eligible = days.filter(d => (isViennaWeekday(d.date) || d.date === seasonEnd) && d.date <= seasonEnd && !days.some(other => other.date === d.date && markets.find(m => m.id === other.marketId)?.kind === 'market'))
-    const md = eligible.find(d => d.id === item.delivery.marketDayId) ?? eligible.find(d => d.date === date)
-    if (!md) return item
-    return {
-      ...item,
-      delivery: {
-        ...item.delivery,
-        pickupDate: md.date,
-        marketDayId: md.id,
-        marketId: md.marketId,
-      },
-    }
-  }
+  if (item.delivery.mode === 'now' || item.delivery.mode === 'post') return item
   const date = item.delivery.pickupDate || item.paintDate
   // Pickups happen at a stall: never on a home (painting) day.
   const pickupDays = days
@@ -186,6 +172,7 @@ export function NewSalePage() {
   const { activeMarket, activeMarketDay, stalls } = useStaffMarket()
   const version = useStaffRefresh()
   const [prices, setPrices] = useState<Pricing | null>(null)
+  const [finishedWithCustom, setFinishedWithCustom] = useState(true)
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [marketStock, setMarketStock] = useState<{ key: string; rows: MarketOrnament[] | null; error: string } | null>(null)
   const [stockRetry, setStockRetry] = useState(0)
@@ -199,7 +186,14 @@ export function NewSalePage() {
   const [days, setDays] = useState<MarketDay[]>([])
   const [agendaDays, setAgendaDays] = useState<AgendaDay[]>([])
   const [suggestions, setSuggestions] = useState<Record<string, CapacityResult>>({})
-  const [moveSuggestions, setMoveSuggestions] = useState<Record<string, MoveSuggestion | null>>({})
+  const [postQuote, setPostQuote] = useState<ShippingQuote | null>(null)
+  const [postQuoteLoading, setPostQuoteLoading] = useState(false)
+  const [postAddressTouched, setPostAddressTouched] = useState(false)
+  const [makeRoomBusy, setMakeRoomBusy] = useState(false)
+  const [makeRoomError, setMakeRoomError] = useState('')
+  const [makeRoomResult, setMakeRoomResult] = useState<{ moved: MakeRoomDialogMove[]; slot?: HourSpan } | null>(null)
+  const makeRoomLock = useRef(false)
+  const makeRoomKey = useRef<{ sig: string; key: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const submitLock = useRef(false)
   const saleKey = useRef(draft.idempotencyKey ?? uid())
@@ -242,7 +236,7 @@ export function NewSalePage() {
     next.idempotencyKey = saleKey.current
     setDraft(next)
     if (params.has('fresh') || params.has('start') || params.has('placeItem')) {
-      setPayMethod(null); setPayState('paid'); setDepositAmount(''); setPaidNote(''); setPaidAmount(null); setMixedHandedNote(''); setDoneQrOpen(false); setCopied(false); setError(''); setStaleNotice(''); setSuggestions({}); setMoveSuggestions({}); setFinishedHandoff(false); setDiscardOpen(false); setLeaveOpen(false); setChangeDate(null)
+      setPayMethod(null); setPayState('paid'); setDepositAmount(''); setPaidNote(''); setPaidAmount(null); setMixedHandedNote(''); setDoneQrOpen(false); setCopied(false); setError(''); setStaleNotice(''); setSuggestions({}); setPostAddressTouched(false); setMakeRoomError(''); setMakeRoomResult(null); makeRoomKey.current = null; setFinishedHandoff(false); setDiscardOpen(false); setLeaveOpen(false); setChangeDate(null)
       const cleaned = new URLSearchParams(params)
       for (const command of ['fresh', 'date', 'start', 'end', 'kind', 'placeItem']) cleaned.delete(command)
       consumedParams.current = cleaned.toString()
@@ -255,14 +249,28 @@ export function NewSalePage() {
 
   useEffect(() => {
     let active = true
-    void Promise.all([api.markets.listMarkets(), api.markets.listMarketDays(), api.agenda.listDays(), api.shop.getConfig(), api.inventory.list()]).then(async ([m, d, agenda, config, stock]) => {
+    void Promise.all([
+      api.markets.listMarkets(),
+      api.markets.listMarketDays(),
+      api.agenda.listDays(),
+      api.shop.getConfig(),
+      api.inventory.list(),
+      api.prices.get().catch(() => null),
+    ]).then(async ([m, d, agenda, config, stock, serverPrices]) => {
       if (!active) return
       if (![config.customPrice, config.finishedPrice, config.nameExtra].every(Number.isFinite)) throw new Error('Server prices are unavailable. Retry before creating a sale.')
-      setPrices(config); setConfigError(''); setInventory(stock.filter(row => row.kind === 'custom')); setSeasonEnd(config.seasonEnd)
+      setPrices({
+        customPrice: config.customPrice,
+        finishedPrice: config.finishedPrice,
+        nameExtra: config.nameExtra,
+        shippingFee: serverPrices?.shippingFee ?? config.deliveryFee ?? 5,
+      })
+      setFinishedWithCustom(serverPrices?.finishedWithCustom ?? true)
+      setConfigError(''); setInventory(stock.filter(row => row.kind === 'custom')); setSeasonEnd(config.seasonEnd)
       setMarkets(m); setDays(d); setAgendaDays(agenda)
       if (d.length) {
         const refDate = DEMO_NOW_HOUR == null || clock.date !== initialClockDate.current ? clock.date : (d.find(day => day.isToday)?.date ?? clock.date)
-        setDraft(current => ({ ...current, items: current.items.map(item => fillDayRefs(item, d, m, config.seasonEnd, activeMarket, refDate)) }))
+        setDraft(current => ({ ...current, items: current.items.map(item => fillDayRefs(item, d, m, activeMarket, refDate)) }))
         // The endpoint caps ranges at 62 days: load only upcoming days, in API-sized ranges, so an
         // old market day or a long season can no longer block the whole sale screen.
         const ranges = upcomingWindows(d.map(day => day.date), refDate)
@@ -343,6 +351,14 @@ export function NewSalePage() {
   const onlyFinished = draft.items.length > 0 && draft.items.every((item) => item.kind === 'finished')
   const hasCustom = draft.items.some((item) => item.kind === 'custom')
   const mixed = hasCustom && draft.items.some((item) => item.kind === 'finished')
+  const hasPost = draft.items.some((item) => item.delivery.mode === 'post')
+  const hasCustomPost = draft.items.some((item) => item.kind === 'custom' && item.delivery.mode === 'post')
+  const canFinishedUsePost = Boolean(finishedWithCustom && hasCustomPost && postQuote?.available !== false)
+  const postPaintDates = draft.items
+    .filter(item => item.kind === 'custom' && item.delivery.mode === 'post' && item.paintDate)
+    .map(item => item.paintDate!)
+    .sort()
+  const postReadyOn = postPaintDates.at(-1) ?? latestLockedPaintDate(draft.items) ?? currentDate
   const readyPieces = (stock?.rows ?? []).filter(piece => piece.status === 'painted')
   const readyIds = new Set(readyPieces.map(piece => piece.id))
   const availablePieces = readyPieces.filter(piece => !draft.items.some(item => item.marketOrnamentId === piece.id))
@@ -353,6 +369,34 @@ export function NewSalePage() {
   const order = draft.order
   const formUrl = order ? `${window.location.origin}/form/${order.formToken}` : ''
   const formStatus = useOrderFormStatus(order?.id, hasCustom && ['qr', 'payment', 'done'].includes(phase))
+
+  // Finished pieces may ship by Post only alongside a custom Post piece (prices.finishedWithCustom).
+  useEffect(() => {
+    if (draft.order || draft.phase === 'done') return
+    if (finishedWithCustom && hasCustomPost) return
+    if (!draft.items.some(item => item.kind === 'finished' && item.delivery.mode === 'post')) return
+    setDraft(current => ({
+      ...current,
+      items: current.items.map(item =>
+        item.kind === 'finished' && item.delivery.mode === 'post'
+          ? { ...item, delivery: { mode: 'now', pickupDate: today?.date, marketDayId: today?.id, marketId: today?.marketId, pickupHour: null, manualDay: false } }
+          : item,
+      ),
+    }))
+  }, [draft.items, draft.order, draft.phase, finishedWithCustom, hasCustomPost, today])
+
+  // Server shipping window for Post (readyOn = last paint day of the Post ornaments, or baseline today).
+  // Deliberately omit `version`: `POST /api/shipping/window` triggers `awg-staff-data-changed` in httpApi.
+  useEffect(() => {
+    if (phase !== 'delivery' || !hasCustom || !postReadyOn) return
+    let cancelled = false
+    setPostQuoteLoading(true)
+    api.shipping.window(postReadyOn)
+      .then(quote => { if (!cancelled) setPostQuote(quote) })
+      .catch(() => { if (!cancelled) setPostQuote(null) })
+      .finally(() => { if (!cancelled) setPostQuoteLoading(false) })
+    return () => { cancelled = true }
+  }, [phase, hasCustom, postReadyOn, configRetry])
 
   const itemsRef = useRef(draft.items)
   useEffect(() => { itemsRef.current = draft.items }, [draft.items])
@@ -389,15 +433,43 @@ export function NewSalePage() {
           .filter(([id, slot]) => id !== itemId && slot.date === date)
           .map(([, slot]) => ({ startHour: slot.startHour, endHour: slot.endHour }))
       const handoffKey = (item: DraftItem) => `${item.delivery.pickupDate ?? currentDate}|${String(item.delivery.pickupHour ?? 99).padStart(5, '0')}`
-      const customCount = itemsRef.current.filter((item) => item.kind === 'custom').length
       const toPlan = itemsRef.current
         .filter((item) => item.kind === 'custom' && !item.slotLocked && item.paintStart == null)
         .sort((a, b) => handoffKey(a).localeCompare(handoffKey(b)))
+      const openPostDates = (() => {
+        const known = paintingDays
+          .filter(day => day.date >= currentDate && day.date <= seasonEnd && day.open && day.booked < day.maxPaintings)
+          .map(day => day.date)
+        const fallback = datesInRange(currentDate, seasonEnd).slice(0, 21)
+        return [...new Set([...known, ...fallback])].sort()
+      })()
       for (const item of toPlan) {
+        if (item.delivery.mode === 'post') {
+          let result: CapacityResult = {
+            ok: false,
+            slot: null,
+            remainingHours: 0,
+            message: 'No free paint slot available for Post shipping.',
+          }
+          for (const date of openPostDates) {
+            const candidate = await api.agenda.checkCapacity({
+              date,
+              durationHours: minutesToHours(item.durationMinutes),
+              extraBusy: busyOn(date, item.id),
+            })
+            if (cancelled) return
+            if (candidate.ok && candidate.slot) {
+              result = candidate
+              break
+            }
+          }
+          next[item.id] = result
+          if (result.ok && result.slot) planned.set(item.id, result.slot)
+          continue
+        }
         const handoff = item.delivery.pickupDate || currentDate
         if (!handoff) continue
         if (item.delivery.mode === 'market' && item.delivery.pickupHour == null) continue
-        if (item.delivery.mode === 'vienna' && !item.delivery.pickupDate) continue
         const handoffMarketDayId = item.delivery.mode === 'market' ? item.delivery.marketDayId : undefined
         const dates = handoffMarketDayId
           ? paintDatesForPickup(handoff, item.delivery.marketId, firstPaintDate, agendaDays)
@@ -427,15 +499,6 @@ export function NewSalePage() {
         }
         next[item.id] = result
         if (result.ok && result.slot) planned.set(item.id, result.slot)
-        if (!result.ok) {
-          let move: MoveSuggestion | null = null
-          const moves = await Promise.all((customCount === 1 ? dates : []).map(date => api.agenda.findMoveSuggestion({
-            date, durationHours: minutesToHours(item.durationMinutes), handoffDate: handoff, handoffMarketDayId,
-            beforeHour: date === handoff && item.delivery.mode === 'market' && item.delivery.pickupHour != null ? item.delivery.pickupHour - PAINT_HANDLING_HOURS : undefined,
-          })))
-          move = moves.find(Boolean) ?? null
-          if (!cancelled) setMoveSuggestions((previous) => ({ ...previous, [item.id]: move }))
-        }
       }
       if (cancelled) return
       const placed = toPlan.filter((item) => next[item.id]?.ok && next[item.id]?.slot)
@@ -454,7 +517,7 @@ export function NewSalePage() {
     return () => {
       cancelled = true
     }
-  }, [phase, suggestKey, currentDate, firstPaintDate, hasCustom, planRetry, agendaDays])
+  }, [phase, suggestKey, currentDate, firstPaintDate, hasCustom, planRetry, agendaDays, paintingDays, seasonEnd])
 
   useEffect(() => {
     if (phase !== 'delivery' || !hasCustom) return
@@ -513,9 +576,9 @@ export function NewSalePage() {
   }
 
   function patchDelivery(id: string, delivery: DraftItem['delivery']) {
-    setMoveSuggestions({})
     setSuggestions({})
     setStaleNotice('')
+    setMakeRoomError('')
     setDraft((current) => {
       const different = current.differentPickups || mixed
       return {
@@ -533,6 +596,7 @@ export function NewSalePage() {
           const next = { ...item.delivery, ...delivery }
           const handoffChanged = next.pickupDate !== item.delivery.pickupDate || next.pickupHour !== item.delivery.pickupHour || next.mode !== item.delivery.mode || next.marketDayId !== item.delivery.marketDayId
           const keepChosenSlot = item.slotLocked && !item.plannedMove && (
+            next.mode === 'post' ||
             !next.pickupDate ||
             (paintFitsHandoff(item, next) && !paintingAtOtherMarket(item, agendaDays, next))
           )
@@ -546,6 +610,21 @@ export function NewSalePage() {
         }),
       }
     })
+  }
+
+  function patchPostAddress(patch: Partial<Address>) {
+    setError('')
+    setDraft(current => ({
+      ...current,
+      postAddress: {
+        line1: '',
+        line2: '',
+        postalCode: '',
+        city: '',
+        ...current.postAddress,
+        ...patch,
+      },
+    }))
   }
 
   function addItem(kind: 'custom' | 'finished' = 'custom') {
@@ -566,7 +645,7 @@ export function NewSalePage() {
           })
       const resolved = kind === 'custom' && (gabyAway || todayNoHours)
         ? { ...next, delivery: marketPickup(nextMarketPickup(marketDays, firstPaintDate, agendaDays, currentDate, nowHour, today?.marketId, todayNoHours ? addUtcDays(currentDate, 1) : currentDate)) }
-        : kind === 'custom' && todayFull ? next : fillDayRefs(next, days, markets, seasonEnd, activeMarket, currentDate)
+        : kind === 'custom' && todayFull ? next : fillDayRefs(next, days, markets, activeMarket, currentDate)
       const items = [...current.items.map((item) => item.plannedMove ? { ...item, plannedMove: undefined, slotLocked: false, paintDate: undefined, paintStart: undefined, paintEnd: undefined } : item), resolved]
       const mixedNow = items.some((i) => i.kind === 'custom') && items.some((i) => i.kind === 'finished')
       return { ...current, items, differentPickups: current.differentPickups || mixedNow }
@@ -653,23 +732,126 @@ export function NewSalePage() {
     })
   }
 
-  async function applyMoveSuggestion(item: DraftItem, suggestion: MoveSuggestion) {
-    setBusy(true)
+  async function makeRoomToday(cardItems: DraftItem[]) {
+    if (makeRoomLock.current || !today || gabyAway) return
+    const shared = !(draft.differentPickups || mixed)
+    const todayCandidates = shared
+      ? draft.items.filter(row => row.kind === 'custom')
+      : draft.items.filter(row =>
+          row.kind === 'custom' &&
+          (cardItems.some(c => c.id === row.id) ||
+            (row.delivery.mode === 'market' && (row.delivery.marketDayId === today.id || row.delivery.pickupDate === currentDate))),
+        )
+    const lacking = todayCandidates.filter(
+      row => row.paintStart == null || row.paintEnd == null || !row.paintDate || (!row.slotLocked && row.paintDate === currentDate),
+    )
+    const targets = lacking.length ? lacking : cardItems.filter(row => row.kind === 'custom')
+    if (!targets.length) return
+    const durationFor = (row: DraftItem) => row.durationMinutes || (row.withName ? 75 : 60)
+    const minutes = targets.reduce((sum, row) => sum + durationFor(row), 0)
+    const sig = `${currentDate}:${minutes}:${today.id}`
+    if (makeRoomKey.current?.sig !== sig) makeRoomKey.current = { sig, key: uid() }
+    const key = makeRoomKey.current.key
+    const slotIndex = new Map(agendaDays.flatMap(d => d.slots).filter(s => s.item).map(s => [s.item!.id, s]))
+
+    makeRoomLock.current = true
+    setMakeRoomBusy(true)
+    setMakeRoomError('')
     setError('')
     try {
-      patchItem(item.id, {
-        plannedMove: suggestion,
-        paintDate: suggestion.freedSlot.date,
-        paintStart: suggestion.freedSlot.startHour,
-        paintEnd: suggestion.freedSlot.endHour,
-        slotLocked: true,
-        fromCalendar: false,
+      const result = await api.agenda.makeRoom({ date: currentDate, minutes, marketDayId: today.id }, key)
+      makeRoomKey.current = null
+      const movedRows: MakeRoomDialogMove[] = result.moved.map(move => {
+        const match = slotIndex.get(move.itemId)
+        return {
+          ...move,
+          photoUrl: match?.photoUrl ?? null,
+          color: match?.item?.color ?? null,
+        }
       })
-      setMoveSuggestions((previous) => ({ ...previous, [item.id]: null }))
+      const freed = result.slot
+      const targetIds = new Set(targets.map(row => row.id))
+      const assigned = new Map<string, HourSpan>()
+      if (freed) {
+        const lockedOnDay = draft.items
+          .filter(row => row.kind === 'custom' && !targetIds.has(row.id) && row.paintDate === freed.date && row.paintStart != null && row.paintEnd != null)
+          .map(row => ({ startHour: row.paintStart!, endHour: row.paintEnd! }))
+        let cursor = freed.startHour
+        for (const row of targets) {
+          const durHours = durationFor(row) / 60
+          const start = cursor
+          const end = Math.round((start + durHours) * 10000) / 10000
+          if (end <= freed.endHour + 0.001 && !lockedOnDay.some(b => hoursOverlap(start, end, b.startHour, b.endHour))) {
+            assigned.set(row.id, { date: freed.date, startHour: start, endHour: end })
+            cursor = end
+          }
+        }
+      }
+      const assignedItems = todayCandidates.map(row => {
+        const slot = assigned.get(row.id)
+        return slot ? { ...row, paintDate: slot.date, paintStart: slot.startHour, paintEnd: slot.endHour, slotLocked: true } : row
+      })
+      const everyTargetGotSlot = Boolean(freed && assigned.size === targets.length)
+      const validTodayHours = freed ? validMarketPickupHours(today, assignedItems, currentDate, nowHour) : []
+      if (freed && assigned.size > 0) {
+        const latestEnd = Math.max(...assignedItems.map(row => row.paintEnd ?? freed.endHour))
+        const minHour = earliestPickupHourAfterPaint(latestEnd)
+        const refItem = targets[0]
+        const chosenHour = refItem.delivery.pickupDate === today.date && refItem.delivery.pickupHour != null && validTodayHours.includes(refItem.delivery.pickupHour)
+          ? refItem.delivery.pickupHour
+          : (validTodayHours.find(h => h >= minHour) ?? validTodayHours[0] ?? null)
+        const todayDelivery: DraftItem['delivery'] = {
+          mode: 'market',
+          pickupDate: today.date,
+          marketDayId: today.id,
+          marketId: today.marketId,
+          pickupHour: chosenHour,
+          manualDay: false,
+        }
+        setDraft(current => {
+          const isShared = !(current.differentPickups || mixed)
+          return {
+            ...current,
+            items: current.items.map(row => {
+              const slot = assigned.get(row.id)
+              if (slot) {
+                return {
+                  ...row,
+                  delivery: todayDelivery,
+                  paintDate: slot.date,
+                  paintStart: slot.startHour,
+                  paintEnd: slot.endHour,
+                  slotLocked: true,
+                  fromCalendar: false,
+                  plannedMove: undefined,
+                }
+              }
+              return isShared ? { ...row, delivery: todayDelivery } : row
+            }),
+          }
+        })
+      }
+      setMakeRoomResult({ moved: movedRows, slot: everyTargetGotSlot && validTodayHours.length > 0 ? freed : undefined })
+      setConfigRetry(n => n + 1)
     } catch (err) {
-      setError(saleErrorMessage(err, 'Could not move the paint session'))
+      const problem = err && typeof err === 'object' ? (err as { code?: string; reason?: string; message?: string; status?: number }) : {}
+      if (problem.status === 409) makeRoomKey.current = null
+      if (problem.code === 'NO_MOVABLE_SESSION') {
+        if (problem.reason === 'SAME_DAY_ONLY') {
+          setMakeRoomError("All of today's sessions are for pickups today, so none can be moved.")
+        } else if (problem.reason === 'NO_TARGET_SLOT') {
+          setMakeRoomError('No other painting day has room while keeping each order’s promised date.')
+        } else if (problem.reason === 'NOT_PAINTING_DAY') {
+          setMakeRoomError('Painting is closed today.')
+        } else {
+          setMakeRoomError(problem.message || 'Could not make room today.')
+        }
+      } else {
+        setMakeRoomError(problem.message || 'Could not make room today. Try again.')
+      }
     } finally {
-      setBusy(false)
+      makeRoomLock.current = false
+      setMakeRoomBusy(false)
     }
   }
 
@@ -687,7 +869,11 @@ export function NewSalePage() {
     setLeaveOpen(false)
     setChangeDate(null)
     setSuggestions({})
-    setMoveSuggestions({})
+    setPostQuote(null)
+    setPostAddressTouched(false)
+    setMakeRoomError('')
+    setMakeRoomResult(null)
+    makeRoomKey.current = null
     setDepositAmount('')
     setCopied(false)
     setError('')
@@ -712,8 +898,7 @@ export function NewSalePage() {
     const soldOnMarketDayId = activeMarketDay?.id ?? (stalls.length <= 1 ? today?.id : undefined)
     const created = await api.orders.createSale({
       soldOnMarketDayId,
-      items: toCreateItems(draft.items, days, today),
-      plannedMove: draft.items.find((item) => item.plannedMove)?.plannedMove,
+      items: toCreateItems(draft.items, days, today, draft.postAddress),
     }, saleKey.current)
     const ref = { id: created.id, code: created.code, formToken: created.formToken, total: created.total }
     setDraft((current) => ({ ...current, order: ref }))
@@ -787,13 +972,24 @@ export function NewSalePage() {
       isPickupInPast(item.delivery, currentDate, nowHour) ||
       (item.kind === 'custom' && (
         (item.delivery.mode === 'market' && (item.delivery.pickupHour == null || !item.delivery.marketDayId)) ||
-        (item.delivery.mode === 'vienna' && !item.delivery.pickupDate) ||
         !paintFitsHandoff(item, item.delivery)
       )),
     )
     if (invalidHandoff) {
       setError('Choose a valid pickup or delivery date and hour after painting finishes.')
       return
+    }
+    if (hasPost) {
+      if (postQuote?.available === false) {
+        setError('Arrives after 23 Dec — choose market pickup')
+        return
+      }
+      const addrErrors = postAddressProblems(draft.postAddress)
+      if (addrErrors.line1 || addrErrors.postalCode || addrErrors.city) {
+        setPostAddressTouched(true)
+        setError('Complete the Post shipping address.')
+        return
+      }
     }
     if (submitLock.current) return
     submitLock.current = true
@@ -845,7 +1041,6 @@ export function NewSalePage() {
       }
       saleKey.current = uid()
       setSuggestions({})
-      setMoveSuggestions({})
       setCopied(false)
       setChangeDate(null)
       setDraft((current) => ({
@@ -901,10 +1096,10 @@ export function NewSalePage() {
     }
   }
 
-  const allVienna = hasCustom && draft.items.every((item) => item.kind !== 'custom' || item.delivery.mode === 'vienna')
+  const allPost = hasCustom && draft.items.every((item) => item.kind !== 'custom' || item.delivery.mode === 'post')
   const title: Record<SalePhase, string> = {
     items: 'What are we selling?',
-    delivery: onlyFinished ? 'Hand over and pay' : allVienna ? 'Delivery and paint' : 'Pickup and paint',
+    delivery: onlyFinished ? 'Hand over and pay' : allPost ? 'Post shipping and paint' : 'Pickup and paint',
     qr: 'Customer form',
     payment: 'Payment',
     done: 'Sale recorded',
@@ -912,7 +1107,7 @@ export function NewSalePage() {
 
   const stepLabels = onlyFinished
     ? ['Items', 'Hand over & pay']
-    : ['Items', allVienna ? 'Delivery' : 'Pickup', 'QR & pay']
+    : ['Items', allPost ? 'Post' : 'Pickup', 'QR & pay']
   const currentStep = phase === 'done' ? stepLabels.length : phase === 'items' ? 0 : phase === 'delivery' ? 1 : 2
 
   const sharedItem = draft.items[0]
@@ -932,6 +1127,15 @@ export function NewSalePage() {
         {draft.items.length > 0 && <ProgressSteps labels={stepLabels} current={currentStep} label="Sale progress" tone="staff" />}
       </div>
 
+      {makeRoomResult ? (
+        <MakeRoomDialog
+          moved={makeRoomResult.moved}
+          yourSlot={makeRoomResult.slot}
+          todayDate={currentDate}
+          note="Moved sessions stay on their new times even if you leave this sale."
+          onClose={() => setMakeRoomResult(null)}
+        />
+      ) : null}
       {discardOpen && <StaffDialog title="Discard this sale?" onClose={() => setDiscardOpen(false)}>
         <p>The ornaments you added are removed.</p>
         <Button tone="staff" variant="danger" onClick={() => {
@@ -1037,7 +1241,6 @@ export function NewSalePage() {
                     onChange={(e) => {
                       const nextDifferent = e.target.checked || mixed
                       setSuggestions({})
-                      setMoveSuggestions({})
                       setDraft((current) => {
                         if (nextDifferent || !current.items.length) return { ...current, differentPickups: nextDifferent }
                         return {
@@ -1068,9 +1271,7 @@ export function NewSalePage() {
                     paintItems={paintItems}
                     markets={markets}
                     marketDays={marketDays}
-                    allDays={days}
                     activeMarket={activeMarket}
-                    seasonEnd={seasonEnd}
                     agendaDays={agendaDays}
                     paintingDays={paintingDays}
                     nowHour={nowHour}
@@ -1078,17 +1279,32 @@ export function NewSalePage() {
                     firstPaintDate={firstPaintDate}
                     today={today}
                     gabyAway={gabyAway}
+                    shippingFee={prices?.shippingFee ?? 5}
+                    postQuote={postQuote}
+                    postQuoteLoading={postQuoteLoading}
+                    hasCustom={hasCustom}
+                    finishedWithCustom={finishedWithCustom}
+                    canFinishedUsePost={canFinishedUsePost}
                     suggestions={suggestions}
-                    moveSuggestion={moveSuggestions[item.id]}
+                    makeRoomBusy={makeRoomBusy}
+                    makeRoomError={makeRoomError}
                     slotTaken={Boolean(error && /hour is taken|overlap/i.test(error))}
-                    onModeChange={() => setError('')}
+                    onModeChange={() => { setError(''); setMakeRoomError('') }}
                     onDelivery={(delivery) => patchDelivery(item.id, delivery)}
                     onPlace={placeOnBoard}
                     onChangeSlot={changeSlot}
-                    onApplyMove={(suggestion) => void applyMoveSuggestion(item, suggestion)}
+                    onMakeRoomToday={(targets) => void makeRoomToday(targets)}
                   />
                 )
               })}
+
+              {hasPost ? (
+                <PostAddressCard
+                  address={draft.postAddress}
+                  touched={postAddressTouched}
+                  onChange={patchPostAddress}
+                />
+              ) : null}
 
               {onlyFinished ? (
                 <div className={`${styles.card} ${styles.payCard}`}>
@@ -1103,10 +1319,10 @@ export function NewSalePage() {
                 <Button
                   tone="staff"
                   size="lg"
-                  disabled={busy || !prices || Boolean(configError) || !draft.items.length || draft.items.some(item => item.kind === 'custom' && (item.paintStart == null || (item.delivery.mode === 'market' && (!item.delivery.marketDayId || item.delivery.pickupHour == null)) || (item.delivery.mode === 'vienna' && !item.delivery.pickupDate) || !paintFitsHandoff(item, item.delivery) || Boolean(paintingAtOtherMarket(item, agendaDays)))) || draft.items.some(item => isPickupInPast(item.delivery, currentDate, nowHour)) || (onlyFinished && payState !== 'unpaid' && !payMethod) || (onlyFinished && payState === 'deposit' && !validDeposit(depositAmount, prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0) : 0))}
+                  disabled={busy || !prices || Boolean(configError) || !draft.items.length || (hasPost && postQuote?.available === false) || draft.items.some(item => item.kind === 'custom' && (item.paintStart == null || (item.delivery.mode === 'market' && (!item.delivery.marketDayId || item.delivery.pickupHour == null)) || !paintFitsHandoff(item, item.delivery) || Boolean(paintingAtOtherMarket(item, agendaDays)))) || draft.items.some(item => isPickupInPast(item.delivery, currentDate, nowHour)) || (onlyFinished && payState !== 'unpaid' && !payMethod) || (onlyFinished && payState === 'deposit' && !validDeposit(depositAmount, prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0) : 0))}
                   onClick={() => void continueFromDelivery()}
                 >
-                  {busy ? 'Saving…' : onlyFinished ? 'Done' : draft.items.some((item) => item.plannedMove) ? 'Save change & create order' : 'Create order & show QR'}
+                  {busy ? 'Saving…' : onlyFinished ? 'Done' : 'Create order & show QR'}
                 </Button>
                 <Button tone="staff" variant="ghost" disabled={Boolean(order)} onClick={() => setPhase('items')}>
                   Back to items
@@ -1190,16 +1406,16 @@ export function NewSalePage() {
             </div>
           ) : null}
         </div>
-        {draft.items.length > 0 && <OrderSummaryPanel prices={prices} items={draft.items} markets={markets} days={days} marketPieces={stock?.rows ?? undefined} orderCode={order?.code} showHandoff={phase !== 'items'} />}
+        {draft.items.length > 0 && <OrderSummaryPanel prices={prices} items={draft.items} markets={markets} days={days} marketPieces={stock?.rows ?? undefined} postQuote={postQuote} orderCode={order?.code} showHandoff={phase !== 'items'} />}
       </div>
     </section>
   )
 }
 
 /** Today's automatic painting limit is used up (or painting is closed): a same-day pickup cannot be planned. */
-function todayPaintingFull(paintingDays: PaintingDay[], today?: MarketDay): PaintingDay | null {
+function todayPaintingFull(paintingDays: PaintingDay[], today?: MarketDay, neededCount = 1): PaintingDay | null {
   const rule = today ? paintingDays.find(row => row.date === today.date) : undefined
-  return rule && (!rule.open || rule.booked >= rule.maxPaintings) ? rule : null
+  return rule && (!rule.open || rule.booked + neededCount > rule.maxPaintings) ? rule : null
 }
 
 function CustomMinutesField({
@@ -1436,6 +1652,73 @@ function ItemsStep({
   )
 }
 
+function postAddressProblems(address?: Address): { line1?: string; postalCode?: string; city?: string } {
+  return {
+    line1: !address?.line1?.trim() ? 'Enter the street and house number.' : undefined,
+    postalCode: !AUSTRIAN_POSTAL_REGEX.test((address?.postalCode ?? '').trim()) ? 'Enter a 4-digit Austrian postcode.' : undefined,
+    city: !address?.city?.trim() ? 'Enter the city.' : undefined,
+  }
+}
+
+function PostAddressCard({
+  address,
+  touched,
+  onChange,
+}: {
+  address?: Address
+  touched: boolean
+  onChange: (patch: Partial<Address>) => void
+}) {
+  const [blurred, setBlurred] = useState<{ line1?: boolean; postalCode?: boolean; city?: boolean }>({})
+  const problems = postAddressProblems(address)
+  return (
+    <article className={styles.card} aria-labelledby="post-address-heading">
+      <h3 id="post-address-heading">Shipping address</h3>
+      <div className={styles.addressFields}>
+        <Field label="Street and house number" htmlFor="post-line1" error={touched || blurred.line1 ? problems.line1 : undefined}>
+          <input
+            id="post-line1"
+            autoComplete="street-address"
+            value={address?.line1 ?? ''}
+            onBlur={() => setBlurred(current => ({ ...current, line1: true }))}
+            onChange={event => onChange({ line1: event.target.value })}
+          />
+        </Field>
+        <Field label="Staircase / door (optional)" htmlFor="post-line2">
+          <input
+            id="post-line2"
+            autoComplete="address-line2"
+            value={address?.line2 ?? ''}
+            onChange={event => onChange({ line2: event.target.value })}
+          />
+        </Field>
+        <div className={styles.addressRow}>
+          <Field label="Postcode" htmlFor="post-postal" error={touched || blurred.postalCode ? problems.postalCode : undefined}>
+            <input
+              id="post-postal"
+              inputMode="numeric"
+              maxLength={4}
+              autoComplete="postal-code"
+              value={address?.postalCode ?? ''}
+              onBlur={() => setBlurred(current => ({ ...current, postalCode: true }))}
+              onChange={event => onChange({ postalCode: event.target.value.replace(/\D/g, '').slice(0, 4) })}
+            />
+          </Field>
+          <Field label="City" htmlFor="post-city" error={touched || blurred.city ? problems.city : undefined}>
+            <input
+              id="post-city"
+              autoComplete="address-level2"
+              value={address?.city ?? ''}
+              onBlur={() => setBlurred(current => ({ ...current, city: true }))}
+              onChange={event => onChange({ city: event.target.value })}
+            />
+          </Field>
+        </div>
+      </div>
+    </article>
+  )
+}
+
 function DeliveryCard({
   item,
   title,
@@ -1445,9 +1728,7 @@ function DeliveryCard({
   paintItems,
   markets,
   marketDays,
-  allDays,
   activeMarket,
-  seasonEnd,
   agendaDays,
   paintingDays,
   nowHour,
@@ -1455,14 +1736,21 @@ function DeliveryCard({
   firstPaintDate,
   today,
   gabyAway,
+  shippingFee,
+  postQuote,
+  postQuoteLoading,
+  hasCustom,
+  finishedWithCustom,
+  canFinishedUsePost,
   suggestions,
-  moveSuggestion,
+  makeRoomBusy,
+  makeRoomError,
   slotTaken,
   onDelivery,
   onModeChange,
   onPlace,
   onChangeSlot,
-  onApplyMove,
+  onMakeRoomToday,
 }: {
   item: DraftItem
   title: string
@@ -1472,9 +1760,7 @@ function DeliveryCard({
   paintItems: DraftItem[]
   markets: Market[]
   marketDays: MarketDay[]
-  allDays: MarketDay[]
   activeMarket: Market | null
-  seasonEnd: string
   agendaDays: AgendaDay[]
   paintingDays: PaintingDay[]
   nowHour: number
@@ -1482,21 +1768,28 @@ function DeliveryCard({
   firstPaintDate: string
   today?: MarketDay
   gabyAway?: Market
+  shippingFee: number
+  postQuote: ShippingQuote | null
+  postQuoteLoading: boolean
+  hasCustom: boolean
+  finishedWithCustom: boolean
+  canFinishedUsePost: boolean
   suggestions: Record<string, CapacityResult>
-  moveSuggestion?: MoveSuggestion | null
+  makeRoomBusy: boolean
+  makeRoomError: string
   slotTaken?: boolean
   onModeChange: () => void
   onDelivery: (delivery: DraftItem['delivery']) => void
   onPlace: (item: DraftItem) => void
   onChangeSlot: (item: DraftItem) => void
-  onApplyMove: (suggestion: MoveSuggestion) => void
+  onMakeRoomToday: (items: DraftItem[]) => void
 }) {
   const showPaint = paintItems.length > 0
   const suggestion = suggestions[item.id]
   const [datePickerOpen, setDatePickerOpen] = useState(false)
-  const [viennaPickerOpen, setViennaPickerOpen] = useState(false)
   const todayIsMarket = Boolean(today && marketDays.some(day => day.id === today.id))
-  const todayFull = showPaint && todayIsMarket ? todayPaintingFull(paintingDays, today) : null
+  const unlockedPaintCount = paintItems.filter(row => !row.slotLocked).length
+  const todayFull = showPaint && todayIsMarket ? todayPaintingFull(paintingDays, today, Math.max(1, unlockedPaintCount)) : null
   const away = showPaint ? gabyAway : undefined
   const lockedDate = latestLockedPaintDate(paintItems)
   const anyLockedNotToday = paintItems.some(row => row.slotLocked && row.paintDate && row.paintDate !== currentDate)
@@ -1517,14 +1810,20 @@ function DeliveryCard({
   useEffect(() => {
     if (staleToday) onDelivery({ ...item.delivery, pickupDate: undefined, marketDayId: undefined, pickupHour: null, manualDay: false })
   }, [staleToday]) // eslint-disable-line react-hooks/exhaustive-deps
+  // If Make room today succeeded and selected Today, close the other-day picker.
+  useEffect(() => {
+    if (today && item.delivery.mode === 'market' && item.delivery.pickupDate === today.date && allPaintLocked) {
+      setDatePickerOpen(false)
+    }
+  }, [today, item.delivery.mode, item.delivery.pickupDate, allPaintLocked])
   const isThisToday = Boolean(
     today && (item.delivery.marketDayId ? item.delivery.marketDayId === today.id : item.delivery.pickupDate === today.date),
   )
-  const pickupWhen: 'today' | 'another_day' | 'vienna' | 'now' =
+  const pickupWhen: 'today' | 'another_day' | 'post' | 'now' =
     item.kind === 'finished' && item.delivery.mode === 'now'
       ? 'now'
-      : item.delivery.mode === 'vienna'
-        ? 'vienna'
+      : item.delivery.mode === 'post'
+        ? 'post'
         : !todayCanPickup
           ? 'another_day'
           : (item.delivery.marketDayId || item.delivery.pickupDate) && !isThisToday
@@ -1575,9 +1874,6 @@ function DeliveryCard({
       a.date.localeCompare(b.date) ||
       (a.marketId === activeMarketId ? -1 : b.marketId === activeMarketId ? 1 : (marketNameById.get(a.marketId) ?? '').localeCompare(marketNameById.get(b.marketId) ?? '')),
     )
-  const viennaDays = allDays.filter(d => isViennaDayValidForItems(d, paintItems, currentDate, firstPaintDate, seasonEnd, marketDays))
-  const viennaDay = viennaDays.find((d) => d.id === item.delivery.marketDayId) ??
-    viennaDays.find((d) => d.date === item.delivery.pickupDate)
   const mixedMarkets = new Set(dayChoices.map((d) => d.marketId)).size > 1
 
   function capacityLabel(date: string): string {
@@ -1586,14 +1882,12 @@ function DeliveryCard({
     const rule = paintingDays.find(row => row.date === date)
     if (!rule) return `${agenda.slots.length} painting sessions scheduled`
     return rule.open ? `${rule.booked}/${rule.maxPaintings} paintings booked` : 'Painting closed'
-
   }
 
   function setMode(mode: DeliveryMode | 'today' | 'another_day') {
     onModeChange()
     if (mode === 'now') {
       setDatePickerOpen(false)
-      setViennaPickerOpen(false)
       onDelivery({
         mode: 'now',
         pickupDate: today?.date,
@@ -1604,16 +1898,23 @@ function DeliveryCard({
       })
       return
     }
-    if (mode === 'vienna') {
+    if (mode === 'post') {
       setDatePickerOpen(false)
-      setViennaPickerOpen(true)
-      // The choice is the handoff itself: summary, hints and labels follow it before a day is picked.
-      if (item.delivery.mode !== 'vienna') onDelivery({ ...item.delivery, mode: 'vienna', pickupDate: undefined, marketDayId: undefined, marketId: undefined, pickupHour: null, manualDay: false })
+      if (item.delivery.mode !== 'post') {
+        onDelivery({
+          ...item.delivery,
+          mode: 'post',
+          pickupDate: undefined,
+          marketDayId: undefined,
+          marketId: undefined,
+          pickupHour: null,
+          manualDay: false,
+        })
+      }
       return
     }
     if (mode === 'today' && todayCanPickup && !todayBlockedFull) {
       setDatePickerOpen(false)
-      setViennaPickerOpen(false)
       onDelivery({
         mode: 'market',
         pickupDate: today?.date,
@@ -1624,7 +1925,6 @@ function DeliveryCard({
       })
       return
     }
-    setViennaPickerOpen(false)
     setDatePickerOpen(true)
     if (item.delivery.mode !== 'market') onDelivery({ ...item.delivery, mode: 'market', pickupDate: undefined, marketDayId: undefined, marketId: today?.marketId, pickupHour: null, manualDay: false })
   }
@@ -1635,17 +1935,28 @@ function DeliveryCard({
     pickupDay && ((today?.marketId && pickupDay.marketId !== today.marketId) || datesWithMultipleMarkets.has(pickupDay.date)),
   )
   const pickupMarketName = pickupDay ? marketNameById.get(pickupDay.marketId) : undefined
+  const postUnavailable = postQuote?.available === false
+  const postWindowText = postQuote ? formatStaffPostWindow(postQuote) : null
+  const postChoiceLabel = `Post (${formatStaffFeeTag(shippingFee)})`
   const pickupOptions = [
     ...(todayCanPickup ? [{ value: 'today' as const, label: todayBlockedFull ? 'Today · full' : 'Today', disabled: todayBlockedFull }] : []),
     { value: 'another_day' as const, label: 'Market day' },
-    { value: 'vienna' as const, label: 'Delivery' },
+    { value: 'post' as const, label: postChoiceLabel, disabled: postUnavailable },
+  ]
+  const finishedOptions = [
+    { value: 'now' as const, label: 'Deliver now' },
+    { value: 'market' as const, label: 'Market day' },
+    ...(finishedWithCustom && hasCustom ? [{ value: 'post' as const, label: 'Post', disabled: !canFinishedUsePost }] : []),
   ]
   const showSelectedMarketDay = Boolean(
-    !viennaPickerOpen &&
     item.delivery.mode === 'market' &&
     pickupDay &&
     (pickupWhen === 'another_day' || item.kind === 'finished'),
   )
+  const canMakeRoomToday = Boolean(showPaint && todayIsMarket && !away && todayCanPickup && (!todayFull || todayFull.open) && item.delivery.mode !== 'post')
+  const noTodayHoursFit = Boolean(pickupWhen === 'today' && hourPreview && previewItems.length > 0 && hours.every(hour => hourPreview[hour]?.ok === false))
+  const noTodaySlotFound = Boolean(pickupWhen === 'today' && !slot && suggestion && !suggestion.ok)
+  const anyMultiTodaySlotMissing = Boolean(pickupWhen === 'today' && paintItems.length > 1 && paintItems.some(row => !slotLabel(row) && suggestions[row.id] && !suggestions[row.id].ok))
 
   const cardFinishedItems = shared
     ? allItems.filter((row): row is DraftItem & { marketOrnamentId: string } => row.kind === 'finished' && Boolean(row.marketOrnamentId))
@@ -1719,36 +2030,54 @@ function DeliveryCard({
         <SegmentedControl
           legend="Handover"
           name={`hand-${item.id}`}
-          value={viennaPickerOpen ? 'vienna' : datePickerOpen ? 'market' : item.delivery.mode}
+          value={datePickerOpen ? 'market' : item.delivery.mode}
           onChange={(mode) => {
             if (mode === 'now') setMode('now')
-            else if (mode === 'vienna') setMode('vienna')
+            else if (mode === 'post') setMode('post')
             else setMode(todayIsMarket ? 'today' : 'another_day')
           }}
-          options={[
-            { value: 'now', label: 'Deliver now' },
-            { value: 'market', label: 'Market day' },
-            { value: 'vienna', label: 'Delivery' },
-          ]}
+          options={finishedOptions}
         />
       ) : (
         <SegmentedControl
           legend="Pickup or delivery"
           name={`when-${item.id}`}
-          value={viennaPickerOpen ? 'vienna' : datePickerOpen ? 'another_day' : pickupWhen === 'now' ? 'today' : pickupWhen}
+          value={datePickerOpen ? 'another_day' : pickupWhen === 'now' ? 'today' : pickupWhen}
           onChange={(value) => setMode(value)}
           options={pickupOptions}
         />
       )}
 
-      {away && !anyLockedNotToday && item.delivery.mode !== 'vienna' ? (
+      {postUnavailable && item.kind === 'custom' ? (
+        <p className={styles.postUnavailable} role="status">Arrives after 23 Dec — choose market pickup</p>
+      ) : null}
+
+      {item.delivery.mode === 'post' && !postUnavailable ? (
+        item.kind === 'finished' ? (
+          <p className={styles.hint}>Ships in the same Post parcel.</p>
+        ) : (
+          <p className={styles.postWindow} role="status">
+            {postWindowText ? <StaffText>{postWindowText}</StaffText> : postQuoteLoading ? 'Checking Post dates…' : 'Post shipping'}
+          </p>
+        )
+      ) : null}
+
+      {away && !anyLockedNotToday && item.delivery.mode !== 'post' ? (
         <p className={styles.hint} role="status">Gaby is painting at {away.name} today.</p>
       ) : null}
 
-      {!away && todayBlockedFull && todayCanPickup && item.delivery.mode !== 'vienna' ? (
-        <p className={styles.hint} role="status">
-          {todayFull!.open ? `Today is full (${todayFull!.booked}/${todayFull!.maxPaintings} paintings booked).` : 'Painting is closed today.'} Automatic planning cannot add one: choose another market day, or place it on the board by hand.
-        </p>
+      {!away && todayBlockedFull && todayCanPickup && item.delivery.mode !== 'post' ? (
+        <div className={styles.makeRoomBlock}>
+          <p className={styles.hint} role="status">
+            {todayFull!.open ? `Today is full (${todayFull!.booked}/${todayFull!.maxPaintings} paintings booked).` : 'Painting is closed today.'} Automatic planning cannot add one: choose another market day, or place it on the board by hand.
+          </p>
+          {canMakeRoomToday ? (
+            <Button tone="staff" size="lg" disabled={makeRoomBusy} onClick={() => onMakeRoomToday(paintItems)}>
+              {makeRoomBusy ? 'Making room…' : 'Make room today'}
+            </Button>
+          ) : null}
+          {makeRoomError ? <p className={styles.err} role="alert">{makeRoomError}</p> : null}
+        </div>
       ) : null}
 
       {showSelectedMarketDay && pickupDay ? (
@@ -1769,7 +2098,14 @@ function DeliveryCard({
       ) : null}
 
       {datePickerOpen ? (
-        <div className={styles.datePicker} id={`market-day-calendar-${item.id}`}>
+        <div
+          className={styles.datePicker}
+          id={`market-day-calendar-${item.id}`}
+          onClick={event => {
+            const input = (event.target as Element).closest('label')?.querySelector<HTMLInputElement>('input[type="radio"]')
+            if (input?.checked) setDatePickerOpen(false)
+          }}
+        >
           <div className={styles.datePickerHead}>
             <div>
               <strong>Choose market day</strong>
@@ -1812,67 +2148,9 @@ function DeliveryCard({
           ) : (
             <p className={styles.emptyDates}>
               {lockedDate
-                ? 'No market pickup days left after the chosen paint date. Choose Delivery instead or change the paint time.'
+                ? 'No market pickup days left after the chosen paint date. Choose Post instead or change the paint time.'
                 : 'No future market pickup days available.'}
             </p>
-          )}
-        </div>
-      ) : null}
-
-      {!datePickerOpen && item.delivery.mode === 'vienna' && (viennaDay || !viennaPickerOpen) ? (
-        <button
-          type="button"
-          className={styles.selectedDate}
-          aria-expanded={viennaPickerOpen}
-          aria-controls={`delivery-day-calendar-${item.id}`}
-          onClick={() => setViennaPickerOpen((open) => !open)}
-        >
-          <CalendarIcon />
-          <span>
-            <strong>{viennaDay ? formatDateLabel(viennaDay.date) : 'Choose delivery day'}</strong>
-            <small>Vienna delivery</small>
-          </span>
-          <ChevronIcon open={viennaPickerOpen} />
-        </button>
-      ) : null}
-
-      {viennaPickerOpen ? (
-        <div className={styles.datePicker} id={`delivery-day-calendar-${item.id}`}>
-          <div className={styles.datePickerHead}>
-            <div>
-              <strong>Choose delivery day</strong>
-
-            </div>
-            <button type="button" className={styles.closePicker} onClick={() => setViennaPickerOpen(false)} aria-label="Close delivery day picker">
-              <CloseIcon />
-            </button>
-          </div>
-          {viennaDays.length ? (
-            <ChoiceList
-              legend="Delivery day"
-              name={`vienna-${item.id}`}
-              value={item.delivery.mode === 'vienna' ? item.delivery.pickupDate ?? null : null}
-              onChange={(date) => {
-                const md = viennaDays.find((d) => d.date === date)
-                onDelivery({
-                  ...item.delivery,
-                  mode: 'vienna',
-                  pickupDate: date,
-                  marketDayId: md?.id,
-                  marketId: md?.marketId,
-                  pickupHour: null,
-                })
-                setViennaPickerOpen(false)
-              }}
-              compact
-              choices={viennaDays.map((d) => ({
-                value: d.date,
-                title: formatDateLabel(d.date),
-                body: capacityLabel(d.date),
-              }))}
-            />
-          ) : (
-            <p className={styles.emptyDates}>No delivery days available.</p>
           )}
         </div>
       ) : null}
@@ -1881,7 +2159,7 @@ function DeliveryCard({
         <p className={styles.lead}>Deliver now at the stall.</p>
       ) : null}
 
-      {!datePickerOpen && !viennaPickerOpen && item.delivery.mode === 'market' && pickupDay && hours.length ? (
+      {!datePickerOpen && item.delivery.mode === 'market' && pickupDay && hours.length ? (
         <div className={styles.pickupTime}>
           <p className={styles.legend}>Pickup hour</p>
           <div className={styles.hours} onMouseLeave={() => setHintHour(null)}>
@@ -1914,7 +2192,20 @@ function DeliveryCard({
           <p className={styles.hourHint} id={`pickup-hint-${item.id}`} aria-live="polite">
             {pickupHint(hintHour ?? item.delivery.pickupHour ?? null, hourPreview, previewItems.length, pickupDay.date)}
           </p>
-          {hourPreview && previewItems.length > 0 && hours.every(hour => hourPreview[hour]?.ok === false) ? (
+          {noTodayHoursFit ? (
+            <div className={styles.makeRoomBlock}>
+              <p className={styles.planPrompt}>
+                No painting time before any pickup hour on this day. Choose another day or{' '}
+                <button type="button" className={styles.textBtn} onClick={() => onPlace(previewItems[0])}>place it on the agenda</button>.
+              </p>
+              {canMakeRoomToday && !todayBlockedFull ? (
+                <Button tone="staff" size="lg" disabled={makeRoomBusy} onClick={() => onMakeRoomToday(paintItems)}>
+                  {makeRoomBusy ? 'Making room…' : 'Make room today'}
+                </Button>
+              ) : null}
+              {!todayBlockedFull && makeRoomError ? <p className={styles.err} role="alert">{makeRoomError}</p> : null}
+            </div>
+          ) : hourPreview && previewItems.length > 0 && hours.every(hour => hourPreview[hour]?.ok === false) ? (
             <p className={styles.planPrompt}>
               No painting time before any pickup hour on this day. Choose another day or{' '}
               <button type="button" className={styles.textBtn} onClick={() => onPlace(previewItems[0])}>place it on the agenda</button>.
@@ -1923,20 +2214,15 @@ function DeliveryCard({
         </div>
       ) : null}
 
-      {showPaint && !datePickerOpen && !viennaPickerOpen ? (
+      {showPaint && !datePickerOpen ? (
         <div className={styles.slotBox}>
           <h4 className={styles.planTitle}>Painting plan</h4>
           {paintItems.length === 1 && item.slotLocked && slot && !slotTaken ? (
             <div className={styles.planSelected} role="status">
-              {item.plannedMove && <strong>Change added to this sale</strong>}
-              {item.plannedMove ? <p>{item.plannedMove.orderCode} → {formatDateLabel(item.plannedMove.to.date)} · {formatHour(item.plannedMove.to.startHour)}–{formatHour(item.plannedMove.to.endHour)}</p> : null}
               <strong><StaffText>{slot}</StaffText></strong>
               {paintedAt ? <small>{paintedAt}</small> : null}
-              {item.plannedMove ? <small>Saved together with the order.</small> : null}
-              <button type="button" className={styles.textBtn} onClick={() => onChangeSlot(item)}>{item.plannedMove ? 'Undo change' : 'Change'}</button>
+              <button type="button" className={styles.textBtn} onClick={() => onChangeSlot(item)}>Change</button>
             </div>
-          ) : item.delivery.mode === 'vienna' && !item.delivery.pickupDate ? (
-            <p className={styles.planPrompt}>Choose the delivery day to calculate a safe painting time.</p>
           ) : item.delivery.mode === 'market' && item.delivery.pickupHour == null ? (
             <p className={styles.planPrompt}>Choose the pickup hour to calculate a safe painting time.</p>
           ) : paintItems.length > 1 ? (
@@ -1953,7 +2239,7 @@ function DeliveryCard({
                         <p>
                           {rowSlot
                             ? <StaffText>{rowSlot}</StaffText>
-                            : failed ? 'No free time before pickup' : 'Checking paint times…'}
+                            : failed ? 'No free time before handoff' : 'Checking paint times…'}
                         </p>
                         {rowSlot && rowPaintedAt ? <small>{rowPaintedAt}</small> : null}
                       </div>
@@ -1965,6 +2251,14 @@ function DeliveryCard({
                 })}
               </ul>
               {slotTaken ? <p className={styles.planPrompt}>One of these times was just taken. Tap Change to pick a new one.</p> : null}
+              {anyMultiTodaySlotMissing && canMakeRoomToday && !todayBlockedFull && !noTodayHoursFit ? (
+                <div className={styles.makeRoomBlock}>
+                  <Button tone="staff" size="lg" disabled={makeRoomBusy} onClick={() => onMakeRoomToday(paintItems)}>
+                    {makeRoomBusy ? 'Making room…' : 'Make room today'}
+                  </Button>
+                  {makeRoomError ? <p className={styles.err} role="alert">{makeRoomError}</p> : null}
+                </div>
+              ) : null}
             </>
           ) : slotTaken ? (
             <p>
@@ -1980,12 +2274,9 @@ function DeliveryCard({
             </p>
           ) : item.slotLocked && slot ? (
             <div className={styles.planSelected} role="status">
-              {item.plannedMove && <strong>Change added to this sale</strong>}
-              {item.plannedMove ? <p>{item.plannedMove.orderCode} → {formatDateLabel(item.plannedMove.to.date)} · {formatHour(item.plannedMove.to.startHour)}–{formatHour(item.plannedMove.to.endHour)}</p> : null}
               <strong><StaffText>{slot}</StaffText></strong>
               {paintedAt ? <small>{paintedAt}</small> : null}
-              {item.plannedMove ? <small>Saved together with the order.</small> : null}
-              <button type="button" className={styles.textBtn} onClick={() => onChangeSlot(item)}>{item.plannedMove ? 'Undo change' : 'Change'}</button>
+              <button type="button" className={styles.textBtn} onClick={() => onChangeSlot(item)}>Change</button>
             </div>
           ) : slot ? (
             <div className={styles.planSelected}>
@@ -1994,23 +2285,20 @@ function DeliveryCard({
               <button type="button" className={styles.textBtn} onClick={() => onPlace(item)}>Change</button>
             </div>
           ) : (
-            moveSuggestion ? (
-              <div className={styles.moveSuggestion}>
-                <strong>No free time — one change makes room</strong>
-                <ol className={styles.moveSteps}>
-                  <li><span aria-hidden="true" className={styles.stepIcon}><svg viewBox="0 0 24 24" focusable="false"><path d="M5 7h10a4 4 0 0 1 0 8H8m0 0l3-3m-3 3l3 3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></span><div><strong>Move {moveSuggestion.title} · {moveSuggestion.orderCode}</strong><p>{formatDateLabel(moveSuggestion.from.date)} · {formatHour(moveSuggestion.from.startHour)}–{formatHour(moveSuggestion.from.endHour)}</p><p>→ {formatDateLabel(moveSuggestion.to.date)} · {formatHour(moveSuggestion.to.startHour)}–{formatHour(moveSuggestion.to.endHour)}</p><small>Customer pickup stays the same.</small></div></li>
-                  <li><span aria-hidden="true" className={styles.stepIcon}><svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg></span><div><strong>Paint this ornament in the freed time</strong><p>{formatDateLabel(moveSuggestion.freedSlot.date)} · {formatHour(moveSuggestion.freedSlot.startHour)}–{formatHour(moveSuggestion.freedSlot.endHour)}</p></div></li>
-                </ol>
-                <Button tone="staff" onClick={() => onApplyMove(moveSuggestion)}>
-                  Use this plan
-                </Button>
-              </div>
-            ) : (
+            <div className={styles.makeRoomBlock}>
               <p>
                 {suggestion && !suggestion.ok ? 'No safe paint time found. Choose another pickup day or review the agenda.' : 'Checking paint times…'}{' '}
                 <button type="button" className={styles.textBtn} onClick={() => onPlace(item)}>Check agenda</button>
               </p>
-            )
+              {noTodaySlotFound && canMakeRoomToday && !todayBlockedFull && !noTodayHoursFit ? (
+                <>
+                  <Button tone="staff" size="lg" disabled={makeRoomBusy} onClick={() => onMakeRoomToday(paintItems)}>
+                    {makeRoomBusy ? 'Making room…' : 'Make room today'}
+                  </Button>
+                  {makeRoomError ? <p className={styles.err} role="alert">{makeRoomError}</p> : null}
+                </>
+              ) : null}
+            </div>
           )}
         </div>
       ) : null}

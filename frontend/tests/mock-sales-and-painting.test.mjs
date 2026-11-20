@@ -61,3 +61,52 @@ test('mock sales reports the selling stall, photos, and nullable market for web 
   assert.equal(byCode('AWG0101').soldAtMarketName, null)
   assert.equal(byCode('AWG0102').soldAtMarketName, null)
 })
+
+test('mock web Post checkout reserves planned paint blocks so a second purchase cannot reuse the same last slot', () => {
+  // Close every painting day in the season except one day with a single 1-hour slot (2026-11-30 10:00–11:00).
+  const day = new Date('2026-11-21T12:00:00Z')
+  while (day.toISOString().slice(0, 10) <= '2026-12-24') {
+    const iso = day.toISOString().slice(0, 10)
+    store.updatePaintingDay(iso, false)
+    day.setUTCDate(day.getUTCDate() + 1)
+  }
+  // 2026-11-30 already has a booked block from the earlier test; open 2026-12-03 with exactly 1 hour (10:00–11:00).
+  store.updatePaintingDay('2026-12-03', true, { openHour: 10, closeHour: 11 })
+
+  const items = [{ kind: 'custom', color: 'red', finish: 'shiny', withName: false, petName: 'Luna', photos: [] }]
+  const quote1 = store.getShippingQuote(items)
+  assert.equal(quote1.available, true)
+  assert.equal(quote1.collectionDate, '2026-12-04')
+
+  const checkout1 = store.createMockCheckout({
+    customerName: 'First Buyer',
+    email: 'first@example.at',
+    phone: '+43 660 1111111',
+    deliveryKind: 'post',
+    address: { line1: 'Herrengasse 1', postalCode: '8010', city: 'Graz' },
+    expectedArrivalTo: quote1.arrivalTo,
+    acceptTerms: true,
+    items,
+  })
+  const order1 = store.getOrderByCode(checkout1.orderCode)
+  const bundle1 = store.getOrderBundle(order1.id)
+  assert.equal(bundle1.blocks.length, 1)
+  assert.deepEqual([bundle1.blocks[0].startHour, bundle1.blocks[0].endHour], [10, 11])
+
+  // The single slot on 2026-12-03 is now taken: a second quote and checkout must see shipping unavailable.
+  const quote2 = store.getShippingQuote(items)
+  assert.equal(quote2.available, false)
+  assert.throws(
+    () => store.createMockCheckout({
+      customerName: 'Second Buyer',
+      email: 'second@example.at',
+      phone: '+43 660 2222222',
+      deliveryKind: 'post',
+      address: { line1: 'Herrengasse 2', postalCode: '8010', city: 'Graz' },
+      expectedArrivalTo: quote1.arrivalTo,
+      acceptTerms: true,
+      items,
+    }),
+    err => err && err.code === 'SHIPPING_UNAVAILABLE',
+  )
+})

@@ -4,8 +4,10 @@ import { test, expect } from '@playwright/test'
 import { axe } from './helpers'
 import { httpFixture, signedIn, today, marketDay } from './staff-fixture'
 
+const PET_SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" rx="12" fill="#e9d8c3"/><circle cx="48" cy="52" r="24" fill="#8b5a3c"/><circle cx="38" cy="48" r="4" fill="#152033"/><circle cx="58" cy="48" r="4" fill="#152033"/><ellipse cx="48" cy="57" rx="5" ry="3.5" fill="#152033"/></svg>')
 const PET_GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64')
 const shotsDir = path.resolve(process.cwd(), '../tasks/audit-results/agenda-gaby-away-shots')
+const postShotsDir = path.resolve(process.cwd(), '../tasks/audit-results/post-shipping-staff-shots')
 
 test.describe('Agenda iPad', () => {
   test('clean header, matching paint and pickup cards, and hours-derived capacity', async ({ page }) => {
@@ -276,6 +278,283 @@ test.describe('Agenda iPad', () => {
       await page.screenshot({ path: path.join(shotsDir, `agenda-gaby-here-${testInfo.project.name}.png`), fullPage: true })
     }
 
+    await axe(page)
+  })
+
+  test('Agenda Post card, Deliveries Ship view with tracking, Order detail tracking & Stock Post settings', async ({ page }, testInfo) => {
+    const postDay: import('../src/domain/types').AgendaDay = {
+      marketDay: { id: 'day-post-01', marketId: 'market-home', date: '2026-12-01', openHour: 10, closeHour: 13, isToday: false },
+      market: { id: 'market-home', name: 'Casa', kind: 'home', totalCost: 0, startDate: null, finishDate: null, stall: null },
+      slots: [],
+      deliveries: [
+        {
+          orderId: 'order-review', orderCode: 'AWGREVIEW', itemId: 'item-order-review',
+          title: 'Luna', customerName: 'Alex Review', color: 'red', finish: 'matte', backName: 'LUNA',
+          productionStatus: 'finished', handedOver: false, deliveryKind: 'post',
+          pickupHour: null, methodLabel: 'Post · Tue 1 Dec', timeLabel: null, phone: '+43 660 1234567',
+          addressLabel: 'Herrengasse 14, Top 3 · 8010 Graz', photoUrl: '/api/photos/pet-1',
+          remaining: 37, paymentState: 'deposit', kind: 'custom', postalCode: '8010',
+        },
+        {
+          orderId: 'order-post-2', orderCode: 'AWGPOST2', itemId: 'item-post-2',
+          title: 'Milo', customerName: 'Julia Graz', color: 'green', finish: 'shiny', backName: 'MILO',
+          productionStatus: 'finished', handedOver: false, deliveryKind: 'post',
+          pickupHour: null, methodLabel: 'Post · Tue 1 Dec', timeLabel: null, phone: '+43 660 9999999',
+          addressLabel: 'Sackstraße 2 · 8010 Graz', photoUrl: '/api/photos/pet-1',
+          remaining: 0, paymentState: 'paid', kind: 'custom', postalCode: '8010',
+        },
+      ],
+    }
+    const fixture = await httpFixture(page, { finished: true, extraAgendaDays: [postDay] })
+    await page.route('**/api/photos/pet-1', route => route.fulfill({ contentType: 'image/svg+xml', body: PET_SVG }))
+    const postItem = fixture.items.get(fixture.original.id)!
+    postItem.photos = [{ id: 'pet-1', name: 'pet.gif', dataUrl: '/api/photos/pet-1' }]
+    postItem.backName = 'LUNA'
+    postItem.delivery = {
+      kind: 'post',
+      deliveryDate: '2026-12-01',
+      arrivalFrom: '2026-12-03',
+      arrivalTo: '2026-12-04',
+      address: { line1: 'Herrengasse 14', line2: 'Top 3', postalCode: '8010', city: 'Graz' },
+    }
+    const postOrder2 = {
+      ...fixture.original,
+      id: 'order-post-2',
+      code: 'AWGPOST2',
+      paymentState: 'paid' as const,
+      paymentMethod: 'card' as const,
+      amountPaid: 57,
+      itemIds: ['item-post-2'],
+    }
+    fixture.records.set(postOrder2.id, postOrder2)
+    fixture.items.set(postOrder2.id, {
+      ...postItem,
+      id: 'item-post-2',
+      orderId: postOrder2.id,
+      petName: 'Milo',
+      backName: 'MILO',
+      color: 'green',
+      finish: 'shiny',
+    })
+
+    // Keep postDay delivery handedOver state in sync after Handed to Post mutates fixture.items.
+    await page.route('**/api/orders/order-post-2/handed-over', async route => {
+      const body = route.request().postDataJSON() as { handedOver: boolean }
+      postDay.deliveries[1].handedOver = body.handedOver
+      await route.fallback()
+    })
+
+    // 1. Agenda Pickups and deliveries card shows "Post · Tue 1 Dec" with parcel count.
+    await signedIn(page, '/staff/agenda?date=2026-12-01')
+    const postCard = page.locator('#agenda-pickups').getByRole('button', { name: /Post · Tue 1 Dec/ })
+    await expect(postCard).toContainText('2 parcels')
+    await postCard.click()
+
+    // 2. Deliveries Ship view: filter All · Market · Post (no Vienna when none exist), parcel count shown once.
+    await expect(page).toHaveURL(/\/staff\/deliveries\?day=2026-12-01&kind=post/)
+    await expect(page.getByRole('heading', { name: 'Ship · Post', exact: true })).toBeVisible()
+    await expect(page.getByText('2 of 2 parcels to hand to Post', { exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'Post · Tue 1 Dec', exact: true })).toBeVisible()
+    await expect(page.getByText(/\bparcels?\b/i)).toHaveCount(1)
+    const filtersBtn = page.getByRole('button', { name: /^Filters/ })
+    if (await filtersBtn.isVisible()) await filtersBtn.click()
+    await expect(page.getByRole('radio', { name: 'Post', exact: true })).toBeChecked()
+    await expect(page.getByRole('radio', { name: 'Vienna', exact: true })).toHaveCount(0)
+    if (await filtersBtn.isVisible()) await filtersBtn.click()
+
+    const paidCard = page.getByRole('article', { name: 'Order AWGPOST2', exact: true })
+    await expect(paidCard).toContainText('Sackstraße 2 · 8010 Graz')
+    await expect(paidCard.getByRole('button', { name: 'Copy address', exact: true })).toBeVisible()
+    await expect(paidCard).toContainText('MILO')
+    await expect(paidCard).toContainText('green shiny')
+    const unpaidCard = page.getByRole('article', { name: 'Order AWGREVIEW', exact: true })
+    await expect(unpaidCard).toContainText(/Collect €37\.00 · deposit paid/)
+
+    // Unpaid Post parcel: handover dialog explains balance must be settled first and never offers "collect later".
+    await unpaidCard.getByRole('button', { name: 'Handed to Post', exact: true }).click()
+    const dueDialog = page.getByRole('dialog', { name: 'Handed to Post', exact: true })
+    await expect(dueDialog).toBeVisible()
+    await expect(dueDialog).toContainText('Collect the remaining balance before handing the parcel to Post.')
+    await expect(dueDialog.getByRole('button', { name: /collect later/i })).toHaveCount(0)
+    await expect(dueDialog.getByRole('button', { name: 'Collect €37.00 & hand to Post', exact: true })).toBeEnabled()
+    await dueDialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect(dueDialog).toHaveCount(0)
+
+    if (testInfo.project.name === 'ipadLandscape' || testInfo.project.name === 'staff-phone-360x640') {
+      fs.mkdirSync(postShotsDir, { recursive: true })
+      const tag = testInfo.project.name === 'ipadLandscape' ? 'ipad-1180' : 'phone-360'
+      await page.screenshot({ path: path.join(postShotsDir, `ship-list-${tag}.png`), fullPage: true })
+    }
+
+    await paidCard.getByLabel('Tracking number (optional)', { exact: true }).fill('100456789012')
+    const handToPost = paidCard.getByRole('button', { name: 'Handed to Post', exact: true })
+    expect((await handToPost.boundingBox())!.height).toBeGreaterThanOrEqual(56)
+    await handToPost.click()
+    await expect(page.getByRole('status').filter({ hasText: 'AWGPOST2 · handed to Post.' })).toBeVisible()
+    expect(fixture.mutations.find(m => m.path === '/api/orders/order-post-2/handed-over')?.body).toEqual({
+      handedOver: true,
+      itemIds: ['item-post-2'],
+      trackingNumber: '100456789012',
+    })
+
+    // 3. Order detail: arrival range, tracking link, and saving tracking refetches handedOver so a concurrent shipment is never undone.
+    await paidCard.getByRole('link', { name: /AWGPOST2/ }).click()
+    await expect(page.getByText('Arrives Thu 3 – Fri 4 Dec').first()).toBeVisible()
+    const trackLink = page.getByRole('link', { name: /Track parcel \(100456789012\)/ })
+    await expect(trackLink).toHaveAttribute('href', 'https://www.post.at/s/sendungsdetails?snr=100456789012')
+    await page.getByLabel('Post tracking number', { exact: true }).fill('AT9876543210')
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByRole('link', { name: /Track parcel \(AT9876543210\)/ })).toBeVisible()
+
+    // Simulate opening AWGREVIEW while unshipped, then another iPad ships it before Save is clicked.
+    await page.goto('/staff/orders/order-review')
+    await expect(page.getByLabel('Post tracking number', { exact: true })).toBeVisible()
+    await page.getByLabel('Post tracking number', { exact: true }).fill('AT1122334455')
+    // Another iPad marks order-review shipped on the server while this screen stays open.
+    fixture.records.get('order-review')!.handedOver = true
+    fixture.items.get('order-review')!.handedOver = true
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByRole('link', { name: /Track parcel \(AT1122334455\)/ })).toBeVisible()
+    await expect(page.getByText('Shipped', { exact: true })).toBeVisible()
+    const reviewTrackMutation = fixture.mutations.filter(m => m.path === '/api/orders/order-review/handed-over').at(-1)
+    expect(reviewTrackMutation?.body).toEqual({
+      handedOver: true,
+      itemIds: ['item-order-review'],
+      trackingNumber: 'AT1122334455',
+    })
+    await axe(page)
+
+    // 4. Stock: shipping fee and Post collection weekdays (1–5) autosave with PRICES_CHANGED handling, plus overrides.
+    await page.goto('/staff/inventory')
+    await expect(page.getByRole('button', { name: 'Save prices' })).toHaveCount(0)
+    await expect(page.getByLabel('Post shipping', { exact: true })).toHaveValue('5.00')
+    await page.getByLabel('Post shipping', { exact: true }).fill('6.50')
+    await page.getByLabel('Post shipping', { exact: true }).blur()
+    await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible()
+    await page.getByRole('checkbox', { name: 'Monday', exact: true }).locator('..').click()
+    await expect.poll(() => fixture.mutations.filter(m => m.path === '/api/prices').length).toBe(2)
+    expect(fixture.mutations.filter(m => m.path === '/api/prices').at(-1)?.body).toMatchObject({
+      shippingFee: 6.5,
+      postCollectionDays: ['monday', 'tuesday', 'friday'],
+    })
+
+    // Simulate PRICES_CHANGED from another device on a subsequent weekday toggle -> reloads fresh values and alerts.
+    let conflictOnce = true
+    await page.route('**/api/prices', async route => {
+      if (route.request().method() === 'PUT' && conflictOnce) {
+        conflictOnce = false
+        return route.fulfill({ status: 409, json: { code: 'PRICES_CHANGED', message: 'Someone changed the prices meanwhile.' } })
+      }
+      await route.fallback()
+    })
+    await page.getByRole('checkbox', { name: 'Wednesday', exact: true }).locator('..').click()
+    await expect(page.getByRole('alert')).toContainText('Someone else changed the prices or collection days.')
+    await expect(page.getByRole('checkbox', { name: 'Wednesday', exact: true })).not.toBeChecked()
+
+    await page.getByLabel('Date', { exact: true }).fill('2026-12-09')
+    await page.getByRole('button', { name: 'Add extra date', exact: true }).click()
+    await expect(page.getByRole('list', { name: 'Post collection date overrides' })).toContainText('Wed 9 Dec')
+    await expect(page.getByRole('list', { name: 'Post collection date overrides' })).toContainText('Extra collection')
+
+    if (testInfo.project.name === 'ipadLandscape' || testInfo.project.name === 'staff-phone-360x640') {
+      fs.mkdirSync(postShotsDir, { recursive: true })
+      const tag = testInfo.project.name === 'ipadLandscape' ? 'ipad-1180' : 'phone-360'
+      await page.screenshot({ path: path.join(postShotsDir, `stock-prices-${tag}.png`), fullPage: true })
+    }
+
+    await page.getByRole('button', { name: 'Remove override for Wed 9 Dec', exact: true }).click()
+    await expect(page.getByText('No date overrides set.')).toBeVisible()
+    await axe(page)
+  })
+
+  test('Deliveries disables Handed to Post until every ornament in a multi-item Post parcel is finished', async ({ page }) => {
+    const partialPostDay: import('../src/domain/types').AgendaDay = {
+      marketDay: { id: 'day-post-partial', marketId: 'market-home', date: '2026-12-01', openHour: 10, closeHour: 13, isToday: false },
+      market: { id: 'market-home', name: 'Casa', kind: 'home', totalCost: 0, startDate: null, finishDate: null, stall: null },
+      slots: [],
+      deliveries: [
+        {
+          orderId: 'order-review', orderCode: 'AWGREVIEW', itemId: 'item-order-review',
+          title: 'Luna', customerName: 'Alex Review', color: 'red', finish: 'matte', backName: 'LUNA',
+          productionStatus: 'not_started', handedOver: false, deliveryKind: 'post',
+          pickupHour: null, methodLabel: 'Post · Tue 1 Dec', timeLabel: null, phone: '+43 660 1234567',
+          addressLabel: 'Herrengasse 14 · 8010 Graz', remaining: 0, paymentState: 'paid', kind: 'custom', postalCode: '8010',
+        },
+        {
+          orderId: 'order-review', orderCode: 'AWGREVIEW', itemId: 'item-second',
+          title: 'Milo', customerName: 'Alex Review', color: 'green', finish: 'shiny', backName: 'MILO',
+          productionStatus: 'finished', handedOver: false, deliveryKind: 'post',
+          pickupHour: null, methodLabel: 'Post · Tue 1 Dec', timeLabel: null, phone: '+43 660 1234567',
+          addressLabel: 'Herrengasse 14 · 8010 Graz', remaining: 0, paymentState: 'paid', kind: 'custom', postalCode: '8010',
+        },
+      ],
+    }
+    await httpFixture(page, { multi: true, finished: false, extraAgendaDays: [partialPostDay] })
+    await signedIn(page, '/staff/deliveries?day=2026-12-01&kind=post')
+    const card = page.getByRole('article', { name: 'Order AWGREVIEW', exact: true })
+    await expect(card).toContainText('LUNA')
+    await expect(card).toContainText('MILO')
+    await expect(card.getByRole('button', { name: 'Handed to Post', exact: true })).toBeDisabled()
+    await expect(card.getByLabel('Tracking number (optional)', { exact: true })).toBeDisabled()
+  })
+
+  test('Agenda per-block Make room moves movable block with popup and shows plain 409 errors', async ({ page }) => {
+    const fixture = await httpFixture(page)
+    const item = fixture.items.get(fixture.original.id)!
+    item.photos = [{ id: 'pet-1', name: 'pet.gif', dataUrl: '/api/photos/pet-1' }]
+    item.delivery = {
+      kind: 'post',
+      deliveryDate: '2026-12-01',
+      arrivalFrom: '2026-12-03',
+      arrivalTo: '2026-12-04',
+      address: { line1: 'Herrengasse 14', postalCode: '8010', city: 'Graz' },
+    }
+    await page.route('**/api/photos/pet-1', route => route.fulfill({ contentType: 'image/gif', body: PET_GIF }))
+
+    let mode: 'no_slot' | 'not_movable' | 'ok' = 'no_slot'
+    await page.route('**/api/agenda/blocks/*/make-room', route => {
+      if (mode === 'no_slot') {
+        return route.fulfill({ status: 409, json: { code: 'NO_SLOT_KEEPS_PROMISE', message: 'No free slot before the handoff day. Move the session by hand.' } })
+      }
+      if (mode === 'not_movable') {
+        return route.fulfill({ status: 409, json: { code: 'SESSION_NOT_MOVABLE', message: 'This session cannot be moved: it is handed over the day it is painted.' } })
+      }
+      return route.fulfill({
+        status: 200,
+        json: {
+          moved: [{
+            itemId: item.id,
+            orderCode: fixture.original.code,
+            from: { date: today, startHour: 12, endHour: 13 },
+            to: { date: '2026-11-09', startHour: 10, endHour: 11 },
+          }],
+        },
+      })
+    })
+
+    await signedIn(page, `/staff/agenda?date=${today}`)
+    const makeRoomBtn = page.getByRole('button', { name: 'Make room · AWGREVIEW', exact: true })
+    await expect(makeRoomBtn).toBeVisible()
+
+    // 409 NO_SLOT_KEEPS_PROMISE
+    await makeRoomBtn.click()
+    await expect(page.getByRole('alert')).toContainText('No free slot before the handoff day')
+
+    // 409 SESSION_NOT_MOVABLE
+    mode = 'not_movable'
+    await makeRoomBtn.click()
+    await expect(page.getByRole('alert')).toContainText('cannot be moved')
+
+    // 200 success popup
+    mode = 'ok'
+    await makeRoomBtn.click()
+    const popup = page.getByRole('dialog', { name: 'Session moved', exact: true })
+    await expect(popup).toBeVisible()
+    await expect(popup).toContainText('AWGREVIEW')
+    await expect(popup).toContainText('Fri 12:00')
+    await expect(popup).toContainText('Mon 10:00')
+    await popup.getByRole('button', { name: 'OK', exact: true }).click()
+    await expect(popup).toHaveCount(0)
     await axe(page)
   })
 })

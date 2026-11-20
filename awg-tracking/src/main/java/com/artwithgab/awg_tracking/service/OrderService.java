@@ -143,7 +143,7 @@ public class OrderService {
             // Only the parcel's own ornaments decide when it is ready; market pickups painted later do not delay it.
             var readyOn = postItems.stream().filter(row -> row.kind() == ItemKind.CUSTOM && row.paintDate() != null)
                     .map(CreateSaleItemRequest::paintDate).max(LocalDate::compareTo).orElse(index.today());
-            shippingWindow = shippingService.calendar(prices).windowAfter(readyOn)
+            shippingWindow = shippingService.calendar(prices).windowAfter(shippingService.withPaintFloor(readyOn))
                     .orElseThrow(() -> new BadRequestException("Post shipping is no longer available.")
                             .code("SHIPPING_UNAVAILABLE").field("delivery"));
             shippingAddress = shippingAddress(postItems);

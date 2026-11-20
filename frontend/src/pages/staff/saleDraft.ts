@@ -1,14 +1,15 @@
-import type { Address, CapacityResult, CustomFinish, CreateSaleItemInput, ItemKind, Market, MarketDay, OrnamentColor } from '../../domain/types'
+import type { Address, CapacityResult, CustomFinish, CreateSaleItemInput, ItemKind, Market, MarketDay, OrnamentColor, ShippingQuote } from '../../domain/types'
 import { marketOrnamentLabel, marketOrnamentParts } from '../../domain/marketStock'
 import { isMarketPickupWeekday } from '../../lib/calendar'
 import { earliestPickupHourAfterPaint, PAINT_HANDLING_HOURS } from '../../lib/newSaleRules'
+import { formatStaffShortDate } from '../../lib/postShipping'
 import { formatDateLabel, formatHour, formatMinutes, hoursOverlap } from '../../lib/time'
 import { itemCost, type Pricing } from '../../lib/money'
 
 export const SALE_DRAFT_KEY = 'awg-sale-draft'
 
 export type DurationPreset = '45' | '60' | '75' | 'custom'
-export type DeliveryMode = 'now' | 'market' | 'vienna'
+export type DeliveryMode = 'now' | 'market' | 'post'
 export type SalePhase = 'items' | 'delivery' | 'qr' | 'payment' | 'done'
 
 export type DraftDelivery = {
@@ -50,6 +51,7 @@ export type SaleDraft = {
   items: DraftItem[]
   differentPickups: boolean
   phase: SalePhase
+  postAddress?: Address
   order?: CreatedSaleRef
   idempotencyKey?: string
   placingItemId?: string
@@ -141,8 +143,7 @@ export function makeCustomFromSlot(date: string, start: number, end: number): Dr
 
 export function applySlot(item: DraftItem, date: string, start: number, end: number): DraftItem {
   const minutes = Math.max(15, Math.round((end - start) * 60))
-  if (item.delivery.mode === 'vienna') {
-    const validViennaDate = item.delivery.pickupDate && item.delivery.pickupDate > date ? item.delivery.pickupDate : undefined
+  if (item.delivery.mode === 'post') {
     return {
       ...item,
       durationMinutes: minutes,
@@ -154,10 +155,12 @@ export function applySlot(item: DraftItem, date: string, start: number, end: num
       slotLocked: true,
       delivery: {
         ...item.delivery,
-        mode: 'vienna',
-        pickupDate: validViennaDate,
-        ...(validViennaDate ? {} : { marketDayId: undefined, manualDay: false }),
+        mode: 'post',
+        pickupDate: undefined,
+        marketDayId: undefined,
+        marketId: undefined,
         pickupHour: null,
+        manualDay: false,
       },
     }
   }
@@ -191,7 +194,9 @@ export function applySlot(item: DraftItem, date: string, start: number, end: num
 }
 
 export function draftTotal(items: DraftItem[], prices: Pricing): number {
-  return Math.round(items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0) * 100) / 100
+  const itemsSum = items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0)
+  const shipping = items.some(item => item.delivery.mode === 'post') ? (prices.shippingFee ?? 0) : 0
+  return Math.round((itemsSum + shipping) * 100) / 100
 }
 
 export function paintMinutes(items: DraftItem[]): number {
@@ -225,10 +230,12 @@ export function slotLabel(item: DraftItem): string | null {
   return `${formatDateLabel(item.paintDate)} · ${formatHour(item.paintStart)}–${formatHour(item.paintEnd)}`
 }
 
-export function deliveryLabel(item: DraftItem, markets: Market[], days: MarketDay[]): string {
+export function deliveryLabel(item: DraftItem, markets: Market[], days: MarketDay[], postQuote?: ShippingQuote | null): string {
   if (item.kind === 'finished' && item.delivery.mode === 'now') return 'Deliver now'
-  if (item.delivery.mode === 'vienna') {
-    return item.delivery.pickupDate ? `Vienna delivery · ${formatDateLabel(item.delivery.pickupDate)}` : 'Vienna delivery · day not chosen'
+  if (item.delivery.mode === 'post') {
+    return postQuote?.available && postQuote.collectionDate
+      ? `Post · ${formatStaffShortDate(postQuote.collectionDate)}`
+      : 'Post shipping'
   }
   // No place or date until a pickup day is chosen.
   if (!item.delivery.pickupDate) return 'Pickup · day not chosen'
@@ -248,14 +255,37 @@ export function suggestionCopy(result: CapacityResult | undefined, busy: boolean
   return 'No free paint slot before this handoff.'
 }
 
-export function toCreateItems(items: DraftItem[], days: MarketDay[], today?: MarketDay): CreateSaleItemInput[] {
+export function toCreateItems(items: DraftItem[], days: MarketDay[], today?: MarketDay, postAddress?: Address): CreateSaleItemInput[] {
+  const cleanPostAddress = postAddress && postAddress.line1.trim()
+    ? {
+        line1: postAddress.line1.trim(),
+        ...(postAddress.line2?.trim() ? { line2: postAddress.line2.trim() } : {}),
+        postalCode: postAddress.postalCode.trim(),
+        city: postAddress.city.trim(),
+      }
+    : null
   return items.map((item) => {
-    const mode = item.kind === 'finished' && item.delivery.mode === 'now' ? 'now' : item.delivery.mode
+    const rawMode = item.delivery.mode as string
+    const mode: DeliveryMode = item.kind === 'finished' && rawMode === 'now' ? 'now' : rawMode === 'vienna' ? 'post' : item.delivery.mode
+    if (mode === 'post') {
+      return {
+        kind: item.kind,
+        marketOrnamentId: item.kind === 'finished' ? item.marketOrnamentId : undefined,
+        withName: item.kind === 'custom' && item.withName,
+        color: item.kind === 'custom' ? item.color : undefined,
+        finish: item.kind === 'custom' ? item.finish ?? 'shiny' : undefined,
+        paintDate: item.kind === 'custom' ? item.paintDate : undefined,
+        paintStart: item.kind === 'custom' ? item.paintStart : undefined,
+        paintEnd: item.kind === 'custom' ? item.paintEnd : undefined,
+        deliveryKind: 'post',
+        pickupHour: null,
+        address: cleanPostAddress ?? item.delivery.address ?? null,
+      }
+    }
     const pickupDay =
       mode === 'now'
         ? (today ?? days.find((d) => d.id === item.delivery.marketDayId) ?? days.find((d) => d.date === item.delivery.pickupDate))
         : (days.find((d) => d.id === item.delivery.marketDayId) ?? days.find((d) => d.date === item.delivery.pickupDate))
-    const deliveryKind = mode === 'vienna' ? 'vienna' : 'market'
     return {
       kind: item.kind,
       marketOrnamentId: item.kind === 'finished' ? item.marketOrnamentId : undefined,
@@ -265,11 +295,11 @@ export function toCreateItems(items: DraftItem[], days: MarketDay[], today?: Mar
       paintDate: item.kind === 'custom' ? item.paintDate : undefined,
       paintStart: item.kind === 'custom' ? item.paintStart : undefined,
       paintEnd: item.kind === 'custom' ? item.paintEnd : undefined,
-      deliveryKind,
-      marketId: deliveryKind === 'market' ? (mode === 'now' ? pickupDay?.marketId : (item.delivery.marketId ?? pickupDay?.marketId)) : undefined,
+      deliveryKind: 'market',
+      marketId: mode === 'now' ? pickupDay?.marketId : (item.delivery.marketId ?? pickupDay?.marketId),
       marketDayId: mode === 'now' ? pickupDay?.id : (item.delivery.marketDayId ?? pickupDay?.id),
-      pickupHour: deliveryKind === 'vienna' ? null : mode === 'now' ? (item.delivery.pickupHour ?? null) : (item.delivery.pickupHour ?? null),
-      address: deliveryKind === 'vienna' ? (item.delivery.address ?? null) : null,
+      pickupHour: item.delivery.pickupHour ?? null,
+      address: null,
     }
   })
 }
@@ -293,14 +323,35 @@ export function buildDraftFromParams(params: URLSearchParams): SaleDraft {
   const placeItem = params.get('placeItem')
   const stored = readStoredDraft()
   const rawPhase = stored ? ((stored.phase as string) === 'formWhere' ? 'qr' as const : stored.phase) : null
+  let migratedAddress: Address | undefined = stored?.postAddress
   const validItems = stored && Array.isArray(stored.items)
     ? stored.items
         .filter((item): item is DraftItem => Boolean(item && typeof item.id === 'string' && (item.kind === 'custom' || item.kind === 'finished') && item.delivery && typeof item.delivery.mode === 'string'))
-        .map((item) => ({ ...item, color: item.color ?? 'red' as const, finish: item.finish ?? 'shiny' as const }))
+        .map((item) => {
+          const base = { ...item, color: item.color ?? 'red' as const, finish: item.finish ?? 'shiny' as const }
+          // Migrate legacy Vienna draft items to Post (keep address, clear Vienna handoff dates so the server computes the range).
+          if ((base.delivery.mode as string) === 'vienna') {
+            if (!migratedAddress && base.delivery.address) migratedAddress = base.delivery.address
+            return {
+              ...base,
+              delivery: {
+                mode: 'post' as const,
+                pickupDate: undefined,
+                marketDayId: undefined,
+                marketId: undefined,
+                pickupHour: null,
+                manualDay: false,
+                ...(base.delivery.address ? { address: base.delivery.address } : {}),
+              },
+            }
+          }
+          return base
+        })
     : []
   const normalizedStored: SaleDraft | null = stored && validItems.length
     ? {
         ...stored,
+        ...(migratedAddress ? { postAddress: migratedAddress } : {}),
         phase: !stored.order && rawPhase && ['qr', 'payment', 'done'].includes(rawPhase) ? 'items' : (rawPhase ?? 'items'),
         items: validItems,
       }

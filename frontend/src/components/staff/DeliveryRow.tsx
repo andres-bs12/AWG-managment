@@ -15,8 +15,12 @@ export function prodLabel(status: ProductionStatus): string {
 export function deliveryStatusLabel(
   row: Pick<AgendaDelivery, 'productionStatus' | 'handedOver' | 'deliveryKind'>,
 ): string {
-  if (row.handedOver) return row.deliveryKind === 'vienna' ? 'Delivered' : 'Handed over'
+  if (row.handedOver) {
+    if (row.deliveryKind === 'post') return 'Handed to Post'
+    return row.deliveryKind === 'vienna' ? 'Delivered' : 'Handed over'
+  }
   if (row.productionStatus === 'finished') {
+    if (row.deliveryKind === 'post') return 'Ready to ship'
     return row.deliveryKind === 'vienna' ? 'Ready for delivery' : 'Ready to pick up'
   }
   return prodLabel(row.productionStatus)

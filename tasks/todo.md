@@ -2,6 +2,11 @@
 
 ## Pendiente 2026-11-20
 
+- [ ] **Envío por Correos (`feat/v3.1-post-shipping`):** revisión del dueño → commit/push y PR a `release/v3.1`; `e2e-full` en CI; compra de prueba Stripe con Post.
+- [ ] **Correos (dueño):** confirmar tarifa real por paquete frente a 5 €, servicio de recogida (días mar+vie, hora límite de reserva; ¿recoge en casa si Gaby está en el puesto?), caja y relleno para que la bola no se rompa (también pedidos de 2–4 adornos).
+- [ ] **Asesor legal:** cambios en AGB/Widerruf/Datenschutz por el envío (`tasks/post-shipping-legal-2026-11-20.md`).
+- [ ] **Últimos días antes de Navidad (21–23 dic):** el dueño decide si se lleva paquetes a Correos a mano (excepción por fecha en Stock).
+
 - [ ] **Decisión del dueño — tienda web en fechas solapadas (25–29 nov):** definir si la recogida online ofrece un puesto primario o ambos y configurar `SHOP_PRIMARY_PICKUP_MARKET_ID`.
 - [ ] **BD local de Gaby:** reiniciar su base local o ejecutar `flyway repair` porque `V15__market_ornament_stock.sql` se editó en sitio.
 - [ ] **Probar en el iPad real:** arrastre táctil, pulsación larga en Agenda y carga/vista de fotos de adornos.

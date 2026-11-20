@@ -20,11 +20,6 @@ export function marketPickupDates(start: string, finish: string): string[] {
   return datesInRange(start, finish).filter(isMarketPickupWeekday)
 }
 
-export function isViennaWeekday(date: string): boolean {
-  const weekday = utcWeekday(date)
-  return weekday === WED || weekday === FRI
-}
-
 /** Home paint: Mon/Tue/Thu = 3 hours, Wed/Fri = 2. Null on Sat/Sun. */
 export function homePaintHours(date: string): { openHour: number; closeHour: number } | null {
   const weekday = utcWeekday(date)

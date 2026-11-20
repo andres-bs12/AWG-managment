@@ -1,3 +1,20 @@
-.timeline { display: grid; gap: var(--space-3); margin: 0; padding-inline-start: var(--space-5); color: var(--color-text); }
-.timeline li { padding-inline-start: var(--space-2); }
-.timeline li:first-child { font-weight: var(--type-label-weight); color: var(--color-success); }
+/* Vertical timeline: 32px marker column, 12px between steps, a rail joining the markers.
+   Done = filled primary, current = filled ink (not the selection colour), upcoming = outline. */
+.timeline { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; color: var(--color-text); }
+.step { position: relative; display: grid; grid-template-columns: var(--size-step-marker) minmax(0, 1fr); gap: var(--space-3); }
+.step:not(:last-child)::after {
+  content: ''; position: absolute; z-index: 0; width: var(--border-control); background: var(--color-border);
+  inset-inline-start: calc(var(--size-step-marker) / 2 - var(--border-control) / 2);
+  top: var(--size-step-marker); bottom: calc(var(--space-3) * -1);
+}
+.marker { position: relative; z-index: 1; display: grid; place-items: center; width: var(--size-step-marker); height: var(--size-step-marker); border: var(--border-control) solid var(--color-control-border); border-radius: var(--radius-circle); background: var(--color-surface-raised); color: var(--color-text-muted); }
+.marker svg { width: var(--size-icon-sm); height: var(--size-icon-sm); fill: none; stroke: currentColor; stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; }
+.step[data-state='done'] .marker { border-color: var(--color-primary); background: var(--color-primary); color: var(--color-on-primary); }
+.step[data-state='current'] .marker { border-color: var(--color-text); background: var(--color-text); color: var(--color-on-primary); }
+.body { display: grid; align-content: start; gap: var(--space-1); min-width: 0; padding-top: var(--space-1); overflow-wrap: anywhere; }
+.title { font-weight: var(--type-label-weight); line-height: var(--type-label-line); }
+.step[data-state='done'] .title { color: var(--color-text-muted); }
+.step[data-state='current'] .title { font-weight: 700; }
+/* Detail: its own line(s) below the title; a map link inside sits on its own row. */
+.detail { display: grid; justify-items: start; color: var(--color-text-muted); font-size: var(--type-hint-size); line-height: var(--type-hint-line); text-wrap: pretty; }
+.step[data-state='current'] .detail { color: var(--color-text); }

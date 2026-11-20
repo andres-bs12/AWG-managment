@@ -17,7 +17,7 @@ import {
 test('worked examples: plans collections strictly after readyOn, rolls 8 Dec holiday, and enforces 23 Dec cutoff', () => {
   const cases = [
     // [readyOn, collectionDate, arrivalFrom, arrivalTo, available]
-    ['2026-11-20', '2026-12-01', '2026-12-03', '2026-12-04', true],
+    ['2026-11-25', '2026-11-27', '2026-12-01', '2026-12-02', true],
     ['2026-11-29', '2026-12-01', '2026-12-03', '2026-12-04', true],
     ['2026-11-30', '2026-12-01', '2026-12-03', '2026-12-04', true],
     ['2026-12-01', '2026-12-04', '2026-12-09', '2026-12-10', true],
@@ -37,6 +37,9 @@ test('worked examples: plans collections strictly after readyOn, rolls 8 Dec hol
         : { available: false, collectionDate: null, arrivalFrom: null, arrivalTo: null },
     )
   }
+  // Owner, 2026-11-20: Post ornaments are painted from 25 Nov, so an order on 20 Nov ships Fri 27 Nov.
+  assert.deepEqual(shippingWindowAfter('2026-11-20'),
+    { available: true, collectionDate: '2026-11-27', arrivalFrom: '2026-12-01', arrivalTo: '2026-12-02' })
 })
 
 test('Post can collect on deliveries-from (2026-11-30) when Monday is a configured weekday', () => {

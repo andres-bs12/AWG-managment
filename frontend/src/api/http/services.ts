@@ -201,7 +201,7 @@ export const httpApi: Api = {
   prices: { get: () => request('/api/prices', {}, staff), update: (input) => request('/api/prices', jsonInit('PUT', input), staff) },
   paintingDays: { list: (from, to) => request(`/api/painting-days?from=${enc(from)}&to=${enc(to)}`, {}, staff), update: (date, open, settings) => request(`/api/painting-days/${enc(date)}`, jsonInit('PATCH', { open, ...settings }), staff) },
   shipping: {
-    window: (readyOn) => request<ShippingQuote>('/api/shipping/window', jsonInit('POST', { readyOn }), staff),
+    window: (readyOn) => request<ShippingQuote>('/api/shipping/window', jsonInit('POST', { readyOn }), { ...staff, notify: false }),
     collectionDays: (from, to) => request(`/api/shipping/collection-days?from=${enc(from)}&to=${enc(to)}`, {}, staff),
     setCollectionDay: (date, open) => request(`/api/shipping/collection-days/${enc(date)}`, jsonInit('PUT', { open }), staff),
   },

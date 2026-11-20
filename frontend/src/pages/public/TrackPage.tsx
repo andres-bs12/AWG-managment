@@ -1,7 +1,7 @@
 import { apiError } from '../../lib/apiError'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import { OrderReceipt } from '../../components/public/OrderReceipt'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { InstagramIcon, INSTAGRAM_URL } from '../../components/public/InstagramLink'
@@ -9,6 +9,7 @@ import { GiftBoxReady } from '../../components/public/GiftBoxReady'
 import { PaintingOrnament } from '../../components/public/PaintingOrnament'
 import { SleighWipe } from '../../components/public/SleighWipe'
 import { TrackDialog } from '../../components/public/TrackDialog'
+import { MarketMapLink } from '../../components/public/MarketMapLink'
 import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
 import { useLocale } from '../../i18n/LocaleContext'
@@ -109,12 +110,13 @@ export function TrackPage() {
   const statusLabel =
     status === 'cancelled' ? t('orderCancelled') : status === 'shipped' ? t('shipped') : status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
   const stepIndex = done ? 2 : status === 'ready' ? 1 : 0
-  const steps = [t('stepPainting'), t('ready'), isPost ? t('shipped') : t('stepHandover')]
+  const steps = [t('stepPainting'), t('ready'), isPost ? t('stepShipping') : t('stepHandover')]
   /** Sleigh only after a hit — misses use the page recovery state without this animation. */
   const showWipe = phase === 'loading' || phase === 'leaving'
 
   /** Two short lines: the slot or arrival range, then how long the stall is still around. */
   const whenLines: string[] = []
+  let marketWhen: ReactNode = null
   // The server builds the link; only ever follow the Post's own tracking page.
   const trackingUrl = view?.trackingUrl?.startsWith(TRACKING_BASE_URL) ? view.trackingUrl : null
   if (view) {
@@ -139,10 +141,12 @@ export function TrackPage() {
         .join(' · ')
       if (head) whenLines.push(head)
       if (when.marketName && when.untilHour != null) {
-        whenLines.push(t('whenAtUntil', { market: when.marketName, time: formatHour(when.untilHour) }))
+        // The market in the sentence is the Google Maps link.
+        const [before, after] = t('whenAtUntil', { market: '\u0001', time: formatHour(when.untilHour) }).split('\u0001')
+        marketWhen = <>{before}<MarketMapLink name={when.marketName} inline />{after}</>
       }
     }
-    if (whenLines.length === 0) whenLines.push(t('whenTbd'))
+    if (whenLines.length === 0 && !marketWhen) whenLines.push(t('whenTbd'))
   }
 
   // Track has no fee field: for Post orders the difference between total and ornaments is the shipping line.
@@ -178,7 +182,7 @@ export function TrackPage() {
             </span>
             <h1 className={styles.title}>{view.customerName && view.customerName !== 'Walk-in' ? t('trackGreeting', { name: view.customerName }) : (locale === 'de' ? 'Deine Bestellung' : 'Your order')}</h1>
 
-            {status === 'cancelled' ? <p>{t('orderCancelledBody')}</p> : <ProgressSteps labels={steps} current={stepIndex} label={statusLabel} />}
+            {status === 'cancelled' ? <p>{t('orderCancelledBody')}</p> : <ProgressSteps labels={steps} current={stepIndex} label={t('shopProgress')} />}
 
             <dl className={styles.facts}>
               <div>
@@ -191,6 +195,7 @@ export function TrackPage() {
                 <dt>{t('pickupWhen')}</dt>
                 <dd>
                   {whenLines[0]}
+                  {marketWhen ? <span className={styles.whenExtra}>{marketWhen}</span> : null}
                   {whenLines[1] ? <span className={styles.whenExtra}>{whenLines[1].split(/(\d+\.?–\d+\.?)/).map((part, i) => i % 2 === 1 ? <span key={i} className={styles.noBreak}>{part}</span> : part)}</span> : null}
                   {trackingUrl ? (
                     <a className={styles.trackingLink} href={trackingUrl} target="_blank" rel="noopener noreferrer">

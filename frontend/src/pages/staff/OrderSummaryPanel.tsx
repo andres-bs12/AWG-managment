@@ -1,7 +1,7 @@
 import { StaffText } from '../../components/staff/StaffText'
 import { formatEur, itemCost, type Pricing } from '../../lib/money'
 import { marketOrnamentParts, type MarketOrnament } from '../../domain/marketStock'
-import type { Market, MarketDay } from '../../domain/types'
+import type { Market, MarketDay, ShippingQuote } from '../../domain/types'
 import { MarketPiecePhoto } from './MarketOrnamentPicker'
 import { deliveryLabel, draftTotal, itemLabel, marketPieceShortSpec, slotLabel, type DraftItem } from './saleDraft'
 import styles from './OrderSummaryPanel.module.css'
@@ -12,14 +12,16 @@ type Props = {
   days: MarketDay[]
   prices: Pricing | null
   marketPieces?: MarketOrnament[]
+  postQuote?: ShippingQuote | null
   orderCode?: string
   /** False while items are still being chosen: no place or date is shown before a handoff is picked. */
   showHandoff?: boolean
 }
 
-export function OrderSummaryPanel({ items, markets, days, orderCode, prices, marketPieces, showHandoff = true }: Props) {
+export function OrderSummaryPanel({ items, markets, days, orderCode, prices, marketPieces, postQuote, showHandoff = true }: Props) {
   if (!items.length) return null
   const total = prices ? draftTotal(items, prices) : null
+  const hasPost = items.some(item => item.delivery.mode === 'post')
   const hasNowFinished = items.some(item => item.kind === 'finished' && item.delivery.mode === 'now')
   const hasWaiting = items.some(item => item.kind === 'custom' || item.delivery.mode !== 'now')
 
@@ -55,7 +57,7 @@ export function OrderSummaryPanel({ items, markets, days, orderCode, prices, mar
                       <StaffText>{shortSpec}</StaffText>
                     </p>
                   ) : null}
-                  {showHandoff ? <p><StaffText>{deliveryLabel(item, markets, days)}</StaffText></p> : null}
+                  {showHandoff ? <p><StaffText>{deliveryLabel(item, markets, days, postQuote)}</StaffText></p> : null}
                 </div>
               </li>
             )
@@ -66,7 +68,7 @@ export function OrderSummaryPanel({ items, markets, days, orderCode, prices, mar
                 <strong>{item.kind === 'custom' ? <span className={styles.colorDot} data-color={item.color} role="img" aria-label={`${item.color} colour`} /> : null}<StaffText>{itemLabel(item, index)}</StaffText></strong>
                 <span>{priceText}</span>
               </div>
-              {showHandoff ? <p><StaffText>{deliveryLabel(item, markets, days)}</StaffText></p> : null}
+              {showHandoff ? <p><StaffText>{deliveryLabel(item, markets, days, postQuote)}</StaffText></p> : null}
               {slotLabel(item) ? <p><StaffText>{`Paint ${slotLabel(item)}`}</StaffText></p> : null}
               {item.kind === 'custom' && item.withName ? <p>Name on the back · +{prices ? formatEur(prices.nameExtra, 'en') : 'price loading…'}</p> : null}
             </li>
@@ -75,6 +77,12 @@ export function OrderSummaryPanel({ items, markets, days, orderCode, prices, mar
       </ul>
       {showHandoff && hasNowFinished && hasWaiting ? (
         <p className={styles.mixedNote}>Ready-made pieces go home now; custom pieces wait for their date.</p>
+      ) : null}
+      {hasPost && prices ? (
+        <div className={styles.feeRow}>
+          <span>Post shipping</span>
+          <span>{formatEur(prices.shippingFee ?? 0, 'en')}</span>
+        </div>
       ) : null}
       <div className={styles.total}>
         <span>Total</span>

@@ -67,7 +67,8 @@ async function expectContact(page: Page) {
     'buy-name': contact.customerName, 'buy-email': contact.email, 'buy-phone': contact.phone,
     'buy-line1': address.line1, 'buy-line2': address.line2, 'buy-postal': address.postalCode, 'buy-city': address.city,
   })) await expect(page.locator(`#${id}`)).toHaveValue(value)
-  await expect(page.locator('#buy-date')).toContainText('Do, 3. – Fr, 4. Dezember')
+  // Stubbed journeys show the stubbed 3–4 Dec quote; mock journeys the 25 Nov paint floor's 1–2 Dec range.
+  await expect(page.locator('#buy-date')).toContainText(/(Do, 3\. – Fr, 4\.|Di, 1\. – Mi, 2\.) Dezember/)
 }
 
 async function expectReview(page: Page, total: number, locale: Locale = 'de') {
