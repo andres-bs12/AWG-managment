@@ -13,5 +13,16 @@ export function StaffText({ children }: { children: string }) {
   const pieces: string[] = []
   for (let index = 0; index < parts.length; index += 2) pieces.push(index + 1 < parts.length ? `${parts[index]} ${parts[index + 1]}` : parts[index])
   // One wrapping span: inside a flex/grid parent, loose spaces between children would collapse ("Nov ·15:30").
-  return <span>{pieces.map((piece, index) => <Fragment key={index}>{index > 0 && ' '}{piece.length <= KEEP_WHOLE ? <span className={styles.joined} data-staff-joined>{piece}</span> : piece}</Fragment>)}</span>
+  return <span>{pieces.map((piece, index) => <Fragment key={index}>{index > 0 && ' '}{piece.length <= KEEP_WHOLE ? joined(piece) : longPiece(piece)}</Fragment>)}</span>
+}
+
+function joined(text: string) {
+  return <span className={styles.joined} data-staff-joined>{text}</span>
+}
+
+// A long piece may wrap inside, but its trailing separator stays glued to the last word.
+function longPiece(piece: string) {
+  const tail = piece.match(/ (\S+ [·→↗–])$/u)
+  if (!tail) return piece
+  return <>{piece.slice(0, tail.index! + 1)}{joined(tail[1])}</>
 }
