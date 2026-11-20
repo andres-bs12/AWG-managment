@@ -9,7 +9,7 @@ import type {
   OrderItem,
   Photo,
   ShopConfig,
-  ShopDeliveryDate,
+  ShippingQuote,
   ShopPickupDay,
   TrackView,
 } from '../../domain/types'
@@ -23,11 +23,14 @@ export class HttpError extends Error {
   status: number
   code?: string
   field?: string
-  constructor(message: string, status: number, code?: string, field?: string) {
+  /** Sub-code, e.g. NO_MOVABLE_SESSION → SAME_DAY_ONLY | NO_TARGET_SLOT | NOT_PAINTING_DAY. */
+  reason?: string
+  constructor(message: string, status: number, code?: string, field?: string, reason?: string) {
     super(message)
     this.status = status
     this.code = code
     this.field = field
+    this.reason = reason
   }
 }
 
@@ -81,15 +84,17 @@ async function request<T>(path: string, init: RequestInit = {}, opts: RequestOpt
     let message = ''
     let code: string | undefined
     let field: string | undefined
+    let reason: string | undefined
     try {
-      const body = (await response.json()) as { message?: string; code?: string; field?: string }
+      const body = (await response.json()) as { message?: string; code?: string; field?: string; reason?: string }
       message = body?.message ?? ''
       code = body.code
       field = body.field
+      reason = body.reason
     } catch {
       /* body was not JSON */
     }
-    throw new HttpError(message || `Request failed (${response.status}).`, response.status, code, field)
+    throw new HttpError(message || `Request failed (${response.status}).`, response.status, code, field, reason)
   }
 
   if (opts.auth && init.method && !['GET', 'HEAD'].includes(init.method)) {
@@ -189,6 +194,11 @@ export const httpApi: Api = {
   inventory: { list: () => request('/api/inventory', {}, staff), update: (id, quantity, expectedQuantity) => request(`/api/inventory/${enc(id)}`, jsonInit('PATCH', { quantity, expectedQuantity }), staff) },
   prices: { get: () => request('/api/prices', {}, staff), update: (input) => request('/api/prices', jsonInit('PUT', input), staff) },
   paintingDays: { list: (from, to) => request(`/api/painting-days?from=${enc(from)}&to=${enc(to)}`, {}, staff), update: (date, open, maxPaintings, hours) => request(`/api/painting-days/${enc(date)}`, jsonInit('PATCH', { open, maxPaintings, ...hours }), staff) },
+  shipping: {
+    window: (readyOn) => request<ShippingQuote>('/api/shipping/window', jsonInit('POST', { readyOn }), staff),
+    collectionDays: (from, to) => request(`/api/shipping/collection-days?from=${enc(from)}&to=${enc(to)}`, {}, staff),
+    setCollectionDay: (date, open) => request(`/api/shipping/collection-days/${enc(date)}`, jsonInit('PUT', { open }), staff),
+  },
   auth: {
     login: (email, password) =>
       request('/api/staff/login', jsonInit('POST', { email, password })),
@@ -212,6 +222,8 @@ export const httpApi: Api = {
     checkCapacity: (input) => request('/api/agenda/capacity', jsonInit('POST', input), staff),
     findMoveSuggestion: async (input) =>
       (await request('/api/agenda/move-suggestion', jsonInit('POST', input), staff)) ?? null,
+    makeRoomForBlock: (itemId) => request(`/api/agenda/blocks/${enc(itemId)}/make-room`, { method: 'POST' }, staff),
+    makeRoom: (input, key) => request('/api/agenda/make-room', { ...jsonInit('POST', input), headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key } }, staff),
   },
   orders: {
     listSales: (filters) => {
@@ -247,8 +259,12 @@ export const httpApi: Api = {
         jsonInit('PATCH', { status }),
         staff,
       ),
-    setHandedOver: (orderId, handedOver, itemIds) =>
-      request(`/api/orders/${enc(orderId)}/handed-over`, jsonInit('PATCH', { handedOver, itemIds }), staff),
+    setHandedOver: (orderId, handedOver, itemIds, trackingNumber) =>
+      request(
+        `/api/orders/${enc(orderId)}/handed-over`,
+        jsonInit('PATCH', { handedOver, itemIds, ...(trackingNumber !== undefined ? { trackingNumber } : {}) }),
+        staff,
+      ),
   },
   payments: {
     setPaymentState: (orderId, state, method, amountPaid) =>
@@ -284,7 +300,7 @@ export const httpApi: Api = {
     unsubscribeWaitlist: (token) => request('/api/shop/waitlist/unsubscribe', jsonInit('POST', { token })),
     joinWaitlist: (email, locale) => request('/api/shop/waitlist', jsonInit('POST', { email, locale })),
     getConfig: () => request<ShopConfig>('/api/shop/config'),
-    listDeliveryDates: (items) => request<ShopDeliveryDate[]>('/api/shop/delivery-dates', jsonInit('POST', { items })),
+    shippingQuote: (items) => request<ShippingQuote>('/api/shop/shipping-quote', jsonInit('POST', { items })),
     listPickupDays: (items) => request<ShopPickupDay[]>('/api/shop/pickup-days', jsonInit('POST', { items })),
     checkout: async (input) => {
       const result = await request<{ orderCode: string; formToken: string; checkoutUrl: string }>(

@@ -1,6 +1,7 @@
 package com.artwithgab.awg_tracking.service;
 
 import com.artwithgab.awg_tracking.config.AwgProperties;
+import com.artwithgab.awg_tracking.support.AustrianPost;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -43,6 +44,14 @@ public class NotificationService {
         boolean ownerOnly = event.kind() == OrderNotification.Kind.FORM_SUBMITTED || event.kind() == OrderNotification.Kind.PAYMENT_REVIEW;
         if (!ownerOnly && !event.unconfirmedWeb()) {
             String name = publicEdit ? "" : event.customerName();
+            if (event.kind() == OrderNotification.Kind.POST_SHIPPED) {
+                String body = greeting("Hallo", name) + event.kind().german + ".\n\nZustellung voraussichtlich "
+                        + AustrianPost.arrivalRange(event.arrivalFrom(), event.arrivalTo(), false)
+                        + (event.trackingUrl() == null ? "" : "\nSendung verfolgen: " + event.trackingUrl())
+                        + "\nBestellung verfolgen: " + link + "\n\nArtWithGab";
+                send(event.customerEmail(), event.kind().german + " · " + event.code(), body);
+                return;
+            }
             String body = greeting("Hallo", name) + event.kind().german + ".\nBestellung: " + event.code()
                     + "\nGesamt: " + event.total() + " EUR · Bezahlt: " + event.amountPaid() + " EUR\nVerfolge deine Bestellung: " + link + "\n\nVielen Dank!\nArtWithGab\n\n---\n\n" + greeting("Hello", name) + event.kind().english + ".\nOrder: " + event.code() + "\nTotal: " + event.total() + " EUR · Paid: " + event.amountPaid() + " EUR\nTrack your order: " + link + "\n\nThank you!\nArtWithGab";
             send(event.customerEmail(), subject, body);

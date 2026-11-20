@@ -11,6 +11,7 @@ import type { TrackView } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
 import { clearBuyDraft } from '../../lib/buyDraft'
 import { DELIVERY_WINDOW_END_HOUR, DELIVERY_WINDOW_START_HOUR, deliveryDatePhrase, icsHour } from '../../lib/deliveryWindow'
+import { formatArrivalRange } from '../../lib/postShipping'
 import buyStyles from './BuyPage.module.css'
 import thanks from './BuyThanksPage.module.css'
 
@@ -77,13 +78,21 @@ export function BuyThanksPage() {
   if (!code) return <PublicPage variant="status"><h1>{t('shopThanksTitle')}</h1><p>{t('shopThanksNoCode')}</p><ButtonLink to="/track" fullWidth>{t('track')}</ButtonLink></PublicPage>
   const longDate = (date: string) => new Intl.DateTimeFormat(locale === 'de' ? 'de-AT' : 'en-GB', { dateStyle: 'long' }).format(new Date(`${date}T12:00:00`))
   const when = view?.when
+  const arrivalFrom = when?.arrivalFrom ?? view?.delivery?.arrivalFrom ?? null
+  const arrivalTo = when?.arrivalTo ?? view?.delivery?.arrivalTo ?? null
+  const isPost = when?.kind === 'post' || view?.delivery?.kind === 'post'
   // The handoff step: what on the first line, when on the second.
-  const handoffWhen = when?.date
-    ? when.kind === 'market'
-      ? [when.marketName, longDate(when.date), when.fromHour != null && t('timeOClock', { time: clock(when.fromHour) })].filter(Boolean).join(' · ')
-      : deliveryDatePhrase(when.date, locale)
-    : null
-  const handoffLabel = <span className={thanks.handoff}><span>{t(when?.kind === 'market' ? 'pickupTimeline' : 'deliveryTimeline')}</span>{handoffWhen && <small className={thanks.when}>{handoffWhen}</small>}</span>
+  const handoffWhen = isPost
+    ? arrivalFrom && arrivalTo
+      ? t('estimatedArrivalPhrase', { range: formatArrivalRange(arrivalFrom, arrivalTo, locale) })
+      : null
+    : when?.date
+      ? when.kind === 'market'
+        ? [when.marketName, longDate(when.date), when.fromHour != null && t('timeOClock', { time: clock(when.fromHour) })].filter(Boolean).join(' · ')
+        : deliveryDatePhrase(when.date, locale)
+      : null
+  const handoffTitle = isPost ? t('methodPost') : t(when?.kind === 'market' ? 'pickupTimeline' : 'deliveryTimeline')
+  const handoffLabel = <span className={thanks.handoff}><span>{handoffTitle}</span>{handoffWhen && <small className={thanks.when}>{handoffWhen}</small>}</span>
   const copy = () => { void navigator.clipboard.writeText(code).then(() => setCopyMessage(t('copiedCode'))).catch(() => setCopyMessage(t('copyFailed'))) }
   const codeCard = <section className={thanks.codeCard} aria-labelledby="thanks-code-label">
     <p id="thanks-code-label" className={thanks.codeLabel}>{t('trackCode')}</p>
@@ -108,7 +117,7 @@ export function BuyThanksPage() {
     </section>
     <div className={thanks.actions}>
       <ButtonLink to={`/track/${encodeURIComponent(code)}`} fullWidth>{t('goTrack')}</ButtonLink>
-      {view.when.kind !== 'unknown' && view.when.date && <Button variant="secondary" fullWidth onClick={() => downloadCalendar(view.when)}>{t(view.when.kind === 'market' ? 'addPickupCalendar' : 'addCalendar')}</Button>}
+      {!isPost && view.when.kind !== 'unknown' && view.when.date && <Button variant="secondary" fullWidth onClick={() => downloadCalendar(view.when)}>{t(view.when.kind === 'market' ? 'addPickupCalendar' : 'addCalendar')}</Button>}
     </div>
     <fieldset className={thanks.feedback} aria-describedby="seq-ends">
       <legend className={thanks.sectionTitle}>{t('seqQuestion')}</legend>

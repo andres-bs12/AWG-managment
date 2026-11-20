@@ -216,20 +216,23 @@ test('expired mock link follows the real 30-day policy, invalid and locked state
   await axe(page); await noOverflow(page)
 })
 
-test('Vienna address uses the common grid, validates postcode and preserves stored photos', async ({ page }) => {
+test('Austrian address uses the common grid, validates postcode and editable city, and preserves stored photos', async ({ page }) => {
   await openForm(page, 'de', 'frm-abs103')
   await expect(page.locator('#form-line1')).toHaveAttribute('autocomplete', 'address-line1')
-  await expect(page.locator('#form-city')).toHaveText('Wien')
-  await page.locator('#form-postal').fill('9999'); await next(page).click()
+  await expect(page.locator('#form-city')).toHaveValue('Vienna')
+  await page.locator('#form-postal').fill('0123'); await page.locator('#form-city').fill(''); await next(page).click()
   await expect(page.locator('#form-postal')).toBeFocused()
   await expect(page.getByRole('alert').getByRole('link', { name: /Postleitzahl/ })).toBeVisible()
+  await expect(page.getByRole('alert').getByRole('link', { name: /Ort/ })).toBeVisible()
   await expect(page.locator('#form-postal')).toHaveAttribute('aria-describedby', /form-postal-error/)
-  await page.locator('#form-postal').fill('1010')
+  await page.locator('#form-postal').fill('5020')
+  await page.locator('#form-city').fill('Salzburg')
   const firstPhoto = await page.locator('img').first().getAttribute('src')
   await page.reload()
   await expect(page.locator('#form-heading')).toBeVisible()
   await expect(page.locator('img').first()).toHaveAttribute('src', firstPhoto!)
-  await expect(page.locator('#form-postal')).toHaveValue('1010')
+  await expect(page.locator('#form-postal')).toHaveValue('5020')
+  await expect(page.locator('#form-city')).toHaveValue('Salzburg')
   await next(page).click(); await axe(page); await noOverflow(page)
 })
 
@@ -288,8 +291,8 @@ test('two ornaments keep fixed variants, independent details and the bought name
     const path = '/src/api/client.ts'; const { api } = await import(path)
     const reference = (await api.forms.getForm('frm-abs103')).item.photos
     const choices = [{ kind: 'custom' as const, withName: true }, { kind: 'custom' as const, withName: false }]
-    const dates = await api.shop.listDeliveryDates(choices)
-    const result = await api.shop.checkout({ customerName: 'Alex Example', email: 'alex@example.com', phone: '+43 660 1234567', address: { line1: 'Street 1', postalCode: '1010', city: 'Wien' }, deliveryDate: dates[0].date, acceptTerms: true,
+    const quote = await api.shop.shippingQuote(choices)
+    const result = await api.shop.checkout({ customerName: 'Alex Example', email: 'alex@example.com', phone: '+43 660 1234567', deliveryKind: 'post', address: { line1: 'Street 1', postalCode: '1010', city: 'Wien' }, expectedArrivalTo: quote.arrivalTo, acceptTerms: true,
       items: [{ ...choices[0], color: 'red', finish: 'shiny', petName: 'Luna', backName: 'Luna', photos: reference }, { ...choices[1], color: 'green', finish: 'matte', petName: 'Otto', photos: reference }],
     })
     return { token: result.formToken, view: await api.forms.getForm(result.formToken) }

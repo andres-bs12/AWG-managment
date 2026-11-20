@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
@@ -22,8 +21,8 @@ class StripeSignatureTests {
 
     private final StripeClient client = new StripeClient(
             new AwgProperties("Europe/Vienna", null, null, null, null, null, null,
-                    new AwgProperties.Shop(true, "http://localhost", "sk_test_dummy", SECRET, BigDecimal.ZERO, 1, 45,
-                            java.time.LocalDate.of(2026, 12, 24), 15, null, null, null), null, null, null),
+                    new AwgProperties.Shop(true, "http://localhost", "sk_test_dummy", SECRET, 1, 45,
+                            java.time.LocalDate.of(2026, 12, 24), 15, null, null, null), null, null, null, null),
             new tools.jackson.databind.ObjectMapper(),
             Clock.fixed(Instant.ofEpochSecond(NOW), ZoneOffset.UTC));
 

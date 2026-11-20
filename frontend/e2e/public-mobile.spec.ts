@@ -113,7 +113,7 @@ async function typeAndTrack(page: Page, field: Locator, letters: string) {
   }
 }
 async function fillContact(page: Page) {
-  for (const [id, value] of Object.entries({ 'buy-name': 'Alex Example', 'buy-email': 'alex@example.com', 'buy-phone': '123456789', 'buy-line1': 'Street 1', 'buy-postal': '1010' })) {
+  for (const [id, value] of Object.entries({ 'buy-name': 'Alex Example', 'buy-email': 'alex@example.com', 'buy-phone': '123456789', 'buy-line1': 'Street 1', 'buy-postal': '1010', 'buy-city': 'Wien' })) {
     const field = page.locator(`#${id}`)
     if (await field.count()) await field.fill(value)
   }
@@ -321,18 +321,17 @@ test('server field rejections reopen the shared delivery/contact screen and focu
   await fillContact(page)
   await next(page).click()
   await page.locator('#buy-terms').check()
-  for (const field of ['address.postalCode', 'deliveryDate']) {
+  for (const field of ['address.postalCode', 'delivery']) {
     await page.evaluate(async field => {
       const path = '/src/api/client.ts'; const { api } = await import(path)
-      api.shop.checkout = async () => { throw { status: 400, code: 'VALIDATION', field } }
+      api.shop.checkout = async () => { throw { status: 400, code: field === 'delivery' ? 'SHIPPING_WINDOW_CHANGED' : 'POSTAL_INVALID', field } }
     }, field)
     await page.locator('form button[type=submit]').click()
-    const id = field === 'deliveryDate' ? '#buy-date' : '#buy-postal'
+    const id = field === 'delivery' ? '#buy-date' : '#buy-postal'
     await expect(page.locator(id)).toBeFocused()
     await expect(page.locator(`${id}-error`)).toBeVisible()
     await expect(page.locator('#buy-name')).toHaveValue('Alex Example')
-    if (field === 'deliveryDate') await chooseFirstDate(page)
-    else await page.locator(id).fill('1010')
+    if (field !== 'delivery') await page.locator(id).fill('1010')
     await next(page).click()
     await expect(page.locator('#buy-terms')).toBeChecked()
   }

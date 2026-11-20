@@ -78,11 +78,11 @@ class SaleApiTests extends ApiTestSupport {
     }
 
     @Test
-    void viennaDeliveryOnSaturdayIs400() throws Exception {
+    void newViennaDeliveryIsRejectedEvenOnAnOldDeliveryDay() throws Exception {
         String token = login();
-        MvcResult res = sale(token, customItem(false, TUE, 10.0, 11.0, "vienna", dayId(token, SAT), null));
+        MvcResult res = sale(token, customItem(false, TUE, 10.0, 11.0, "vienna", dayId(token, WED), null));
         assertEquals(400, res.getResponse().getStatus());
-        assertEquals("Vienna deliveries are on Wednesday or Friday", this.<String>read(res, "$.message"));
+        assertEquals("items[0].deliveryKind", this.<String>read(res, "$.field"));
     }
 
     @Test

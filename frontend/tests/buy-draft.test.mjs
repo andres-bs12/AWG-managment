@@ -46,3 +46,14 @@ test('saving an explicit empty name never restores previous lettering', () => {
   assert.equal(JSON.parse(saved).items[0].backName, '')
   assert.equal(loadBuyDraft().items[0].petName, '')
 })
+
+test('defaults deliveryKind to post, upgrades legacy vienna drafts to post, and preserves city', () => {
+  saved = ''
+  assert.equal(loadBuyDraft().deliveryKind, 'post')
+  assert.equal(loadBuyDraft().city, '')
+  saved = JSON.stringify({ deliveryKind: 'vienna', city: 'Salzburg', postalCode: '5020' })
+  const migrated = loadBuyDraft()
+  assert.equal(migrated.deliveryKind, 'post')
+  assert.equal(migrated.city, 'Salzburg')
+  assert.equal(migrated.postalCode, '5020')
+})

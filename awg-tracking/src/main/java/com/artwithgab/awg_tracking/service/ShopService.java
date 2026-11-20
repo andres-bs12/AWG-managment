@@ -11,9 +11,9 @@ import com.artwithgab.awg_tracking.model.*;
 import com.artwithgab.awg_tracking.payment.StripeClient;
 import com.artwithgab.awg_tracking.repository.CustomerRepository;
 import com.artwithgab.awg_tracking.repository.OrderRepository;
-import com.artwithgab.awg_tracking.support.CalendarRules;
+import com.artwithgab.awg_tracking.support.AustrianPost;
 import com.artwithgab.awg_tracking.support.Hours;
-import com.artwithgab.awg_tracking.support.ViennaAddress;
+import com.artwithgab.awg_tracking.support.PostShipping;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,7 +31,7 @@ import java.time.format.TextStyle;
 import java.util.*;
 
 /**
- * Public web shop: Vienna home delivery only (Wednesday/Friday), paid online with Stripe Checkout.
+ * Public web shop: Austrian Post shipping and market pickup, paid online with Stripe Checkout.
  *
  * Flow: the customer picks ornaments → we offer only delivery days for which every custom ornament
  * can still be painted before that day → checkout reserves the painting slots and stock and creates
@@ -55,6 +55,7 @@ public class ShopService {
     private final AgendaService agendaService;
     private final CalendarService calendarService;
     private final PricingService pricingService;
+    private final ShippingService shippingService;
     private final InventoryService inventoryService;
     private final OrderCodeGenerator codeGenerator;
     private final OrderRepository orderRepository;
@@ -84,7 +85,7 @@ public class ShopService {
                 .toList();
         LocalDate end = seasonEnd();
         LocalDate from = props.shop().deliveriesFrom();
-        return new ShopConfigDto(isOpen(), p.customPrice(), p.finishedPrice(), p.nameExtra(), fee(), MAX_ITEMS, colors,
+        return new ShopConfigDto(isOpen(), p.customPrice(), p.finishedPrice(), p.nameExtra(), p.shippingFee(), MAX_ITEMS, colors,
                 end.toString(), LocalDate.now(clock.withZone(java.time.ZoneId.of(props.zone()))).isAfter(end),
                 from == null ? null : from.toString(), props.shop().deliveryWindowStart().toString(),
                 props.shop().deliveryWindowEnd().toString(), mailConfigured());
@@ -185,29 +186,33 @@ public class ShopService {
         }
     }
 
-    // ─── Delivery days ──────────────────────────────────────────────────────
+    private record ShippingPlan(PostShipping.Window window, List<HourSpanDto> slots) {}
 
     @Transactional(readOnly = true)
-    public List<DeliveryDateDto> deliveryDates(List<ShopItemShape> items) {
+    public ShippingWindowDto shippingQuote(List<ShopItemShape> items) {
         requireCustomOnly(items);
-        AgendaService.Snapshot s = agendaService.snapshot();
-        List<Double> durations = durations(items);
-        List<DeliveryDateDto> out = new ArrayList<>();
-        LocalDate first = firstDeliveryDay(s.index().today());
-        LocalDate last = s.index().today().plusDays(props.shop().maxDaysAhead());
-        if (last.isAfter(seasonEnd())) last = seasonEnd();
-        for (LocalDate d = first; !d.isAfter(last); d = d.plusDays(1)) {
-            if (!isDeliveryDay(s, d)) continue;
-            if (plan(s, d, durations) != null) {
-                out.add(new DeliveryDateDto(d.toString(), d.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH).toLowerCase(Locale.ROOT)));
-            }
+        var shipping = shippingService.calendar(pricingService.current());
+        return ShippingWindowDto.from(planShipping(agendaService.snapshot(), durations(items), shipping)
+                .map(ShippingPlan::window));
+    }
+
+    private Optional<ShippingPlan> planShipping(AgendaService.Snapshot snapshot, List<Double> durations, PostShipping shipping) {
+        LocalDate today = snapshot.index().today();
+        LocalDate last = today.plusDays(props.shop().maxDaysAhead());
+        LocalDate readyOn = today.plusDays(Math.max(1, props.shop().leadDays()) - 1L);
+        for (var candidate = shipping.windowAfter(readyOn); candidate.isPresent();
+             candidate = shipping.windowAfter(candidate.get().collectionDate())) {
+            var window = candidate.get();
+            if (window.collectionDate().isAfter(last)) break;
+            List<HourSpanDto> slots = plan(snapshot, window.collectionDate(), durations);
+            if (slots != null) return Optional.of(new ShippingPlan(window, slots));
         }
-        return out;
+        return Optional.empty();
     }
 
     /**
      * Stall days where a web order can be picked up: from the lead time on (pickups do not wait for
-     * the first Vienna delivery day), not after the season end, with painting time for every
+     * the first Post collection day), not after the season end, with painting time for every
      * ornament on days before the stall day.
      */
     public List<PickupDayDto> pickupDays(List<ShopItemShape> items) {
@@ -243,25 +248,8 @@ public class ShopService {
                 && !time.isAfter(day.getCloseTime().minusMinutes(PICKUP_STEP_MINUTES));
     }
 
-    /** Lead time after today, and never before the season's first delivery day. */
-    private LocalDate firstDeliveryDay(LocalDate today) {
-        LocalDate first = today.plusDays(Math.max(1, props.shop().leadDays()));
-        LocalDate from = props.shop().deliveriesFrom();
-        return from != null && from.isAfter(first) ? from : first;
-    }
-
     /**
-     * Wed/Fri (plus the season's last delivery day, 24 Dec) with a calendar day, not after the season
-     * end, and not a stall day: on market Fridays the stall has priority.
-     */
-    private boolean isDeliveryDay(AgendaService.Snapshot s, LocalDate d) {
-        if (d.isAfter(seasonEnd())) return false;
-        return (CalendarRules.isViennaDay(d) || d.equals(seasonEnd()))
-                && s.index().dayByDate(d).isPresent() && s.index().marketDayOn(d).isEmpty();
-    }
-
-    /**
-     * Finds a painting slot for every custom ornament, on days strictly before the delivery day and
+     * Finds a painting slot for every custom ornament, on days strictly before the handoff day and
      * not before tomorrow. Returns null when they do not all fit.
      */
     List<HourSpanDto> plan(AgendaService.Snapshot s, LocalDate delivery, List<Double> durations) {
@@ -306,12 +294,16 @@ public class ShopService {
     public CheckoutResponse checkout(CheckoutRequest req, Map<String, MultipartFile> files, String clientIp) {
         if (!isOpen()) throw new StripeClient.ShopUnavailableException();
         boolean pickup = req.isPickup();
+        if (req.deliveryKind() == DeliveryKind.DELIVERY) {
+            throw new BadRequestException("Choose Post shipping or market pickup.").code("VALIDATION").field("deliveryKind");
+        }
+        if (pickup && req.deliveryDate() == null) {
+            throw new BadRequestException("Choose a pickup day.").code("VALIDATION").field("deliveryDate");
+        }
         if (!pickup) {
-            if (req.address() == null) throw new BadRequestException("Add the delivery address.").code("VALIDATION").field("address");
-            if (!ViennaAddress.isViennaPostal(req.address().postalCode())) throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).")
-                    .code("POSTAL_OUTSIDE_VIENNA").field("address.postalCode");
-            if (!CalendarRules.isViennaDay(req.deliveryDate()) && !req.deliveryDate().equals(seasonEnd())) {
-                throw new BadRequestException("Deliveries are on Wednesday or Friday.").code("DELIVERY_DAY_INVALID").field("deliveryDate");
+            AustrianPost.requireAddress(req.address());
+            if (req.expectedArrivalTo() == null) {
+                throw new BadRequestException("Confirm the estimated arrival date.").code("VALIDATION").field("expectedArrivalTo");
             }
         }
 
@@ -338,10 +330,6 @@ public class ShopService {
             if (!isPickupTimeAllowed(stall.get(), req.pickupTime())) {
                 throw new BadRequestException("Choose a pickup time while the stall is open.").code("PICKUP_TIME_INVALID").field("pickupTime");
             }
-        } else if (req.deliveryDate().isBefore(firstDeliveryDay(today))
-                || req.deliveryDate().isAfter(today.plusDays(props.shop().maxDaysAhead()))
-                || !isDeliveryDay(s, req.deliveryDate())) {
-            throw new BadRequestException("Choose one of the offered delivery days.").code("DELIVERY_DAY_INVALID").field("deliveryDate");
         }
 
         // Validate items before reserving anything.
@@ -372,8 +360,25 @@ public class ShopService {
         // Re-plan under the lock: someone may have taken the time since the dates were listed.
         List<ShopItemRequest> customs = req.items().stream().filter(i -> i.kind() == ItemKind.CUSTOM)
                 .sorted(Comparator.comparing((ShopItemRequest i) -> i.withName() ? 0 : 1)).toList();
-        List<HourSpanDto> slots = plan(s, req.deliveryDate(), durations(customs));
-        if (slots == null) throw new ConflictException("That delivery day just filled up. Choose another day.").code("DAY_FULL").field("deliveryDate");
+        var prices = pricingService.current();
+        List<HourSpanDto> slots;
+        PostShipping.Window window = null;
+        if (pickup) {
+            slots = plan(s, req.deliveryDate(), durations(customs));
+            if (slots == null) {
+                throw new ConflictException("That pickup day just filled up. Choose another day.").code("DAY_FULL").field("deliveryDate");
+            }
+        } else {
+            var shipping = planShipping(s, durations(customs), shippingService.calendar(prices))
+                    .orElseThrow(() -> new ConflictException("Post shipping is no longer available.")
+                            .code("SHIPPING_UNAVAILABLE").field("delivery"));
+            window = shipping.window();
+            if (window.arrivalTo().isAfter(req.expectedArrivalTo())) {
+                throw new ConflictException("The estimated arrival window changed. Confirm the new dates.")
+                        .code("SHIPPING_WINDOW_CHANGED").field("delivery");
+            }
+            slots = shipping.slots();
+        }
 
         Customer customer = new Customer();
         customer.setName(req.customerName().trim());
@@ -393,7 +398,7 @@ public class ShopService {
         order.setCheckoutClientHash(clientHash);
         order.setPaymentState(PaymentState.UNPAID);
         order.setFormSubmitted(true);
-        BigDecimal deliveryFee = pickup ? BigDecimal.ZERO : fee();
+        BigDecimal deliveryFee = pickup ? BigDecimal.ZERO : prices.shippingFee();
         order.setDeliveryAddress(pickup ? null : OrderService.toAddress(req.address()));
         order.setDeliveryFee(deliveryFee);
 
@@ -413,9 +418,15 @@ public class ShopService {
             item.setNameExtra(pricingService.nameExtraFor(row.kind(), withName));
             item.setProductionStatus(custom ? ProductionStatus.NOT_STARTED : ProductionStatus.FINISHED);
             item.setPosition(position++);
-            item.setDeliveryKind(pickup ? DeliveryKind.MARKET : DeliveryKind.DELIVERY);
-            item.setHandoffDate(req.deliveryDate());
-            if (pickup) item.setPickUpTime(req.pickupTime());
+            item.setDeliveryKind(pickup ? DeliveryKind.MARKET : DeliveryKind.POST);
+            if (pickup) {
+                item.setHandoffDate(req.deliveryDate());
+                item.setPickUpTime(req.pickupTime());
+            } else {
+                item.setHandoffDate(window.collectionDate());
+                item.setArrivalFrom(window.arrivalFrom());
+                item.setArrivalTo(window.arrivalTo());
+            }
             item.setPetName(row.petName() == null ? "" : row.petName().trim());
             item.setNote(row.note() == null ? "" : row.note().trim());
             if (withName && row.backName() != null) {
@@ -457,7 +468,7 @@ public class ShopService {
                 String name = "Custom pet ornament" + (item.getPetName().isBlank() ? "" : " · " + item.getPetName()) + (item.isWithName() ? " + name" : "");
                 lines.add(new StripeClient.Line(name, item.getCost(), 1));
             }
-            if (deliveryFee.signum() > 0) lines.add(new StripeClient.Line("Delivery in Vienna", deliveryFee, 1));
+            if (deliveryFee.signum() > 0) lines.add(new StripeClient.Line("Versand per Post", deliveryFee, 1));
             session = stripe.createCheckoutSession(order.getId().toString(), order.getCode(),
                     customer.getEmail(), lines, clock.instant().plusSeconds(32 * 60));
             order.setStripeSessionId(session.id());
@@ -573,8 +584,5 @@ public class ShopService {
         log.info("Released unpaid web order {}", order.getCode());
     }
 
-    private BigDecimal fee() {
-        BigDecimal fee = props.shop().deliveryFee();
-        return fee == null ? BigDecimal.ZERO : fee.setScale(2, java.math.RoundingMode.HALF_UP);
-    }
+
 }

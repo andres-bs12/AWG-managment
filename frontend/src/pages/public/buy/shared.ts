@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import type { ShopConfig, ShopDeliveryDate, ShopPickupDay, OrnamentColor } from '../../../domain/types'
+import type { ShopConfig, ShippingQuote, ShopPickupDay, OrnamentColor } from '../../../domain/types'
 import type { BuyDraft, BuyItem } from '../../../lib/buyDraft'
 import { useLocale } from '../../../i18n/LocaleContext'
 
@@ -17,8 +17,8 @@ export type BuyStepProps = {
   described: (key: string, hint?: boolean) => string | undefined
   photoErrors: Record<string, string>
   addFiles: (uid: string, files: File[] | null) => Promise<void>
-  dates: ShopDeliveryDate[]
-  datesState: 'idle' | 'loading' | 'ready' | 'error'
+  shippingQuote: ShippingQuote | null
+  shippingState: 'idle' | 'loading' | 'ready' | 'error'
   setDatesRetry: Dispatch<SetStateAction<number>>
   pickupDays: ShopPickupDay[]
   pickupState: 'idle' | 'loading' | 'ready' | 'error'

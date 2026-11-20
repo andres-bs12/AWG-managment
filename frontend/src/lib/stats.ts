@@ -156,7 +156,7 @@ export function aggregateStats(input: {
       cancelled: created.length - active.length, checkoutsInProgress: active.length - sold.length,
     },
     bySource, daily, colors,
-    delivery: { market: items.filter(item => item.delivery.kind !== 'vienna').length, vienna: items.filter(item => item.delivery.kind === 'vienna').length },
+    delivery: { market: items.filter(item => item.delivery.kind === 'market').length, vienna: items.filter(item => item.delivery.kind === 'vienna').length, post: items.filter(item => item.delivery.kind === 'post').length },
     web: {
       homeViews: total('home_view'), buyViews: total('buy_view'), trackViews: total('track_view'), formViews: total('form_view'),
       funnel: [

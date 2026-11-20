@@ -24,7 +24,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ErrorResponse> api(ApiException e) {
-        return body(e.getStatus(), e.getMessage(), e.getCode(), e.getField());
+        return ResponseEntity.status(e.getStatus()).body(
+                new ErrorResponse(e.getStatus().value(), e.getMessage(), e.getCode(), e.getField(), e.getReason()));
     }
 
     /** Two writers changed the same order at once; the later one must reload instead of overwriting. */
@@ -106,6 +107,6 @@ public class GlobalExceptionHandler {
             case 413 -> "TOO_LARGE";
             default -> "ERROR";
         };
-        return ResponseEntity.status(status).body(new ErrorResponse(status.value(), message, c, field));
+        return ResponseEntity.status(status).body(new ErrorResponse(status.value(), message, c, field, null));
     }
 }

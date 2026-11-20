@@ -1,7 +1,9 @@
 package com.artwithgab.awg_tracking.dto.pricing;
 
 import java.math.BigDecimal;
+import java.util.List;
 
-/** Current prices. revision 0 means the server defaults are in use. */
-public record PricesDto(BigDecimal customPrice, BigDecimal finishedPrice, BigDecimal nameExtra, long revision) {
+/** Current prices and the read-only Post eligibility flag. Revision 0 means server defaults. */
+public record PricesDto(BigDecimal customPrice, BigDecimal finishedPrice, BigDecimal nameExtra,
+                        BigDecimal shippingFee, List<String> postCollectionDays, boolean finishedWithCustom, long revision) {
 }

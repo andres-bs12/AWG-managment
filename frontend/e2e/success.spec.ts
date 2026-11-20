@@ -20,12 +20,16 @@ async function useHttpMetrics(page: Page) {
   })
 }
 
-function trackView(paymentState: 'unpaid' | 'paid'): TrackView {
+function trackView(paymentState: 'unpaid' | 'paid', kind: 'post' | 'vienna' = 'post'): TrackView {
   return {
-    code, paymentState, total: 49.99, status: 'preparing', customerName: 'Alex Example',
+    code, paymentState, total: 54.99, status: 'preparing', customerName: 'Alex Example',
     items: [{ kind: 'custom', color: 'red', finish: 'shiny', petName: 'Luna', withName: false, backName: '', productionStatus: 'not_started' }],
-    delivery: { kind: 'vienna', deliveryDate, address: { line1: 'Hauptstraße 1', postalCode: '1010', city: 'Wien' } },
-    when: { kind: 'vienna', date: deliveryDate, fromHour: null, untilHour: null, marketName: null },
+    delivery: kind === 'post'
+      ? { kind: 'post', deliveryDate: '2026-12-01', arrivalFrom: '2026-12-03', arrivalTo: '2026-12-04', address: { line1: 'Hauptstraße 1', postalCode: '1010', city: 'Wien' } }
+      : { kind: 'vienna', deliveryDate, address: { line1: 'Hauptstraße 1', postalCode: '1010', city: 'Wien' } },
+    when: kind === 'post'
+      ? { kind: 'post', date: '2026-12-01', arrivalFrom: '2026-12-03', arrivalTo: '2026-12-04', fromHour: null, untilHour: null, marketName: null }
+      : { kind: 'vienna', date: deliveryDate, fromHour: null, untilHour: null, marketName: null },
   }
 }
 
@@ -78,7 +82,8 @@ test('confirms only after Track changes from unpaid to paid, then copies and lin
   await expect(page.getByRole('heading', { name: 'Deine Zahlung wird geprüft' })).toHaveCount(0)
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('awg-buy-draft'))).toBeNull()
   const timeline = page.getByRole('list').filter({ has: page.getByRole('listitem').filter({ hasText: /^Bezahlt/ }) })
-  await expect(timeline.getByRole('listitem')).toHaveText(['Bezahlt ✓', 'Wird gemalt', /Lieferung.*2\.\sDezember\s2026.*18–20\sUhr/])
+  await expect(timeline.getByRole('listitem')).toHaveText(['Bezahlt ✓', 'Wird gemalt', /Versand per Post.*Zustellung voraussichtlich 3\.–4\.\sDezember/])
+  await expect(page.getByRole('button', { name: /Kalender/ })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Bestellung verfolgen', exact: true })).toHaveAttribute('href', `/track/${code}`)
   await page.getByRole('button', { name: 'Code kopieren', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Code kopiert' })).toBeVisible()
@@ -110,8 +115,11 @@ for (const response of ['unpaid', 'stalled'] as const) {
   })
 }
 
-test('downloads a calendar event for the confirmed delivery date', async ({ page }) => {
-  await paidThanks(page)
+test('legacy Vienna order still renders its delivery date and downloads a calendar event', async ({ page }) => {
+  await open(page)
+  await page.route(trackEndpoint, route => route.fulfill({ json: trackView('paid', 'vienna') }))
+  await showThanks(page, false)
+  await expect(page.getByRole('heading', { level: 1, name: 'Danke für deine Bestellung!' })).toBeVisible()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Lieferung zum Kalender hinzufügen', exact: true }).click()
   const download = await downloadPromise
@@ -175,10 +183,8 @@ test('cancelled checkout says nothing was charged and restores the saved design'
   await page.locator('summary').filter({ hasText: 'Notiz für Gaby' }).click()
   await page.locator('textarea[id^="note-"]').fill('Keep the white whiskers')
   await delivery(page)
-  const selectedDate = await page.locator('input[name="delivery-date"]:checked').getAttribute('aria-label')
-  expect(selectedDate).not.toBeNull()
   await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('awg-buy-draft') ?? '{}'))).toMatchObject({
-    customerName: 'Alex Example', email: 'alex@example.com', deliveryDate: expect.stringMatching(/^2026-/),
+    customerName: 'Alex Example', email: 'alex@example.com', city: 'Wien', deliveryKind: 'post',
     items: [{ color: 'red', finish: 'shiny', withName: true, backName: 'LUNA', petName: 'Luna', note: 'Keep the white whiskers' }],
   })
 
@@ -198,7 +204,8 @@ test('cancelled checkout says nothing was charged and restores the saved design'
   await expect(page.locator('#buy-name')).toHaveValue('Alex Example')
   await expect(page.locator('#buy-email')).toHaveValue('alex@example.com')
   await expect(page.locator('#buy-line1')).toHaveValue('Hauptstraße 1')
-  await expect(page.locator('input[name="delivery-date"]:checked')).toHaveAttribute('aria-label', selectedDate!)
+  await expect(page.locator('#buy-city')).toHaveValue('Wien')
+  await expect(page.locator('#buy-date')).toContainText('Do, 3. – Fr, 4. Dezember')
 })
 
 for (const transport of ['http', 'mock'] as const) {
@@ -237,7 +244,7 @@ for (const transport of ['http', 'mock'] as const) {
     await page.locator('#buy-email').fill(personal.email)
     await page.locator('#buy-line1').fill(personal.street)
     // Include an actual validation event, then recover without losing the draft.
-    await page.locator('#buy-postal').fill('9999')
+    await page.locator('#buy-postal').fill('0123')
     await page.locator('#buy-name').focus()
     await expect(page.locator('#buy-postal')).toHaveAttribute('aria-invalid', 'true')
     await page.locator('#buy-postal').fill('1010')

@@ -2,6 +2,7 @@ package com.artwithgab.awg_tracking.service;
 
 import com.artwithgab.awg_tracking.dto.form.*;
 import com.artwithgab.awg_tracking.dto.order.OrderItemDto;
+import com.artwithgab.awg_tracking.enums.DeliveryKind;
 import com.artwithgab.awg_tracking.enums.ItemKind;
 import com.artwithgab.awg_tracking.enums.ProductionStatus;
 import com.artwithgab.awg_tracking.exception.BadRequestException;
@@ -10,6 +11,8 @@ import com.artwithgab.awg_tracking.exception.ResourceNotFoundException;
 import com.artwithgab.awg_tracking.model.*;
 import com.artwithgab.awg_tracking.repository.OrderRepository;
 import com.artwithgab.awg_tracking.repository.StoredPhotoRepository;
+import com.artwithgab.awg_tracking.support.AustrianPost;
+import com.artwithgab.awg_tracking.support.ViennaAddress;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,7 +71,7 @@ public class FormService {
     }
 
     private static boolean needsAddress(Order order) {
-        return order.getOrderItems().stream().anyMatch(i -> i.getDeliveryKind() == com.artwithgab.awg_tracking.enums.DeliveryKind.DELIVERY);
+        return order.getOrderItems().stream().anyMatch(i -> i.getDeliveryKind() != DeliveryKind.MARKET);
     }
 
     /** The customer may change the form until painting starts and the order is not handed over. */
@@ -95,13 +98,19 @@ public class FormService {
         customer.setName(payload.customerName().trim());
         customer.setPhone(payload.phone().trim());
         customer.setEmail(payload.email().trim());
-        if (needsAddress(order)) {
+        boolean post = !order.postItems().isEmpty();
+        if (post) {
+            if (payload.address() != null || order.getDeliveryAddress() == null) {
+                AustrianPost.requireAddress(payload.address());
+                order.setDeliveryAddress(OrderService.toAddress(payload.address()));
+            }
+        } else if (needsAddress(order)) {
             if (payload.address() == null || payload.address().line1() == null || payload.address().line1().isBlank()) {
                 if (order.getDeliveryAddress() == null) {
                     throw new BadRequestException("Add the delivery address in Vienna.").code("VALIDATION").field("address");
                 }
             } else {
-                if (!com.artwithgab.awg_tracking.support.ViennaAddress.isViennaPostal(payload.address().postalCode())) {
+                if (!ViennaAddress.isViennaPostal(payload.address().postalCode())) {
                     throw new BadRequestException("We only deliver inside Vienna (postal codes 1010–1230).")
                             .code("POSTAL_OUTSIDE_VIENNA").field("address.postalCode");
                 }

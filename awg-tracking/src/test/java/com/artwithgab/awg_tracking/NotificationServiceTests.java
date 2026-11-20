@@ -10,6 +10,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -74,6 +75,40 @@ class NotificationServiceTests {
         assertTrue(messages.getAllValues().stream().filter(m -> m.getTo()[0].equals("customer@example.com"))
                 .allMatch(m -> m.getText().contains("/track/" + order.code()) && m.getText().contains("Hallo") && m.getText().contains("Hello")));
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullSource
+    @org.junit.jupiter.params.provider.ValueSource(strings = "AT12345678")
+    void customerGetsOneShippedMailAfterEveryPostItemIsHandedOver(String trackingNumber) {
+        var address = new com.artwithgab.awg_tracking.dto.common.AddressDto("Hauptplatz 1", null, "Linz", "4020");
+        var finishedPost = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null,
+                DeliveryKind.POST, null, null, null, address);
+        // The shipped order is committed, so each invocation needs a different paint slot.
+        LocalDate paintDate = LocalDate.of(2026, 11, trackingNumber == null ? 25 : 26);
+        var customPost = new CreateSaleItemRequest(ItemKind.CUSTOM, false, CustomColor.RED, CustomFinish.SHINY,
+                paintDate, 10.0, 11.0, DeliveryKind.POST, null, null, null, address);
+        var pickup = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null,
+                DeliveryKind.MARKET, null, null, null, null);
+        var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(pickup, finishedPost, customPost)));
+        UUID id = UUID.fromString(order.id());
+        String subject = "Deine Bestellung ist unterwegs · " + order.code();
+        var firstPost = List.of(UUID.fromString(order.itemIds().get(1)));
+        var lastPost = List.of(UUID.fromString(order.itemIds().get(2)));
+        orders.setHandedOver(id, true, firstPost, trackingNumber);
+        verify(mail, after(300).never()).send(org.mockito.ArgumentMatchers.<SimpleMailMessage>argThat(m -> subject.equals(m.getSubject())));
+
+        orders.setItemStatus(id, lastPost.getFirst(), ProductionStatus.FINISHED);
+        orders.setHandedOver(id, true, lastPost);
+        orders.setHandedOver(id, true, lastPost);
+        var message = org.mockito.ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mail, timeout(5000).times(6)).send(message.capture());
+        var shipped = message.getAllValues().stream().filter(m -> subject.equals(m.getSubject())).toList();
+        assertEquals(1, shipped.size());
+        assertTrue(shipped.getFirst().getText().contains("Zustellung voraussichtlich 3.–4. Dezember 2026"));
+        assertEquals(trackingNumber != null, shipped.getFirst().getText().contains("https://www.post.at/s/sendungsdetails?snr=AT12345678"));
+        assertFalse(orders.getOrder(id).handedOver());
+        assertTrue(invoices.findByOrderIdOrderByNumberAsc(id).isEmpty());
+    }
+
     @Test void rolledBackSaleDoesNotSend() {
         var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null);
         long before = invoices.count();
@@ -113,7 +148,7 @@ class NotificationServiceTests {
         NotificationService service = new NotificationService(provider, properties, invoiceDelivery, new com.artwithgab.awg_tracking.security.RateLimiter(java.time.Clock.systemUTC()));
         ReflectionTestUtils.setField(service, "host", "");
         service.onOrderNotification(new OrderNotification(OrderNotification.Kind.CANCELLED, "AWG1234", "Customer", "customer@example.com",
-                BigDecimal.TEN, BigDecimal.ZERO, "UNPAID", "", "", null, false));
+                BigDecimal.TEN, BigDecimal.ZERO, "UNPAID", "", "", null, false, null, null, null));
         var invoice = new com.artwithgab.awg_tracking.model.Invoice();
         invoice.setNumber(1L);
         invoice.setRecipient("customer@example.com");

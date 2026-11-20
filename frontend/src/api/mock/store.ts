@@ -3,7 +3,8 @@ import { filterSales } from '../../lib/sales'
 import { readFormToken, rememberFormToken } from '../formTokens'
 import type {
   Prices, PricesUpdate,
-  InventoryItem, PaintingDay, ShopCheckoutInput,
+  InventoryItem, PaintingDay, ShopCheckoutInput, ShopItemInput, ShippingQuote,
+  MakeRoomInput, MakeRoomMove, MakeRoomResult, PostCollectionDay,
   AgendaDay,
   AgendaDelivery,
   AgendaSlot,
@@ -28,6 +29,16 @@ import type {
   TrackWhen,
 } from '../../domain/types'
 import { itemCost } from '../../lib/money'
+import {
+  AUSTRIAN_POSTAL_REGEX,
+  isCollectionOn,
+  isWorkingDay,
+  type PostShippingConfig,
+  planPostShipping,
+  postTrackingUrl,
+  shippingWindowAfter,
+  TRACKING_NUMBER_REGEX,
+} from '../../lib/postShipping'
 import { mockPricing, validatePriceInput } from './pricing'
 import { marketPickupDates, paintDatesToTry } from '../../lib/calendar'
 import { hasPaintOverlap } from '../../lib/slots'
@@ -36,7 +47,11 @@ import { createSeed, DEMO_NOW_HOUR, SEED_REVISION, STAFF_ACCOUNTS, STORAGE_KEY, 
 import { uid as newUuid } from '../../lib/uid'
 
 /** Prices live beside the seed data; absent in older saved demo data, which means the defaults at revision 0. */
-let state: MockState & { prices?: Prices } = load()
+let state: MockState & {
+  prices?: Prices
+  /** Mirrors `post_collection_day`: per-date Post collection overrides, empty by default. */
+  postCollectionOverrides?: Record<string, boolean>
+} = load()
 let version = 0
 const listeners = new Set<() => void>()
 
@@ -182,7 +197,14 @@ function blocksForDay(dayId: string): TimeBlock[] {
 }
 
 export function currentPrices(): Prices {
-  return { ...(state.prices ?? { ...mockPricing, revision: 0 }) }
+  const stored = state.prices
+  return {
+    ...mockPricing,
+    revision: 0,
+    ...stored,
+    postCollectionDays: [...(stored?.postCollectionDays ?? mockPricing.postCollectionDays)],
+    finishedWithCustom: mockPricing.finishedWithCustom,
+  }
 }
 
 export function updatePrices(input: PricesUpdate): Prices {
@@ -190,9 +212,84 @@ export function updatePrices(input: PricesUpdate): Prices {
   if (input.expectedRevision !== current.revision) throw Object.assign(new Error('Someone else changed the prices. Reload and check them.'), { code: 'PRICES_CHANGED', status: 409 })
   const problem = validatePriceInput(input)
   if (problem) throw Object.assign(new Error(problem), { status: 400 })
-  state.prices = { customPrice: input.customPrice, finishedPrice: input.finishedPrice, nameExtra: input.nameExtra, revision: current.revision + 1 }
+  state.prices = {
+    customPrice: input.customPrice,
+    finishedPrice: input.finishedPrice,
+    nameExtra: input.nameExtra,
+    shippingFee: input.shippingFee ?? current.shippingFee,
+    postCollectionDays: [...(input.postCollectionDays ?? current.postCollectionDays)],
+    finishedWithCustom: current.finishedWithCustom,
+    revision: current.revision + 1,
+  }
   emit()
   return currentPrices()
+}
+
+function mockTodayIso(): string {
+  const now = new Date()
+  const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  return iso >= '2026-01-01' && iso <= '2026-12-31' ? iso : todayDay().date
+}
+
+/** The Post rules with the staff-edited weekdays and per-date overrides (like `ShippingService.rules`). */
+function postConfig(): Partial<PostShippingConfig> {
+  return { collectionDays: currentPrices().postCollectionDays, overrides: { ...(state.postCollectionOverrides ?? {}) } }
+}
+
+export function listCollectionDays(from: string, to: string): PostCollectionDay[] {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from ?? '') || !/^\d{4}-\d{2}-\d{2}$/.test(to ?? '') || to < from) {
+    throw Object.assign(new Error('Invalid date range.'), { code: 'VALIDATION', status: 400 })
+  }
+  const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000)
+  if (days >= 400) {
+    throw Object.assign(new Error('Choose a collection date range of at most 400 days.'), { code: 'VALIDATION', status: 400 })
+  }
+  const overrides = state.postCollectionOverrides ?? {}
+  const out: PostCollectionDay[] = []
+  for (let date = from; date <= to; date = addUtcDays(date, 1)) {
+    const open = isCollectionOn(date, postConfig())
+    const override = overrides[date] ?? null
+    if (open || override !== null) out.push({ date, open, override })
+  }
+  return out
+}
+
+export function setCollectionDay(date: string, open: boolean | null) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? '')) throw Object.assign(new Error('Invalid date.'), { code: 'VALIDATION', status: 400 })
+  if (open === true && !isWorkingDay(date)) {
+    throw Object.assign(new Error('Post collections must be on a working day.'), { code: 'VALIDATION', field: 'open', status: 400 })
+  }
+  if (open == null) {
+    if (state.postCollectionOverrides) delete state.postCollectionOverrides[date]
+  } else {
+    ;(state.postCollectionOverrides ??= {})[date] = open
+  }
+  emit()
+}
+
+export function getShippingWindow(readyOn: string): ShippingQuote {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(readyOn ?? '')) {
+    throw Object.assign(new Error('Invalid date.'), { code: 'VALIDATION', field: 'readyOn', status: 400 })
+  }
+  const today = mockTodayIso()
+  const effective = readyOn < today ? today : readyOn
+  return shippingWindowAfter(effective, postConfig())
+}
+
+export function getShippingQuote(items: Pick<ShopItemInput, 'kind' | 'withName'>[]): ShippingQuote {
+  if (!items.length) return { available: false, collectionDate: null, arrivalFrom: null, arrivalTo: null }
+  if (items.some(item => item.kind !== 'custom')) {
+    throw Object.assign(new Error('Only custom pet ornaments can be ordered online.'), { status: 400 })
+  }
+  return planPostShipping({
+    today: mockTodayIso(),
+    items,
+    config: postConfig(),
+    findSlot: (date, durationHours, extraBusy) => {
+      const res = findFreeSlot(date, durationHours, undefined, undefined, extraBusy)
+      return res.ok ? res.slot : null
+    },
+  }).quote
 }
 
 export function listInventory(): InventoryItem[] {
@@ -359,20 +456,54 @@ export function createMockCheckout(input: ShopCheckoutInput) {
   for (const [id, count] of counts) {
     if ((inventory.find(row => row.id === id)?.quantity ?? 0) < count) throw Object.assign(new Error('Out of stock.'), { code: 'OUT_OF_STOCK' })
   }
+  const prices = currentPrices()
+  const pickup = input.deliveryKind === 'market'
+  if (input.deliveryKind === 'vienna') {
+    throw Object.assign(new Error('Choose Post shipping or market pickup.'), { code: 'VALIDATION', field: 'deliveryKind', status: 400 })
+  }
+  let postQuote: ShippingQuote | null = null
+  if (!pickup) {
+    if (!input.address?.line1?.trim() || !input.address?.city?.trim()) {
+      throw Object.assign(new Error('Add the shipping address.'), { code: 'VALIDATION', field: 'address', status: 400 })
+    }
+    if (!AUSTRIAN_POSTAL_REGEX.test(input.address.postalCode?.trim() ?? '')) {
+      throw Object.assign(new Error('Enter a four-digit Austrian postcode.'), { code: 'POSTAL_INVALID', field: 'address.postalCode', status: 400 })
+    }
+    if (!input.expectedArrivalTo) {
+      throw Object.assign(new Error('Confirm the estimated arrival date.'), { code: 'VALIDATION', field: 'expectedArrivalTo', status: 400 })
+    }
+    postQuote = getShippingQuote(input.items)
+    if (!postQuote.available || !postQuote.collectionDate || !postQuote.arrivalFrom || !postQuote.arrivalTo) {
+      throw Object.assign(new Error('Post shipping is no longer available.'), { code: 'SHIPPING_UNAVAILABLE', field: 'delivery', status: 409 })
+    }
+    if (postQuote.arrivalTo > input.expectedArrivalTo) {
+      throw Object.assign(new Error('The estimated arrival window changed. Confirm the new dates.'), { code: 'SHIPPING_WINDOW_CHANGED', field: 'delivery', status: 409 })
+    }
+  }
   const customer: Customer = { id: uid('cus'), name: input.customerName, email: input.email, phone: input.phone }
   const orderId = uid('ord')
   const code = makeOrderCode()
   const token = uid('frm')
+  const cleanAddress = !pickup && input.address
+    ? {
+        line1: input.address.line1.trim(),
+        ...(input.address.line2?.trim() ? { line2: input.address.line2.trim() } : {}),
+        postalCode: input.address.postalCode.trim(),
+        city: input.address.city.trim(),
+      }
+    : undefined
   const items: OrderItem[] = input.items.map(item => ({
     id: uid('orn'), orderId, kind: 'custom', petName: item.petName ?? '', withName: item.withName,
     color: item.color ?? 'red', finish: item.finish, backName: item.backName ?? '', note: item.note ?? '',
-    cost: itemCost('custom', item.withName, currentPrices()), productionStatus: 'not_started', photos: item.photos,
-    formComplete: true, delivery: input.deliveryKind === 'market'
+    cost: itemCost('custom', item.withName, prices), productionStatus: 'not_started', photos: item.photos,
+    formComplete: true, delivery: pickup
       ? { kind: 'market', marketDayId: state.marketDays.find(day => day.date === input.deliveryDate && state.markets.some(m => m.id === day.marketId && m.kind === 'market'))?.id, marketId: state.marketDays.find(day => day.date === input.deliveryDate)?.marketId, pickupHour: input.pickupTime ? Number(input.pickupTime.slice(0, 2)) + Number(input.pickupTime.slice(3)) / 60 : null }
-      : { kind: 'vienna', address: input.address, deliveryDate: input.deliveryDate },
+      : { kind: 'post', address: cleanAddress, deliveryDate: postQuote!.collectionDate!, arrivalFrom: postQuote!.arrivalFrom, arrivalTo: postQuote!.arrivalTo },
   }))
+  const deliveryFee = pickup ? 0 : prices.shippingFee
+  const total = Math.round((items.reduce((sum, item) => sum + item.cost, 0) + deliveryFee) * 100) / 100
   const order: Order = { id: orderId, customerId: customer.id, code, trackToken: uid('trk'), formToken: token,
-    source: 'web', checkoutStatus: 'confirmed', paymentState: 'paid', paymentMethod: 'card', amountPaid: items.reduce((sum, item) => sum + item.cost, 0), total: items.reduce((sum, item) => sum + item.cost, 0),
+    source: 'web', checkoutStatus: 'confirmed', paymentState: 'paid', paymentMethod: 'card', deliveryFee, amountPaid: total, total,
     createdAt: new Date().toISOString(), itemIds: items.map(item => item.id), handedOver: false, paymentEntries: [] }
   for (const [id, count] of counts) inventory.find(row => row.id === id)!.quantity -= count
   state.customers.push(customer); state.orders.push(order); state.items.push(...items)
@@ -660,8 +791,10 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         postalCode: null,
         waitingForCustomer: item.kind === 'custom' && (!item.photos.length || (item.withName && !item.backName)),
       })
-    } else if (item.delivery.kind === 'vienna') {
-      if (!viennaBelongsToDate(item, date)) continue
+    } else if (item.delivery.kind === 'vienna' || item.delivery.kind === 'post') {
+      const isPost = item.delivery.kind === 'post'
+      if (isPost ? deliveryDateForItem(item) !== date : !viennaBelongsToDate(item, date)) continue
+      const shortDate = new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '')
       rows.push({
         orderId: order.id,
         orderCode: order.code,
@@ -673,9 +806,9 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         title,
         productionStatus: item.productionStatus,
         handedOver: item.handedOver ?? order.handedOver,
-        deliveryKind: 'vienna',
+        deliveryKind: item.delivery.kind,
         pickupHour: null,
-        methodLabel: `Vienna · ${new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '')}`,
+        methodLabel: `${isPost ? 'Post' : 'Vienna'} · ${shortDate}`,
         timeLabel: null,
         phone: customer.phone,
         addressLabel: addressLabel(item.delivery.address),
@@ -732,14 +865,16 @@ export function moveBlock(blockId: string, date: string, startHour: number) {
   if (day.isToday && startHour < DEMO_NOW_HOUR) {
     throw new Error('That time has already passed')
   }
-  const deliveryDay = item.delivery.marketDayId
-    ? state.marketDays.find((row) => row.id === item.delivery.marketDayId)
-    : undefined
+  const handoff = deliveryDateForItem(item)
+  const deliveryDay = handoff ? { date: handoff } : undefined
   if (!deliveryDay || day.date > deliveryDay.date) {
     throw new Error('Painting must stay before pickup')
   }
   if (item.delivery.kind === 'vienna' && day.date >= deliveryDay.date) {
     throw new Error('Vienna orders must be painted before the handoff day')
+  }
+  if (item.delivery.kind === 'post' && day.date >= deliveryDay.date) {
+    throw new Error('Post orders must be painted before the collection day')
   }
   if (
     item.delivery.kind === 'market' &&
@@ -754,6 +889,144 @@ export function moveBlock(blockId: string, date: string, startHour: number) {
   block.startHour = startHour
   block.endHour = end
   emit()
+}
+
+function makeRoomError(code: string, message: string, reason?: string): Error {
+  return Object.assign(new Error(message), { code, status: 409, ...(reason ? { reason } : {}) })
+}
+
+/** Like MakeRoomPlanner.isMovable: a not-started session whose handoff is after its paint day. */
+function movableSession(block: TimeBlock): OrderItem | null {
+  const item = block.orderItemId ? state.items.find(row => row.id === block.orderItemId) : undefined
+  const paintDate = marketDayDate(block.marketDayId) ?? block.marketDayId.replace(/^home-/, '')
+  const handoff = item ? deliveryDateForItem(item) : null
+  if (!item || !handoff || block.status !== 'not_started' || item.productionStatus !== 'not_started' || item.handedOver) return null
+  return handoff > paintDate ? item : null
+}
+
+/** Painting dates from today up to (not including) the handoff: later days first, then earlier ones. */
+function makeRoomTargets(handoff: string, original: string): string[] {
+  const out: string[] = []
+  for (let date = todayDay().date; date < handoff; date = addUtcDays(date, 1)) {
+    const setting = paintingDay(date)
+    if (setting.open && setting.maxPaintings > 0 && dayByDate(date)) out.push(date)
+  }
+  return [...out.filter(date => date >= original), ...out.filter(date => date < original)]
+}
+
+const minuteFloor = (date: string, after = 0) => date === todayDay().date ? Math.max(DEMO_NOW_HOUR, after) : after
+
+function placeBlock(block: TimeBlock, date: string, startHour: number, endHour: number) {
+  const day = dayByDate(date)!
+  if (!state.marketDays.some(row => row.id === day.id)) state.marketDays.push(day)
+  block.marketDayId = day.id
+  block.startHour = startHour
+  block.endHour = endHour
+}
+
+function blockSpan(block: TimeBlock) {
+  return { date: marketDayDate(block.marketDayId) ?? block.marketDayId.replace(/^home-/, ''), startHour: block.startHour, endHour: block.endHour }
+}
+
+/** Mock of `POST /api/agenda/blocks/{itemId}/make-room`. */
+export function makeRoomForBlock(itemId: string): MakeRoomResult {
+  const block = state.blocks.find(row => row.orderItemId === itemId)
+  const item = block ? movableSession(block) : null
+  if (!block || !item) throw makeRoomError('SESSION_NOT_MOVABLE', 'This session cannot be moved: it is handed over the day it is painted.')
+  const from = blockSpan(block)
+  const duration = block.endHour - block.startHour
+  const targets = makeRoomTargets(deliveryDateForItem(item)!, from.date)
+  for (const date of targets) {
+    const after = date === from.date ? minuteFloor(date, from.endHour) : minuteFloor(date)
+    const result = findFreeSlot(date, duration, after || undefined, undefined, [], block.id)
+    if (result.ok && result.slot) {
+      placeBlock(block, date, result.slot.startHour, result.slot.endHour)
+      emit()
+      const order = state.orders.find(row => row.id === item.orderId)
+      return { moved: [{ itemId, orderCode: order?.code ?? '', from, to: { date, startHour: result.slot.startHour, endHour: result.slot.endHour } }] }
+    }
+  }
+  if (targets.includes(from.date)) {
+    const earlier = findFreeSlot(from.date, duration, minuteFloor(from.date) || undefined, undefined, [], block.id, from.startHour)
+    if (earlier.ok && earlier.slot) {
+      placeBlock(block, from.date, earlier.slot.startHour, earlier.slot.endHour)
+      emit()
+      const order = state.orders.find(row => row.id === item.orderId)
+      return { moved: [{ itemId, orderCode: order?.code ?? '', from, to: { date: from.date, startHour: earlier.slot.startHour, endHour: earlier.slot.endHour } }] }
+    }
+  }
+  throw makeRoomError('NO_SLOT_KEEPS_PROMISE', 'No free slot before the handoff day. Move the session by hand.')
+}
+
+const makeRoomReplays = new Map<string, MakeRoomResult>()
+
+/** Mock of `POST /api/agenda/make-room`: fewest moves, latest handoffs first, all or nothing. */
+export function makeRoom(input: MakeRoomInput, key: string): MakeRoomResult {
+  const replay = makeRoomReplays.get(key)
+  if (replay) return replay
+  const { date } = input
+  const duration = input.minutes / 60
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? '') || !(input.minutes > 0 && input.minutes <= 1440)) {
+    throw Object.assign(new Error('Invalid request.'), { code: 'VALIDATION', status: 400 })
+  }
+  const setting = paintingDay(date)
+  const requestedDay = input.marketDayId
+    ? state.marketDays.find(day => day.id === input.marketDayId && day.date === date && state.markets.some(m => m.id === day.marketId && m.kind === 'market'))
+    : dayByDate(date)
+  if (!requestedDay || date < todayDay().date || !setting.open || setting.maxPaintings <= 0) {
+    throw makeRoomError('NO_MOVABLE_SESSION', 'Painting is unavailable on this day.', 'NOT_PAINTING_DAY')
+  }
+  const remember = (result: MakeRoomResult) => { makeRoomReplays.set(key, result); return result }
+  const free = findFreeSlot(date, duration, minuteFloor(date) || undefined, input.marketDayId ? requestedDay.marketId : undefined)
+  if (free.ok && free.slot) return remember({ slot: free.slot, moved: [] })
+
+  const onDay = blocksForDate(date).filter(block => block.orderItemId)
+  if (onDay.length && onDay.every(block => { const item = state.items.find(row => row.id === block.orderItemId); return item && deliveryDateForItem(item) === date })) {
+    throw makeRoomError('NO_MOVABLE_SESSION', "All of today's sessions are for pickups today, so none can be moved.", 'SAME_DAY_ONLY')
+  }
+  const handoffOf = (block: TimeBlock) => deliveryDateForItem(movableSession(block)!)!
+  const candidates = onDay.filter(block => movableSession(block)).sort((a, b) => handoffOf(b).localeCompare(handoffOf(a)) || a.startHour - b.startHour)
+  const subsets = (size: number, start = 0): TimeBlock[][] => size === 0 ? [[]]
+    : candidates.slice(start).flatMap((block, i) => subsets(size - 1, start + i + 1).map(rest => [block, ...rest]))
+  for (let size = 1; size <= candidates.length; size++) {
+    for (const subset of subsets(size)) {
+      const saved = state.blocks.map(block => ({ ...block }))
+      const savedDays = state.marketDays.length
+      const removed = new Set(subset.map(block => block.id))
+      state.blocks = state.blocks.filter(block => !removed.has(block.id))
+      const slot = findFreeSlot(date, duration, minuteFloor(date) || undefined)
+      const moved: MakeRoomMove[] = []
+      let placedAll = !!(slot.ok && slot.slot)
+      for (const block of [...subset].sort((a, b) => handoffOf(a).localeCompare(handoffOf(b)))) {
+        if (!placedAll) break
+        const item = movableSession(block)!
+        const from = { ...saved.find(copy => copy.id === block.id)! }
+        const fromSpan = blockSpan(from)
+        let placed = false
+        for (const target of makeRoomTargets(handoffOf(block), fromSpan.date)) {
+          const extra = target === date && slot.slot ? [slot.slot] : []
+          const result = findFreeSlot(target, block.endHour - block.startHour, minuteFloor(target) || undefined, undefined, extra)
+          if (result.ok && result.slot) {
+            placeBlock(block, target, result.slot.startHour, result.slot.endHour)
+            state.blocks.push(block)
+            const order = state.orders.find(row => row.id === item.orderId)
+            moved.push({ itemId: item.id, orderCode: order?.code ?? '', from: fromSpan, to: { date: target, startHour: result.slot.startHour, endHour: result.slot.endHour } })
+            placed = true
+            break
+          }
+        }
+        placedAll = placed
+      }
+      if (placedAll && slot.slot) {
+        emit()
+        return remember({ slot: slot.slot, moved })
+      }
+      // All or nothing: put every session back where it was.
+      state.blocks = saved
+      state.marketDays.length = savedDays
+    }
+  }
+  throw makeRoomError('NO_MOVABLE_SESSION', 'No available painting slots can free this time and keep the promised handoffs.', 'NO_TARGET_SLOT')
 }
 
 export function getOrder(id: string): Order {
@@ -809,10 +1082,36 @@ export function createSale(input: CreateSaleInput): Order {
   const createdItems: OrderItem[] = []
   const createdBlocks: TimeBlock[] = []
 
+  const prices = currentPrices()
+  const hasPost = rows.some(row => row.deliveryKind === 'post')
+  let postWindow: ShippingQuote | null = null
+  if (hasPost) {
+    const postRows = rows.filter(row => row.deliveryKind === 'post')
+    if (postRows.some(row => row.kind === 'finished') && (!prices.finishedWithCustom || !postRows.some(row => row.kind === 'custom'))) {
+      throw Object.assign(new Error('Finished pieces can only ship together with a custom ornament sent by post.'), { code: 'SHIPPING_NEEDS_CUSTOM', field: 'delivery', status: 400 })
+    }
+    const customPaintDates = postRows.filter(row => row.kind === 'custom' && row.paintDate).map(row => row.paintDate!).sort()
+    const readyOn = customPaintDates.at(-1) ?? todayDay().date
+    postWindow = shippingWindowAfter(readyOn, postConfig())
+    if (!postWindow.available || !postWindow.collectionDate) {
+      throw Object.assign(new Error('Post shipping can no longer arrive before Christmas.'), { code: 'SHIPPING_UNAVAILABLE', status: 400 })
+    }
+    const postAddress = rows.find(row => row.deliveryKind === 'post' && row.address)?.address
+    if (postAddress) {
+      if (!postAddress.line1?.trim() || !postAddress.city?.trim()) {
+        throw Object.assign(new Error('Add the shipping address.'), { code: 'VALIDATION', field: 'address', status: 400 })
+      }
+      if (!AUSTRIAN_POSTAL_REGEX.test(postAddress.postalCode?.trim() ?? '')) {
+        throw Object.assign(new Error('Enter a four-digit Austrian postcode.'), { code: 'POSTAL_INVALID', field: 'address.postalCode', status: 400 })
+      }
+    }
+  }
+
   for (const row of rows) {
     const itemId = uid('orn')
     const withName = row.kind === 'custom' && row.withName
-    const cost = itemCost(row.kind, withName, currentPrices())
+    const cost = itemCost(row.kind, withName, prices)
+    const isPost = row.deliveryKind === 'post'
     createdItems.push({
       id: itemId,
       orderId,
@@ -827,13 +1126,21 @@ export function createSale(input: CreateSaleInput): Order {
       productionStatus: row.kind === 'finished' ? 'finished' : 'not_started',
       photos: [],
       formComplete: false,
-      delivery: {
-        kind: row.deliveryKind,
-        marketId: row.marketId,
-        marketDayId: row.marketDayId,
-        pickupHour: row.pickupHour ?? null,
-        address: row.address ?? null,
-      },
+      delivery: isPost
+        ? {
+            kind: 'post',
+            deliveryDate: postWindow!.collectionDate!,
+            arrivalFrom: postWindow!.arrivalFrom,
+            arrivalTo: postWindow!.arrivalTo,
+            address: row.address ?? null,
+          }
+        : {
+            kind: row.deliveryKind,
+            marketId: row.marketId,
+            marketDayId: row.marketDayId,
+            pickupHour: row.pickupHour ?? null,
+            address: row.address ?? null,
+          },
     })
 
     if (row.kind === 'custom') {
@@ -848,11 +1155,11 @@ export function createSale(input: CreateSaleInput): Order {
       const clashExisting = blocksForDate(md.date).some((b) =>
         b.id !== moving?.id && hoursOverlap(row.paintStart!, row.paintEnd!, b.startHour, b.endHour),
       )
-      const deliveryDay = state.marketDays.find((day) => day.id === row.marketDayId)
+      const deliveryDay = isPost ? { date: postWindow!.collectionDate! } : state.marketDays.find((day) => day.id === row.marketDayId)
       const hours = paintingDay(md.date)
       if (row.paintEnd <= row.paintStart || row.paintStart < hours.openHour || row.paintEnd > hours.closeHour ||
         (md.isToday && row.paintStart < DEMO_NOW_HOUR) ||
-        !deliveryDay || row.paintDate > deliveryDay.date ||
+        !deliveryDay || (isPost ? row.paintDate >= deliveryDay.date : row.paintDate > deliveryDay.date) ||
         (row.paintDate === deliveryDay.date && row.deliveryKind === 'market' && row.pickupHour != null && row.paintEnd > row.pickupHour) ||
         (move && destination?.id === md.id && hoursOverlap(row.paintStart, row.paintEnd, move.to.startHour, move.to.endHour))) {
         throw new Error('Choose a paint time before pickup, within working hours.')
@@ -887,6 +1194,7 @@ export function createSale(input: CreateSaleInput): Order {
     }
   }
   if (destination && !state.marketDays.some(day => day.id === destination.id)) state.marketDays.push(destination)
+  const deliveryFee = hasPost ? prices.shippingFee : 0
   const order: Order = {
     id: orderId,
     customerId: customer.id,
@@ -896,7 +1204,8 @@ export function createSale(input: CreateSaleInput): Order {
     paymentState: 'unpaid',
     paymentMethod: null,
     amountPaid: 0,
-    total: createdItems.reduce((sum, item) => sum + item.cost, 0),
+    deliveryFee,
+    total: Math.round((createdItems.reduce((sum, item) => sum + item.cost, 0) + deliveryFee) * 100) / 100,
     createdAt: new Date().toISOString(),
     itemIds: createdItems.map((item) => item.id),
     handedOver: false,
@@ -975,13 +1284,21 @@ export function setItemStatus(orderId: string, itemId: string, status: Productio
   emit()
 }
 
-export function setHandedOver(orderId: string, handedOver: boolean, itemIds?: string[]) {
+export function setHandedOver(orderId: string, handedOver: boolean, itemIds?: string[], trackingNumber?: string | null) {
   const order = requireOrder(orderId)
   if (order.status === 'CANCELLED') throw new Error('This order is cancelled.')
   const items = state.items.filter((i) => i.orderId === orderId)
   const selected = itemIds ? items.filter(i => itemIds.includes(i.id)) : items
   if (itemIds && (!itemIds.length || selected.length !== itemIds.length)) throw new Error('Select valid items from this order.')
   if (handedOver && selected.some(i => i.productionStatus !== 'finished')) throw new Error('Finish all ornaments before marking handed over')
+  if (trackingNumber !== undefined) {
+    const clean = (trackingNumber ?? '').trim() || null
+    if (clean && !TRACKING_NUMBER_REGEX.test(clean)) {
+      throw Object.assign(new Error('Enter a parcel number with 8–40 letters or digits.'), { code: 'VALIDATION', field: 'trackingNumber', status: 400 })
+    }
+    order.trackingNumber = clean
+    order.trackingUrl = postTrackingUrl(clean)
+  }
   for (const item of items) item.handedOver ??= order.handedOver
   for (const item of selected) item.handedOver = handedOver
   const complete = items.length > 0 && items.every(i => i.handedOver)
@@ -992,6 +1309,9 @@ export function setHandedOver(orderId: string, handedOver: boolean, itemIds?: st
 
 function trackStatusFor(order: Order, items: OrderItem[]): TrackView['status'] {
   if (order.status === 'CANCELLED') return 'cancelled'
+  // Like Order.isPostShipped: every Post item handed to the Post.
+  const postItems = items.filter(i => i.delivery.kind === 'post')
+  if (postItems.length && postItems.every(i => i.handedOver ?? order.handedOver)) return 'shipped'
   if (order.handedOver) return 'delivered'
   if (items.every((i) => i.productionStatus === 'finished')) return 'ready'
   return 'preparing'
@@ -1002,7 +1322,8 @@ export function getTrackByCode(code: string): TrackView {
   if (!order) throw Object.assign(new Error('Order not found. Check the code.'), { code: 'ORDER_NOT_FOUND', status: 404 })
   const customer = state.customers.find((c) => c.id === order.customerId)
   const items = state.items.filter((i) => i.orderId === order.id)
-  const first = items[0]
+  // Like TrackingService: a Post item describes the order's handoff when there is one.
+  const first = items.find(i => i.delivery.kind === 'post') ?? items[0]
   const owner = readFormToken(order.code) === order.formToken
     && !(order.handedOver && order.handedOverAt && Date.now() - Date.parse(order.handedOverAt) >= 30 * 86400000)
   const personal = owner || order.code.length >= 9
@@ -1012,18 +1333,30 @@ export function getTrackByCode(code: string): TrackView {
   const day = first?.delivery.marketDayId
     ? state.marketDays.find((d) => d.id === first.delivery.marketDayId)
     : undefined
+  const trackingUrl = postTrackingUrl(order.trackingNumber)
   const when: TrackWhen =
-    first?.delivery.kind === 'vienna'
-      ? { kind: 'vienna', date: first.delivery.deliveryDate ?? null, fromHour: 18, toHour: 20, marketName: null, untilHour: null }
-      : day
-        ? {
-            kind: 'market',
-            date: day.date,
-            fromHour: first.delivery.pickupHour ?? null,
-            marketName: market?.name ?? null,
-            untilHour: day.closeHour,
-          }
-        : { kind: 'unknown', date: null, fromHour: null, marketName: null, untilHour: null }
+    first?.delivery.kind === 'post'
+      ? {
+          kind: 'post',
+          date: first.delivery.deliveryDate ?? day?.date ?? null,
+          arrivalFrom: first.delivery.arrivalFrom ?? null,
+          arrivalTo: first.delivery.arrivalTo ?? null,
+          fromHour: null,
+          toHour: null,
+          marketName: null,
+          untilHour: null,
+        }
+      : first?.delivery.kind === 'vienna'
+        ? { kind: 'vienna', date: first.delivery.deliveryDate ?? day?.date ?? null, fromHour: 18, toHour: 20, marketName: null, untilHour: null }
+        : day
+          ? {
+              kind: 'market',
+              date: day.date,
+              fromHour: first.delivery.pickupHour ?? null,
+              marketName: market?.name ?? null,
+              untilHour: day.closeHour,
+            }
+          : { kind: 'unknown', date: null, fromHour: null, marketName: null, untilHour: null }
 
   return {
     total: order.total,
@@ -1031,6 +1364,7 @@ export function getTrackByCode(code: string): TrackView {
     code: order.code,
     status: trackStatusFor(order, items),
     customerName: personal ? customer?.name.split(' ')[0] ?? '' : '',
+    trackingUrl,
     items: items.map((i) => ({
       color: i.color,
       finish: i.finish,
@@ -1040,6 +1374,10 @@ export function getTrackByCode(code: string): TrackView {
       productionStatus: i.productionStatus,
       withName: i.withName,
       backName: personal ? i.backName : '',
+      deliveryKind: i.delivery.kind,
+      arrivalFrom: i.delivery.arrivalFrom ?? null,
+      arrivalTo: i.delivery.arrivalTo ?? null,
+      handedOver: i.handedOver ?? order.handedOver,
     })),
     delivery: first ? { ...first.delivery, address: owner ? first.delivery.address : undefined } : { kind: 'market' },
     when,
@@ -1063,6 +1401,18 @@ export function getForm(token: string): CustomerFormView {
     handoffs: items.map((row) => {
       const day = state.marketDays.find((entry) => entry.id === row.delivery.marketDayId)
       const market = state.markets.find((entry) => entry.id === row.delivery.marketId)
+      if (row.delivery.kind === 'post') {
+        return {
+          kind: 'post',
+          date: row.delivery.deliveryDate ?? day?.date ?? null,
+          arrivalFrom: row.delivery.arrivalFrom ?? null,
+          arrivalTo: row.delivery.arrivalTo ?? null,
+          fromHour: null,
+          toHour: null,
+          marketName: null,
+          untilHour: null,
+        }
+      }
       return {
         kind: row.delivery.kind === 'vienna' ? 'vienna' : day ? 'market' : 'unknown',
         date: row.delivery.kind === 'vienna' ? row.delivery.deliveryDate ?? day?.date ?? null : day?.date ?? null,
@@ -1072,8 +1422,8 @@ export function getForm(token: string): CustomerFormView {
         untilHour: day?.closeHour ?? null,
       }
     }),
-    needsAddress: items.some((i) => i.delivery.kind === 'vienna'),
-    address: items.find((i) => i.delivery.kind === 'vienna')?.delivery.address ?? null,
+    needsAddress: items.some((i) => i.delivery.kind === 'post' || i.delivery.kind === 'vienna'),
+    address: items.find((i) => i.delivery.kind === 'post' || i.delivery.kind === 'vienna')?.delivery.address ?? null,
     editable: !order.handedOver && items.filter(i => i.kind === 'custom').every((i) => i.productionStatus === 'not_started'),
     withName: items.some((i) => i.withName),
     alreadySubmitted: items.every((i) => i.formComplete),
@@ -1092,9 +1442,15 @@ export function submitForm(token: string, payload: CustomerFormPayload): { order
   if (!customer || !item) throw new Error('Form data missing')
   if (!getForm(token).editable) throw Object.assign(new Error('Form is locked.'), { code: 'FORM_LOCKED', status: 409 })
   if (getForm(token).needsAddress) {
-    if (!payload.address?.line1 || !payload.address.city) throw Object.assign(new Error('Address required.'), { code: 'VALIDATION', field: 'address' })
-    if (!/^1(0[1-9]|1[0-9]|2[0-3])0$/.test(payload.address.postalCode)) throw Object.assign(new Error('Invalid postal code.'), { code: 'POSTAL_OUTSIDE_VIENNA', field: 'address.postalCode' })
-    items.filter(i => i.delivery.kind === 'vienna').forEach(i => { i.delivery.address = payload.address })
+    if (!payload.address?.line1?.trim() || !payload.address?.city?.trim()) throw Object.assign(new Error('Address required.'), { code: 'VALIDATION', field: 'address' })
+    if (!AUSTRIAN_POSTAL_REGEX.test(payload.address.postalCode?.trim() ?? '')) throw Object.assign(new Error('Invalid postal code.'), { code: 'POSTAL_INVALID', field: 'address.postalCode' })
+    const cleanAddress = {
+      line1: payload.address.line1.trim(),
+      ...(payload.address.line2?.trim() ? { line2: payload.address.line2.trim() } : {}),
+      postalCode: payload.address.postalCode.trim(),
+      city: payload.address.city.trim(),
+    }
+    items.filter(i => i.delivery.kind === 'post' || i.delivery.kind === 'vienna').forEach(i => { i.delivery.address = cleanAddress })
   }
   customer.name = payload.customerName.trim()
   customer.phone = payload.phone.trim()

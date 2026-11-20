@@ -38,4 +38,47 @@ for (const locale of ['de', 'en'] as const) {
     await expect(page.locator('#line1, #postal, #city')).toHaveCount(0)
     await axe(page)
   })
+
+  test(`Post order on Track shows arrival range, Versendet/Shipped chip when handed over, and tracking link only with trackingUrl (${locale})`, async ({ page }) => {
+    await page.addInitScript(lang => localStorage.setItem('awg-locale', lang), locale)
+    await page.goto('/track')
+    const order = await page.evaluate(async () => {
+      const path = '/src/api/client.ts'; const { api } = await import(path)
+      const quote = await api.shop.shippingQuote([{ kind: 'custom', withName: false }])
+      const created = await api.shop.checkout({
+        customerName: 'Clara Post', email: 'clara@example.at', phone: '+43 660 1234567',
+        deliveryKind: 'post',
+        address: { line1: 'Getreidegasse 9', postalCode: '5020', city: 'Salzburg' },
+        expectedArrivalTo: quote.arrivalTo,
+        acceptTerms: true,
+        items: [{ kind: 'custom', color: 'red', finish: 'shiny', withName: false, petName: '', photos: [{ id: 'p1', name: 'pet.png', dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' }] }],
+      })
+      const found = await api.orders.getOrderByCode(created.orderCode)
+      const bundle = await api.orders.getOrderBundle(found!.id)
+      return { id: found!.id, itemId: bundle.items[0].id, code: created.orderCode }
+    })
+
+    await page.goto(`/track/${order.code}`)
+    const card = page.locator('section[aria-live]')
+    await expect(card.getByRole('heading', { level: 1 })).toBeVisible()
+    await card.evaluate(node => Promise.all(node.getAnimations().map(animation => animation.finished)))
+    await expect(card).toContainText(locale === 'de' ? 'Versand per Post' : 'Shipping by post')
+    await expect(card).toContainText(locale === 'de' ? 'Zustellung voraussichtlich 3.–4. Dezember' : 'Estimated delivery 3–4 December')
+    await expect(card.getByRole('link', { name: locale === 'de' ? 'Sendung verfolgen' : 'Track parcel' })).toHaveCount(0)
+    await axe(page)
+
+    // Hand over to Post with a parcel tracking number -> chip becomes Versendet / Shipped and tracking link appears.
+    await page.evaluate(async ({ id, itemId }) => {
+      const path = '/src/api/client.ts'; const { api } = await import(path)
+      await api.orders.setItemStatus(id, itemId, 'finished')
+      await api.orders.setHandedOver(id, true, [itemId], '10123456789012345678')
+    }, order)
+    await page.reload()
+    await expect(card.getByRole('heading', { level: 1 })).toBeVisible()
+    await card.evaluate(node => Promise.all(node.getAnimations().map(animation => animation.finished)))
+    await expect(card.locator('[class*="chipDone"]')).toHaveText(locale === 'de' ? 'Versendet' : 'Shipped')
+    const parcelLink = card.getByRole('link', { name: locale === 'de' ? 'Sendung verfolgen' : 'Track parcel', exact: true })
+    await expect(parcelLink).toHaveAttribute('href', 'https://www.post.at/s/sendungsdetails?snr=10123456789012345678')
+    await axe(page)
+  })
 }

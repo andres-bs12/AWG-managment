@@ -109,7 +109,7 @@ class InvoiceApiTests extends ApiTestSupport {
 
     @Test void deliveryWindowIsIncludedInTrackFormConfigAndInvoice() throws Exception {
         String staff = login();
-        UUID id = UUID.fromString(saleOk(staff, customItem(false, TUE, 10.0, 11.0, "vienna", dayId(staff, WED), null)));
+        UUID id = UUID.fromString(legacyViennaOrder(staff, 10.0, false));
         var order = orders.updatePaymentState(id, PaymentState.PAID, PaymentMethod.CASH, null);
         mvc.perform(withIp(get("/api/track/" + order.code()))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.when.kind").value("vienna"))

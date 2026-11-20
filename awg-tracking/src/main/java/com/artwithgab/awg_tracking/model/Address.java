@@ -4,12 +4,14 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** Vienna delivery address. Lives on Order (one address per order). */
+/** Shipping or legacy Vienna delivery address. Lives on Order (one address per order). */
 @Embeddable
 @Getter
+@EqualsAndHashCode
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor

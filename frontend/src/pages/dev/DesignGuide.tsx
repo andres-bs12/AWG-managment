@@ -36,7 +36,7 @@ import { BuyDateStep } from '../public/buy/BuyDateStep'
 import { BuyContactStep } from '../public/buy/BuyContactStep'
 import { BuyPetStep } from '../public/buy/BuyPetStep'
 import { BuyReviewStep } from '../public/buy/BuyReviewStep'
-import { guideConfig, guideDates, guideDraft, guideItem } from '../../api/fixtures/designGuide'
+import { guideConfig, guideDraft, guideItem, guideQuote } from '../../api/fixtures/designGuide'
 import type { BuyItem } from '../../lib/buyDraft'
 import type { BuyStepProps } from '../public/buy/shared'
 import { contrastRatio } from '../../lib/contrast.mjs'
@@ -91,7 +91,7 @@ function Primitives() {
     <Fixture title="ChoiceList" source="components/ui/ChoiceList.tsx · §7.3" states><ChoiceList legend={t('shopColour')} value={choice} onChange={setChoice} name="guide-choice" choices={[{ value: 'red', title: t('colorRed'), body: t('previewDisclaimer') }, { value: 'green', title: t('colorGreen') }]} /><p>{t('guideUnsupportedStates')}</p></Fixture>
     <Fixture title="SegmentedControl" source="components/ui/SegmentedControl.tsx · §7.4" states><SegmentedControl tone="public" legend={t('previewSide')} value={segment} onChange={setSegment} options={[{ value: 'front', label: t('previewFront') }, { value: 'back', label: t('previewBack') }]} name="guide-side" /></Fixture>
     <Fixture title="Field" source="components/ui/Field.tsx · §7.5" states>{(['default', 'disabled', 'error', 'busy'] as const).map(state => <Field key={state} label={t('yourName')} htmlFor={`guide-field-${state}`} hint={t('phoneHint')} error={state === 'error' ? t('required') : undefined}><input id={`guide-field-${state}`} disabled={state === 'disabled' || state === 'busy'} aria-busy={state === 'busy'} /></Field>)}<Field label={t('noteLabel')} htmlFor="guide-textarea"><textarea id="guide-textarea" /></Field><Field label={t('shopColour')} htmlFor="guide-select"><select id="guide-select"><option>{t('colorRed')}</option><option>{t('colorGreen')}</option></select></Field></Fixture>
-    <Fixture title="HelpTip" source="components/ui/HelpTip.tsx · §7.6" states><div className={styles.row}>{t('shopCity')}<HelpTip label={t('explainVienna')}>{t('viennaHelp')}</HelpTip></div><div className={styles.row}>{t('shopFinish')}<HelpTip label={t('explainFinishes')}>{t('finishExplanation')}</HelpTip></div></Fixture>
+    <Fixture title="HelpTip" source="components/ui/HelpTip.tsx · §7.6" states><div className={styles.row}>{t('shopFinish')}<HelpTip label={t('explainFinishes')}>{t('finishExplanation')}</HelpTip></div></Fixture>
     <Fixture title="ProgressSteps" source="components/ui/ProgressSteps.tsx · §7.13">{[0, 1, 2, 3].map(current => <ProgressSteps key={current} labels={[t('paidTimeline'), t('paintingTimeline'), t('deliveryTimeline')]} current={current} label={t('shopProgress')} />)}</Fixture>
   </div></section>
 }
@@ -115,7 +115,7 @@ function ShopFixture() {
     described: key => state === 'error' ? `${key}-error` : undefined,
     photoErrors: state === 'upload-error' ? { [active.uid]: t('photoInvalid') } : {},
     addFiles: async uid => patchItem(uid, { photos: Array.from({ length: Math.min(6, photos + 1) }, (_, i) => ({ id: `guide-photo-${i}`, name: 'reference.png', dataUrl: referencePhoto })) }),
-    dates: state === 'empty' ? [] : guideDates, datesState: state === 'loading' ? 'loading' : state === 'network-error' ? 'error' : 'ready', setDatesRetry, pickupDays: [], pickupState: 'idle',
+    shippingQuote: state === 'empty' ? { available: false, collectionDate: null, arrivalFrom: null, arrivalTo: null } : guideQuote, shippingState: state === 'loading' ? 'loading' : state === 'network-error' ? 'error' : 'ready', setDatesRetry, pickupDays: [], pickupState: 'idle',
     formatDate: date => new Intl.DateTimeFormat(locale === 'de' ? 'de-AT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${date}T12:00:00`)),
     serverError: state === 'error' ? t('shopCheckoutError') : '',
   }

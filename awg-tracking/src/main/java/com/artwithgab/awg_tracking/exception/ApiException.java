@@ -9,6 +9,7 @@ public abstract class ApiException extends RuntimeException {
     private String code;
     /** Request property the error belongs to, e.g. "address.postalCode". */
     private String field;
+    private String reason;
 
     protected ApiException(HttpStatus status, String message) {
         super(message);
@@ -27,6 +28,15 @@ public abstract class ApiException extends RuntimeException {
     public ApiException field(String field) {
         this.field = field;
         return this;
+    }
+
+    public ApiException reason(String reason) {
+        this.reason = reason;
+        return this;
+    }
+
+    public String getReason() {
+        return reason;
     }
 
     public String getCode() {

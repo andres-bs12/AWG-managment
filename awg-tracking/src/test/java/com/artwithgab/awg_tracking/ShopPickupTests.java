@@ -91,6 +91,22 @@ class ShopPickupTests extends ApiTestSupport {
     }
 
     @Test
+    void makeRoomCanMoveAWebPickupBlockWithoutChangingThePickup() throws Exception {
+        String token = login();
+        var checkout = checkout(SAT, "15:30", null);
+        assertThat(checkout.getResponse().getStatus()).isEqualTo(200);
+        var order = orderRepository.findByCodeIgnoreCase(read(checkout, "$.orderCode")).orElseThrow();
+        var item = order.getOrderItems().getFirst();
+        assertThat(item.getPaintStart().toLocalTime()).isEqualTo(LocalTime.NOON);
+
+        mvc.perform(post("/api/agenda/blocks/{id}/make-room", item.getId()).header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.moved[0].to.startHour").value(13.0));
+        assertThat(item.getHandoffDate()).isEqualTo(LocalDate.parse(SAT));
+        assertThat(item.getPickUpTime()).isEqualTo(LocalTime.of(15, 30));
+    }
+
+    @Test
     void pickupTimeMustBeOnTheHalfHourWhileTheStallIsOpen() throws Exception {
         for (String time : new String[] {"11:30", "18:45", "19:00", "15:10"}) {
             MvcResult res = checkout("2026-11-28", time, null);
@@ -110,10 +126,10 @@ class ShopPickupTests extends ApiTestSupport {
     }
 
     @Test
-    void viennaDeliveryStillNeedsAnAddress() throws Exception {
+    void postShippingNeedsAnAddress() throws Exception {
         var req = multipart("/api/shop/checkout");
         Map<String, Object> payload = Map.of("customerName", "Eva Gruber", "email", "eva@example.com", "phone", "+43 1 234",
-                "deliveryDate", "2026-12-02", "acceptTerms", true,
+                "expectedArrivalTo", "2026-12-04", "acceptTerms", true,
                 "items", List.of(Map.of("kind", "custom", "withName", false, "color", "red", "finish", "shiny", "petName", "Luna",
                         "photos", List.of(Map.of("id", "p0", "name", "luna.jpg")))));
         req.file(new MockMultipartFile("photo-p0", "luna.jpg", "image/jpeg", JPEG));

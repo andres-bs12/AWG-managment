@@ -10,6 +10,7 @@ import { petNameFromBack } from '../../lib/petName'
 import { phoneValid } from '../../lib/phone'
 import { formatDateLabel, formatHour } from '../../lib/time'
 import { deliveryDatePhrase } from '../../lib/deliveryWindow'
+import { AUSTRIAN_POSTAL_REGEX, formatArrivalRange } from '../../lib/postShipping'
 import { formDraftKey, restoreFormDraft, serializeFormDraft, type FormDraft, type FormItemDraft } from '../../lib/formDraft'
 import { PublicPage, PageHeader, PublicState, ErrorSummary, FormActions } from '../../components/public/PublicForm'
 import shell from '../../components/public/PublicForm.module.css'
@@ -25,7 +26,7 @@ import styles from './FormPage.module.css'
 
 type Step = 'details' | 'review'
 type Terminal = 'expired' | 'invalid' | 'locked' | null
-const empty: FormDraft = { customerName: '', phone: '', email: '', address: { line1: '', line2: '', postalCode: '', city: 'Wien' }, items: [] }
+const empty: FormDraft = { customerName: '', phone: '', email: '', address: { line1: '', line2: '', postalCode: '', city: '' }, items: [] }
 function targets(view: CustomerFormView): OrderItem[] {
   const custom = (view.items ?? [view.item]).filter(item => item.kind === 'custom')
   return custom.length ? custom : [view.item]
@@ -117,10 +118,12 @@ function CustomerForm({ token }: { token: string }) {
     const index = allItems.findIndex(item => ['pet', 'back', 'photos', 'note'].some(prefix => id === `${prefix}-${item.id}`))
     return [id, `${message}${allItems.length > 1 && index >= 0 ? ` · ${t('ornamentN', { n: index + 1 })}` : ''}`]
   }))
-  const handoffs = [...new Set((view?.handoffs ?? []).map(handoff => handoff.kind === 'vienna'
-    ? [t('whenVienna'), handoff.date ? deliveryDatePhrase(handoff.date, locale) : ''].filter(Boolean).join(' · ')
-    : handoff.kind === 'unknown' ? t('whenTbd')
-      : [handoff.marketName, handoff.date ? formatDateLabel(handoff.date, locale === 'de' ? 'de-AT' : 'en-GB') : '', handoff.fromHour != null ? t('whenFrom', { time: formatHour(handoff.fromHour) }) : ''].filter(Boolean).join(' · ')))]
+  const handoffs = [...new Set((view?.handoffs ?? []).map(handoff => handoff.kind === 'post'
+    ? [t('methodPost'), handoff.arrivalFrom && handoff.arrivalTo ? t('estimatedArrivalPhrase', { range: formatArrivalRange(handoff.arrivalFrom, handoff.arrivalTo, locale) }) : ''].filter(Boolean).join(' · ')
+    : handoff.kind === 'vienna'
+      ? [t('whenVienna'), handoff.date ? deliveryDatePhrase(handoff.date, locale) : ''].filter(Boolean).join(' · ')
+      : handoff.kind === 'unknown' ? t('whenTbd')
+        : [handoff.marketName, handoff.date ? formatDateLabel(handoff.date, locale === 'de' ? 'de-AT' : 'en-GB') : '', handoff.fromHour != null ? t('whenFrom', { time: formatHour(handoff.fromHour) }) : ''].filter(Boolean).join(' · ')))]
 
   function clear(ids: string[]) {
     setValidFields(current => current.filter(id => !ids.includes(id)))
@@ -154,8 +157,8 @@ function CustomerForm({ token }: { token: string }) {
     else if (!phoneValid(draft.phone)) found['form-phone'] = 'phoneInvalid'
     if (view?.needsAddress) {
       if (!draft.address.line1.trim()) found['form-line1'] = 'formNeedStreet'
-      if (!/^1(0[1-9]|1[0-9]|2[0-3])0$/.test(draft.address.postalCode.trim())) found['form-postal'] = 'shopPostalInvalid'
-      if (!draft.address.city.trim()) found['form-city'] = 'required'
+      if (!AUSTRIAN_POSTAL_REGEX.test(draft.address.postalCode.trim())) found['form-postal'] = 'shopPostalInvalid'
+      if (!draft.address.city.trim()) found['form-city'] = 'formNeedCity'
     }
     return found
   }

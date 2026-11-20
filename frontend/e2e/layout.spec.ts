@@ -3,7 +3,7 @@ import { open, choose, pet, next, axe, expectActionClearance, expectDocumentScro
 
 test('contact fields have labels, single-column spacing and aligned postcode and city', async ({ page }) => {
   await open(page); await choose(page); await pet(page); await next(page).click()
-  for (const id of ['buy-name', 'buy-email', 'buy-phone', 'buy-line1', 'buy-line2', 'buy-postal']) {
+  for (const id of ['buy-name', 'buy-email', 'buy-phone', 'buy-line1', 'buy-line2', 'buy-postal', 'buy-city']) {
     const input = page.locator(`#${id}`)
     const label = page.locator(`label[for="${id}"]`)
     await expect(label).toBeVisible()
@@ -12,10 +12,10 @@ test('contact fields have labels, single-column spacing and aligned postcode and
   }
   const email = await page.locator('#buy-email').boundingBox(), phone = await page.locator('#buy-phone').boundingBox()
   expect(phone!.y).toBeGreaterThan(email!.y + email!.height)
-  const postal = await page.locator('#buy-postal').boundingBox(), city = await page.locator('[class*="cityValue"]').boundingBox()
+  const postal = await page.locator('#buy-postal').boundingBox(), city = await page.locator('#buy-city').boundingBox()
   expect(Math.abs(postal!.y - city!.y)).toBeLessThanOrEqual(1)
-  await page.locator('#buy-postal').fill('9999'); await page.locator('#buy-postal').blur()
-  const postalError = await page.locator('#buy-postal').boundingBox(), cityError = await page.locator('[class*="cityValue"]').boundingBox()
+  await page.locator('#buy-postal').fill('0123'); await page.locator('#buy-postal').blur()
+  const postalError = await page.locator('#buy-postal').boundingBox(), cityError = await page.locator('#buy-city').boundingBox()
   expect(Math.abs(postalError!.y - cityError!.y)).toBeLessThanOrEqual(1)
 })
 

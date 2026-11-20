@@ -15,6 +15,7 @@ import com.artwithgab.awg_tracking.enums.DeliveryKind;
 import com.artwithgab.awg_tracking.enums.ItemKind;
 import com.artwithgab.awg_tracking.model.*;
 import com.artwithgab.awg_tracking.support.Hours;
+import com.artwithgab.awg_tracking.support.AustrianPost;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -90,7 +91,7 @@ public class ViewMapper {
                 o.isPaymentReview(),
                 List.of(),
                 o.getCheckoutStatus() == null ? null : o.getCheckoutStatus().name().toLowerCase(java.util.Locale.ROOT),
-                o.getSource());
+                o.getSource(), o.getTrackingNumber(), AustrianPost.trackingUrl(o.getTrackingNumber()));
     }
 
     /** Day the item is handed off, resolved against the calendar. */
@@ -109,7 +110,8 @@ public class ViewMapper {
                 market ? day.map(d -> d.getMarket().getId().toString()).orElse(null) : null,
                 day.map(d -> d.getId().toString()).orElse(null),
                 item.getPickUpTime() == null ? null : Hours.of(item.getPickUpTime()),
-                market ? null : address(item.getOrder().getDeliveryAddress()));
+                market ? null : address(item.getOrder().getDeliveryAddress()),
+                item.getHandoffDate(), item.getArrivalFrom(), item.getArrivalTo());
     }
 
     public OrderItemDto item(OrderItem i, CalendarIndex index) {
@@ -151,10 +153,14 @@ public class ViewMapper {
     }
 
     public TrackWhenDto when(OrderItem item, CalendarIndex index) {
+        if (item.getDeliveryKind() == DeliveryKind.POST) {
+            return new TrackWhenDto("post", item.getHandoffDate().toString(), null, null, null, null,
+                    item.getArrivalFrom(), item.getArrivalTo());
+        }
         if (item.getDeliveryKind() == DeliveryKind.DELIVERY) {
             return new TrackWhenDto("vienna", item.getHandoffDate().toString(),
                     Hours.of(properties.shop().deliveryWindowStart()), null, null,
-                    Hours.of(properties.shop().deliveryWindowEnd()));
+                    Hours.of(properties.shop().deliveryWindowEnd()), null, null);
         }
         return handoffDay(item, index)
                 .map(day -> new TrackWhenDto(

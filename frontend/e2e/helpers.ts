@@ -28,9 +28,7 @@ export async function choose(page: Page, color = /^(Rot|Red)$/, finish = /^(Glä
   }
 }
 export async function chooseFirstDate(page: Page) {
-  const radio = page.locator('input[name="delivery-date"]').first()
-  await radio.locator('..').click()
-  await expect(radio).toBeChecked()
+  await expect(page.locator('#buy-date')).toBeVisible()
 }
 export async function pet(page: Page, name = 'Luna') {
   // There is no pet-name field: a name is only asked for when it is painted on the back.
@@ -47,6 +45,7 @@ export async function delivery(page: Page) {
   await page.locator('#buy-phone').fill('123456789')
   await page.locator('#buy-line1').fill('Hauptstraße 1')
   await page.locator('#buy-postal').fill('1010')
+  await page.locator('#buy-city').fill('Wien')
 }
 export async function review(page: Page) { await delivery(page); await next(page).click(); await expect(page.locator('#buy-terms')).toBeVisible() }
 export async function axe(page: Page) {

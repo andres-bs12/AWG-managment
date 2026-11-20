@@ -11,7 +11,7 @@ import java.time.LocalTime;
 import java.util.List;
 
 /**
- * Web order. {@code deliveryKind} is "vienna" (default; needs {@code address}, Wed/Fri) or "market"
+ * Web order. {@code deliveryKind} is "post" (default; needs {@code address} and {@code expectedArrivalTo}) or "market"
  * (pickup at the stall on {@code deliveryDate} at {@code pickupTime}; no address, no delivery fee).
  * Photos come as multipart parts named photo-{id}.
  */
@@ -20,7 +20,8 @@ public record CheckoutRequest(
         @NotBlank @Email @Size(max = 200) String email,
         @NotBlank @Size(max = 40) String phone,
         @Valid AddressDto address,
-        @NotNull LocalDate deliveryDate,
+        LocalDate deliveryDate,
+        LocalDate expectedArrivalTo,
         DeliveryKind deliveryKind,
         LocalTime pickupTime,
         @NotEmpty @Size(max = 10) @Valid List<ShopItemRequest> items,

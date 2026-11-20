@@ -14,6 +14,7 @@ import { ButtonLink } from '../../components/ui/ButtonLink'
 import { useLocale } from '../../i18n/LocaleContext'
 import { formatDateLabel, formatHour } from '../../lib/time'
 import { deliveryDatePhrase } from '../../lib/deliveryWindow'
+import { formatArrivalRange, TRACKING_BASE_URL } from '../../lib/postShipping'
 import type { TrackView } from '../../domain/types'
 import styles from './TrackPage.module.css'
 
@@ -103,18 +104,29 @@ export function TrackPage() {
   }, [formSaved, phase])
 
   const status = view?.status ?? 'preparing'
+  const isPost = view?.when.kind === 'post' || view?.delivery?.kind === 'post'
+  const done = status === 'shipped' || status === 'delivered'
   const statusLabel =
-    status === 'cancelled' ? t('orderCancelled') : status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
-  const stepIndex = status === 'delivered' ? 2 : status === 'ready' ? 1 : 0
-  const steps = [t('stepPainting'), t('ready'), t('stepHandover')]
+    status === 'cancelled' ? t('orderCancelled') : status === 'shipped' ? t('shipped') : status === 'delivered' ? t('delivered') : status === 'ready' ? t('ready') : t('preparing')
+  const stepIndex = done ? 2 : status === 'ready' ? 1 : 0
+  const steps = [t('stepPainting'), t('ready'), isPost ? t('shipped') : t('stepHandover')]
   /** Sleigh only after a hit — misses use the page recovery state without this animation. */
   const showWipe = phase === 'loading' || phase === 'leaving'
 
-  /** Two short lines: the slot the customer picked, then how long the stall is still around. */
+  /** Two short lines: the slot or arrival range, then how long the stall is still around. */
   const whenLines: string[] = []
+  // The server builds the link; only ever follow the Post's own tracking page.
+  const trackingUrl = view?.trackingUrl?.startsWith(TRACKING_BASE_URL) ? view.trackingUrl : null
   if (view) {
     const when = view.when
-    if (when.kind === 'vienna') {
+    if (isPost) {
+      whenLines.push(t('methodPost'))
+      const arrivalFrom = when.arrivalFrom ?? view.delivery?.arrivalFrom ?? view.items[0]?.arrivalFrom
+      const arrivalTo = when.arrivalTo ?? view.delivery?.arrivalTo ?? view.items[0]?.arrivalTo
+      if (arrivalFrom && arrivalTo) {
+        whenLines.push(t('estimatedArrivalPhrase', { range: formatArrivalRange(arrivalFrom, arrivalTo, locale) }))
+      }
+    } else if (when.kind === 'vienna') {
       // What on the first line, when on the second.
       whenLines.push(t('whenVienna'))
       if (when.date) whenLines.push(deliveryDatePhrase(when.date, locale))
@@ -132,6 +144,11 @@ export function TrackPage() {
     }
     if (whenLines.length === 0) whenLines.push(t('whenTbd'))
   }
+
+  // Track has no fee field: for Post orders the difference between total and ornaments is the shipping line.
+  const itemsSum = view ? view.items.reduce((sum, item) => sum + (item.cost ?? 0), 0) : 0
+  const shippingFee = view && isPost && view.total != null && view.items.every(item => item.cost != null) && view.total - itemsSum > 0.005
+    ? Math.round((view.total! - itemsSum) * 100) / 100 : undefined
 
   // The form was saved even if loading the order fails: both cards confirm it, at the card's content width.
   const savedBanner = formSaved ? <p ref={savedNotice} tabIndex={-1} className={styles.savedBanner} role="status">{t('formSavedBanner')}</p> : null
@@ -154,7 +171,7 @@ export function TrackPage() {
           <div className={styles.details}>
             <span
               className={`${styles.chip} ${
-                status === 'cancelled' ? '' : status === 'preparing' ? styles.chipWork : status === 'delivered' ? styles.chipDone : styles.chipReady
+                status === 'cancelled' ? '' : status === 'preparing' ? styles.chipWork : done ? styles.chipDone : styles.chipReady
               }`}
             >
               {statusLabel}
@@ -174,12 +191,17 @@ export function TrackPage() {
                 <dt>{t('pickupWhen')}</dt>
                 <dd>
                   {whenLines[0]}
-                  {whenLines[1] ? <span className={styles.whenExtra}>{whenLines[1]}</span> : null}
+                  {whenLines[1] ? <span className={styles.whenExtra}>{whenLines[1].split(/(\d+\.?–\d+\.?)/).map((part, i) => i % 2 === 1 ? <span key={i} className={styles.noBreak}>{part}</span> : part)}</span> : null}
+                  {trackingUrl ? (
+                    <a className={styles.trackingLink} href={trackingUrl} target="_blank" rel="noopener noreferrer">
+                      {t('trackParcel')}
+                    </a>
+                  ) : null}
                 </dd>
               </div>}
             </dl>
 
-            <OrderReceipt items={view.items} total={view.total} paymentState={view.paymentState} />
+            <OrderReceipt items={view.items} total={view.total} paymentState={view.paymentState} shipping={shippingFee} />
 
             <a className={styles.instagram} href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer">
               <InstagramIcon className={styles.instagramIcon} />

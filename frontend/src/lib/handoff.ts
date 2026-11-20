@@ -12,6 +12,9 @@ export function handoffDate(delivery: Delivery, days: MarketDay[]): string | nul
 /** Short staff label: when this ornament is handed off (not the paint slot). */
 export function handoffLabel(item: Pick<OrderItem, 'delivery'>, days: MarketDay[]): string {
   const date = handoffDate(item.delivery, days) ?? item.delivery.deliveryDate ?? null
+  if (item.delivery.kind === 'post') {
+    return date ? `Post · ${formatDateLabel(date)}` : 'Post · Date pending'
+  }
   if (item.delivery.kind === 'vienna') {
     return date ? `Vienna · ${formatDateLabel(date)}` : 'Vienna · Date pending'
   }

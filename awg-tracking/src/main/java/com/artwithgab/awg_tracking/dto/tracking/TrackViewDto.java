@@ -8,8 +8,8 @@ import java.util.List;
 
 /**
  * Mirrors `TrackView`. Public: only the first name, pet names and handoff info. No phone or email;
- * the address is returned only so the customer sees what they entered.
- * status: preparing | ready | delivered.
+ * a legacy Vienna address is returned only to the form token holder.
+ * status: preparing | ready | shipped | delivered | cancelled.
  */
 public record TrackViewDto(
         BigDecimal total,
@@ -19,6 +19,7 @@ public record TrackViewDto(
         String customerName,
         List<TrackItemDto> items,
         DeliveryDto delivery,
-        TrackWhenDto when
+        TrackWhenDto when,
+        String trackingUrl
 ) {
 }

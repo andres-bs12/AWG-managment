@@ -1,6 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import type { ShopDeliveryDate } from '../src/domain/types'
-import { choose, delivery, mobile, next, open, pet, photo, review } from './helpers'
+import type { ShippingQuote } from '../src/domain/types'
+import { choose, delivery, next, open, pet, photo, review } from './helpers'
 
 // Check the actual focused control, including clipping and sticky overlays. Do
 // not scroll it into view here: that would conceal a broken keyboard tab order.
@@ -142,20 +142,11 @@ test.describe('desktop keyboard checkout', () => {
     await expect(page.locator('#buy-heading')).toHaveText('Lieferung')
     await expect(page.locator('#buy-heading')).toBeFocused()
 
-    const days = page.locator('input[name="delivery-date"]')
-    await expect(days.nth(1)).toBeAttached()
-    await tabTo(page, days.first())
-    await page.keyboard.press('ArrowRight')
-    await expect(days.nth(1)).toBeChecked()
-    await expect(days.nth(1)).toBeFocused()
-    await expectVisibleFocus(page)
-    await page.keyboard.press('Enter')
-    await expect(days.nth(1)).toBeChecked()
-    await expect(days.nth(1)).toBeFocused()
+    await expect(page.locator('#buy-date')).toContainText('Do, 3. – Fr, 4. Dezember')
     await expect(page.locator('#buy-date-error')).toHaveCount(0)
     for (const [id, value] of Object.entries({
       'buy-name': 'Alex Example', 'buy-email': 'alex@example.com', 'buy-phone': '+43 123456789',
-      'buy-line1': 'Hauptstraße 1', 'buy-line2': 'Stiege 2, Tür 3', 'buy-postal': '1010',
+      'buy-line1': 'Hauptstraße 1', 'buy-line2': 'Stiege 2, Tür 3', 'buy-postal': '1010', 'buy-city': 'Wien',
     })) await typeInto(page, page.locator(`#${id}`), value)
     await continueByKeyboard(page, 'Space')
     await expect(page.locator('#buy-heading')).toHaveText('Prüfen & bezahlen')
@@ -166,7 +157,7 @@ test.describe('desktop keyboard checkout', () => {
     const pay = page.getByRole('button', { name: /^Zahlungspflichtig bestellen/ })
     await tabTo(page, pay)
     await expect(pay).toBeEnabled()
-    await expect(page.locator('main')).toContainText('62,98')
+    await expect(page.locator('main')).toContainText('67,98')
     await expect(page).toHaveURL(/\/buy$/)
   })
 })
@@ -219,8 +210,9 @@ test('Tab and Shift+Tab exclude collapsed notes and the native file input', asyn
   await tabTo(page, page.locator('summary'), true)
 })
 
-const dates: ShopDeliveryDate[] = ['2026-12-02', '2026-12-09', '2026-12-16'].map(date => ({ date, weekday: 'Wednesday' }))
-const datesEndpoint = '**/api/shop/delivery-dates'
+const initialQuote: ShippingQuote = { available: true, collectionDate: '2026-12-01', arrivalFrom: '2026-12-03', arrivalTo: '2026-12-04' }
+const shiftedQuote: ShippingQuote = { available: true, collectionDate: '2026-12-04', arrivalFrom: '2026-12-09', arrivalTo: '2026-12-10' }
+const quoteEndpoint = '**/api/shop/shipping-quote'
 
 // Reuse the real HTTP adapter for availability and checkout while all other
 // services remain in mock mode, matching the success spec's API-boundary setup.
@@ -230,25 +222,25 @@ async function useHttpAvailability(page: Page) {
     const httpPath = '/src/api/http/services.ts'
     const { api } = await import(clientPath)
     const { httpApi } = await import(httpPath)
-    api.shop.listDeliveryDates = httpApi.shop.listDeliveryDates
+    api.shop.shippingQuote = httpApi.shop.shippingQuote
     api.shop.checkout = httpApi.shop.checkout
   })
 }
 
 for (const locale of ['de', 'en'] as const) {
-  test(`unavailable date before payment reopens the calendar and keeps every other answer (${locale})`, async ({ page }) => {
+  test(`shifted shipping window before payment reopens delivery and keeps every other answer (${locale})`, async ({ page }) => {
     await open(page, locale)
-    let unavailable = false
+    let shifted = false
     let rechecks = 0
     let checkouts = 0
-    await page.route(datesEndpoint, async route => {
+    await page.route(quoteEndpoint, async route => {
       expect(route.request().method()).toBe('POST')
       expect(route.request().postDataJSON()).toEqual({ items: [{ kind: 'custom', withName: expect.any(Boolean) }] })
-      if (unavailable) {
+      if (shifted) {
         expect(route.request().postDataJSON()).toEqual({ items: [{ kind: 'custom', withName: true }] })
         rechecks++
       }
-      await route.fulfill({ json: unavailable ? dates.slice(1) : dates })
+      await route.fulfill({ json: shifted ? shiftedQuote : initialQuote })
     })
     await page.route('**/api/shop/checkout', async route => {
       checkouts++
@@ -268,30 +260,20 @@ for (const locale of ['de', 'en'] as const) {
     await next(page).click()
     await expect(page.locator('#buy-terms')).toBeVisible()
     await page.locator('#buy-terms').check()
-    const before = await page.evaluate(() => JSON.parse(sessionStorage.getItem('awg-buy-draft')!))
-    expect(before.deliveryDate).toBe('2026-12-02')
-    unavailable = true
+    shifted = true
     await page.locator('form button[type=submit]').click()
     await expect.poll(() => rechecks).toBe(1)
     const message = locale === 'de'
-      ? 'Dieser Liefertag ist nicht mehr verfügbar. Bitte wähle einen anderen.'
-      : 'This delivery day is no longer available. Please choose another.'
+      ? 'Der voraussichtliche Zustellzeitraum hat sich geändert. Bitte prüfe ihn und versuche es erneut.'
+      : 'The estimated delivery dates have changed. Please review them and try again.'
     await expect(page.locator('#buy-date-error')).toHaveText(message)
     await expect(page.locator('#buy-date')).toBeFocused()
     await expect(page.locator('#buy-date')).toHaveAttribute('aria-describedby', 'buy-date-error')
-    await expect(page.locator('input[name="delivery-date"]')).toHaveCount(2)
-    await expect(page.getByRole('radio', { name: /^(Mittwoch|Wednesday),? 2[. ]/ })).toHaveCount(0)
-    await expect(page.locator('input[name="delivery-date"]:checked')).toHaveCount(0)
-    await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('awg-buy-draft')!))).toEqual({ ...before, deliveryDate: '' })
-    for (const [id, value] of Object.entries({ 'buy-name': 'Alex Example', 'buy-email': 'alex@example.com', 'buy-phone': '123456789', 'buy-line1': 'Hauptstraße 1', 'buy-line2': 'Stiege 2, Tür 3', 'buy-postal': '1010' })) {
+    await expect(page.locator('#buy-date')).toContainText(locale === 'de' ? 'Mi, 9. – Do, 10. Dezember' : 'Wed 9 – Thu 10 December')
+    for (const [id, value] of Object.entries({ 'buy-name': 'Alex Example', 'buy-email': 'alex@example.com', 'buy-phone': '123456789', 'buy-line1': 'Hauptstraße 1', 'buy-line2': 'Stiege 2, Tür 3', 'buy-postal': '1010', 'buy-city': 'Wien' })) {
       await expect(page.locator(`#${id}`)).toHaveValue(value)
     }
     expect(checkouts).toBe(0)
-    const replacement = page.locator('input[name="delivery-date"]').first()
-    await tabTo(page, replacement)
-    await page.keyboard.press('Enter')
-    await expect(replacement).toBeChecked()
-    await expect(page.locator('#buy-date-error')).toHaveCount(0)
     await next(page).click()
     await expect(page.locator('#buy-terms')).toBeChecked()
     // The name appears once, in the card title; the body only says that a name is painted.
@@ -357,7 +339,7 @@ test('failed availability recheck keeps review editable and retryable without cr
   await page.locator('#buy-terms').check()
   const saved = await page.evaluate(() => sessionStorage.getItem('awg-buy-draft'))
   let checkouts = 0
-  await page.route(datesEndpoint, route => route.abort('failed'))
+  await page.route(quoteEndpoint, route => route.abort('failed'))
   await page.route('**/api/shop/checkout', async route => { checkouts++; await route.fulfill({ status: 503 }) })
   await useHttpAvailability(page)
   await page.locator('form button[type=submit]').click()

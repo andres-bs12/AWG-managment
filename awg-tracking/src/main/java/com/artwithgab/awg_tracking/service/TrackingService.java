@@ -14,6 +14,7 @@ import com.artwithgab.awg_tracking.exception.ResourceNotFoundException;
 import com.artwithgab.awg_tracking.model.Order;
 import com.artwithgab.awg_tracking.model.OrderItem;
 import com.artwithgab.awg_tracking.repository.OrderRepository;
+import com.artwithgab.awg_tracking.support.AustrianPost;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -73,7 +74,9 @@ public class TrackingService {
     }
 
     private static DeliveryDto withoutAddressUnless(DeliveryDto d, boolean include) {
-        return include ? d : new DeliveryDto(d.kind(), d.marketId(), d.marketDayId(), d.pickupHour(), null);
+        return include && d.kind() == DeliveryKind.DELIVERY ? d
+                : new DeliveryDto(d.kind(), d.marketId(), d.marketDayId(), d.pickupHour(), null,
+                        d.deliveryDate(), d.arrivalFrom(), d.arrivalTo());
     }
 
     /** Codes generated before 2026-11-05 have fewer than 6 characters after "AWG". */
@@ -92,8 +95,10 @@ public class TrackingService {
     private TrackViewDto view(Order order, boolean owner) {
         CalendarIndex index = calendarService.snapshot();
         List<OrderItem> items = order.getOrderItems();
-        OrderItem first = items.isEmpty() ? null : items.getFirst();
-        String status = order.isCancelled() ? "cancelled" : order.isHandedOver() ? "delivered"
+        OrderItem first = order.postItems().stream().findFirst()
+                .orElse(items.isEmpty() ? null : items.getFirst());
+        boolean shipped = order.isPostShipped();
+        String status = order.isCancelled() ? "cancelled" : shipped ? "shipped" : order.isHandedOver() ? "delivered"
                 : items.stream().allMatch(i -> i.getProductionStatus() == ProductionStatus.FINISHED) ? "ready" : "preparing";
         // Empty when unknown: the client shows a generic greeting in its own language.
         String name = order.getCustomer().publicName();
@@ -110,8 +115,9 @@ public class TrackingService {
                 firstName,
                 items.stream().map(i -> new TrackItemDto(i.getCustomColor(), i.getCustomFinish(), i.getCost(),
                         personal ? ViewMapper.nz(i.getPetName()) : "", i.getItemKind(), i.getProductionStatus(), i.isWithName(),
-                        personal ? ViewMapper.nz(i.getNameInOrnament()) : "")).toList(),
+                        personal ? ViewMapper.nz(i.getNameInOrnament()) : "", i.getDeliveryKind(),
+                        i.getArrivalFrom(), i.getArrivalTo(), i.isHandedOver())).toList(),
                 first == null ? null : withoutAddressUnless(mapper.delivery(first, index), owner),
-                when);
+                when, personal ? AustrianPost.trackingUrl(order.getTrackingNumber()) : null);
     }
 }

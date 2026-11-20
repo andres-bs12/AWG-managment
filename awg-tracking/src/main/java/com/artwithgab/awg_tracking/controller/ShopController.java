@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Public web shop (Vienna delivery, Stripe Checkout). */
+/** Public web shop (Stripe Checkout). */
 @RestController
 @RequestMapping("/api/shop")
 @RequiredArgsConstructor
@@ -39,14 +39,14 @@ public class ShopController {
         return shopService.config();
     }
 
-    @PostMapping("/delivery-dates")
-    public List<DeliveryDateDto> deliveryDates(@Valid @RequestBody DeliveryDatesRequest body, HttpServletRequest request) {
+    @PostMapping("/shipping-quote")
+    public ShippingWindowDto shippingQuote(@Valid @RequestBody ShopItemsRequest body, HttpServletRequest request) {
         rateLimiter.check("shop-dates", request.getRemoteAddr(), 30);
-        return shopService.deliveryDates(body.items());
+        return shopService.shippingQuote(body.items());
     }
 
     @PostMapping("/pickup-days")
-    public List<PickupDayDto> pickupDays(@Valid @RequestBody DeliveryDatesRequest body, HttpServletRequest request) {
+    public List<PickupDayDto> pickupDays(@Valid @RequestBody ShopItemsRequest body, HttpServletRequest request) {
         rateLimiter.check("shop-dates", request.getRemoteAddr(), 30);
         return shopService.pickupDays(body.items());
     }

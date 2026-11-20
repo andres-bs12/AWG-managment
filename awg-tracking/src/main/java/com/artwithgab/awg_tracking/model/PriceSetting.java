@@ -26,6 +26,10 @@ public class PriceSetting {
     private BigDecimal finishedPrice;
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal nameExtra;
+    @Column(precision = 10, scale = 2)
+    private BigDecimal shippingFee;
+    @Column(length = 80)
+    private String postCollectionDays;
     /** Bumped on every save; the screen sends the revision it showed to detect concurrent edits. */
     @Column(nullable = false)
     private long revision;

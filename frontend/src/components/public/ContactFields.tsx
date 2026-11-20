@@ -1,11 +1,10 @@
 import { Field } from '../ui/Field'
-import { HelpTip } from '../ui/HelpTip'
 import { useLocale } from '../../i18n/LocaleContext'
 import styles from './ContactFields.module.css'
 
 export type ContactValues = { customerName: string; email: string; phone: string; line1: string; line2: string; postalCode: string; city?: string }
 
-/** Shared contact/address composition; QR forms retain the server's address city. */
+/** Shared contact/address composition for /buy and /form. */
 export function ContactFields({ prefix, values, onChange, error, onBlur, validFields = [], withAddress = true, announceErrors = true, deliveryPhone = true }: {
   prefix: string; values: ContactValues; onChange: (partial: Partial<ContactValues>) => void;
   error: (id: string) => string | undefined; onBlur?: (id: string) => void; validFields?: string[];
@@ -31,7 +30,7 @@ export function ContactFields({ prefix, values, onChange, error, onBlur, validFi
       <Field className={styles.narrow} label={t('shopLine2')} htmlFor={`${prefix}-line2`} error={error(`${prefix}-line2`)} announceError={announceErrors}><input id={`${prefix}-line2`} maxLength={200} autoComplete="address-line2" value={values.line2} onBlur={() => onBlur?.(`${prefix}-line2`)} onChange={event => onChange({ line2: event.target.value })} /></Field>
       <div className={styles.locality} data-field-grid>
         <Field className={styles.postal} label={t('shopPostal')} htmlFor={`${prefix}-postal`} error={error(`${prefix}-postal`)} renderError={false}><input id={`${prefix}-postal`} maxLength={4} inputMode="numeric" autoComplete="postal-code" value={values.postalCode} onBlur={() => onBlur?.(`${prefix}-postal`)} data-valid={validFields.includes(`${prefix}-postal`) || undefined} onChange={event => onChange({ postalCode: event.target.value.replace(/\D/g, '') })} /></Field>
-        <div className={styles.city}><div className={styles.cityLabel}><strong id={`${prefix}-city-label`}>{t('shopCity')}</strong><HelpTip label={t('explainVienna')}>{t('viennaHelp')}</HelpTip></div><span className={styles.cityValue} id={`${prefix}-city`} tabIndex={-1} aria-labelledby={`${prefix}-city-label`} aria-describedby={error(`${prefix}-city`) ? `${prefix}-city-error` : undefined}>Wien</span></div>
+        <Field className={styles.city} label={t('shopCity')} htmlFor={`${prefix}-city`} error={error(`${prefix}-city`)} renderError={false}><input id={`${prefix}-city`} maxLength={120} autoComplete="address-level2" value={values.city ?? ''} onBlur={() => onBlur?.(`${prefix}-city`)} data-valid={validFields.includes(`${prefix}-city`) || undefined} onChange={event => onChange({ city: event.target.value })} /></Field>
         {['postal', 'city'].map(suffix => error(`${prefix}-${suffix}`) && <p key={suffix} className={styles.error} id={`${prefix}-${suffix}-error`} role={announceErrors ? 'alert' : undefined}>{error(`${prefix}-${suffix}`)}</p>)}
       </div>
     </div></fieldset>}

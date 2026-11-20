@@ -8,6 +8,6 @@ public record AddressDto(
         @NotBlank @Size(max = 120) String line1,
         @Size(max = 120) String line2,
         @NotBlank @Size(max = 80) String city,
-        @NotBlank @Size(max = 12) String postalCode
+        String postalCode
 ) {
 }

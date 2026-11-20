@@ -92,6 +92,7 @@ public class RetentionService {
             if (item.getNameInOrnament() != null) item.setNameInOrnament("");
         }
         order.setDeliveryAddress(null);
+        order.setTrackingNumber(null);
         order.setCancellationReason(null);
         order.setCheckoutClientHash(null);
         // Caller-provided retry key; not needed once the sale is long done.

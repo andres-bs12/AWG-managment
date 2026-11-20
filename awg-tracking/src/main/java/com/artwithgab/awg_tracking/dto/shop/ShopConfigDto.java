@@ -5,7 +5,8 @@ import java.util.List;
 
 /**
  * Public prices, available colors/finishes and whether online orders are open. Only custom ornaments
- * are sold online. deliveriesFrom: no delivery day before this date (null = no limit).
+ * are sold online. deliveriesFrom: no Post collection before this date (null = no limit).
+ * deliveryFee is the Post shipping fee. The hours are for legacy Vienna deliveries.
  */
 public record ShopConfigDto(boolean enabled, BigDecimal customPrice, BigDecimal finishedPrice, BigDecimal nameExtra,
                             BigDecimal deliveryFee, int maxItems, List<ShopColorOptionDto> colors,

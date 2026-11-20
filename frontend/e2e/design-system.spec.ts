@@ -71,32 +71,19 @@ for (const locale of ['de', 'en'] as const) {
     await finish.click(); await expect(finish).toHaveAttribute('aria-expanded', 'true')
     await finish.press('Escape'); await expect(finish).toHaveAttribute('aria-expanded', 'false'); await expect(finish).toBeFocused()
     await choose(page); await pet(page); await next(page).click()
-    const help = page.getByRole('button', { name: locale === 'de' ? 'Lieferung in Wien erklären' : 'Explain Vienna delivery' })
-    await help.click()
-    await expect(page.getByText(locale === 'de' ? 'Wir liefern derzeit nur innerhalb Wiens.' : 'We currently only deliver within Vienna.', { exact: true })).toBeVisible()
-    await page.locator('#buy-name').focus(); await page.keyboard.press('Escape')
-    await expect(help).toBeFocused(); await expect(help).toHaveAttribute('aria-expanded', 'false')
     await axe(page)
   })
 
-  test(`calendar choice outside shortcuts has one persistent summary (${locale})`, async ({ page }) => {
+  test(`Post shipping quote displays one persistent arrival range summary (${locale})`, async ({ page }) => {
     await open(page, locale)
     await page.evaluate(async () => {
       const path = '/src/api/client.ts'; const { api } = await import(path)
-      api.shop.listDeliveryDates = async () => ['02', '09', '16', '23'].map(day => ({ date: `2026-12-${day}`, weekday: 'Wednesday' }))
+      api.shop.shippingQuote = async () => ({ available: true, collectionDate: '2026-12-01', arrivalFrom: '2026-12-03', arrivalTo: '2026-12-04' })
     })
     await choose(page); await pet(page); await next(page).click()
-    const date = page.getByRole('radio', { name: locale === 'de' ? 'Mittwoch, 23. Dezember 2026' : 'Wednesday 23 December 2026', exact: true })
-    await date.locator('..').click()
     await expect(page.locator('[data-selected-date]')).toHaveAttribute('data-selected', 'true')
-    await expect(page.locator('[data-selected-date] > span')).toHaveText(locale === 'de' ? 'Mi, 23. Dez · 18–20 Uhr' : 'Wed, 23 Dec · 6–8 pm')
-    // One shortcut only: the earliest date, above the full calendar.
-    await expect(page.locator('[class*="dateCard"][aria-pressed]')).toHaveCount(1)
-    await expect(page.locator('[class*="dateCard"][aria-pressed="true"]')).toHaveCount(0)
-    await page.locator('[class*="dateCard"][aria-pressed]').click()
-    await expect(page.locator('[class*="dateCard"][aria-pressed="true"]')).toHaveCount(1)
-    await expect(page.locator('[data-selected-date] > span')).toHaveText(locale === 'de' ? 'Mi, 2. Dez · 18–20 Uhr' : 'Wed, 2 Dec · 6–8 pm')
-    await expect(date).not.toBeChecked()
+    await expect(page.locator('[data-selected-date] > small')).toHaveText(locale === 'de' ? 'Voraussichtliche Zustellung' : 'Estimated delivery')
+    await expect(page.locator('[data-selected-date] > span')).toHaveText(locale === 'de' ? 'Do, 3. – Fr, 4. Dezember' : 'Thu 3 – Fri 4 December')
   })
 
   test(`review uses precise edit actions and static artwork (${locale})`, async ({ page }) => {

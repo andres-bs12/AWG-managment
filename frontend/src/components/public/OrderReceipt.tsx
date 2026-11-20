@@ -6,7 +6,8 @@ import styles from './OrderReceipt.module.css'
 
 type ReceiptItem = { petName: string; kind: 'custom' | 'finished'; withName?: boolean; color?: OrnamentColor; cost?: number; backName: string }
 
-export function OrderReceipt({ items, total, paymentState }: { items: ReceiptItem[]; total?: number; paymentState?: PaymentState }) {
+/** `shipping`: the Post fee line (Track passes total minus the ornaments for Post orders). */
+export function OrderReceipt({ items, total, paymentState, shipping }: { items: ReceiptItem[]; total?: number; paymentState?: PaymentState; shipping?: number }) {
   const { locale, t } = useLocale()
   const money = (value: number) => new Intl.NumberFormat(locale === 'de' ? 'de-AT' : 'en-IE', { style: 'currency', currency: 'EUR' }).format(value)
   return (
@@ -24,6 +25,7 @@ export function OrderReceipt({ items, total, paymentState }: { items: ReceiptIte
             {item.cost != null ? <span>{money(item.cost)}</span> : null}
           </li>
         ))}
+        {shipping ? <li><div><strong>{t('methodPost')}</strong></div><span>{money(shipping)}</span></li> : null}
       </ul>
       {total != null || paymentState ? <div className={styles.total}>
         <div><span>{t('orderTotal')}</span>{total != null ? <strong>{money(total)}</strong> : null}</div>

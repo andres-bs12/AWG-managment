@@ -6,6 +6,7 @@ import com.artwithgab.awg_tracking.support.Hours;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +38,12 @@ public final class CalendarIndex {
 
     public double nowHour() {
         return Hours.of(now.toLocalTime());
+    }
+
+    /** Stored painting appointments have minute precision. Never round a new start back into the past. */
+    double nextMinuteHour() {
+        LocalDateTime minute = now.truncatedTo(ChronoUnit.MINUTES);
+        return now.equals(minute) ? nowHour() : (minute.toLocalTime().toSecondOfDay() / 60 + 1) / 60.0;
     }
 
     public boolean isToday(MarketDay day) {

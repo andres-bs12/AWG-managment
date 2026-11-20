@@ -2,6 +2,7 @@ package com.artwithgab.awg_tracking.controller;
 
 import com.artwithgab.awg_tracking.dto.agenda.*;
 import com.artwithgab.awg_tracking.service.AgendaService;
+import com.artwithgab.awg_tracking.support.IdempotencyKeys;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -32,6 +33,18 @@ public class AgendaController {
     public ResponseEntity<Void> moveBlock(@PathVariable UUID blockId, @Valid @RequestBody MoveBlockRequest body) {
         agendaService.moveBlock(blockId, body.date(), body.startHour());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/blocks/{itemId}/make-room")
+    public MakeRoomResultDto makeRoom(@PathVariable UUID itemId) {
+        return agendaService.makeRoom(itemId);
+    }
+
+    @PostMapping("/make-room")
+    public MakeRoomResultDto makeRoom(@Valid @RequestBody MakeRoomRequest body,
+                                     @RequestHeader(value = IdempotencyKeys.HEADER, required = false) String key) {
+        IdempotencyKeys.validate(key);
+        return agendaService.makeRoom(body, key);
     }
 
     @PostMapping("/capacity")

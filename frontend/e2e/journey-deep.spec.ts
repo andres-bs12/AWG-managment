@@ -1,10 +1,10 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
-import type { ShopConfig, ShopDeliveryDate } from '../src/domain/types'
-import { choose, delivery, mobile, next, open, photo } from './helpers'
+import type { ShippingQuote, ShopConfig } from '../src/domain/types'
+import { choose, delivery, next, open, photo } from './helpers'
 
 type Locale = 'de' | 'en'
-const dates: ShopDeliveryDate[] = ['2026-12-02', '2026-12-09', '2026-12-16'].map(date => ({ date, weekday: 'Wednesday' }))
+const quote: ShippingQuote = { available: true, collectionDate: '2026-12-01', arrivalFrom: '2026-12-03', arrivalTo: '2026-12-04' }
 const contact = { customerName: 'Alex Example', email: 'alex@example.com', phone: '123456789' }
 const address = { line1: 'Hauptstraße 1', line2: 'Stiege 2, Tür 3', postalCode: '1010', city: 'Wien' }
 const note = 'Keep the white whiskers'
@@ -28,7 +28,7 @@ async function prepare(page: Page): Promise<ShopConfig> {
   })
   await page.reload()
   await expect(page.locator('fieldset[id^="color-"]')).toBeVisible()
-  await page.route('**/api/shop/delivery-dates', route => route.fulfill({ json: dates }))
+  await page.route('**/api/shop/shipping-quote', route => route.fulfill({ json: quote }))
   // The configured server is mock. Use the REAL multipart HTTP checkout and
   // availability adapters so page.route observes the actual wire contract.
   return page.evaluate(async () => {
@@ -36,7 +36,7 @@ async function prepare(page: Page): Promise<ShopConfig> {
     const httpPath = '/src/api/http/services.ts'
     const { api } = await import(clientPath)
     const { httpApi } = await import(httpPath)
-    api.shop.listDeliveryDates = httpApi.shop.listDeliveryDates
+    api.shop.shippingQuote = httpApi.shop.shippingQuote
     api.shop.checkout = httpApi.shop.checkout
     return api.shop.getConfig()
   })
@@ -58,17 +58,16 @@ async function addNote(page: Page) {
 
 async function fillDelivery(page: Page) {
   await delivery(page)
-  await expect(page.locator('input[name="delivery-date"]').first()).toBeChecked()
+  await expect(page.locator('#buy-date')).toContainText(/(Do, 3\. – Fr, 4\. Dezember|Thu 3 – Fri 4 December)/)
   await page.locator('#buy-line2').fill(address.line2)
 }
 
 async function expectContact(page: Page) {
   for (const [id, value] of Object.entries({
     'buy-name': contact.customerName, 'buy-email': contact.email, 'buy-phone': contact.phone,
-    'buy-line1': address.line1, 'buy-line2': address.line2, 'buy-postal': address.postalCode,
+    'buy-line1': address.line1, 'buy-line2': address.line2, 'buy-postal': address.postalCode, 'buy-city': address.city,
   })) await expect(page.locator(`#${id}`)).toHaveValue(value)
-  await expect(page.locator('input[name="delivery-date"]').first()).toBeChecked()
-  await expect(page.locator('input[name="delivery-date"]').first()).toHaveAttribute('aria-label', 'Mittwoch, 2. Dezember 2026')
+  await expect(page.locator('#buy-date')).toContainText('Do, 3. – Fr, 4. Dezember')
 }
 
 async function expectReview(page: Page, total: number, locale: Locale = 'de') {
@@ -122,7 +121,7 @@ for (const locale of ['de', 'en'] as const) {
       // Only the generated photo id is variable. Assert the ENTIRE payload,
       // including no accidental UID, preview data URL or client-side price.
       expect(parsed).toEqual({
-        ...contact, address, deliveryDate: dates[0].date, acceptTerms: true,
+        ...contact, deliveryKind: 'post', address, expectedArrivalTo: quote.arrivalTo, acceptTerms: true,
         items: [{ kind: 'custom', color: 'red', finish: 'shiny', withName: true,
           backName: 'Luna', petName: 'Luna', note, photos: [{ id: expect.stringMatching(/^pho-/), name: 'pet.png' }] }],
       })

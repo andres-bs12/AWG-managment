@@ -20,7 +20,7 @@ public record StatsDto(String from, String to, Sales sales, List<SourceRow> bySo
 
     public record ColorRow(String color, String finish, int count) {}
 
-    public record Delivery(int market, int vienna) {}
+    public record Delivery(int market, int vienna, int post) {}
 
     /** visits = Home + shop + Track + QR form page loads. funnel follows one /buy session's path. */
     public record Web(long homeViews, long buyViews, long trackViews, long formViews,

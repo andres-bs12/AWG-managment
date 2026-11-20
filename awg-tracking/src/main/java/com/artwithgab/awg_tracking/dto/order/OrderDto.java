@@ -31,6 +31,8 @@ public record OrderDto(
         boolean paymentReview,
         List<Object> paymentEntries,
         String checkoutStatus,
-        com.artwithgab.awg_tracking.enums.OrderSource source
+        com.artwithgab.awg_tracking.enums.OrderSource source,
+        String trackingNumber,
+        String trackingUrl
 ) {
 }

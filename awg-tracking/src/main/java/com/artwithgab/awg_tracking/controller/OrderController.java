@@ -2,6 +2,7 @@ package com.artwithgab.awg_tracking.controller;
 
 import com.artwithgab.awg_tracking.dto.order.*;
 import com.artwithgab.awg_tracking.service.OrderService;
+import com.artwithgab.awg_tracking.support.IdempotencyKeys;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -56,10 +57,8 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<OrderDto> createSale(@Valid @RequestBody CreateSaleRequest body,
-                                               @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
-        if (idempotencyKey != null && !idempotencyKey.matches("[A-Za-z0-9_-]{8,64}")) {
-            throw new com.artwithgab.awg_tracking.exception.BadRequestException("Invalid Idempotency-Key.").code("VALIDATION").field("Idempotency-Key");
-        }
+                                               @RequestHeader(value = IdempotencyKeys.HEADER, required = false) String idempotencyKey) {
+        if (idempotencyKey != null) IdempotencyKeys.validate(idempotencyKey);
         OrderService.SaleResult result = orderService.createSale(body, idempotencyKey);
         return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(result.order());
     }
@@ -70,9 +69,9 @@ public class OrderController {
         return ResponseEntity.noContent().build();
     }
 
-    @PatchMapping("/{id}/handed-over")
+    @RequestMapping(path = "/{id}/handed-over", method = {RequestMethod.PATCH, RequestMethod.PUT})
     public ResponseEntity<Void> setHandedOver(@PathVariable UUID id, @Valid @RequestBody HandedOverRequest body) {
-        orderService.setHandedOver(id, body.handedOver(), body.itemIds());
+        orderService.setHandedOver(id, body.handedOver(), body.itemIds(), body.trackingNumber());
         return ResponseEntity.noContent().build();
     }
 

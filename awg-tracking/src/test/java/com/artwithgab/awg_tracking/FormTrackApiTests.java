@@ -28,7 +28,8 @@ class FormTrackApiTests extends ApiTestSupport {
     }
 
     private Created customOrder(String token, String deliveryKind, String dayDate, Double pickup, double start) throws Exception {
-        String orderId = saleOk(token, customItem(true, TUE, start, start + 1.25, deliveryKind, dayId(token, dayDate), pickup));
+        String orderId = deliveryKind.equals("vienna") ? legacyViennaOrder(token, start, true)
+                : saleOk(token, customItem(true, TUE, start, start + 1.25, deliveryKind, dayId(token, dayDate), pickup));
         MvcResult order = mvc.perform(get("/api/orders/" + orderId).header("Authorization", bearer(token))).andReturn();
         MvcResult bundle = mvc.perform(get("/api/orders/" + orderId + "/bundle").header("Authorization", bearer(token))).andReturn();
         return new Created(orderId, read(order, "$.code"), read(order, "$.formToken"), read(bundle, "$.items[0].id"));
@@ -165,6 +166,32 @@ class FormTrackApiTests extends ApiTestSupport {
                 .file(new MockMultipartFile("payload", "payload", "application/json", json(payload).getBytes()))
                 .file(new MockMultipartFile("photo-p1", "bella.jpg", "image/jpeg", JPEG));
         return mvc.perform(withIp(req)).andReturn();
+    }
+
+    @Test
+    void postFormCollectsAnAustrianAddressAndTrackKeepsItPrivate() throws Exception {
+        Created c = customOrder(login(), "post", WED, null);
+        mvc.perform(withIp(get("/api/forms/" + c.formToken())))
+                .andExpect(jsonPath("$.needsAddress").value(true))
+                .andExpect(jsonPath("$.handoffs[0].kind").value("post"))
+                .andExpect(jsonPath("$.handoffs[0].arrivalTo").value("2026-12-04"));
+
+        MvcResult none = submitWithAddress(c, null);
+        assertEquals(400, none.getResponse().getStatus());
+        assertEquals("address", this.<String>read(none, "$.field"));
+
+        MvcResult invalid = submitWithAddress(c, Map.of("line1", "Hauptplatz 1", "postalCode", "04020", "city", "Linz"));
+        assertEquals(400, invalid.getResponse().getStatus());
+        assertEquals("POSTAL_INVALID", this.<String>read(invalid, "$.code"));
+        assertEquals("address.postalCode", this.<String>read(invalid, "$.field"));
+
+        MvcResult saved = submitWithAddress(c, Map.of("line1", "Hauptplatz 1", "postalCode", "4020", "city", "Linz"));
+        assertEquals(200, saved.getResponse().getStatus(), saved.getResponse().getContentAsString());
+        mvc.perform(withIp(get("/api/forms/" + c.formToken())))
+                .andExpect(jsonPath("$.address.city").value("Linz"));
+        mvc.perform(withIp(get("/api/track/" + c.code())).header("X-Form-Token", c.formToken()))
+                .andExpect(jsonPath("$.delivery.address").doesNotExist())
+                .andExpect(jsonPath("$.when.kind").value("post"));
     }
 
     @Test

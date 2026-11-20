@@ -86,8 +86,9 @@ public class StatsService {
                 .map(e -> new StatsDto.ColorRow(e.getKey().split("\\|")[0], e.getKey().split("\\|")[1], e.getValue()))
                 .sorted(Comparator.comparingInt(StatsDto.ColorRow::count).reversed()).toList();
 
-        var delivery = new StatsDto.Delivery(count(items, i -> i.getDeliveryKind() != DeliveryKind.DELIVERY),
-                count(items, i -> i.getDeliveryKind() == DeliveryKind.DELIVERY));
+        var delivery = new StatsDto.Delivery(count(items, i -> i.getDeliveryKind() == DeliveryKind.MARKET),
+                count(items, i -> i.getDeliveryKind() == DeliveryKind.DELIVERY),
+                count(items, i -> i.getDeliveryKind() == DeliveryKind.POST));
 
         return new StatsDto(from.toString(), to.toString(), sales, bySource, daily, colors, delivery, web(rows));
     }

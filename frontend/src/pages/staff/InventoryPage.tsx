@@ -95,6 +95,8 @@ function PricesCard({ initial }: { initial: Prices }) {
         customPrice: parseEuroAmount(draft.customPrice),
         finishedPrice: parseEuroAmount(draft.finishedPrice),
         nameExtra: parseEuroAmount(draft.nameExtra),
+        shippingFee: saved.shippingFee,
+        postCollectionDays: saved.postCollectionDays,
         expectedRevision: saved.revision,
       })
       setSaved(next); setDraft(draftFrom(next)); setStatus('Saved')

@@ -2,8 +2,8 @@ import { test, expect, type Page } from '@playwright/test'
 import { axe, choose, expectActionClearance, mobile, next, open, pet } from './helpers'
 
 const copy = {
-  de: { market: 'Abholung am Markt', vienna: 'Lieferung in Wien', time: 'Wähle, wann du kommst.', edit: 'Lieferung ändern', pickup: 'Abholung' },
-  en: { market: 'Pick up at the market', vienna: 'Delivery in Vienna', time: 'Please choose when you will come.', edit: 'Change delivery', pickup: 'Pickup' },
+  de: { market: 'Abholung am Markt', post: 'Versand per Post', time: 'Wähle, wann du kommst.', edit: 'Lieferung ändern', pickup: 'Abholung', unavailable: 'Vor Weihnachten ist kein Postversand mehr möglich.' },
+  en: { market: 'Pick up at the market', post: 'Shipping by post', time: 'Please choose when you will come.', edit: 'Change delivery', pickup: 'Pickup', unavailable: 'Post can no longer arrive before Christmas.' },
 } as const
 
 /** Record the checkout input the page hands to the API (photos reduced to a count). */
@@ -41,7 +41,7 @@ for (const locale of ['de', 'en'] as const) {
     await expect(page.locator('[data-selected-date]')).toHaveAttribute('data-selected', 'true')
     await expect(page.locator('[data-selected-date] > span')).toContainText('15:30')
     // Pickup needs contact details only.
-    await expect(page.locator('#buy-line1, #buy-postal')).toHaveCount(0)
+    await expect(page.locator('#buy-line1, #buy-postal, #buy-city')).toHaveCount(0)
     await page.locator('#buy-name').fill('Alex Example')
     await page.locator('#buy-email').fill('alex@example.com')
     await page.locator('#buy-phone').fill('123456789')
@@ -74,11 +74,27 @@ for (const locale of ['de', 'en'] as const) {
     await next(page).click()
     await expect(page.locator('#buy-time-error')).toHaveText(copy[locale].time)
     await expect(page.locator('#buy-time')).toBeFocused()
-    // Switching back to Vienna clears the pickup choice and brings the address back.
-    await page.getByRole('radio', { name: new RegExp(`^${copy[locale].vienna}`) }).locator('..').click()
+    // Switching back to Post clears the pickup choice and brings the address and arrival range back.
+    await page.getByRole('radio', { name: new RegExp(`^${copy[locale].post}`) }).locator('..').click()
     await expect(page.locator('#buy-time')).toHaveCount(0)
     await expect(page.locator('#buy-line1')).toBeVisible()
-    await expect(page.locator('[class*="dateCard"][aria-pressed]')).toHaveCount(1)
+    await expect(page.locator('#buy-city')).toBeVisible()
+    await expect(page.locator('[data-selected-date]')).toHaveAttribute('data-selected', 'true')
+  })
+
+  test(`when Post can no longer arrive before Christmas, the card is disabled and market pickup stays selectable (${locale})`, async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-12-20T12:00:00Z'))
+    await page.addInitScript(lang => localStorage.setItem('awg-locale', lang), locale)
+    await page.goto('/buy')
+    await expect(page.locator('fieldset[id^="color-"]')).toBeVisible()
+    await choose(page); await pet(page); await next(page).click()
+    const postRadio = page.locator('input[name="delivery-kind"][value="post"]')
+    const marketRadio = page.locator('input[name="delivery-kind"][value="market"]')
+    await expect(postRadio).toBeDisabled()
+    await expect(postRadio.locator('..')).toContainText(copy[locale].unavailable)
+    await expect(marketRadio).toBeEnabled()
+    await expect(marketRadio).toBeChecked()
+    await axe(page)
   })
 }
 

@@ -60,7 +60,7 @@ test('mock aggregation matches the backend: cancelled and unpaid web checkouts a
   assert.deepEqual(stats.bySource, [{ source: 'stall', orders: 2, ornaments: 3, revenue: 120 }, { source: 'web', orders: 1, ornaments: 2, revenue: 92.99 }])
   assert.deepEqual(stats.daily.map(day => [day.date, day.orders, day.revenue, day.visits]), [['2026-11-10', 2, 120, 5], ['2026-11-11', 1, 92.99, 3]])
   assert.deepEqual(stats.colors, [{ color: 'red', finish: 'shiny', count: 2 }, { color: 'green', finish: 'shiny', count: 1 }, { color: 'red', finish: 'matte', count: 1 }])
-  assert.deepEqual(stats.delivery, { market: 4, vienna: 1 })
+  assert.deepEqual(stats.delivery, { market: 4, vienna: 1, post: 0 })
   assert.equal(stats.web.homeViews, 5)
   assert.deepEqual(stats.web.funnel.slice(0, 2), [{ stage: 'opened', count: 3 }, { stage: 'delivery', count: 2 }])
   assert.deepEqual(stats.web.validationErrors, [{ step: 'delivery', field: 'postalCode', code: 'invalid', count: 2 }])

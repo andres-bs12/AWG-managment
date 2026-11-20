@@ -6,9 +6,11 @@ export type OrnamentColor = 'red' | 'grey' | 'green' | 'white' | 'beige'
 export type CustomFinish = 'shiny' | 'matte'
 export type ItemKind = 'custom' | 'finished'
 export type ProductionStatus = 'not_started' | 'in_progress' | 'finished'
-export type DeliveryKind = 'market' | 'vienna'
+export type DeliveryKind = 'market' | 'post' | 'vienna'
+export type PostCollectionWeekday = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
 export type MarketKind = 'market' | 'home'
-export type TrackStatus = 'preparing' | 'ready' | 'delivered' | 'cancelled'
+/** `shipped`: every Post item of the order was handed to the Post (wins over `delivered`). */
+export type TrackStatus = 'preparing' | 'ready' | 'shipped' | 'delivered' | 'cancelled'
 
 export type StaffUser = {
   id: string
@@ -57,6 +59,8 @@ export type OrderItem = {
     marketDayId?: string
     pickupHour?: number | null
     deliveryDate?: string
+    arrivalFrom?: string | null
+    arrivalTo?: string | null
     address?: Address | null
   }
 }
@@ -101,9 +105,12 @@ export type Order = {
   amountPaid?: number
   createdAt: string
   itemIds: string[]
-  /** True once staff marks market pickup / Vienna handoff as done. Drives Track `delivered`. */
+  /** True once staff marks market pickup / Post shipping / Vienna handoff as done. Drives Track `delivered`. */
   handedOver: boolean
   handedOverAt?: string
+  deliveryFee?: number
+  trackingNumber?: string | null
+  trackingUrl?: string | null
   paymentReview?: boolean
   /** Append-only payment entries. Older records may not have this field yet. */
   paymentEntries?: PaymentEntry[]
@@ -220,16 +227,24 @@ export type TrackItemView = {
   productionStatus: ProductionStatus
   withName: boolean
   backName: string
+  deliveryKind?: DeliveryKind
+  arrivalFrom?: string | null
+  arrivalTo?: string | null
+  handedOver?: boolean
 }
 
 /**
  * Structured handoff info so the UI can localise it. `market` means "collect at the stall";
+ * `post` means Austrian Post shipping; `vienna` is legacy Vienna hand delivery;
  * `unknown` covers orders whose handoff has not been scheduled yet.
  */
 export type TrackWhen = {
-  kind: 'market' | 'vienna' | 'unknown'
-  /** ISO date of the handoff day, when known. */
+  kind: 'market' | 'post' | 'vienna' | 'unknown'
+  /** ISO date of the handoff day (or Post collection day), when known. */
   date: string | null
+  /** Estimated arrival window for Post shipping. */
+  arrivalFrom?: string | null
+  arrivalTo?: string | null
   /** Decimal hour for pickup or the start of the Vienna delivery window. */
   fromHour: number | null
   /** End of the Vienna delivery window; absent/null for market pickup. */
@@ -248,6 +263,8 @@ export type TrackView = {
   items: TrackItemView[]
   delivery: OrderItem['delivery']
   when: TrackWhen
+  /** Post parcel link built by the server; null without a parcel number. */
+  trackingUrl?: string | null
 }
 
 export type CustomerFormView = {
@@ -325,8 +342,25 @@ export type MoveSuggestion = {
 
 export type InventoryItem = { id: string; kind: ItemKind; color: OrnamentColor | null; finish?: CustomFinish | null; quantity: number }
 /** Staff-editable prices in euros. `revision` 0 means the server defaults; it increments on every save. */
-export type Prices = { customPrice: number; finishedPrice: number; nameExtra: number; revision: number }
-export type PricesUpdate = Omit<Prices, 'revision'> & { expectedRevision: number }
+export type Prices = {
+  customPrice: number
+  finishedPrice: number
+  nameExtra: number
+  shippingFee: number
+  postCollectionDays: PostCollectionWeekday[]
+  /** Read-only server policy: finished pieces may ship by Post only with a custom Post piece in the same order. */
+  finishedWithCustom: boolean
+  revision: number
+}
+export type PricesUpdate = Omit<Prices, 'revision' | 'finishedWithCustom'> & { expectedRevision: number }
+/** A resolved Post collection date; `override` is null when only the weekday and holiday rules apply. */
+export type PostCollectionDay = { date: string; open: boolean; override: boolean | null }
+/** Decimal hours, like `HourSpanDto`. */
+export type HourSpan = { date: string; startHour: number; endHour: number }
+export type MakeRoomMove = { itemId: string; orderCode: string; from: HourSpan; to: HourSpan }
+/** `slot` is present only for `POST /api/agenda/make-room`. */
+export type MakeRoomResult = { slot?: HourSpan; moved: MakeRoomMove[] }
+export type MakeRoomInput = { date: string; minutes: number; marketDayId?: string }
 export type PaintingDay = { date: string; open: boolean; maxPaintings: number; booked: number; openHour: number; closeHour: number }
 
 export type ShopConfig = {
@@ -349,7 +383,12 @@ export type ShopConfig = {
 
 export type ShopColorOption = { color: OrnamentColor; finish: CustomFinish; inStock: boolean }
 
-export type ShopDeliveryDate = { date: string; weekday: string }
+export type ShippingQuote = {
+  available: boolean
+  collectionDate: string | null
+  arrivalFrom: string | null
+  arrivalTo: string | null
+}
 
 /** A stall day the customer can pick a web order up at (painting happens before it). */
 export type ShopPickupDay = { date: string; weekday: string; marketName: string; stall?: number | null; openTime: string; closeTime: string }
@@ -369,9 +408,12 @@ export type ShopCheckoutInput = {
   customerName: string
   email: string
   phone: string
-  /** Required for Vienna delivery; omitted for market pickup. */
+  /** Required for Post shipping; omitted for market pickup. */
   address?: Address
-  deliveryDate: string
+  /** Market pickup date; omitted/nullable for Post shipping. */
+  deliveryDate?: string | null
+  /** Latest estimated arrival date confirmed by the customer, required for Post shipping. */
+  expectedArrivalTo?: string | null
   deliveryKind?: DeliveryKind
   /** Arrival time at the stall ('HH:mm'), market pickup only. */
   pickupTime?: string
@@ -395,7 +437,7 @@ export type Stats = {
   bySource: { source: 'stall' | 'web'; orders: number; ornaments: number; revenue: number }[]
   daily: { date: string; orders: number; ornaments: number; revenue: number; visits: number }[]
   colors: { color: string; finish: string; count: number }[]
-  delivery: { market: number; vienna: number }
+  delivery: { market: number; vienna: number; post: number }
   /** Anonymous page loads; no cookies. */
   web: {
     homeViews: number; buyViews: number; trackViews: number; formViews: number

@@ -88,6 +88,8 @@
 .facts dd { margin: var(--space-1) 0 0; font-weight: var(--type-label-weight); }
 .facts > div + div { padding-top: var(--space-3); border-top: var(--border-thin) solid var(--color-border); }
 .whenExtra { display: block; margin-top: var(--space-1); color: var(--color-text-muted); font-size: var(--type-hint-size); font-weight: var(--type-label-weight); text-wrap: pretty; }
+.noBreak { white-space: nowrap; }
+.trackingLink { display: inline-flex; align-items: center; min-height: var(--touch); margin-top: var(--space-1); color: var(--color-text); font-weight: var(--type-button-weight); text-decoration: underline; text-underline-offset: var(--space-1); }
 .code { font-family: var(--font-sans); font-size: var(--type-h3-size); font-weight: var(--type-h3-weight); overflow-wrap: anywhere; user-select: all; }
 
 /* Contact on Instagram: one quiet, full-width row after the receipt. */

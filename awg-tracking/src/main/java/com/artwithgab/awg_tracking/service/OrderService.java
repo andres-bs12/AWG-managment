@@ -11,7 +11,8 @@ import com.artwithgab.awg_tracking.exception.ResourceNotFoundException;
 import com.artwithgab.awg_tracking.model.*;
 import com.artwithgab.awg_tracking.repository.CustomerRepository;
 import com.artwithgab.awg_tracking.repository.OrderRepository;
-import com.artwithgab.awg_tracking.support.CalendarRules;
+import com.artwithgab.awg_tracking.support.AustrianPost;
+import com.artwithgab.awg_tracking.support.PostShipping;
 import com.artwithgab.awg_tracking.support.Hours;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ public class OrderService {
     private final OrderCodeGenerator codeGenerator;
     private final InventoryService inventoryService;
     private final PricingService pricingService;
+    private final ShippingService shippingService;
     private final CalendarService calendarService;
     private final AgendaService agendaService;
     private final ViewMapper mapper;
@@ -39,7 +41,6 @@ public class OrderService {
     private final org.springframework.context.ApplicationEventPublisher events;
     private final com.artwithgab.awg_tracking.repository.StoredPhotoRepository photoRepository;
     private final PhotoStorageService photoStorage;
-    private final com.artwithgab.awg_tracking.config.AwgProperties props;
     private final com.artwithgab.awg_tracking.payment.StripeClient stripe;
 
     Order findOrderOrThrow(UUID id) {
@@ -103,6 +104,36 @@ public class OrderService {
         AgendaService.Snapshot s = agendaService.snapshot();
         CalendarIndex index = s.index();
 
+        var prices = pricingService.current();
+        for (int n = 0; n < req.items().size(); n++) {
+            CreateSaleItemRequest row = req.items().get(n);
+            if (row.deliveryKind() == DeliveryKind.DELIVERY) {
+                throw new BadRequestException("Choose Post shipping or market pickup.")
+                        .code("VALIDATION").field("items[" + n + "].deliveryKind");
+            }
+            if (row.kind() == ItemKind.CUSTOM && row.color() != null && !row.color().isOffered()) {
+                throw new BadRequestException("This color is no longer sold.").code("VALIDATION").field("items[" + n + "].color");
+            }
+        }
+        var postItems = req.items().stream().filter(row -> row.deliveryKind() == DeliveryKind.POST).toList();
+        PostShipping.Window shippingWindow = null;
+        Address shippingAddress = null;
+        if (!postItems.isEmpty()) {
+            boolean hasFinishedPost = postItems.stream().anyMatch(row -> row.kind() == ItemKind.GENERIC);
+            boolean hasCustomPost = postItems.stream().anyMatch(row -> row.kind() == ItemKind.CUSTOM);
+            if (hasFinishedPost && (!prices.finishedWithCustom() || !hasCustomPost)) {
+                throw new BadRequestException("Finished ornaments can only ship with a custom Post item when enabled.")
+                        .code("SHIPPING_NEEDS_CUSTOM").field("delivery");
+            }
+            // Only the parcel's own ornaments decide when it is ready; market pickups painted later do not delay it.
+            var readyOn = postItems.stream().filter(row -> row.kind() == ItemKind.CUSTOM && row.paintDate() != null)
+                    .map(CreateSaleItemRequest::paintDate).max(LocalDate::compareTo).orElse(index.today());
+            shippingWindow = shippingService.calendar(prices).windowAfter(readyOn)
+                    .orElseThrow(() -> new BadRequestException("Post shipping is no longer available.")
+                            .code("SHIPPING_UNAVAILABLE").field("delivery"));
+            shippingAddress = shippingAddress(postItems);
+        }
+
         // Planned move: recompute and require the exact same suggestion.
         MoveSuggestionDto move = req.plannedMove();
         OrderItem moving = null;
@@ -115,13 +146,15 @@ public class OrderService {
                     .filter(r -> r.paintDate() != null && r.paintDate().toString().equals(move.freedSlot().date())
                             && r.paintStart() != null && Math.abs(r.paintStart() - move.freedSlot().startHour()) < Hours.EPS)
                     .findFirst().orElse(null);
-            MarketDay deliveryDay = intoSlot == null ? null : index.byId(intoSlot.marketDayId()).orElse(null);
+            MarketDay deliveryDay = intoSlot == null || intoSlot.deliveryKind() == DeliveryKind.POST
+                    ? null : index.byId(intoSlot.marketDayId()).orElse(null);
             Double beforeHour = intoSlot != null && intoSlot.deliveryKind() == DeliveryKind.MARKET && deliveryDay != null
                     && deliveryDay.getDate().toString().equals(move.freedSlot().date()) ? intoSlot.pickupHour() : null;
             MoveSuggestionDto fresh = agendaService.findMoveSuggestion(s,
                     LocalDate.parse(move.from().date()),
                     move.freedSlot().endHour() - move.freedSlot().startHour(),
-                    deliveryDay != null ? deliveryDay.getDate() : LocalDate.parse(move.freedSlot().date()),
+                    intoSlot != null && intoSlot.deliveryKind() == DeliveryKind.POST ? shippingWindow.collectionDate()
+                            : deliveryDay != null ? deliveryDay.getDate() : LocalDate.parse(move.freedSlot().date()),
                     beforeHour);
             if (moving == null || moveDestination == null || !move.equals(fresh)) {
                 throw new ConflictException("Pickup or agenda changed. Recalculate the painting plan.");
@@ -140,19 +173,17 @@ public class OrderService {
         order.setCustomer(customer);
         order.setPaymentState(PaymentState.UNPAID);
         order.setCreatedAt(clock.instant());
+        if (shippingWindow != null) {
+            order.setDeliveryAddress(shippingAddress);
+            order.setDeliveryFee(prices.shippingFee());
+        }
 
         MarketDay soldOn = index.marketDayOn(index.today()).orElse(null);
         List<double[]> newBlocks = new ArrayList<>();
         List<LocalDate> newBlockDates = new ArrayList<>();
-        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal total = shippingWindow == null ? BigDecimal.ZERO : prices.shippingFee();
         int position = 0;
 
-        for (int n = 0; n < req.items().size(); n++) {
-            CreateSaleItemRequest check = req.items().get(n);
-            if (check.kind() == ItemKind.CUSTOM && check.color() != null && !check.color().isOffered()) {
-                throw new BadRequestException("This color is no longer sold.").code("VALIDATION").field("items[" + n + "].color");
-            }
-        }
         for (CreateSaleItemRequest row : req.items()) {
             OrderItem item = new OrderItem();
             boolean custom = row.kind() == ItemKind.CUSTOM;
@@ -169,31 +200,23 @@ public class OrderService {
 
             // Handoff
             item.setDeliveryKind(row.deliveryKind());
-            MarketDay handoffDay = index.byId(row.marketDayId()).orElse(null);
+            boolean post = row.deliveryKind() == DeliveryKind.POST;
+            MarketDay handoffDay = post ? null : index.byId(row.marketDayId()).orElse(null);
             LocalDate handoff;
-            if (handoffDay != null) {
-                // Custom pickups happen at the stall; a finished ornament may be handed over on the spot on any day.
-                if (custom && row.deliveryKind() == DeliveryKind.MARKET && handoffDay.getMarket().getKind() != MarketKind.MARKET) {
+            if (post) {
+                handoff = shippingWindow.collectionDate();
+                item.setArrivalFrom(shippingWindow.arrivalFrom());
+                item.setArrivalTo(shippingWindow.arrivalTo());
+            } else if (handoffDay != null) {
+                // A finished ornament may be handed over on the spot on any day.
+                if (custom && handoffDay.getMarket().getKind() != MarketKind.MARKET) {
                     throw new BadRequestException("Choose a market day for the pickup");
                 }
                 handoff = handoffDay.getDate();
-            } else if (!custom && row.deliveryKind() == DeliveryKind.MARKET) {
-                handoff = index.today(); // finished ornament handed over on the spot
+            } else if (!custom) {
+                handoff = index.today();
             } else {
-                throw new BadRequestException(row.deliveryKind() == DeliveryKind.MARKET ? "Choose a pickup day" : "Choose a delivery day");
-            }
-            if (row.deliveryKind() == DeliveryKind.DELIVERY) {
-                LocalDate seasonEnd = props.shop().seasonEnd();
-                boolean lastDay = handoff.equals(seasonEnd);
-                if (!CalendarRules.isViennaDay(handoff) && !lastDay) {
-                    throw new BadRequestException("Vienna deliveries are on Wednesday or Friday").code("DELIVERY_DAY_INVALID");
-                }
-                if (seasonEnd != null && handoff.isAfter(seasonEnd)) {
-                    throw new BadRequestException("The last Vienna delivery of the season is on " + seasonEnd + ".").code("DELIVERY_DAY_INVALID");
-                }
-                if (index.marketDayOn(handoff).isPresent()) {
-                    throw new BadRequestException("That day is a market day: the stall has priority. Choose another delivery day.").code("DELIVERY_DAY_INVALID");
-                }
+                throw new BadRequestException("Choose a pickup day");
             }
             if (handoff.isBefore(index.today())) throw new BadRequestException("That pickup day has already passed");
             item.setHandoffDate(handoff);
@@ -204,9 +227,6 @@ public class OrderService {
                 if (pickupHour < open - Hours.EPS || pickupHour >= close) throw new BadRequestException("Pickup hour is outside market hours");
             }
             item.setPickUpTime(pickupHour == null ? null : Hours.toTime(pickupHour));
-            if (row.deliveryKind() == DeliveryKind.DELIVERY && row.address() != null && order.getDeliveryAddress() == null) {
-                order.setDeliveryAddress(toAddress(row.address()));
-            }
 
             // Painting
             if (custom) {
@@ -223,8 +243,8 @@ public class OrderService {
                 String movingId = moving == null ? null : moving.getId().toString();
                 boolean clashExisting = s.busyOn(md.getDate(), movingId).stream().anyMatch(b -> Hours.overlap(start, end, b.start(), b.end()));
                 boolean outside = end <= start
-                        || start < s.paintingOpenHour(md.getDate()) - Hours.EPS
-                        || end > s.paintingCloseHour(md.getDate()) + Hours.EPS
+                        || start < s.paintingOpenHour(md.getDate(), md) - Hours.EPS
+                        || end > s.paintingCloseHour(md.getDate(), md) + Hours.EPS
                         || md.getDate().isBefore(index.today())
                         || (index.isToday(md) && start < index.nowHour())
                         || (move != null && moveDestination.getId().equals(md.getId())
@@ -258,6 +278,24 @@ public class OrderService {
         orderRepository.save(order);
         events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.SALE_CREATED));
         return mapper.order(order);
+    }
+
+    private static Address shippingAddress(List<CreateSaleItemRequest> postItems) {
+        Address address = null;
+        for (var item : postItems) {
+            if (item.address() == null) continue;
+            AustrianPost.requireAddress(item.address());
+            Address candidate = toAddress(item.address());
+            if (address != null && !address.equals(candidate)) {
+                throw new BadRequestException("Use one shipping address per order.").code("VALIDATION").field("address");
+            }
+            address = candidate;
+        }
+        // Custom-only parcels can get their address from the customer QR form.
+        if (address == null && postItems.stream().anyMatch(item -> item.kind() == ItemKind.GENERIC)) {
+            AustrianPost.requireAddress(null);
+        }
+        return address;
     }
 
     // ─── Updates ────────────────────────────────────────────────────────────
@@ -295,7 +333,12 @@ public class OrderService {
     }
 
     @Transactional
-    public void setHandedOver(UUID orderId, boolean handedOver, java.util.List<UUID> itemIds) {
+    public void setHandedOver(UUID orderId, boolean handedOver, List<UUID> itemIds) {
+        setHandedOver(orderId, handedOver, itemIds, null);
+    }
+
+    @Transactional
+    public void setHandedOver(UUID orderId, boolean handedOver, List<UUID> itemIds, String trackingNumber) {
         Order order = orderRepository.findForHandover(orderId).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
         requireActive(order);
         var items = order.getOrderItems();
@@ -306,16 +349,31 @@ public class OrderService {
         if (handedOver && selected.stream().anyMatch(i -> i.getProductionStatus() != ProductionStatus.FINISHED)) {
             throw new ConflictException("Finish all ornaments before marking handed over");
         }
+        if (trackingNumber != null) {
+            if (items.stream().noneMatch(i -> i.getDeliveryKind() == DeliveryKind.POST)) {
+                throw new BadRequestException("This order has no Post shipment.").code("VALIDATION").field("trackingNumber");
+            }
+            if (order.getAnonymizedAt() != null) {
+                throw new ConflictException("The shipment details have expired.").field("trackingNumber");
+            }
+            order.setTrackingNumber(AustrianPost.trackingNumber(trackingNumber));
+        }
+        boolean alreadyShipped = order.isPostShipped();
         selected.forEach(i -> i.setHandedOver(handedOver));
-        updateHandover(order);
+        boolean completed = updateHandover(order);
+        if (!alreadyShipped && order.isPostShipped()) {
+            events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.POST_SHIPPED));
+        } else if (completed) {
+            events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.HANDED_OVER));
+        }
     }
 
-    private void updateHandover(Order order) {
+    private boolean updateHandover(Order order) {
         boolean complete = !order.getOrderItems().isEmpty() && order.getOrderItems().stream().allMatch(OrderItem::isHandedOver);
         boolean changed = order.isHandedOver() != complete;
         order.setHandedOver(complete);
         if (changed) order.setHandedOverAt(complete ? clock.instant() : null);
-        if (changed && complete) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.HANDED_OVER));
+        return changed && complete;
     }
 
     /** Changes one item's production status; un-finishing an item also undoes the handoff. */

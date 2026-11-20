@@ -16,7 +16,7 @@ test('screens and validation state meet axe and visual checks', async ({ page },
   await next(page).click(); await axe(page)
   await expectActionClearance(page)
   await chooseFirstDate(page)
-  await page.locator('#buy-name').fill('Alex Example'); await page.locator('#buy-email').fill('alex@example.com'); await page.locator('#buy-phone').fill('123456789'); await page.locator('#buy-line1').fill('Hauptstraße 1'); await page.locator('#buy-postal').fill('1010'); await next(page).click()
+  await page.locator('#buy-name').fill('Alex Example'); await page.locator('#buy-email').fill('alex@example.com'); await page.locator('#buy-phone').fill('123456789'); await page.locator('#buy-line1').fill('Hauptstraße 1'); await page.locator('#buy-postal').fill('1010'); await page.locator('#buy-city').fill('Wien'); await next(page).click()
   await axe(page); await snap(page, 'review.png')
   await page.locator('form button[type=submit]').click(); await expect(page.locator('#buy-terms')).toBeFocused(); await axe(page)
 })

@@ -3,6 +3,7 @@ package com.artwithgab.awg_tracking.service;
 import com.artwithgab.awg_tracking.config.AwgProperties;
 import com.artwithgab.awg_tracking.enums.*;
 import com.artwithgab.awg_tracking.model.*;
+import com.artwithgab.awg_tracking.support.AustrianPost;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -75,7 +76,10 @@ public class InvoiceRenderer {
             if (item.isWithName()) line(b, en ? "   Name surcharge" : "   Namenszuschlag", money(extra, en));
             line(b, en ? "   Item total" : "   Positionssumme", money(item.getCost(), en));
             String date = DATE.format(item.getHandoffDate());
-            if (item.getDeliveryKind() == DeliveryKind.DELIVERY) {
+            if (item.getDeliveryKind() == DeliveryKind.POST) {
+                b.append(en ? "   Estimated delivery " : "   Zustellung voraussichtlich ")
+                        .append(AustrianPost.arrivalRange(item.getArrivalFrom(), item.getArrivalTo(), en)).append('\n');
+            } else if (item.getDeliveryKind() == DeliveryKind.DELIVERY) {
                 line(b, en ? "   Vienna delivery" : "   Lieferung in Wien", date + " "
                         + TIME.format(props.shop().deliveryWindowStart()) + "–" + TIME.format(props.shop().deliveryWindowEnd()));
             } else {
@@ -90,7 +94,11 @@ public class InvoiceRenderer {
             }
         }
         BigDecimal fee = order.getDeliveryFee() == null ? BigDecimal.ZERO : order.getDeliveryFee();
-        if (!receipt || fee.signum() > 0) line(b, en ? "Delivery fee" : "Lieferkosten", money(fee, en));
+        if (!order.postItems().isEmpty()) {
+            line(b, en ? "Shipping by post" : "Versand per Post", money(fee, en));
+        } else if (!receipt || fee.signum() > 0) {
+            line(b, en ? "Delivery fee" : "Lieferkosten", money(fee, en));
+        }
         line(b, en ? "Total" : "Gesamt", money(total, en));
         line(b, en ? "Paid" : "Bezahlt", money(paid, en));
         line(b, en ? "Balance due" : "Offener Betrag", money(balance, en));

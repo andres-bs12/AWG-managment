@@ -159,7 +159,7 @@
 
 /* Validation moves focus to the group: show where it went. */
 .chips:focus-visible,
-.calendarField:focus-visible {
+.selectedDate:focus-visible {
   outline: none;
   box-shadow: var(--focus);
   border-radius: var(--radius);
@@ -321,77 +321,6 @@
   margin-bottom: 0;
 }
 
-/* ── Step 3: delivery calendar ───────────────────────────────────────── */
-
-.calendarField {
-  min-width: 0;
-  max-width: var(--layout-calendar-max);
-  margin: 0;
-  padding: 0;
-  border: var(--border-thin) solid transparent;
-  border-radius: var(--radius-control);
-}
-
-.calendarField[aria-invalid='true'] { border-color: var(--color-error); }
-
-.calendar {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  justify-items: center;
-  gap: var(--space-1) 0;
-  /* Same width as the shortcut card and "Dein Termin" above and below it: one left and right edge. */
-}
-
-.weekday,
-.unavailable,
-.day {
-  position: relative;
-  display: grid;
-  place-items: center;
-  min-width: 0;
-  height: var(--touch);
-}
-
-.weekday {
-  color: var(--public-muted);
-  font-size: 0.75rem;
-  font-weight: var(--type-body-weight);
-}
-
-.unavailable {
-  color: var(--public-muted);
-}
-
-.day {
-  width: var(--touch);
-  height: var(--touch);
-  min-width: 0;
-  align-self: center;
-  border: var(--border-thin) solid var(--color-control-border);
-  border-radius: 50%;
-  font-weight: var(--type-body-weight);
-  cursor: pointer;
-}
-
-@media (hover: hover) { .day:hover:not([data-selected='true']) { background: var(--color-selection-hover); } }
-
-.day[data-selected='true'] {
-  border: var(--border-control) solid var(--color-selected);
-  background: var(--color-selected-surface);
-  color: var(--color-text);
-  font-weight: var(--type-label-weight);
-}
-
-/* Selected day, said in words (no box: it is the answer, not a note). */
-
-/* ── Step 4: contact and address ─────────────────────────────────────── */
-
-/* 6-column form grid. Fields are subgrids (see Field.module.css), so side-by-side inputs align. */
-
-/* PLZ + Ort are one entity: one row at every width. */
-
-/* Ort is fixed: same rows as a field (label, hint, control), with the value where the input would be. */
-
 /* ── Step 5: review ──────────────────────────────────────────────────── */
 
 .terms {
@@ -483,8 +412,7 @@ form.shop > .actions { margin-top: var(--space-5); }
   display: none;
 }
 
-.linkBtn:focus-visible,
-.day:has(input:focus-visible) {
+.linkBtn:focus-visible {
   outline: none;
   box-shadow: var(--focus);
 }
@@ -569,13 +497,7 @@ form.shop > .actions { margin-top: var(--space-5); }
 @keyframes itemEnter { from { transform: translateX(var(--motion-shift)); } to { transform: translateX(0); } }
 @media (prefers-reduced-motion: reduce) { .itemPanel { animation: none; } }
 
-.dateCards { display: grid; grid-template-columns: 1fr; gap: var(--space-3); max-width: var(--layout-calendar-max); margin: 0 0 var(--space-5); }
-.dateCard, .dateSkeleton { min-height: var(--size-date-card); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-surface-raised); }
-.dateCard { display: flex; flex-wrap: wrap; align-content: center; gap: var(--space-1); padding: calc(var(--space-4) - var(--border-thin)); text-align: left; color: var(--color-text); cursor: pointer; }
-.dateCard small { flex-basis: 100%; font-size: var(--type-hint-size); font-weight: var(--type-label-weight); }
-.dateCard[data-selected='true'] { padding: calc(var(--space-4) - var(--border-control)); border: var(--border-control) solid var(--color-selected); background: var(--color-selected-surface); font-weight: var(--type-label-weight); }
-.dateCard:focus-visible { outline: none; box-shadow: var(--focus); }
-.dateSkeleton { background: var(--color-disabled-surface); }
+.dateSkeleton { min-height: var(--size-date-card); border: var(--border-thin) solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-disabled-surface); }
 
 .linkBtn { color: var(--color-text); text-underline-offset: var(--space-1); font-weight: var(--type-button-weight); }
 
@@ -591,19 +513,6 @@ form.shop > .actions { margin-top: var(--space-5); }
 .seq legend { font-weight: 700; }
 .seqThanks { margin: var(--space-2) 0 0; color: var(--color-text); }
 @keyframes reviewed { from { opacity: .55; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-/* Keep seven non-overlapping targets at 360px; a measured narrow container becomes a date list. */
-@media (max-width: 767px) {
-  .calendarField { margin-inline: calc(-1 * var(--space-4)); }
-  .calendarField h3 { margin-inline: var(--space-4); }
-  .calendarField:has(.calendar[data-list='true']) { margin-inline: 0; }
-  .calendarField:has(.calendar[data-list='true']) h3 { margin-inline: 0; }
-}
-.dayFull { display: none; }
-.calendar[data-list='true'] { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-3); }
-.calendar[data-list='true'] > :not(label) { display: none; }
-.calendar[data-list='true'] .day { width: 100%; height: auto; min-height: var(--touch); padding: var(--space-2); border-radius: var(--radius-control); }
-.calendar[data-list='true'] .dayNumber { display: none; }
-.calendar[data-list='true'] .dayFull { display: inline; }
 .chip[data-disabled='true'] { border-color: var(--color-control-border); }
 
 .waitlist { display: grid; gap: var(--space-3); }
@@ -620,7 +529,9 @@ form.shop > .actions { margin-top: var(--space-5); }
 .choiceCard span { color: var(--color-text-muted); font-size: var(--type-hint-size); }
 .choiceCard[data-selected='true'] { padding: calc(var(--space-4) - var(--border-control)); border: var(--border-control) solid var(--color-selected); background: var(--color-selected-surface); }
 .choiceCard[data-selected='true'] span { color: var(--color-text); }
-@media (hover: hover) { .choiceCard:hover:not([data-selected='true']) { background: var(--color-selection-hover); } }
+.choiceCard[data-disabled='true'] { border-style: dashed; background: var(--color-disabled-surface); color: var(--color-disabled-text); cursor: not-allowed; }
+.choiceCard[data-disabled='true'] span { color: var(--color-disabled-text); }
+@media (hover: hover) { .choiceCard:hover:not([data-selected='true']):not([data-disabled='true']) { background: var(--color-selection-hover); } }
 .choiceCard:has(input:focus-visible) { box-shadow: var(--focus); }
 .pickupDays .dateSkeleton { min-height: var(--size-date-card); border-radius: var(--radius-control); }
 /* One heading per market, then its days: the market name is said once, never on every card. */
@@ -637,10 +548,12 @@ form.shop > .actions { margin-top: var(--space-5); }
 .timeChip { justify-content: center; padding: 0 calc(var(--space-2) - var(--border-thin)); font-variant-numeric: tabular-nums; }
 .timeChip[data-selected='true'] { padding: 0 calc(var(--space-2) - var(--border-control)); }
 @media (min-width: 768px) { .timeRow { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
-/* The chosen date, said once and unmistakably (C1 when chosen, neutral placeholder before). */
+/* The chosen date or estimated range, said once and unmistakably (C1 when chosen, neutral placeholder before). */
 .selectedDate { display: grid; gap: var(--space-1); max-width: var(--layout-calendar-max); margin: var(--space-4) 0 0; padding: calc(var(--space-4) - var(--border-thin)); border: var(--border-thin) dashed var(--color-control-border); border-radius: var(--radius-control); color: var(--color-text-muted); }
+.postRange { margin-top: 0; }
 .selectedDate small { font-size: var(--type-hint-size); font-weight: var(--type-label-weight); }
 .selectedDate[data-selected='true'] { padding: calc(var(--space-4) - var(--border-control)); border: var(--border-control) solid var(--color-selected); background: var(--color-selected-surface); color: var(--color-text); font-weight: var(--type-label-weight); }
+.selectedDate[aria-invalid='true'] { border-color: var(--color-error); }
 
 /* Task B: visible order overview and an explicit per-ornament name decision. */
 .ornamentOverview { margin-bottom: var(--space-5); min-width: 0; }

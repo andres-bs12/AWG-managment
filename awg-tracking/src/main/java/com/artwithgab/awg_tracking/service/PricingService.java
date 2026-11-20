@@ -4,6 +4,7 @@ import com.artwithgab.awg_tracking.config.AwgProperties;
 import com.artwithgab.awg_tracking.dto.pricing.PricesDto;
 import com.artwithgab.awg_tracking.dto.pricing.UpdatePricesRequest;
 import com.artwithgab.awg_tracking.enums.ItemKind;
+import com.artwithgab.awg_tracking.exception.BadRequestException;
 import com.artwithgab.awg_tracking.exception.ConflictException;
 import com.artwithgab.awg_tracking.model.PriceSetting;
 import com.artwithgab.awg_tracking.repository.PriceSettingRepository;
@@ -14,6 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.DayOfWeek;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * Prices live on the server so a client cannot change them. Staff edit them on the Stock screen;
@@ -30,12 +35,20 @@ public class PricingService {
 
     @Transactional(readOnly = true)
     public PricesDto current() {
-        return repository.findById(PriceSetting.ID)
-                .map(row -> new PricesDto(row.getCustomPrice(), row.getFinishedPrice(), row.getNameExtra(), row.getRevision()))
-                .orElseGet(() -> {
-                    var p = props.pricing();
-                    return new PricesDto(p.custom(), p.finished(), p.nameExtra(), 0);
-                });
+        return view(repository.findById(PriceSetting.ID).orElse(null));
+    }
+
+    private PricesDto view(PriceSetting row) {
+        var defaults = props.pricing();
+        List<String> days = row == null || row.getPostCollectionDays() == null
+                ? props.post().collectionWeekdays().stream().map(DayOfWeek::name).toList()
+                : Arrays.asList(row.getPostCollectionDays().split(","));
+        List<String> weekdays = days.stream().map(day -> day.toLowerCase(Locale.ROOT)).toList();
+        if (row == null) return new PricesDto(defaults.custom(), defaults.finished(), defaults.nameExtra(),
+                defaults.shipping(), weekdays, props.post().finishedWithCustom(), 0);
+        return new PricesDto(row.getCustomPrice(), row.getFinishedPrice(), row.getNameExtra(),
+                row.getShippingFee() == null ? defaults.shipping() : row.getShippingFee(), weekdays,
+                props.post().finishedWithCustom(), row.getRevision());
     }
 
     public BigDecimal itemCost(ItemKind kind, boolean withName) {
@@ -62,6 +75,10 @@ public class PricingService {
         if (body.expectedRevision() != now.revision()) {
             throw new ConflictException("Someone changed the prices meanwhile. Check them and save again.").code("PRICES_CHANGED");
         }
+        if (body.postCollectionDays().stream().distinct().count() != body.postCollectionDays().size()) {
+            throw new BadRequestException("Choose distinct Post collection weekdays.")
+                    .code("VALIDATION").field("postCollectionDays");
+        }
         PriceSetting row = repository.findById(PriceSetting.ID).orElseGet(() -> {
             PriceSetting created = new PriceSetting();
             created.setId(PriceSetting.ID);
@@ -70,12 +87,14 @@ public class PricingService {
         row.setCustomPrice(body.customPrice());
         row.setFinishedPrice(body.finishedPrice());
         row.setNameExtra(body.nameExtra());
+        row.setShippingFee(body.shippingFee());
+        row.setPostCollectionDays(String.join(",", body.postCollectionDays()).toUpperCase(Locale.ROOT));
         row.setRevision(now.revision() + 1);
         row.setUpdatedAt(clock.instant());
         repository.save(row);
         // Audit trail for price changes (no customer data): old -> new, revision.
         log.info("Prices changed to revision {}: custom {} -> {}, finished {} -> {}, name {} -> {}", row.getRevision(),
                 now.customPrice(), body.customPrice(), now.finishedPrice(), body.finishedPrice(), now.nameExtra(), body.nameExtra());
-        return new PricesDto(row.getCustomPrice(), row.getFinishedPrice(), row.getNameExtra(), row.getRevision());
+        return view(row);
     }
 }

@@ -11,25 +11,24 @@ test('validation, focus and associated errors across steps', async ({ page }) =>
   await expect(page.locator('[id^="photos-"][id$="-error"]')).toBeVisible()
   await next(page).click(); await expect(page.locator('button[id^="photos-"]')).toBeFocused()
   await page.locator('input[type=file]').setInputFiles(photo); await expect(page.locator('img[alt^="Foto 1"]')).toBeVisible(); await next(page).click()
-  await next(page).click(); await expect(page.locator('#buy-date')).toBeFocused()
-  await expect(page.locator('#buy-date-error')).toBeVisible()
-  await chooseFirstDate(page); await next(page).click()
+  await expect(page.locator('#buy-date')).toBeVisible()
+  await next(page).click()
   await expect(page.locator('#buy-name')).toBeFocused()
-  for (const id of ['buy-name', 'buy-email', 'buy-phone', 'buy-line1', 'buy-postal']) await expect(page.locator(`#${id}-error`)).toBeVisible()
+  for (const id of ['buy-name', 'buy-email', 'buy-phone', 'buy-line1', 'buy-postal', 'buy-city']) await expect(page.locator(`#${id}-error`)).toBeVisible()
   await page.locator('#buy-email').fill('bad'); await page.locator('#buy-email').blur(); await expect(page.locator('#buy-email-error')).toBeVisible()
-  await page.locator('#buy-postal').fill('9999'); await page.locator('#buy-postal').blur(); await expect(page.locator('#buy-postal-error')).toBeVisible()
+  await page.locator('#buy-postal').fill('0123'); await page.locator('#buy-postal').blur(); await expect(page.locator('#buy-postal-error')).toBeVisible()
 })
 
 
-test('contact errors are associated and reject short and non-Vienna postcodes', async ({ page }) => {
+test('contact errors are associated and reject invalid Austrian postcodes', async ({ page }) => {
   await open(page); await choose(page); await pet(page); await next(page).click()
   await chooseFirstDate(page); await next(page).click()
   await expect(page.locator('#buy-name')).toBeFocused()
-  for (const id of ['buy-name', 'buy-email', 'buy-phone', 'buy-line1', 'buy-postal']) {
+  for (const id of ['buy-name', 'buy-email', 'buy-phone', 'buy-line1', 'buy-postal', 'buy-city']) {
     await expect(page.locator(`#${id}`)).toHaveAttribute('aria-describedby', new RegExp(`${id}-error`))
     await expect(page.locator(`#${id}-error`)).toBeVisible()
   }
-  for (const value of ['9999', '101']) {
+  for (const value of ['0123', '101']) {
     await page.locator('#buy-postal').fill(value); await page.locator('#buy-postal').blur()
     await expect(page.locator('#buy-postal-error')).toBeVisible()
   }

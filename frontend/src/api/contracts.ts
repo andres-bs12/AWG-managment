@@ -9,7 +9,10 @@ import type {
   Market,
   MarketDay,
   SaveMarketInput,
+  MakeRoomInput,
+  MakeRoomResult,
   MoveSuggestion,
+  PostCollectionDay,
   Order,
   Photo,
   PaymentMethod,
@@ -17,7 +20,7 @@ import type {
   ShopCheckoutInput,
   ShopCheckoutResult,
   ShopConfig,
-  ShopDeliveryDate,
+  ShippingQuote,
   ShopPickupDay,
   ShopItemInput,
   StaffUser,
@@ -61,6 +64,18 @@ export type AgendaService = {
     handoffDate: string
     beforeHour?: number
   }) => Promise<MoveSuggestion | null>
+  /** Moves one movable paint session to the next slot before its handoff. 409 SESSION_NOT_MOVABLE / NO_SLOT_KEEPS_PROMISE. */
+  makeRoomForBlock: (itemId: string) => Promise<MakeRoomResult>
+  /** Frees `minutes` on `date` by moving sessions; `key` is the Idempotency-Key. 409 NO_MOVABLE_SESSION with `reason`. */
+  makeRoom: (input: MakeRoomInput, key: string) => Promise<MakeRoomResult>
+}
+
+export type ShippingService = {
+  /** Staff New sale: the Post collection and arrival window for ornaments ready on `readyOn`. */
+  window: (readyOn: string) => Promise<ShippingQuote>
+  collectionDays: (from: string, to: string) => Promise<PostCollectionDay[]>
+  /** `open` adds or cancels a collection on that date; `null` clears the override. */
+  setCollectionDay: (date: string, open: boolean | null) => Promise<void>
 }
 
 export type OrderService = {
@@ -82,8 +97,9 @@ export type OrderService = {
     itemId: string,
     status: import('../domain/types').ProductionStatus,
   ) => Promise<void>
-  /** Mark (or undo) market pickup / Vienna handoff — Track becomes `delivered`. */
-  setHandedOver: (orderId: string, handedOver: boolean, itemIds?: string[]) => Promise<void>
+  /** Mark (or undo) market pickup / Post shipping / Vienna handoff — Track becomes `delivered`. */
+  /** `trackingNumber`: Post parcel number stored on the order when present (blank clears it). */
+  setHandedOver: (orderId: string, handedOver: boolean, itemIds?: string[], trackingNumber?: string | null) => Promise<void>
 }
 
 export type PaymentService = {
@@ -114,7 +130,7 @@ export type ShopService = {
   unsubscribeWaitlist: (token: string) => Promise<void>
   joinWaitlist: (email: string, locale: 'de' | 'en') => Promise<void>
   getConfig: () => Promise<ShopConfig>
-  listDeliveryDates: (items: Pick<ShopItemInput, 'kind' | 'withName'>[]) => Promise<ShopDeliveryDate[]>
+  shippingQuote: (items: Pick<ShopItemInput, 'kind' | 'withName'>[]) => Promise<ShippingQuote>
   listPickupDays: (items: Pick<ShopItemInput, 'kind' | 'withName'>[]) => Promise<ShopPickupDay[]>
   /** Creates the order and a Stripe Checkout session; the browser then redirects to `checkoutUrl`. */
   checkout: (input: ShopCheckoutInput) => Promise<ShopCheckoutResult>
@@ -136,6 +152,7 @@ export type Api = {
   inventory: { list: () => Promise<InventoryItem[]>; update: (id: string, quantity: number, expectedQuantity?: number) => Promise<InventoryItem> }
   prices: { get: () => Promise<Prices>; update: (input: PricesUpdate) => Promise<Prices> }
   paintingDays: { list: (from: string, to: string) => Promise<PaintingDay[]>; update: (date: string, open: boolean, maxPaintings: number, hours?: { openHour: number; closeHour: number }) => Promise<PaintingDay> }
+  shipping: ShippingService
   auth: AuthService
   markets: MarketService
   agenda: AgendaService

@@ -95,6 +95,7 @@ public class OrderItem {
     //   - MARKET   → handoffDate REQUIRED; pickUpTime required for CUSTOM (deadline to be ready).
     //                A finished ornament handed over on the spot may have no time.
     //   - DELIVERY → handoffDate REQUIRED (Wed/Fri), pickUpTime null.
+    //   - POST     → handoffDate is the Post collection day; arrivalFrom/To store the estimated window.
     //   The delivery address lives on Order.
 
     @Enumerated(EnumType.STRING)
@@ -103,6 +104,9 @@ public class OrderItem {
 
     @Column(nullable = false)
     private LocalDate handoffDate;
+
+    private LocalDate arrivalFrom;
+    private LocalDate arrivalTo;
 
     private LocalTime pickUpTime;
 

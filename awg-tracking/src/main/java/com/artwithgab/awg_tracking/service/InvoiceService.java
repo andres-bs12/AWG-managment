@@ -37,11 +37,13 @@ public class InvoiceService {
     @EventListener
     @Transactional(propagation = Propagation.MANDATORY)
     public void onOrderNotification(OrderNotification event) {
-        boolean handover = event.kind() == OrderNotification.Kind.HANDED_OVER;
+        boolean shipped = event.kind() == OrderNotification.Kind.POST_SHIPPED;
+        boolean handover = shipped || event.kind() == OrderNotification.Kind.HANDED_OVER;
         if (!handover && event.kind() != OrderNotification.Kind.WEB_PAID && event.kind() != OrderNotification.Kind.SALE_CREATED
                 && event.kind() != OrderNotification.Kind.PAYMENT_CHANGED && event.kind() != OrderNotification.Kind.FORM_SUBMITTED) return;
         if (event.orderId() == null) return;
         var order = orders.findById(UUID.fromString(event.orderId())).orElseThrow();
+        if (shipped && !order.isHandedOver()) return;
         if (!handover && order.getPaymentState() == PaymentState.UNPAID) return;
         // Without seller data there is no business to invoice from: send a plain payment
         // confirmation (no invoice number, no tax wording) instead of a legally incomplete invoice.

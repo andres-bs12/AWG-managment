@@ -23,11 +23,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PriceApiTests extends ApiTestSupport {
     @Autowired InvoiceRepository invoices;
     @Autowired OrderService orders;
+    @Autowired com.artwithgab.awg_tracking.repository.PriceSettingRepository settings;
 
     private MvcResult putPrices(String token, String custom, String finished, String name, long revision) throws Exception {
         return mvc.perform(put("/api/prices").header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON)
                 .content(json(Map.of("customPrice", new BigDecimal(custom), "finishedPrice", new BigDecimal(finished),
-                        "nameExtra", new BigDecimal(name), "expectedRevision", revision)))).andReturn();
+                        "nameExtra", new BigDecimal(name), "expectedRevision", revision,
+                        "shippingFee", new BigDecimal("6.25"), "postCollectionDays", java.util.List.of("monday", "thursday"))))).andReturn();
     }
 
     @Test void defaultsApplyUntilTheFirstSave() throws Exception {
@@ -36,7 +38,27 @@ class PriceApiTests extends ApiTestSupport {
                 .andExpect(jsonPath("$.customPrice").value(49.99))
                 .andExpect(jsonPath("$.finishedPrice").value(39.99))
                 .andExpect(jsonPath("$.nameExtra").value(12.99))
+                .andExpect(jsonPath("$.shippingFee").value(5.0))
+                .andExpect(jsonPath("$.postCollectionDays[0]").value("tuesday"))
+                .andExpect(jsonPath("$.postCollectionDays[1]").value("friday"))
                 .andExpect(jsonPath("$.revision").value(0));
+    }
+
+    @Test void anExistingPriceRowWithoutShippingSettingsUsesDefaults() throws Exception {
+        var row = new com.artwithgab.awg_tracking.model.PriceSetting();
+        row.setId(com.artwithgab.awg_tracking.model.PriceSetting.ID);
+        row.setCustomPrice(new BigDecimal("51.00"));
+        row.setFinishedPrice(new BigDecimal("41.00"));
+        row.setNameExtra(new BigDecimal("13.00"));
+        row.setRevision(7);
+        row.setUpdatedAt(java.time.Instant.parse("2026-11-20T00:00:00Z"));
+        settings.save(row);
+        mvc.perform(get("/api/prices").header("Authorization", bearer(login())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.revision").value(7))
+                .andExpect(jsonPath("$.customPrice").value(51))
+                .andExpect(jsonPath("$.shippingFee").value(5))
+                .andExpect(jsonPath("$.postCollectionDays[0]").value("tuesday"));
     }
 
     @Test void pricesAreStaffOnly() throws Exception {
@@ -50,11 +72,20 @@ class PriceApiTests extends ApiTestSupport {
         MvcResult saved = putPrices(token, "55.00", "35.50", "15.00", 0);
         assertEquals(200, saved.getResponse().getStatus(), saved.getResponse().getContentAsString());
         assertEquals(1, this.<Integer>read(saved, "$.revision"));
+        assertThat(this.<java.util.List<String>>read(saved, "$.postCollectionDays"))
+                .containsExactly("monday", "thursday");
 
         mvc.perform(withIp(get("/api/shop/config")))
                 .andExpect(jsonPath("$.customPrice").value(55.0))
                 .andExpect(jsonPath("$.finishedPrice").value(35.5))
-                .andExpect(jsonPath("$.nameExtra").value(15.0));
+                .andExpect(jsonPath("$.nameExtra").value(15.0))
+                .andExpect(jsonPath("$.deliveryFee").value(6.25));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/shipping/window")
+                        .header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("readyOn", "2026-11-27"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.collectionDate").value("2026-11-30"));
 
         MvcResult sale = sale(token, customItem(true, TUE, 10.0, 11.25, "market", dayId(token, SAT), 14.0), finishedItem());
         assertEquals(201, sale.getResponse().getStatus(), sale.getResponse().getContentAsString());
@@ -75,6 +106,22 @@ class PriceApiTests extends ApiTestSupport {
         assertEquals(400, putPrices(token, "50.00", "40.00", "-1.00", 0).getResponse().getStatus());
         assertEquals(400, putPrices(token, "50.001", "40.00", "13.00", 0).getResponse().getStatus());
         assertEquals(400, putPrices(token, "1000.00", "40.00", "13.00", 0).getResponse().getStatus());
+    }
+
+    @Test void invalidShippingSettingsAreRejected() throws Exception {
+        String token = login();
+        var body = new java.util.HashMap<String, Object>(Map.of(
+                "customPrice", 50, "finishedPrice", 40, "nameExtra", 13, "expectedRevision", 0,
+                "shippingFee", 5, "postCollectionDays", java.util.List.of("monday", "monday")));
+        for (var days : java.util.List.of(java.util.List.of("monday", "monday"), java.util.List.of("saturday"), java.util.List.of())) {
+            body.put("postCollectionDays", days);
+            mvc.perform(put("/api/prices").header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON)
+                    .content(json(body))).andExpect(status().isBadRequest());
+        }
+        body.put("postCollectionDays", java.util.List.of("monday"));
+        body.put("shippingFee", 100);
+        mvc.perform(put("/api/prices").header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON)
+                .content(json(body))).andExpect(status().isBadRequest());
     }
 
     @Test void invoiceKeepsTheSurchargeChargedAtSaleTime() throws Exception {

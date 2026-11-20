@@ -10,13 +10,14 @@ import { AnimatedPrice } from '../../components/public/AnimatedPrice'
 import { OrnamentPreview, type OrnamentSide } from '../../components/public/OrnamentPreview'
 import { OrnamentLoader } from '../../components/public/OrnamentLoader'
 import { Button } from '../../components/ui/Button'
-import type { Photo, ShopConfig, ShopDeliveryDate, ShopPickupDay } from '../../domain/types'
+import type { Photo, ShopConfig, ShippingQuote, ShopPickupDay } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
 import { loadBuyDraft, newItem, saveBuyDraft, type BuyDraft, type BuyItem } from '../../lib/buyDraft'
 import { apiError } from '../../lib/apiError'
 import { keepFormFocusVisible } from '../../lib/publicFormFocus'
 import { petNameFromBack } from '../../lib/petName'
 import { phoneValid } from '../../lib/phone'
+import { AUSTRIAN_POSTAL_REGEX } from '../../lib/postShipping'
 import styles from './BuyPage.module.css'
 import { MAX_PHOTOS, pickupTimes } from './buy/shared'
 import { OrnamentOverview } from '../../components/public/OrnamentOverview'
@@ -27,10 +28,9 @@ import { BuyContactStep } from './buy/BuyContactStep'
 import { BuyReviewStep } from './buy/BuyReviewStep'
 import { CartRows } from './buy/CartRows'
 
-const VIENNA_POSTAL = /^1(0[1-9]|1[0-9]|2[0-3])0$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 /** Contact errors that mean "left empty" (metrics report them as required, the rest as invalid). */
-const MISSING = new Set(['formNeedName', 'formNeedEmail', 'formNeedPhone', 'formNeedStreet'])
+const MISSING = new Set(['formNeedName', 'formNeedEmail', 'formNeedPhone', 'formNeedStreet', 'formNeedCity'])
 
 export function BuyPage() {
   const { t, locale } = useLocale()
@@ -50,8 +50,8 @@ export function BuyPage() {
   const [activeUid, setActiveUid] = useState(draft.items[0].uid)
   const [removed, setRemoved] = useState<{ item: BuyItem; index: number; label: string } | null>(null)
   const [sides, setSides] = useState<Record<string, OrnamentSide>>({})
-  const [dates, setDates] = useState<ShopDeliveryDate[]>([])
-  const [datesState, setDatesState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [shippingQuote, setShippingQuote] = useState<ShippingQuote | null>(null)
+  const [shippingState, setShippingState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [datesRetry, setDatesRetry] = useState(0)
   const [pickupDays, setPickupDays] = useState<ShopPickupDay[]>([])
   const [pickupState, setPickupState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -132,19 +132,21 @@ export function BuyPage() {
   useEffect(() => {
     if (!config?.enabled || config.seasonOver) return
     let active = true
-    const timer = window.setTimeout(() => setDatesState('loading'), 0)
+    const timer = window.setTimeout(() => setShippingState('loading'), 0)
     const items = signature ? signature.split(',').map((entry) => ({ kind: 'custom' as const, withName: entry.endsWith(':1') })) : [{ kind: 'custom' as const, withName: false }]
-    api.shop.listDeliveryDates(items).then((list) => {
+    api.shop.shippingQuote(items).then((quote) => {
       window.clearTimeout(timer)
       if (!active) return
-      setDates(list)
-      setDatesState('ready')
-      setDraft((current) => current.deliveryKind === 'vienna' && current.deliveryDate && !list.some((date) => date.date === current.deliveryDate) ? { ...current, deliveryDate: '' } : current)
+      setShippingQuote(quote)
+      setShippingState('ready')
+      if (!quote.available) {
+        setDraft((current) => current.deliveryKind !== 'market' ? { ...current, deliveryKind: 'market', deliveryDate: '', pickupTime: '' } : current)
+      }
     }).catch(() => {
       window.clearTimeout(timer)
       if (!active) return
-      setDates([])
-      setDatesState('error')
+      setShippingQuote(null)
+      setShippingState('error')
     })
     return () => { active = false; window.clearTimeout(timer) }
   }, [signature, config?.enabled, config?.seasonOver, datesRetry])
@@ -184,7 +186,7 @@ export function BuyPage() {
   const total = draft.items.length ? itemsTotal + deliveryFee : 0
   const err = (key: string) => errors[key]?.startsWith('api:') ? apiError({ code: errors[key].slice(4) }, locale, t('shopCheckoutError')).text : errors[key] ? t(errors[key]) : undefined
   const described = (key: string, hint = false) => [hint ? `${key}-hint` : '', err(key) ? `${key}-error` : ''].filter(Boolean).join(' ') || undefined
-  function patch(partial: Partial<BuyDraft>) { if (partial.deliveryKind && partial.deliveryKind !== draft.deliveryKind) void api.metrics.track({ event: 'buy_choice', field: 'delivery', value: partial.deliveryKind }).catch(() => {}); const changedFields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', postalCode: 'buy-postal' }; setValidFields(current => current.filter(id => !Object.keys(partial).some(key => changedFields[key] === id))); setDraft((current) => ({ ...current, ...partial })); const fields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', line2: 'buy-line2', postalCode: 'buy-postal', deliveryDate: 'buy-date', pickupTime: 'buy-time', deliveryKind: 'buy-date', acceptTerms: 'buy-terms' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[fields[key]]); return next }); setServerError('') }
+  function patch(partial: Partial<BuyDraft>) { if (partial.deliveryKind && partial.deliveryKind !== draft.deliveryKind) void api.metrics.track({ event: 'buy_choice', field: 'delivery', value: partial.deliveryKind }).catch(() => {}); const changedFields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', postalCode: 'buy-postal', city: 'buy-city' }; setValidFields(current => current.filter(id => !Object.keys(partial).some(key => changedFields[key] === id))); setDraft((current) => ({ ...current, ...partial })); const fields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', line2: 'buy-line2', postalCode: 'buy-postal', city: 'buy-city', deliveryDate: 'buy-date', pickupTime: 'buy-time', deliveryKind: 'buy-date', acceptTerms: 'buy-terms' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[fields[key]]); return next }); setServerError('') }
   function patchItem(uid: string, partial: Partial<BuyItem>) {
     // Toggling or clearing the name unpins the side, so an empty back never stays selected.
     if (partial.withName !== undefined || partial.backName?.trim() === '') setSides(current => { const next = { ...current }; delete next[uid]; return next })
@@ -207,7 +209,9 @@ export function BuyPage() {
     if (currentStep === 1) for (const item of draft.items) {
       if (!item.photos.length) found[`photos-${item.uid}`] = 'shopNeedPhotoShop'
     }
-    if (currentStep === 2 && draft.deliveryKind === 'vienna' && (datesState !== 'ready' || !dates.some((date) => date.date === draft.deliveryDate))) found['buy-date'] = 'shopNeedDate'
+    if (currentStep === 2 && draft.deliveryKind !== 'market' && (shippingState !== 'ready' || !shippingQuote?.available || !shippingQuote.arrivalFrom || !shippingQuote.arrivalTo)) {
+      found['buy-date'] = shippingState === 'ready' && !shippingQuote?.available ? 'postUnavailable' : 'shopDatesError'
+    }
     if (currentStep === 2 && draft.deliveryKind === 'market') {
       const day = pickupState === 'ready' ? pickupDays.find((entry) => entry.date === draft.deliveryDate) : undefined
       if (!day) found['buy-date'] = 'shopNeedPickupDay'
@@ -219,8 +223,11 @@ export function BuyPage() {
       else if (!EMAIL.test(draft.email.trim())) found['buy-email'] = 'invalidEmail'
       if (!draft.phone.trim()) found['buy-phone'] = 'formNeedPhone'
       else if (!phoneValid(draft.phone)) found['buy-phone'] = 'phoneInvalid'
-      if (draft.deliveryKind === 'vienna' && !draft.line1.trim()) found['buy-line1'] = 'formNeedStreet'
-      if (draft.deliveryKind === 'vienna' && !VIENNA_POSTAL.test(draft.postalCode.trim())) found['buy-postal'] = 'shopPostalInvalid'
+      if (draft.deliveryKind !== 'market') {
+        if (!draft.line1.trim()) found['buy-line1'] = 'formNeedStreet'
+        if (!AUSTRIAN_POSTAL_REGEX.test(draft.postalCode.trim())) found['buy-postal'] = 'shopPostalInvalid'
+        if (!draft.city.trim()) found['buy-city'] = 'formNeedCity'
+      }
     }
     if (currentStep === 4 && !draft.acceptTerms) found['buy-terms'] = 'shopNeedTerms'
     return found
@@ -229,7 +236,7 @@ export function BuyPage() {
     const error = validate(3)[id]
     setErrors(current => { const next = { ...current }; if (error) next[id] = error; else if (!current[id]?.startsWith('api:')) delete next[id]; return next })
     setValidFields(current => error ? current.filter(value => value !== id) : [...new Set([...current, id])])
-    const field = ({ 'buy-name': 'customerName', 'buy-email': 'email', 'buy-phone': 'phone', 'buy-line1': 'line1', 'buy-postal': 'postalCode' } as Record<string, string>)[id]
+    const field = ({ 'buy-name': 'customerName', 'buy-email': 'email', 'buy-phone': 'phone', 'buy-line1': 'line1', 'buy-postal': 'postalCode', 'buy-city': 'city' } as Record<string, string>)[id]
     if (error && field) void api.metrics.track({ event: 'buy_validation_error', step: 'delivery', field, code: MISSING.has(error) ? 'required' : 'invalid' }).catch(() => {})
   }
   /** First problem = first unfinished ornament, in the order its fields are asked. */
@@ -271,29 +278,45 @@ export function BuyPage() {
     busyRef.current = true; setBusy(true); setServerError('')
     try {
       const wanted = draft.items.map(item => ({ kind: 'custom' as const, withName: item.withName }))
-      let stillAvailable: boolean
+      let expectedArrivalTo = shippingQuote?.arrivalTo ?? null
       if (pickup) {
         const days = await api.shop.listPickupDays(wanted)
         setPickupDays(days); setPickupState('ready')
-        stillAvailable = days.some(day => day.date === draft.deliveryDate)
+        if (!days.some(day => day.date === draft.deliveryDate)) {
+          setDraft(current => ({ ...current, deliveryDate: '', pickupTime: '' }))
+          go(1)
+          showErrors({ 'buy-date': 'shopDateUnavailable' })
+          busyRef.current = false; setBusy(false)
+          return
+        }
       } else {
-        const availableDates = await api.shop.listDeliveryDates(wanted)
-        setDates(availableDates); setDatesState('ready')
-        stillAvailable = availableDates.some(date => date.date === draft.deliveryDate)
-      }
-      if (!stillAvailable) {
-        setDraft(current => ({ ...current, deliveryDate: '', pickupTime: '' }))
-        go(1)
-        showErrors({ 'buy-date': 'shopDateUnavailable' })
-        busyRef.current = false; setBusy(false)
-        return
+        const freshQuote = await api.shop.shippingQuote(wanted)
+        setShippingQuote(freshQuote); setShippingState('ready')
+        if (!freshQuote.available || !freshQuote.arrivalTo) {
+          setDraft(current => ({ ...current, deliveryKind: 'market', deliveryDate: '', pickupTime: '' }))
+          go(1)
+          showErrors({ 'buy-date': 'api:SHIPPING_UNAVAILABLE' })
+          busyRef.current = false; setBusy(false)
+          return
+        }
+        if (!expectedArrivalTo || freshQuote.arrivalTo > expectedArrivalTo) {
+          go(1)
+          showErrors({ 'buy-date': 'api:SHIPPING_WINDOW_CHANGED' })
+          busyRef.current = false; setBusy(false)
+          return
+        }
+        expectedArrivalTo = freshQuote.arrivalTo
       }
       const result = await api.shop.checkout({
         customerName: draft.customerName.trim(), email: draft.email.trim(), phone: draft.phone.trim(),
         ...(pickup
-          ? { deliveryKind: 'market' as const, pickupTime: draft.pickupTime }
-          : { address: { line1: draft.line1.trim(), line2: draft.line2.trim() || undefined, postalCode: draft.postalCode.trim(), city: 'Wien' } }),
-        deliveryDate: draft.deliveryDate, acceptTerms: draft.acceptTerms,
+          ? { deliveryKind: 'market' as const, deliveryDate: draft.deliveryDate, pickupTime: draft.pickupTime }
+          : {
+              deliveryKind: 'post' as const,
+              address: { line1: draft.line1.trim(), line2: draft.line2.trim() || undefined, postalCode: draft.postalCode.trim(), city: draft.city.trim() },
+              expectedArrivalTo,
+            }),
+        acceptTerms: draft.acceptTerms,
         items: draft.items.map((item) => ({ kind: 'custom', withName: item.withName, color: item.color || undefined, finish: item.finish || undefined, petName: item.withName ? petNameFromBack(item.backName) : '', backName: item.withName ? item.backName.trim() : undefined, note: item.note.trim() || undefined, photos: item.photos })),
       })
       // Only follow Stripe Checkout or a same-origin URL (the mock success page).
@@ -302,13 +325,24 @@ export function BuyPage() {
       try { sessionStorage.setItem('awg-checkout-pending', result.orderCode) } catch { /* storage unavailable */ }
       window.location.assign(target.href)
     } catch (error) {
-      const problem = apiError(error, locale, t('shopCheckoutError')); const field = problem.field ?? ''; const match = field.match(/^items\[(\d+)\]\.(\w+)/); const item = match ? draft.items[Number(match[1])] : ['petName', 'backName', 'photos'].includes(field) ? draft.items[0] : undefined; const itemFields: Record<string, [number, string]> = { petName: [0, 'back'], photos: [1, 'photos'], color: [0, 'color'], finish: [0, 'finish'], backName: [0, 'back'], note: [1, 'note'] }; const simple: Record<string, [number, string]> = { customerName: [3, 'buy-name'], email: [3, 'buy-email'], phone: [3, 'buy-phone'], 'address.line1': [3, 'buy-line1'], 'address.line2': [3, 'buy-line2'], 'address.city': [3, 'buy-city'], address: [3, 'buy-line1'], 'address.postalCode': [3, 'buy-postal'], deliveryDate: [2, 'buy-date'], pickupTime: [2, 'buy-time'] }; const itemField = match?.[2] ?? field; const target = item && itemFields[itemField] && (itemField !== 'petName' || item.withName) ? [itemFields[itemField][0], `${itemFields[itemField][1]}-${item.uid}`] as const : simple[field];
-      if (target) { go(target[0] < 2 ? 0 : 1); showErrors({ [target[1]]: (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string') ? `api:${error.code}` : 'shopFixErrors' }) } else setServerError(problem.text)
+      const code = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' ? error.code : undefined
+      if (code === 'SHIPPING_UNAVAILABLE' || code === 'SHIPPING_WINDOW_CHANGED') {
+        const wanted = draft.items.map(item => ({ kind: 'custom' as const, withName: item.withName }))
+        try {
+          const fresh = await api.shop.shippingQuote(wanted)
+          setShippingQuote(fresh); setShippingState('ready')
+          if (!fresh.available) setDraft(current => current.deliveryKind !== 'market' ? { ...current, deliveryKind: 'market', deliveryDate: '', pickupTime: '' } : current)
+        } catch {
+          setDatesRetry(v => v + 1)
+        }
+      }
+      const problem = apiError(error, locale, t('shopCheckoutError')); const field = problem.field ?? ''; const match = field.match(/^items\[(\d+)\]\.(\w+)/); const item = match ? draft.items[Number(match[1])] : ['petName', 'backName', 'photos'].includes(field) ? draft.items[0] : undefined; const itemFields: Record<string, [number, string]> = { petName: [0, 'back'], photos: [1, 'photos'], color: [0, 'color'], finish: [0, 'finish'], backName: [0, 'back'], note: [1, 'note'] }; const simple: Record<string, [number, string]> = { customerName: [3, 'buy-name'], email: [3, 'buy-email'], phone: [3, 'buy-phone'], 'address.line1': [3, 'buy-line1'], 'address.line2': [3, 'buy-line2'], 'address.city': [3, 'buy-city'], address: [3, 'buy-line1'], 'address.postalCode': [3, 'buy-postal'], deliveryDate: [2, 'buy-date'], delivery: [2, 'buy-date'], expectedArrivalTo: [2, 'buy-date'], deliveryKind: [2, 'buy-date'], pickupTime: [2, 'buy-time'] }; const itemField = match?.[2] ?? field; const target = item && itemFields[itemField] && (itemField !== 'petName' || item.withName) ? [itemFields[itemField][0], `${itemFields[itemField][1]}-${item.uid}`] as const : simple[field];
+      if (target) { go(target[0] < 2 ? 0 : 1); showErrors({ [target[1]]: code ? `api:${code}` : 'shopFixErrors' }) } else setServerError(problem.text)
       busyRef.current = false; setBusy(false)
     }
   }
 
-  const stepProps = { t, draft, config, itemPrice, patch, patchItem, err, described, photoErrors: Object.fromEntries(Object.entries(photoErrors).map(([key, value]) => [key, value ? t(value) : ''])), addFiles, dates, datesState, setDatesRetry, pickupDays, pickupState, formatDate, serverError }
+  const stepProps = { t, draft, config, itemPrice, patch, patchItem, err, described, photoErrors: Object.fromEntries(Object.entries(photoErrors).map(([key, value]) => [key, value ? t(value) : ''])), addFiles, shippingQuote, shippingState, setDatesRetry, pickupDays, pickupState, formatDate, serverError }
 
   const activeItem = draft.items.find(item => item.uid === activeUid) ?? draft.items[0]
   function next() {

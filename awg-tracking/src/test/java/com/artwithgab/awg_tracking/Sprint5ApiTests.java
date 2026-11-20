@@ -57,24 +57,6 @@ class Sprint5ApiTests extends ApiTestSupport {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void viennaDeliveryOnAStallFridayIsRefused() throws Exception {
-        String token = login();
-        // Fri 27 Nov is a Rathausplatz day: the stall has priority.
-        MvcResult res = sale(token, customItem(false, TUE, 10.0, 11.0, "vienna", dayId(token, "2026-11-27"), null));
-        assertThat(res.getResponse().getStatus()).isEqualTo(400);
-        assertThat(this.<String>read(res, "$.code")).isEqualTo("DELIVERY_DAY_INVALID");
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void viennaDeliveryOnSaturdayHasCode() throws Exception {
-        String token = login();
-        MvcResult res = sale(token, customItem(false, TUE, 10.0, 11.0, "vienna", dayId(token, SAT), null));
-        assertThat(this.<String>read(res, "$.code")).isEqualTo("DELIVERY_DAY_INVALID");
-    }
-
-    @Test
     void stockUpdateWithStaleExpectedQuantityIs409() throws Exception {
         String token = login();
         var row = inventory.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow();

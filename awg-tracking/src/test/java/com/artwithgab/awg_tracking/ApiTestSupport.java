@@ -76,6 +76,8 @@ public abstract class ApiTestSupport {
 
     @Autowired
     protected MockMvc mvc;
+    @Autowired
+    private com.artwithgab.awg_tracking.repository.OrderRepository storedOrders;
 
     /** A fresh client address per call, because the rate limiter keys on it and the clock is frozen. */
     protected static String freshIp() {
@@ -150,6 +152,19 @@ public abstract class ApiTestSupport {
         return mvc.perform(post("/api/orders").header("Authorization", bearer(token))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(Map.of("items", new ArrayList<>(List.of(items)))))).andReturn();
+    }
+
+    /** A persisted order from before the Post migration. */
+    protected String legacyViennaOrder(String token, double paintStart, boolean withName) throws Exception {
+        String id = saleOk(token, customItem(withName, TUE, paintStart, paintStart + (withName ? 1.25 : 1),
+                "market", dayId(token, SAT), 14.0));
+        var order = storedOrders.findById(java.util.UUID.fromString(id)).orElseThrow();
+        var item = order.getOrderItems().getFirst();
+        item.setDeliveryKind(com.artwithgab.awg_tracking.enums.DeliveryKind.DELIVERY);
+        item.setHandoffDate(java.time.LocalDate.parse(WED));
+        item.setPickUpTime(null);
+        storedOrders.flush();
+        return id;
     }
 
     /** Creates a sale that must succeed and returns the order id. */

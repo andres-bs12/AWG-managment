@@ -60,7 +60,7 @@ class Sprint6ApiTests extends ApiTestSupport {
         if (finish != null) item.put("finish", finish);
         Map<String, Object> payload = Map.of("customerName", "Eva Gruber", "email", "eva@example.com", "phone", "+43 1 234",
                 "address", Map.of("line1", "Neubaugasse 1", "city", "Wien", "postalCode", "1070"),
-                "deliveryDate", "2026-12-02", "acceptTerms", true, "items", List.of(item));
+                "expectedArrivalTo", "2026-12-04", "acceptTerms", true, "items", List.of(item));
         var req = multipart("/api/shop/checkout");
         req.file(new MockMultipartFile("photo-p0", "luna.jpg", "image/jpeg", JPEG));
         req.file(new MockMultipartFile("payload", "", "application/json", json(payload).getBytes()));
@@ -102,11 +102,10 @@ class Sprint6ApiTests extends ApiTestSupport {
     }
 
     @Test
-    void noWebDeliveryBeforeTheSeasonStarts() throws Exception {
-        MvcResult res = mvc.perform(withIp(post("/api/shop/delivery-dates")).contentType(MediaType.APPLICATION_JSON)
+    void noPostCollectionBeforeShippingStarts() throws Exception {
+        MvcResult res = mvc.perform(withIp(post("/api/shop/shipping-quote")).contentType(MediaType.APPLICATION_JSON)
                 .content(json(Map.of("items", List.of(Map.of("kind", "custom", "withName", false)))))).andExpect(status().isOk()).andReturn();
-        List<String> dates = read(res, "$[*].date");
-        assertThat(dates).isNotEmpty().allSatisfy(d -> assertThat(d).isGreaterThanOrEqualTo("2026-11-30"));
+        assertThat(this.<String>read(res, "$.collectionDate")).isGreaterThanOrEqualTo("2026-11-30");
     }
 
     /** A finished-ornament sale marked handed over {@code daysAgo} days ago. */

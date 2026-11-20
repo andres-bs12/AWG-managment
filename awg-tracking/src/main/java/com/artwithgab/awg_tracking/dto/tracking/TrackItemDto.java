@@ -2,10 +2,12 @@ package com.artwithgab.awg_tracking.dto.tracking;
 
 import com.artwithgab.awg_tracking.enums.CustomColor;
 import com.artwithgab.awg_tracking.enums.CustomFinish;
+import com.artwithgab.awg_tracking.enums.DeliveryKind;
 import com.artwithgab.awg_tracking.enums.ItemKind;
 import com.artwithgab.awg_tracking.enums.ProductionStatus;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record TrackItemDto(
         CustomColor color,
@@ -15,6 +17,10 @@ public record TrackItemDto(
         ItemKind kind,
         ProductionStatus productionStatus,
         boolean withName,
-        String backName
+        String backName,
+        DeliveryKind deliveryKind,
+        LocalDate arrivalFrom,
+        LocalDate arrivalTo,
+        boolean handedOver
 ) {
 }

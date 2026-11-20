@@ -1,6 +1,7 @@
 package com.artwithgab.awg_tracking.model;
 
 import com.artwithgab.awg_tracking.enums.CheckoutStatus;
+import com.artwithgab.awg_tracking.enums.DeliveryKind;
 import com.artwithgab.awg_tracking.enums.OrderSource;
 import com.artwithgab.awg_tracking.enums.PaymentMethod;
 import com.artwithgab.awg_tracking.enums.PaymentState;
@@ -93,9 +94,22 @@ public class Order {
     @Column(length = 64)
     private String checkoutClientHash;
 
-    /** Vienna delivery fee charged online; included in total. */
+    /** Handoff fee charged once per order and included in total. */
     @Column(precision = 10, scale = 2)
     private BigDecimal deliveryFee;
+
+    @Column(length = 40)
+    private String trackingNumber;
+
+    public List<OrderItem> postItems() {
+        return orderItems.stream()
+                .filter(item -> item.getDeliveryKind() == DeliveryKind.POST).toList();
+    }
+
+    public boolean isPostShipped() {
+        var items = postItems();
+        return !items.isEmpty() && items.stream().allMatch(OrderItem::isHandedOver);
+    }
 
     /** True while a web order waits for payment: it holds slots but is hidden from agenda lists. */
     /** Client-generated key of a staff sale, so a double tap or retry returns the same order. */
