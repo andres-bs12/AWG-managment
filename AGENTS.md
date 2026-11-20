@@ -1,6 +1,6 @@
 # Contexto del proyecto — ArtWithGab (AWG)
 
-**Actualizado:** 2026-11-20 (v3.1 en `release/v3.1`, sin desplegar: stock numerado, iPad staff, dos mercados y reglas de Gaby; envío por Post en `feat/v3.1-post-shipping`; v3.0.2 sigue en producción)
+**Actualizado:** 2026-11-20 (**v3.1.0 desplegada** en producción: commit `389a1b3`, etiqueta `v3.1.0`, `main` movida; migraciones V14–V17 aplicadas; backup `~/backups/pre-v3.1-20261120T2038.sql.gz`)
 **Propósito de este archivo:** memoria persistente para el dueño del proyecto y los agentes que trabajen en este repositorio.
 
 ## Instrucción de mantenimiento
@@ -96,7 +96,7 @@ Scripts disponibles en `frontend/package.json`: `dev`, `build`, `build:mock`, `l
 - Frontend: `/buy` paso 2 «Versand per Post» con rango y ciudad editable, revisión, gracias y Track (Versendet + «Sendung verfolgen»); staff: New sale «Post (+€5)», lista Ship por día de recogida en Deliveries, precios y días de recogida en Stock, número de envío en detalle, «Make room today» con popup y «Make room» por bloque en Agenda. Lista para el asesor legal: `tasks/post-shipping-legal-2026-11-20.md`. Contrato: `tasks/post-shipping-contract-2026-11-20.md`.
 - Pendiente: revisión del dueño, commit/push de la rama, `e2e-full` en CI, compra real con Stripe, hablar con Correos (tarifa real vs 5 €, servicio de recogida, embalaje), textos legales del asesor.
 
-## v3.1 (2026-11-12, rama `release/v3.1`, sin desplegar)
+## v3.1 (desplegada 2026-11-20, `389a1b3`)
 
 - **Ronda 3 de iPad, Agenda (2026-11-20, sin commit):** engranaje junto al título, icono de mercado en la tira de días y línea de hora actual por encima de los pedidos. Calendario y entregas usan tarjetas neutras con estado en una etiqueta. El engranaje muestra el puesto automático efectivo y el resumen de capacidad usa las reservas activas de Painting days. Las sesiones Ready futuras quedan como enlaces con su hora registrada fuera de la cuadrícula. HTTP y mock liberan su tiempo futuro y rechazan volver a To paint si otra sesión ya lo reservó. Build HTTP, lint, 96 pruebas Node y 207 Maven en verde. Chrome con mock verificado a 820×1180, 1180×820 y 360×640. Specs E2E actualizadas, ejecución de Playwright pendiente.
 
