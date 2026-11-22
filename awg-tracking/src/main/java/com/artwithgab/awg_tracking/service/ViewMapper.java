@@ -92,7 +92,8 @@ public class ViewMapper {
                 o.isPaymentReview(),
                 List.of(),
                 o.getCheckoutStatus() == null ? null : o.getCheckoutStatus().name().toLowerCase(java.util.Locale.ROOT),
-                o.getSource(), o.getTrackingNumber(), AustrianPost.trackingUrl(o.getTrackingNumber()));
+                o.getSource(), o.getTrackingNumber(), AustrianPost.trackingUrl(o.getTrackingNumber()),
+                o.needsReview(), o.getReviewedAt() == null ? null : o.getReviewedAt().toString());
     }
 
     /** Day the item is handed off, resolved against the calendar. */

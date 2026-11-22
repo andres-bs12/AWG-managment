@@ -96,9 +96,16 @@ Scripts disponibles en `frontend/package.json`: `dev`, `build`, `build:mock`, `l
 - **Make room:** `POST /api/agenda/blocks/{itemId}/make-room` mueve una sesión elegible y `POST /api/agenda/make-room` libera un hueco con `Idempotency-Key`. Ambos conservan la fecha de entrega o recogida. Ver [contrato de Post](tasks/post-shipping-contract-2026-11-20.md) y [contrato HTTP vigente](docs/frontend-api-swap.md).
 - **Verificación de la versión según el registro de entrega:** 270 pruebas de backend, 106 Node y `e2e-full` en verde en CI.
 
+## Correos y revisión (rama `fix/qa-real-tests-2026-11-22`, 2026-11-22)
+
+- Prueba real en producción: llegaron los 10 correos al cliente. Hallazgos en `tasks/qa-real-tests-2026-11-22.md`; página visual de plantillas: https://claude.ai/artifact/FT1twyvR5Vx9uZ5eZcSNpr.
+- Plantillas HTML aprobadas por el dueño: `service/mail/CustomerMailTemplates` (vista) y `CustomerMailComposer` (qué correo toca por evento, uno como máximo). Avisos al dueño siguen en texto en `NotificationService`; `OWNER_EMAIL` admite varias direcciones. Sin datos fiscales no hay comprobante aparte.
+- V18: `orders.reviewed_at` (pedido web pagado queda en Needs attention hasta «Mark reviewed», `POST /api/orders/{id}/reviewed`) y `orders.locale` (idioma de los correos).
+- Arreglados: script de contraseña (hash sin citar por ssh) y ventas en días con solo «Casa».
+
 ## Backend actual
 
-- Paquete `com.artwithgab.awg_tracking`. API REST con sesiones staff bearer opacas, PostgreSQL y Flyway **V1–V17** con `ddl-auto=validate`. V14 guarda precios y recargos por nombre, V15 añade stock numerado, V16 guarda el puesto de recogida y de pintura, y V17 añade Post y los replays de Make room. Los tests usan H2 sin Flyway.
+- Paquete `com.artwithgab.awg_tracking`. API REST con sesiones staff bearer opacas, PostgreSQL y Flyway **V1–V18** (V18 en la rama de correos, sin desplegar aún) con `ddl-auto=validate`. V14 guarda precios y recargos por nombre, V15 añade stock numerado, V16 guarda el puesto de recogida y de pintura, y V17 añade Post y los replays de Make room. Los tests usan H2 sin Flyway.
 - Cada bloque de pintura se deriva de `OrderItem.paintStart/paintEnd` y usa el ID del ítem. Toda reserva de pintura o stock toma `ScheduleLock` (fila 1). Métricas usan la fila 2. Precios del servidor en `price_setting`, con valores de configuración como respaldo.
 - Ventas staff idempotentes. Un checkout web `PENDING` o `REVIEW` ocupa horas como reserva sin datos del cliente en Agenda, queda fuera de Entregas y aparece en Needs attention. Stripe se confirma en el servidor y un importe inesperado requiere revisión.
 - Los enlaces de formulario caducan 30 días tras la entrega. `RetentionService` borra fotos y datos personales, incluido el número de envío, 60 días después de entregar o a los 365 días si sigue sin entregar. La lista de espera usa doble opt-in y borra altas sin confirmar a los siete días.

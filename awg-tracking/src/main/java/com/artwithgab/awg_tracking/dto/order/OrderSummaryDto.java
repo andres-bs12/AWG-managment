@@ -14,6 +14,8 @@ public record OrderSummaryDto(String id, String code, String customerName, Strin
                               String paymentState, String checkoutStatus, BigDecimal total, int items,
                               String nextHandoffDate, boolean handedOver, String source, String status,
                               /** What was recorded as received, so lists can show the balance due. */
-                              BigDecimal amountPaid, String soldAtMarketName, List<SaleItem> saleItems) {
+                              BigDecimal amountPaid, String soldAtMarketName, List<SaleItem> saleItems,
+                              /** A paid web order staff has not marked as reviewed yet. */
+                              boolean needsReview) {
     public record SaleItem(String id, ItemKind kind, CustomColor color, String photoUrl, String marketOrnamentId) {}
 }

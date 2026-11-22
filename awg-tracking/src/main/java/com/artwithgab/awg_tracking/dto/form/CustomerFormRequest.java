@@ -18,6 +18,8 @@ public record CustomerFormRequest(
         @NotBlank @Email @Size(max = 200) String email,
         @NotEmpty @Size(max = 20) @Valid List<ItemFormRequest> items,
         /** Required when the order has a Vienna delivery (see CustomerFormViewDto.needsAddress). */
-        @Valid com.artwithgab.awg_tracking.dto.common.AddressDto address
+        @Valid com.artwithgab.awg_tracking.dto.common.AddressDto address,
+        /** Language for customer e-mails; optional, German when missing. */
+        @jakarta.validation.constraints.Pattern(regexp = "de|en") String locale
 ) {
 }

@@ -62,8 +62,11 @@ export function StaffLayout() {
   }, [location.pathname, location.search])
   useEffect(() => {
     let active = true
-    api.orders.attention().then(rows => { if (active) { setAttention(rows.length); setAttentionError('') } }).catch(err => { if (active) { setAttention(null); setAttentionError(err instanceof Error ? err.message : 'Could not load attention count.') } })
-    return () => { active = false }
+    const load = () => api.orders.attention().then(rows => { if (active) { setAttention(rows.length); setAttentionError('') } }).catch(err => { if (active) { setAttention(null); setAttentionError(err instanceof Error ? err.message : 'Could not load attention count.') } })
+    void load()
+    // New web orders arrive without any staff action: check again every minute while the app is open.
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load() }, 60_000)
+    return () => { active = false; window.clearInterval(timer) }
   }, [version])
   useEffect(() => {
     let current = true

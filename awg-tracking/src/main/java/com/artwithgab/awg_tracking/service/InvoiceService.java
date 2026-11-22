@@ -40,7 +40,11 @@ public class InvoiceService {
         boolean shipped = event.kind() == OrderNotification.Kind.POST_SHIPPED;
         boolean handover = shipped || event.kind() == OrderNotification.Kind.HANDED_OVER;
         if (!handover && event.kind() != OrderNotification.Kind.WEB_PAID && event.kind() != OrderNotification.Kind.SALE_CREATED
-                && event.kind() != OrderNotification.Kind.PAYMENT_CHANGED && event.kind() != OrderNotification.Kind.FORM_SUBMITTED) return;
+                && event.kind() != OrderNotification.Kind.PAYMENT_CHANGED && event.kind() != OrderNotification.Kind.FORM_SUBMITTED
+                && event.kind() != OrderNotification.Kind.FORM_COMPLETED) return;
+        // Without seller data there is no invoice to send: the customer's event e-mail carries the payment
+        // confirmation (CustomerMailComposer), so a separate receipt would only duplicate it.
+        if (!props.invoice().configured()) return;
         if (event.orderId() == null) return;
         var order = orders.findById(UUID.fromString(event.orderId())).orElseThrow();
         if (shipped && !order.isHandedOver()) return;

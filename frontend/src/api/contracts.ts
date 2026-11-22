@@ -84,6 +84,8 @@ export type OrderService = {
   listSales: (filters: import('../domain/types').SalesFilters) => Promise<import('../domain/types').SalesPage>
   search: (query: string) => Promise<import('../domain/types').OrderSummary[]>
   attention: () => Promise<import('../domain/types').OrderSummary[]>
+  /** Staff confirms a new web order was seen; it leaves "Needs attention". */
+  markReviewed: (id: string) => Promise<Order>
   getOrder: (id: string) => Promise<Order>
   getOrderByCode: (code: string) => Promise<Order | null>
   getOrderBundle: (id: string) => Promise<{

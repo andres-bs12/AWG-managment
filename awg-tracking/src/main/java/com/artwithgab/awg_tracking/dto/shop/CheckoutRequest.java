@@ -27,7 +27,9 @@ public record CheckoutRequest(
         UUID marketDayId,
         LocalTime pickupTime,
         @NotEmpty @Size(max = 10) @Valid List<ShopItemRequest> items,
-        @AssertTrue(message = "Accept the terms to continue") boolean acceptTerms
+        @AssertTrue(message = "Accept the terms to continue") boolean acceptTerms,
+        /** Language for customer e-mails; optional, German when missing. */
+        @jakarta.validation.constraints.Pattern(regexp = "de|en") String locale
 ) {
     public boolean isPickup() {
         return deliveryKind == DeliveryKind.MARKET;

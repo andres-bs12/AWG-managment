@@ -9,7 +9,7 @@ import { paymentSummary } from '../../lib/paymentSummary'
 import { addUtcDays } from '../../lib/time'
 import { pickupTimes } from '../../lib/pickupTimes'
 import {
-  searchOrders, attentionOrders, listSales, statsSource,
+  searchOrders, attentionOrders, markOrderReviewed, listSales, statsSource,
   createMockCheckout, abandonMockCheckout, getShippingQuote, getShippingWindow, listCollectionDays, setCollectionDay, makeRoom, makeRoomForBlock,
   currentPrices, updatePrices, listInventory, updateInventory, paintingDay, updatePaintingDay, joinWaitlist, confirmWaitlist, unsubscribeWaitlist,
   checkCapacity,
@@ -155,6 +155,7 @@ export const mockApi: Api = {
     listSales: (filters) => later(() => listSales(filters)),
     search: (query) => later(() => searchOrders(query)),
     attention: () => later(() => attentionOrders()),
+    markReviewed: (id) => later(() => markOrderReviewed(id)),
     getOrder: (id) => later(() => getOrder(id)),
     getOrderByCode: (code) => later(() => getOrderByCode(code)),
     getOrderBundle: (id) => later(() => getOrderBundle(id)),

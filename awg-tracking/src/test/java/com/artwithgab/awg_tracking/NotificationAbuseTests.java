@@ -67,37 +67,32 @@ class NotificationAbuseTests {
         assertTrue(sent.getAllValues().stream().allMatch(m -> Arrays.equals(m.getTo(), new String[]{"owner@example.com"})));
     }
 
-    @Test void addressAndFormShareOneFifteenMinuteBudgetPerOrderAndUseNeutralGreeting() {
+    @Test void ownerEditNoticesShareOneFifteenMinuteBudgetPerOrder() {
         Order order = order();
         service.onOrderNotification(OrderNotification.from(order, OrderNotification.Kind.ADDRESS_CHANGED));
         service.onOrderNotification(OrderNotification.from(order, OrderNotification.Kind.FORM_SUBMITTED));
         clock.now = clock.now.plusSeconds(899);
         service.onOrderNotification(OrderNotification.from(order, OrderNotification.Kind.ADDRESS_CHANGED));
-        verify(mail, times(2)).send(any(SimpleMailMessage.class));
+        verify(mail, times(1)).send(any(SimpleMailMessage.class));
         clock.now = clock.now.plusSeconds(1);
         service.onOrderNotification(OrderNotification.from(order, OrderNotification.Kind.FORM_SUBMITTED));
-        verify(mail, times(3)).send(any(SimpleMailMessage.class));
+        verify(mail, times(2)).send(any(SimpleMailMessage.class));
         // A different order is not silenced, nor are payment events for the same order.
         service.onOrderNotification(OrderNotification.from(order(), OrderNotification.Kind.ADDRESS_CHANGED));
         service.onOrderNotification(OrderNotification.from(order, OrderNotification.Kind.PAYMENT_CHANGED));
         var sent = org.mockito.ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mail, times(7)).send(sent.capture());
-        var addressMails = sent.getAllValues().stream().filter(m -> m.getTo()[0].equals("customer@example.com")
-                && m.getSubject().contains("address")).toList();
-        assertEquals(2, addressMails.size());
-        assertTrue(addressMails.stream().allMatch(m -> m.getText().startsWith("Hallo,\n\n") && !m.getText().contains("evil.example")));
+        verify(mail, times(4)).send(sent.capture());
+        // Order events only notify the owner here; customer e-mails come from CustomerMailComposer.
+        assertTrue(sent.getAllValues().stream().allMatch(m -> m.getTo()[0].equals("owner@example.com")));
     }
 
-    @Test void formFirstAlsoSuppressesAddressMailUntilWindowExpires() {
-        Order order = order();
-        service.onOrderNotification(OrderNotification.from(order, OrderNotification.Kind.FORM_SUBMITTED));
-        service.onOrderNotification(OrderNotification.from(order, OrderNotification.Kind.ADDRESS_CHANGED));
+    @Test void everyOwnerAddressGetsTheNotice() {
+        var props = (AwgProperties) ReflectionTestUtils.getField(service, "properties");
+        when(props.mail()).thenReturn(new AwgProperties.Mail("shop@example.com", "owner@example.com, personal@example.com"));
+        service.onOrderNotification(OrderNotification.from(order(), OrderNotification.Kind.WEB_PAID));
         var sent = org.mockito.ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mail).send(sent.capture());
-        assertEquals("owner@example.com", sent.getValue().getTo()[0]);
-        clock.now = clock.now.plusSeconds(900);
-        service.onOrderNotification(OrderNotification.from(order, OrderNotification.Kind.ADDRESS_CHANGED));
-        verify(mail, times(3)).send(any(SimpleMailMessage.class));
+        verify(mail, times(2)).send(sent.capture());
+        assertEquals(java.util.List.of("owner@example.com", "personal@example.com"), sent.getAllValues().stream().map(m -> m.getTo()[0]).toList());
     }
 
     @Test void smtpFailuresLogOnlyExceptionClassAndNumericCodeForRegularAndInvoiceMail() throws Exception {
@@ -123,6 +118,7 @@ class NotificationAbuseTests {
                 return null;
             }).when(invoices).deliver(eq(1L), any());
             service.onInvoiceIssued(new InvoiceIssued(1L));
+            service.onCustomerMail(new com.artwithgab.awg_tracking.service.mail.CustomerMail("customer@example.com", "Subject", "Text", "<p>Html</p>"));
             assertEquals(3, logs.list.size());
             assertTrue(logs.list.stream().allMatch(e -> e.getFormattedMessage().equals("Mail delivery failed: exception=MailSendException smtpCode=550")
                     && e.getThrowableProxy() == null));

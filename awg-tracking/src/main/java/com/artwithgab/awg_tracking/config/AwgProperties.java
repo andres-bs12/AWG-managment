@@ -96,7 +96,19 @@ public record AwgProperties(
     }
 
     /** E-mail notifications; nothing is sent while spring.mail.host is empty. */
-    public record Mail(String from, String ownerEmail) {
+    public record Mail(String from, String ownerEmail, String replyTo, String contactEmail) {
+        @org.springframework.boot.context.properties.bind.ConstructorBinding
+        public Mail {
+            if (contactEmail == null || contactEmail.isBlank()) contactEmail = "artwithgab@gmail.com";
+        }
+
+        public Mail(String from, String ownerEmail) { this(from, ownerEmail, null, null); }
+
+        /** OWNER_EMAIL may list several addresses separated by commas. */
+        public java.util.List<String> ownerEmails() {
+            if (ownerEmail == null) return java.util.List.of();
+            return java.util.Arrays.stream(ownerEmail.split("[,;\\s]+")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+        }
     }
 
     /** Seller identity and tax treatment must be supplied by the owner. No tax status is assumed. */

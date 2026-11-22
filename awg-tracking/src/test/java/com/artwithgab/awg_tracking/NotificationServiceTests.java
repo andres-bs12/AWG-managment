@@ -60,27 +60,37 @@ class NotificationServiceTests {
         } finally {
             orders.cancelOrder(id);
         }
-        var messages = org.mockito.ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mail, timeout(5000).times(6)).send(messages.capture());
-        assertEquals(3, messages.getAllValues().stream().filter(m -> m.getTo()[0].equals("owner@example.com")).count());
-        assertEquals(3, messages.getAllValues().stream().filter(m -> m.getTo()[0].equals("customer@example.com")).count());
-        assertTrue(messages.getAllValues().stream().allMatch(m -> m.getText().contains(order.code())));
-        var invoiceMail = org.mockito.ArgumentCaptor.forClass(jakarta.mail.internet.MimeMessage.class);
-        verify(mail, timeout(5000).times(1)).send(invoiceMail.capture());
+        // Owner notices stay plain text: sale created, payment, cancellation.
+        var notices = org.mockito.ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mail, timeout(5000).times(3)).send(notices.capture());
+        assertTrue(notices.getAllValues().stream().allMatch(m -> m.getTo()[0].equals("owner@example.com") && m.getText().contains(order.code())));
+        // The customer gets one HTML e-mail per event, plus the invoice (seller data is configured in this test).
+        var mime = org.mockito.ArgumentCaptor.forClass(jakarta.mail.internet.MimeMessage.class);
+        verify(mail, timeout(5000).times(4)).send(mime.capture());
         try {
-            assertTrue(invoiceMail.getValue().getSubject().startsWith("Rechnung "));
-            assertEquals("customer@example.com", invoiceMail.getValue().getAllRecipients()[0].toString());
-            invoiceMail.getValue().saveChanges();
-            String plain = textPart(invoiceMail.getValue(), "text/plain");
-            String html = textPart(invoiceMail.getValue(), "text/html");
+            var bySubject = new java.util.HashMap<String, jakarta.mail.internet.MimeMessage>();
+            for (var m : mime.getAllValues()) { m.saveChanges(); bySubject.put(m.getSubject(), m); }
+            assertTrue(bySubject.containsKey("Deine Bestellung " + order.code() + " ist bestätigt"));
+            assertTrue(bySubject.containsKey("Zahlung erhalten · " + order.code()));
+            assertTrue(bySubject.containsKey("Deine Bestellung " + order.code() + " wurde storniert"));
+            var invoiceMail = bySubject.entrySet().stream().filter(e -> e.getKey().startsWith("Rechnung ")).findFirst().orElseThrow().getValue();
+            assertEquals("customer@example.com", invoiceMail.getAllRecipients()[0].toString());
+            String plain = textPart(invoiceMail, "text/plain");
+            String html = textPart(invoiceMail, "text/html");
             assertTrue(plain.contains("Offener Betrag: 0,00 EUR") && plain.contains(order.code()));
             assertTrue(html.contains("<pre") && html.contains(order.code()));
             assertTrue(plain.contains("<b>Customer</b>"));
             assertTrue(html.contains("&lt;b&gt;Customer&lt;/b&gt;") && !html.contains("<b>Customer</b>"));
+            for (String subject : List.of("Deine Bestellung " + order.code() + " ist bestätigt", "Zahlung erhalten · " + order.code())) {
+                var customerMail = bySubject.get(subject);
+                assertEquals("customer@example.com", customerMail.getAllRecipients()[0].toString());
+                String customerHtml = textPart(customerMail, "text/html");
+                String customerText = textPart(customerMail, "text/plain");
+                assertTrue(customerHtml.contains("/track/" + order.code()) && customerText.contains("/track/" + order.code()));
+                assertTrue(customerHtml.contains("@art_withgab_") && customerHtml.contains("artwithgab@gmail.com"));
+                assertFalse(customerHtml.contains("<b>Customer</b>"));
+            }
         } catch (Exception e) { throw new AssertionError(e); }
-        assertTrue(messages.getAllValues().stream().anyMatch(m -> m.getSubject().contains("cancelled")));
-        assertTrue(messages.getAllValues().stream().filter(m -> m.getTo()[0].equals("customer@example.com"))
-                .allMatch(m -> m.getText().contains("/track/" + order.code()) && m.getText().contains("Hallo") && m.getText().contains("Hello")));
     }
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.NullSource
@@ -101,17 +111,21 @@ class NotificationServiceTests {
         var firstPost = List.of(UUID.fromString(order.itemIds().get(1)));
         var lastPost = List.of(UUID.fromString(order.itemIds().get(2)));
         orders.setHandedOver(id, true, firstPost, trackingNumber);
-        verify(mail, after(300).never()).send(org.mockito.ArgumentMatchers.<SimpleMailMessage>argThat(m -> subject.equals(m.getSubject())));
+        verify(mail, after(300).never()).send(org.mockito.ArgumentMatchers.<jakarta.mail.internet.MimeMessage>argThat(m -> subject.equals(subjectOf(m))));
 
         orders.setItemStatus(id, lastPost.getFirst(), ProductionStatus.FINISHED);
         orders.setHandedOver(id, true, lastPost);
         orders.setHandedOver(id, true, lastPost);
-        var message = org.mockito.ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mail, timeout(5000).times(6)).send(message.capture());
-        var shipped = message.getAllValues().stream().filter(m -> subject.equals(m.getSubject())).toList();
+        // Customer: order confirmed, ready for the market pickup, and exactly one "on its way".
+        var message = org.mockito.ArgumentCaptor.forClass(jakarta.mail.internet.MimeMessage.class);
+        verify(mail, timeout(5000).times(3)).send(message.capture());
+        var shipped = message.getAllValues().stream().filter(m -> subject.equals(subjectOf(m))).toList();
         assertEquals(1, shipped.size());
-        assertTrue(shipped.getFirst().getText().contains("Zustellung voraussichtlich 3.–4. Dezember 2026"));
-        assertEquals(trackingNumber != null, shipped.getFirst().getText().contains("https://www.post.at/s/sendungsdetails?snr=AT12345678"));
+        try {
+            String text = textPart(shipped.getFirst(), "text/plain");
+            assertTrue(text.contains("3.–4. Dezember 2026"));
+            assertEquals(trackingNumber != null, text.contains("https://www.post.at/s/sendungsdetails?snr=AT12345678"));
+        } catch (Exception e) { throw new AssertionError(e); }
         assertFalse(orders.getOrder(id).handedOver());
         assertTrue(invoices.findByOrderIdOrderByNumberAsc(id).isEmpty());
     }
@@ -143,7 +157,12 @@ class NotificationServiceTests {
         return marketStock.saveAndFlush(piece).getId();
     }
 
+    private static String subjectOf(jakarta.mail.internet.MimeMessage message) {
+        try { return message == null ? null : message.getSubject(); } catch (jakarta.mail.MessagingException e) { throw new AssertionError(e); }
+    }
+
     private static String textPart(jakarta.mail.Part part, String type) throws Exception {
+        if (part instanceof jakarta.mail.internet.MimeMessage message) message.saveChanges();
         if (part.isMimeType(type)) return (String) part.getContent();
         if (part.getContent() instanceof jakarta.mail.Multipart parts) {
             for (int i = 0; i < parts.getCount(); i++) {

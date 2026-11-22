@@ -33,6 +33,9 @@ public record OrderDto(
         String checkoutStatus,
         com.artwithgab.awg_tracking.enums.OrderSource source,
         String trackingNumber,
-        String trackingUrl
+        String trackingUrl,
+        /** A paid web order staff has not marked as reviewed yet. */
+        boolean needsReview,
+        String reviewedAt
 ) {
 }

@@ -430,6 +430,7 @@ public class ShopService {
         order.setCheckoutClientHash(clientHash);
         order.setPaymentState(PaymentState.UNPAID);
         order.setFormSubmitted(true);
+        if (req.locale() != null) order.setLocale(req.locale());
         BigDecimal deliveryFee = pickup ? BigDecimal.ZERO : prices.shippingFee();
         order.setDeliveryAddress(pickup ? null : OrderService.toAddress(req.address()));
         order.setDeliveryFee(deliveryFee);

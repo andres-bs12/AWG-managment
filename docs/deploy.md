@@ -104,7 +104,7 @@ El esquema lo gestiona Flyway (V1–V17 en `awg-tracking/src/main/resources/db/m
 
 ## E-mails (notificaciones)
 
-Con SMTP configurado, el dueño recibe avisos de venta, pago, producción, entrega o envío, cancelación y ediciones del cliente. El cliente recibe los avisos que corresponden a su pedido confirmado. El correo «unterwegs» sale en alemán al completar la entrega a Correos e incluye el rango de llegada y el enlace de seguimiento si hay número.
+Con SMTP configurado, el dueño recibe avisos de venta, pago, producción, entrega o envío, cancelación y ediciones del cliente, en texto plano. El cliente recibe como máximo un correo HTML por evento, en el idioma que eligió (plantillas aprobadas el 2026-11-22 en `service/mail/CustomerMailTemplates`): pedido confirmado (formulario QR completado, venta con email o pago web), pago recibido, Kugel lista para recoger (no en envíos por Post), en camino por Post, entregada con el comprobante final, dirección cambiada, pedido cancelado y la confirmación de la lista de espera. Todos llevan Instagram y el email de contacto. Sin datos fiscales no se envía un comprobante aparte: el correo del evento ya incluye la confirmación de pago. El correo «unterwegs» sale en alemán al completar la entrega a Correos e incluye el rango de llegada y el enlace de seguimiento si hay número.
 
 Variables:
 
@@ -113,7 +113,9 @@ Variables:
 | `MAIL_HOST`, `MAIL_PORT` | Servidor SMTP (por ejemplo, el de tu proveedor de correo; puerto 587 con STARTTLS). Vacío = no se envía nada (solo queda en el log). |
 | `MAIL_USERNAME`, `MAIL_PASSWORD` | Credenciales SMTP (contraseña de aplicación si el proveedor la pide). |
 | `MAIL_FROM` | Remitente, por ejemplo `pedidos@<tu-dominio>`. |
-| `OWNER_EMAIL` | A dónde llegan los avisos del dueño. |
+| `OWNER_EMAIL` | A dónde llegan los avisos del dueño. Admite varias direcciones separadas por comas. |
+| `MAIL_REPLY_TO` | Opcional. A dónde llegan las respuestas de los clientes (por ejemplo, el buzón de Gaby). |
+| `MAIL_CONTACT` | Email de contacto que aparece al pie de cada correo al cliente, junto a Instagram. Por defecto `artwithgab@gmail.com`. |
 
 Los e-mails se envían en segundo plano después de guardar el cambio. Si el SMTP falla, el pedido no se ve afectado y el error queda en el log.
 

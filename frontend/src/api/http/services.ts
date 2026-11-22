@@ -243,6 +243,7 @@ export const httpApi: Api = {
     },
     search: (query) => request(`/api/orders/search?q=${enc(query)}`, {}, staff),
     attention: () => request('/api/orders/attention', {}, staff),
+    markReviewed: (id) => request(`/api/orders/${enc(id)}/reviewed`, { method: 'POST' }, staff),
     getOrder: (id) => request(`/api/orders/${enc(id)}`, {}, staff),
     getOrderByCode: async (code) => {
       try {

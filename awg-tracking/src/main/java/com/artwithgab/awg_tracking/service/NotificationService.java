@@ -1,7 +1,6 @@
 package com.artwithgab.awg_tracking.service;
 
 import com.artwithgab.awg_tracking.config.AwgProperties;
-import com.artwithgab.awg_tracking.support.AustrianPost;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -40,22 +39,14 @@ public class NotificationService {
                 // Staff detail page (the only way to open an order kept off the agenda, e.g. a payment review).
                 + (event.orderId() == null || event.kind() == OrderNotification.Kind.CANCELLED ? ""
                         : "\nStaff: " + properties.shop().publicBaseUrl().replaceAll("/+$", "") + "/staff/orders/" + event.orderId());
-        send(properties.mail().ownerEmail(), subject, ownerBody);
-        boolean ownerOnly = event.kind() == OrderNotification.Kind.FORM_SUBMITTED || event.kind() == OrderNotification.Kind.PAYMENT_REVIEW;
-        if (!ownerOnly && !event.unconfirmedWeb()) {
-            String name = publicEdit ? "" : event.customerName();
-            if (event.kind() == OrderNotification.Kind.POST_SHIPPED) {
-                String body = greeting("Hallo", name) + event.kind().german + ".\n\nZustellung voraussichtlich "
-                        + AustrianPost.arrivalRange(event.arrivalFrom(), event.arrivalTo(), false)
-                        + (event.trackingUrl() == null ? "" : "\nSendung verfolgen: " + event.trackingUrl())
-                        + "\nBestellung verfolgen: " + link + "\n\nArtWithGab";
-                send(event.customerEmail(), event.kind().german + " · " + event.code(), body);
-                return;
-            }
-            String body = greeting("Hallo", name) + event.kind().german + ".\nBestellung: " + event.code()
-                    + "\nGesamt: " + event.total() + " EUR · Bezahlt: " + event.amountPaid() + " EUR\nVerfolge deine Bestellung: " + link + "\n\nVielen Dank!\nArtWithGab\n\n---\n\n" + greeting("Hello", name) + event.kind().english + ".\nOrder: " + event.code() + "\nTotal: " + event.total() + " EUR · Paid: " + event.amountPaid() + " EUR\nTrack your order: " + link + "\n\nThank you!\nArtWithGab";
-            send(event.customerEmail(), subject, body);
-        }
+        for (String owner : properties.mail().ownerEmails()) send(owner, subject, ownerBody);
+        // Customer e-mails are chosen and rendered by CustomerMailComposer and arrive here as CustomerMail.
+    }
+
+    @Async("notificationExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onCustomerMail(com.artwithgab.awg_tracking.service.mail.CustomerMail mail) {
+        sendHtml(mail.recipient(), mail.subject(), mail.text(), mail.html());
     }
 
     @Async("notificationExecutor")
@@ -98,25 +89,21 @@ public class NotificationService {
         String confirm = base + "/waitlist/confirm#" + event.token();
         String leave = base + "/waitlist/unsubscribe#" + event.token();
         boolean en = "en".equals(event.locale());
-        String subject = en ? "ArtWithGab: please confirm your e-mail" : "ArtWithGab: bitte bestätige deine E-Mail";
-        String body = en
-                ? "Hello,\n\nyou asked us to tell you when orders for hand-painted pet ornaments open again.\n"
-                  + "Please confirm your e-mail address: " + confirm
-                  + "\n\nIf this was not you, ignore this e-mail; we delete unconfirmed addresses after a week.\n"
-                  + "Remove your address at any time: " + leave + "\n\nArtWithGab"
-                : "Hallo,\n\ndu möchtest erfahren, wann wieder Bestellungen für handbemalte Tierkugeln möglich sind.\n"
-                  + "Bitte bestätige deine E-Mail-Adresse: " + confirm
-                  + "\n\nWarst du das nicht? Dann ignoriere diese E-Mail; unbestätigte Adressen löschen wir nach einer Woche.\n"
-                  + "Du kannst dich jederzeit abmelden: " + leave + "\n\nArtWithGab";
-        send(event.email(), subject, body);
+        var rendered = com.artwithgab.awg_tracking.service.mail.CustomerMailTemplates.waitlist(en, confirm, leave,
+                properties.mail().contactEmail(), base);
+        sendHtml(event.email(), rendered.subject(), rendered.text(), rendered.html());
     }
 
     private void send(String recipient, String subject, String body) {
         subject = header(subject);
         try {
             JavaMailSender mail = sender.getIfAvailable();
-            if (host == null || host.isBlank() || recipient == null || recipient.isBlank() || properties.mail().from() == null || properties.mail().from().isBlank() || mail == null) {
+            if (host == null || host.isBlank() || properties.mail().from() == null || properties.mail().from().isBlank() || mail == null) {
                 log.info("E-mail not sent (mail not configured): {}", subject);
+                return;
+            }
+            if (recipient == null || recipient.isBlank()) {
+                log.info("E-mail not sent (no recipient yet): {}", subject);
                 return;
             }
             SimpleMailMessage message = new SimpleMailMessage();
@@ -124,6 +111,33 @@ public class NotificationService {
             message.setTo(header(recipient));
             message.setSubject(subject);
             message.setText(body);
+            mail.send(message);
+        } catch (Exception e) {
+            logMailFailure(e);
+        }
+    }
+
+    /** Customer e-mail: HTML with a plain-text alternative; replies go to the configured reply-to address. */
+    private void sendHtml(String recipient, String subject, String text, String html) {
+        subject = header(subject);
+        try {
+            JavaMailSender mail = sender.getIfAvailable();
+            if (host == null || host.isBlank() || properties.mail().from() == null || properties.mail().from().isBlank() || mail == null) {
+                log.info("E-mail not sent (mail not configured): {}", subject);
+                return;
+            }
+            if (recipient == null || recipient.isBlank()) {
+                log.info("E-mail not sent (no recipient yet): {}", subject);
+                return;
+            }
+            var message = mail.createMimeMessage();
+            var helper = new org.springframework.mail.javamail.MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+            helper.setFrom(header(properties.mail().from()));
+            helper.setTo(header(recipient));
+            String replyTo = properties.mail().replyTo();
+            if (replyTo != null && !replyTo.isBlank()) helper.setReplyTo(header(replyTo));
+            helper.setSubject(subject);
+            helper.setText(text, html);
             mail.send(message);
         } catch (Exception e) {
             logMailFailure(e);
@@ -146,11 +160,6 @@ public class NotificationService {
             if (current instanceof org.springframework.mail.MailSendException mail) pending.addAll(java.util.List.of(mail.getMessageExceptions()));
         }
         log.warn("Mail delivery failed: exception={} smtpCode={}", failure.getClass().getSimpleName(), smtpCode);
-    }
-
-    private static String greeting(String hello, String name) {
-        String clean = header(name).trim();
-        return (clean.isEmpty() ? hello : hello + " " + clean) + ",\n\n";
     }
 
     private static String header(String value) { return value == null ? "" : value.replace("\r", "").replace("\n", ""); }

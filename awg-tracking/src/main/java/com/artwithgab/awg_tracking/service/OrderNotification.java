@@ -15,7 +15,7 @@ public record OrderNotification(Kind kind, String code, String customerName, Str
                                 String address, String items, String orderId, boolean unconfirmedWeb, LocalDate arrivalFrom,
                                 LocalDate arrivalTo, String trackingUrl) {
     public enum Kind {
-        WEB_PAID("Web order paid", "Deine Online-Bestellung wurde bezahlt", "Your online order has been paid"),
+        WEB_PAID("New web order paid - please review", "Deine Online-Bestellung wurde bezahlt", "Your online order has been paid"),
         SALE_CREATED("Stall sale created", "Deine Bestellung wurde aufgenommen", "Your order has been placed"),
         PAYMENT_CHANGED("Payment updated", "Deine Zahlung wurde aktualisiert", "Your payment has been updated"),
         ALL_FINISHED("All ornaments finished", "Deine Ornamente sind fertig", "Your ornaments are ready"),
@@ -23,7 +23,10 @@ public record OrderNotification(Kind kind, String code, String customerName, Str
         POST_SHIPPED("Shipment handed to Post", "Deine Bestellung ist unterwegs", ""),
         CANCELLED("Order cancelled", "Deine Bestellung wurde storniert", "Your order has been cancelled"),
         ADDRESS_CHANGED("Delivery address changed", "Deine Lieferadresse wurde geändert", "Your delivery address has changed"),
-        FORM_SUBMITTED("Customer form submitted", "", ""),
+        /** First time the customer sends the QR form: the customer gets their order confirmation. */
+        FORM_COMPLETED("Customer form completed", "", ""),
+        /** Later edits of an already completed form: owner notice only. */
+        FORM_SUBMITTED("Customer form edited", "", ""),
         PAYMENT_REVIEW("Stripe payment needs review (amount/currency mismatch)", "", "");
         final String owner, german, english;
         Kind(String owner, String german, String english) { this.owner = owner; this.german = german; this.english = english; }

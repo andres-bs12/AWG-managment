@@ -333,6 +333,7 @@ export function BuyPage() {
               expectedArrivalTo,
             }),
         acceptTerms: draft.acceptTerms,
+        locale,
         items: draft.items.map((item) => ({ kind: 'custom', withName: item.withName, color: item.color || undefined, finish: item.finish || undefined, petName: item.withName ? petNameFromBack(item.backName) : '', backName: item.withName ? item.backName.trim() : undefined, note: item.note.trim() || undefined, photos: item.photos })),
       })
       // Only follow Stripe Checkout or a same-origin URL (the mock success page).

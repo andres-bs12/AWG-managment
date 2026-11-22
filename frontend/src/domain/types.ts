@@ -80,6 +80,8 @@ export type OrderSummary = {
   saleItems: SaleItemPreview[]
   /** Recorded as received; the balance due is total minus this. */
   amountPaid?: number
+  /** A paid web order nobody on staff has marked as reviewed yet. */
+  needsReview?: boolean
 }
 
 export type SaleItemPreview = {
@@ -126,6 +128,10 @@ export type Order = {
   trackingNumber?: string | null
   trackingUrl?: string | null
   paymentReview?: boolean
+  /** A paid web order nobody on staff has marked as reviewed yet. */
+  needsReview?: boolean
+  /** Null on a new web order until staff reviews it; missing means nothing to review. */
+  reviewedAt?: string | null
   /** Append-only payment entries. Older records may not have this field yet. */
   paymentEntries?: PaymentEntry[]
   /** Previously recorded amount from legacy orders without individual receipts. */
@@ -319,6 +325,8 @@ export type CustomerFormPayload = {
   phone: string
   email: string
   items: ItemFormPayload[]
+  /** Language for customer e-mails. */
+  locale?: 'de' | 'en'
 }
 
 export type CreateSaleItemInput = {
@@ -446,6 +454,8 @@ export type ShopCheckoutInput = {
   pickupTime?: string
   acceptTerms: boolean
   items: ShopItemInput[]
+  /** Language for customer e-mails. */
+  locale?: 'de' | 'en'
 }
 
 export type ShopCheckoutResult = { orderCode: string; formToken: string; checkoutUrl: string }

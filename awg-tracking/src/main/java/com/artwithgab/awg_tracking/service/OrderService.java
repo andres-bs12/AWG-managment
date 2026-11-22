@@ -194,6 +194,8 @@ public class OrderService {
         order.setCustomer(customer);
         order.setPaymentState(PaymentState.UNPAID);
         order.setCreatedAt(clock.instant());
+        // Staff created the sale themselves, so there is nothing new to review.
+        order.setReviewedAt(order.getCreatedAt());
         if (shippingWindow != null) {
             order.setDeliveryAddress(shippingAddress);
             order.setDeliveryFee(prices.shippingFee());
@@ -578,11 +580,20 @@ public class OrderService {
                 page, size, result.getTotalElements(), result.getTotalPages());
     }
 
-    /** Web orders staff must look at: still waiting for Stripe, or paid with a mismatching amount. */
+    /** Web orders staff must look at: new paid orders to review, still waiting for Stripe, or paid with a mismatching amount. */
     @Transactional(readOnly = true)
     public List<OrderSummaryDto> needingAttention() {
-        return orderRepository.findByCheckoutStatusIn(List.of(CheckoutStatus.PENDING, CheckoutStatus.REVIEW)).stream()
+        return java.util.stream.Stream.concat(orderRepository.findUnreviewedWebOrders().stream(),
+                        orderRepository.findByCheckoutStatusIn(List.of(CheckoutStatus.PENDING, CheckoutStatus.REVIEW)).stream())
                 .map(OrderService::summary).toList();
+    }
+
+    /** Staff confirms they saw a new web order; repeating it keeps the first time. */
+    @Transactional
+    public OrderDto markReviewed(UUID orderId) {
+        Order order = orderRepository.findById(orderId).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+        if (order.getReviewedAt() == null) order.setReviewedAt(clock.instant());
+        return getOrder(orderId);
     }
 
     static OrderSummaryDto summary(Order o) {
@@ -604,7 +615,7 @@ public class OrderService {
                 o.getPaymentState().name().toLowerCase(Locale.ROOT), o.getCheckoutStatus() == null ? null : o.getCheckoutStatus().name().toLowerCase(Locale.ROOT),
                 o.getTotal(), o.getOrderItems().size(), next, o.isHandedOver(),
                 web ? "web" : "stall", o.getStatus(),
-                o.getAmountPaid() == null ? BigDecimal.ZERO : o.getAmountPaid(), soldAtMarketName, saleItems);
+                o.getAmountPaid() == null ? BigDecimal.ZERO : o.getAmountPaid(), soldAtMarketName, saleItems, o.needsReview());
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────

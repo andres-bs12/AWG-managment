@@ -691,7 +691,8 @@ export function createMockCheckout(input: ShopCheckoutInput) {
   const total = Math.round((items.reduce((sum, item) => sum + item.cost, 0) + deliveryFee) * 100) / 100
   const order: Order = { id: orderId, customerId: customer.id, code, trackToken: uid('trk'), formToken: token,
     source: 'web', checkoutStatus: 'confirmed', paymentState: 'paid', paymentMethod: 'card', deliveryFee, amountPaid: total, total,
-    createdAt: new Date().toISOString(), itemIds: items.map(item => item.id), handedOver: false, paymentEntries: [] }
+    createdAt: new Date().toISOString(), itemIds: items.map(item => item.id), handedOver: false, paymentEntries: [],
+    reviewedAt: null, needsReview: true }
   for (const [id, count] of counts) inventory.find(row => row.id === id)!.quantity -= count
   state.customers.push(customer); state.orders.push(order); state.items.push(...items); state.blocks.push(...createdBlocks)
   // The mock checkout redirects directly to success, so it simulates confirmed payment.
@@ -1881,7 +1882,7 @@ function orderSummary(order: Order): import('../../domain/types').OrderSummary {
   const soldOn = order.source === 'web' ? undefined : state.soldOnMarketDays?.[order.id]
   const marketId = soldOn ? state.marketDays.find(day => day.id === soldOn)?.marketId : undefined
   const soldAtMarketName = state.markets.find(market => market.id === marketId)?.name ?? null
-  return { id: order.id, code: order.code, customerName: bundle.customer.name, phone: bundle.customer.phone, createdAt: order.createdAt, paymentState: order.paymentState, checkoutStatus: order.checkoutStatus ?? (order.paymentReview ? 'review' : null), total: order.total, items: bundle.items.length, nextHandoffDate: dates[0] ?? null, handedOver: order.handedOver, source: order.source ?? 'stall', status: order.status ?? 'ACTIVE', amountPaid: paymentSummary(order).paid, soldAtMarketName, saleItems: [] }
+  return { id: order.id, code: order.code, customerName: bundle.customer.name, phone: bundle.customer.phone, createdAt: order.createdAt, paymentState: order.paymentState, checkoutStatus: order.checkoutStatus ?? (order.paymentReview ? 'review' : null), total: order.total, items: bundle.items.length, nextHandoffDate: dates[0] ?? null, handedOver: order.handedOver, source: order.source ?? 'stall', status: order.status ?? 'ACTIVE', amountPaid: paymentSummary(order).paid, soldAtMarketName, saleItems: [], needsReview: Boolean(order.needsReview) && order.status !== 'CANCELLED' }
 }
 /** Read-only snapshot for the mock Statistics endpoint. */
 export function statsSource(): { orders: Order[]; items: import('../../domain/types').OrderItem[] } {
@@ -1898,5 +1899,11 @@ export function listSales(filters: import('../../domain/types').SalesFilters): i
   return result
 }
 export function attentionOrders() {
-  return state.orders.filter(order => order.status !== 'CANCELLED' && (order.paymentReview || order.checkoutStatus === 'pending' || order.checkoutStatus === 'review')).map(orderSummary)
+  return state.orders.filter(order => order.status !== 'CANCELLED' && (order.needsReview || order.paymentReview || order.checkoutStatus === 'pending' || order.checkoutStatus === 'review')).map(orderSummary)
+}
+/** Mirrors POST /api/orders/{id}/reviewed: the first review time is kept. */
+export function markOrderReviewed(id: string): Order {
+  const order = requireOrder(id)
+  if (order.needsReview) { order.needsReview = false; order.reviewedAt = new Date().toISOString(); emit() }
+  return order
 }

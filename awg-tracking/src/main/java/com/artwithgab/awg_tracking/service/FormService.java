@@ -142,8 +142,10 @@ public class FormService {
             }
             replacePhotos(item, row, files);
         }
+        boolean first = !order.isFormSubmitted();
         order.setFormSubmitted(true);
-        events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.FORM_SUBMITTED));
+        if (payload.locale() != null) order.setLocale(payload.locale());
+        events.publishEvent(OrderNotification.from(order, first ? OrderNotification.Kind.FORM_COMPLETED : OrderNotification.Kind.FORM_SUBMITTED));
         return new SubmitFormResponse(order.getCode());
     }
 

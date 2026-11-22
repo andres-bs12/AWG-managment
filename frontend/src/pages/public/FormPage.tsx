@@ -190,7 +190,7 @@ function CustomerForm({ token }: { token: string }) {
     if (sendingRef.current || uploads.current.size || showErrors(validate())) return
     sendingRef.current = true; setSending(true); setIssue(null)
     try {
-      const result = await api.forms.submitForm(token, { address: view?.needsAddress ? draft.address : undefined, customerName: draft.customerName, phone: draft.phone, email: draft.email,
+      const result = await api.forms.submitForm(token, { address: view?.needsAddress ? draft.address : undefined, customerName: draft.customerName, phone: draft.phone, email: draft.email, locale,
         items: draft.items.map(({ orderItemId, petName, backName, note, photos }) => ({ orderItemId, petName: formItems.find(source => source.id === orderItemId)?.withName && backName.trim() ? petNameFromBack(backName) : petName, backName, note, photos })),
       }, { rememberToken: !staffHandoff })
       try { sessionStorage.removeItem(formDraftKey(token)) } catch { setStorageError(true) }

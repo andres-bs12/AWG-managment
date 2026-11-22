@@ -64,6 +64,11 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, org.springf
     @Query("select o from Order o join fetch o.customer where o.status <> 'CANCELLED' and o.checkoutStatus in :statuses order by o.createdAt desc")
     List<Order> findByCheckoutStatusIn(@org.springframework.data.repository.query.Param("statuses") java.util.Collection<CheckoutStatus> statuses);
 
+    /** Paid web orders nobody on staff has looked at yet. */
+    @Query("select o from Order o join fetch o.customer where o.status <> 'CANCELLED' and o.source = com.artwithgab.awg_tracking.enums.OrderSource.WEB"
+            + " and o.checkoutStatus = com.artwithgab.awg_tracking.enums.CheckoutStatus.CONFIRMED and o.reviewedAt is null order by o.createdAt desc")
+    List<Order> findUnreviewedWebOrders();
+
     /** Orders created in [from, to), with items, for the staff Statistics page. */
     @Query("select distinct o from Order o left join fetch o.orderItems where o.createdAt >= :from and o.createdAt < :to")
     List<Order> findCreatedBetween(@org.springframework.data.repository.query.Param("from") Instant from,

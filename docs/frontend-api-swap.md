@@ -65,7 +65,9 @@ En HTTP el login oculta credenciales demo y «Reset demo data».
 
 ## Staff order and agenda details
 
-- `orders.search(q)` → `GET /api/orders/search?q=…`; `orders.attention()` → `GET /api/orders/attention`. Both return `OrderSummary[]`: id, code, customerName, phone, createdAt, paymentState, checkoutStatus (lowercase/null), total, items (count), nextHandoffDate and handedOver.
+- `orders.search(q)` → `GET /api/orders/search?q=…`; `orders.attention()` → `GET /api/orders/attention`. Both return `OrderSummary[]`: id, code, customerName, phone, createdAt, paymentState, checkoutStatus (lowercase/null), total, items (count), nextHandoffDate, handedOver and `needsReview`.
+- Attention lists, newest first, paid web orders not yet reviewed (`needsReview: true`), then web checkouts still `pending` or in `review`. `orders.markReviewed(id)` → `POST /api/orders/{id}/reviewed` (staff) sets `reviewedAt` once and returns the `Order`; repeating it keeps the first time. Stall sales are created already reviewed. `Order` carries `needsReview` and `reviewedAt`.
+- `forms.submitForm` and `shop.checkout` accept an optional `locale` (`de`/`en`) for customer e-mails; German when missing.
 - `ShopConfig.finishedPrice` joins customPrice/nameExtra. Staff must have all three finite server prices before creating a sale; there is no client price fallback. The shop still sells custom ornaments only.
 - Order/bundle responses add lowercase `checkoutStatus` and `source` (`web`/`stall`). PENDING disables manual collection; PENDING/REVIEW disable painting actions.
 - `AgendaSlot` adds `held` and nullable `holdUntil` (ISO instant). A held slot has `order/item/customer = null`; REVIEW holds have no expiry promise. Keep held blocks in overlap/capacity geometry.

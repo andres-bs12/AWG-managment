@@ -101,6 +101,17 @@ public class Order {
     @Column(length = 40)
     private String trackingNumber;
 
+    /** Language of customer e-mails, chosen by the customer in the shop or QR form ("de" or "en"). */
+    @Column(nullable = false, length = 2)
+    private String locale = "de";
+
+    /** When staff confirmed they saw a new web order; null keeps it in "Needs attention". Stall sales start reviewed. */
+    private Instant reviewedAt;
+
+    public boolean needsReview() {
+        return source == OrderSource.WEB && checkoutStatus == CheckoutStatus.CONFIRMED && reviewedAt == null && !isCancelled();
+    }
+
     public List<OrderItem> postItems() {
         return orderItems.stream()
                 .filter(item -> item.getDeliveryKind() == DeliveryKind.POST).toList();

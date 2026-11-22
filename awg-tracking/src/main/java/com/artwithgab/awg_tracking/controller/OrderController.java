@@ -45,6 +45,11 @@ public class OrderController {
         return orderService.needingAttention();
     }
 
+    @PostMapping("/{id}/reviewed")
+    public OrderDto reviewed(@PathVariable UUID id) {
+        return orderService.markReviewed(id);
+    }
+
     @GetMapping("/{id}")
     public OrderDto get(@PathVariable UUID id) {
         return orderService.getOrder(id);
