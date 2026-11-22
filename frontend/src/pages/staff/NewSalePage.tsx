@@ -352,6 +352,7 @@ export function NewSalePage() {
   const hasCustom = draft.items.some((item) => item.kind === 'custom')
   const mixed = hasCustom && draft.items.some((item) => item.kind === 'finished')
   const hasPost = draft.items.some((item) => item.delivery.mode === 'post')
+  const postAddressOptional = hasPost && !draft.items.some((item) => item.delivery.mode === 'post' && item.kind !== 'custom')
   const hasCustomPost = draft.items.some((item) => item.kind === 'custom' && item.delivery.mode === 'post')
   const canFinishedUsePost = Boolean(finishedWithCustom && hasCustomPost && postQuote?.available !== false)
   const postPaintDates = draft.items
@@ -986,7 +987,9 @@ export function NewSalePage() {
         return
       }
       const addrErrors = postAddressProblems(draft.postAddress)
-      if (addrErrors.line1 || addrErrors.postalCode || addrErrors.city) {
+      // Custom-only parcels may leave the address to the customer QR form (same rule as the backend).
+      const addressLater = postAddressOptional && postAddressBlank(draft.postAddress)
+      if (!addressLater && (addrErrors.line1 || addrErrors.postalCode || addrErrors.city)) {
         setPostAddressTouched(true)
         setError('Complete the Post shipping address.')
         return
@@ -1302,7 +1305,8 @@ export function NewSalePage() {
               {hasPost ? (
                 <PostAddressCard
                   address={draft.postAddress}
-                  touched={postAddressTouched}
+                  optional={postAddressOptional}
+                  touched={postAddressTouched && !(postAddressOptional && postAddressBlank(draft.postAddress))}
                   onChange={patchPostAddress}
                 />
               ) : null}
@@ -1661,20 +1665,28 @@ function postAddressProblems(address?: Address): { line1?: string; postalCode?: 
   }
 }
 
+function postAddressBlank(address?: Address): boolean {
+  return !address?.line1?.trim() && !address?.line2?.trim() && !address?.postalCode?.trim() && !address?.city?.trim()
+}
+
 function PostAddressCard({
   address,
+  optional,
   touched,
   onChange,
 }: {
   address?: Address
+  optional: boolean
   touched: boolean
   onChange: (patch: Partial<Address>) => void
 }) {
   const [blurred, setBlurred] = useState<{ line1?: boolean; postalCode?: boolean; city?: boolean }>({})
-  const problems = postAddressProblems(address)
+  // An optional, still empty address shows no errors: the customer adds it in the QR form.
+  const problems = optional && postAddressBlank(address) ? {} : postAddressProblems(address)
   return (
     <article className={styles.card} aria-labelledby="post-address-heading">
       <h3 id="post-address-heading">Shipping address</h3>
+      {optional ? <p className={styles.addressHint}>Optional. The customer can add it in the QR form.</p> : null}
       <div className={styles.addressFields}>
         <Field label="Street and house number" htmlFor="post-line1" error={touched || blurred.line1 ? problems.line1 : undefined}>
           <input

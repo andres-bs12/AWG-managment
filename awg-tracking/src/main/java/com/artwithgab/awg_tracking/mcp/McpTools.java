@@ -104,11 +104,11 @@ public class McpTools {
                         schema(Map.of("query", str("Code, name or phone, e.g. 'Müller' or 'K7Q2'")), List.of("query")),
                         a -> orderService.search(requiredString(a, "query"))),
                 read("get_order", "Get order",
-                        "Full order by code (e.g. 'K7Q2ZX') or id: customer, items with colour, finish, name, production and handover, painting blocks and payments.",
+                        "Full order by code (e.g. 'K7Q2ZX') or id: customer name and phone (customerPhone), items with colour, finish, name, production and handover, painting blocks and payments.",
                         schema(Map.of("code", str("Order code"), "id", str("Order UUID")), List.of()),
                         this::getOrder),
                 contact("get_customer_contact", "Customer contact",
-                        "Phone, e-mail and shipping address of the customer of ONE order (by code). Use only when the owner asks how to reach or ship to that customer; other tools never return contact data.",
+                        "Phone, e-mail and shipping address of the customer of ONE order (by code). Use when the owner asks how to e-mail or ship to that customer; get_order also returns the phone, other tools never return contact data.",
                         schema(Map.of("code", str("Order code")), List.of("code"))),
                 read("get_agenda_day", "Agenda of a day",
                         "Painting sessions and pickups/shipments for one day, plus which market is open and where Gaby paints. Defaults to today (Europe/Vienna).",
@@ -202,7 +202,16 @@ public class McpTools {
         } else {
             throw new ToolInputException("Give an order code or id.");
         }
-        return orderService.getOrderBundle(orderId);
+        var bundle = orderService.getOrderBundle(orderId);
+        // One order at a time, so staff can call the customer. E-mail and address stay in get_customer_contact.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> out = json.convertValue(bundle, LinkedHashMap.class);
+        String phone = bundle.customer() == null ? null : bundle.customer().phone();
+        if (phone != null && !phone.isBlank()) {
+            out.put("customerPhone", phone);
+            log.info("MCP get_order with phone by staff user {} for order {}", currentStaff().getId(), orderId);
+        }
+        return out;
     }
 
     private Object marketStock(Map<String, Object> a) {

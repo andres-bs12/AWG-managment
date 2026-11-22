@@ -279,7 +279,8 @@ export function toCreateItems(items: DraftItem[], days: MarketDay[], today?: Mar
         paintEnd: item.kind === 'custom' ? item.paintEnd : undefined,
         deliveryKind: 'post',
         pickupHour: null,
-        address: cleanPostAddress ?? item.delivery.address ?? null,
+        // Once the shared address card exists it is the only source; a cleared card sends no address.
+        address: postAddress ? cleanPostAddress : item.delivery.address ?? null,
       }
     }
     const pickupDay =

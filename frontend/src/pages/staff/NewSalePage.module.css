@@ -687,6 +687,11 @@
   margin: 0;
 }
 
+.addressHint {
+  margin: 0 0 var(--space-3);
+  color: var(--staff-muted, var(--color-text-muted));
+}
+
 .addressFields {
   display: grid;
   gap: var(--space-4);

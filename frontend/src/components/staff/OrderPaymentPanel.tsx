@@ -12,24 +12,32 @@ import styles from './OrderPaymentPanel.module.css'
 type Props = { order: Order; busy: boolean; onSetState: (state: PaymentState, method: PaymentMethod | null, amountPaid?: number) => Promise<boolean> }
 export function OrderPaymentPanel({ order, busy, onSetState }: Props) {
   const { paid, remaining } = paymentSummary(order)
-  const [method, setMethod] = useState<PaymentMethod | null>(order.paymentMethod)
-  const [deposit, setDeposit] = useState(String(Math.round(order.total * 50) / 100))
-  const [state, setState] = useState<PaymentState>('paid')
-  const [correction, setCorrection] = useState<PaymentState>('unpaid')
+  const [methodDraft, setMethod] = useState<PaymentMethod | null | undefined>(undefined)
+  const method = methodDraft === undefined ? order.paymentMethod : methodDraft
+  // Until staff type an amount, the field follows the order, so a refresh from another iPad never leaves a stale value.
+  const [depositDraft, setDeposit] = useState<string | null>(null)
+  const deposit = depositDraft ?? String(order.paymentState === 'deposit' ? paid : Math.round(order.total * 50) / 100)
+  const [chosenState, setState] = useState<PaymentState>('paid')
+  const [chosenCorrection, setCorrection] = useState<PaymentState | null>(null)
+  // A deposit order can only be completed; the choice only applies while nothing was received.
+  const state: PaymentState = order.paymentState === 'unpaid' ? chosenState : 'paid'
+  // The correction starts on the recorded state, so it never suggests a change nobody picked.
+  const correction: PaymentState = chosenCorrection ?? order.paymentState
   const [error, setError] = useState('')
   const [confirming, setConfirming] = useState<PaymentState | null>(null)
   const pending = order.checkoutStatus === 'pending'
   const amount = Number(deposit.replace(',', '.'))
+  const unchanged = correction === order.paymentState && method === order.paymentMethod && (correction !== 'deposit' || amount === paid)
   function update(next: PaymentState, correcting = false) {
     setError('')
     if (next === 'deposit' && (!deposit.trim() || !Number.isFinite(amount) || amount <= 0 || amount >= order.total)) { setError('Enter an amount greater than zero and less than the total.'); return }
     if (correcting) { setConfirming(next); return }
-    void onSetState(next, method, next === 'deposit' ? amount : undefined)
+    void onSetState(next, method, next === 'deposit' ? amount : undefined).then(ok => { if (ok) { setDeposit(null); setMethod(undefined) } })
   }
   function confirmCorrection() {
     const next = confirming
     setConfirming(null)
-    if (next) void onSetState(next, method, next === 'deposit' ? amount : undefined)
+    if (next) void onSetState(next, method, next === 'deposit' ? amount : undefined).then(ok => { if (ok) { setCorrection(null); setDeposit(null); setMethod(undefined) } })
   }
   const methodField = <SegmentedControl legend="Method" name="payment-method" value={method} onChange={setMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} />
   const depositField = (id: string) => <Field label="Deposit received (€)" htmlFor={id}><input id={id} inputMode="decimal" value={deposit} disabled={busy} onChange={event => { setDeposit(event.target.value); setError('') }} /></Field>
@@ -48,7 +56,7 @@ export function OrderPaymentPanel({ order, busy, onSetState }: Props) {
         <p>Use after checking the payment record. Corrections replace the recorded amount.</p>
         <SegmentedControl legend="Corrected payment state" name="correction-state" value={correction} onChange={setCorrection} options={[{ value: 'unpaid', label: 'Unpaid' }, { value: 'deposit', label: 'Deposit' }, { value: 'paid', label: 'Paid' }]} />
         {remaining === 0 && methodField}{correction === 'deposit' && depositField('correction-deposit')}
-        <Button tone="staff" variant="secondary" disabled={busy} onClick={() => update(correction, true)}>Correct to {correction}{correction === 'deposit' && Number.isFinite(amount) ? ` · ${formatEur(amount, 'en')}` : ''}</Button>
+        <Button tone="staff" variant="secondary" disabled={busy || unchanged} onClick={() => update(correction, true)}>Correct to {correction}{correction === 'deposit' && Number.isFinite(amount) ? ` · ${formatEur(amount, 'en')}` : ''}</Button>
       </details>
     </>}
     {error && <p role="alert">{error}</p>}

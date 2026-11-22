@@ -395,9 +395,12 @@ class McpServerApiTests extends ApiTestSupport {
         String order = toolText(token, "get_order", Map.of("code", code));
         String search = toolText(token, "search_orders", Map.of("query", "Muster"));
         String agenda = toolText(token, "get_agenda_day", Map.of("date", TUE));
-        for (String text : List.of(order, search, agenda)) {
+        for (String text : List.of(search, agenda)) {
             assertThat(text).doesNotContain("1234567").doesNotContain("maria@example.com");
         }
+        // One order at a time carries the phone (to call the customer), never the e-mail.
+        assertThat((String) JsonPath.read(order, "$.customerPhone")).isEqualTo("+43 660 1234567");
+        assertThat(order).doesNotContain("maria@example.com").doesNotContain("\"phone\"");
         assertThat(search).contains("Maria Muster");
 
         String contact = toolText(token, "get_customer_contact", Map.of("code", code));

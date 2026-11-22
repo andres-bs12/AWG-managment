@@ -3,12 +3,12 @@ import { axe } from './helpers'
 
 // AWG0103: Vienna delivery, in the workshop (seed.ts).
 const copy = {
-  de: { instagram: 'Fragen? Schreib uns auf Instagram', change: 'Lieferadresse ändern' },
-  en: { instagram: 'Questions? Message us on Instagram', change: 'Change delivery address' },
+  de: { instagram: 'Fragen? Schreib uns auf Instagram', email: 'Oder schreib an artwithgab@gmail.com', change: 'Lieferadresse ändern' },
+  en: { instagram: 'Questions? Message us on Instagram', email: 'Or write to artwithgab@gmail.com', change: 'Change delivery address' },
 } as const
 
 for (const locale of ['de', 'en'] as const) {
-  test(`Track offers Instagram contact and no address change (${locale})`, async ({ page }) => {
+  test(`Track offers Instagram and e-mail contact and no address change (${locale})`, async ({ page }) => {
     await page.addInitScript(lang => localStorage.setItem('awg-locale', lang), locale)
     await page.goto('/track/AWG0103')
     const card = page.locator('section[aria-live]')
@@ -25,10 +25,15 @@ for (const locale of ['de', 'en'] as const) {
       const own = node.getBoundingClientRect(), parent = node.parentElement!.getBoundingClientRect()
       return own.left >= parent.left && own.right <= parent.right && node.scrollWidth <= node.clientWidth
     })).toBe(true)
-    // It follows the receipt and comes before the page actions.
+    const mail = card.getByRole('link', { name: copy[locale].email, exact: true })
+    await expect(mail).toHaveAttribute('href', 'mailto:artwithgab@gmail.com?subject=AWG0103')
+    expect((await mail.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    expect(await mail.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
+    // The contact rows follow the receipt and come before the page actions.
     expect(await link.evaluate(node => {
-      const receipt = node.parentElement!.querySelector('section')
-      const back = node.parentElement!.querySelector('a[href="/"]')
+      const content = node.parentElement!.parentElement!
+      const receipt = content.querySelector('section')
+      const back = content.querySelector('a[href="/"]')
       return !!receipt && !!back
         && !!(receipt.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)
         && !!(node.compareDocumentPosition(back) & Node.DOCUMENT_POSITION_FOLLOWING)

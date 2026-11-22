@@ -20,6 +20,7 @@ import type { MarketDay } from '../../domain/types'
 import { handoffArrivalLabel, handoffLabel } from '../../lib/handoff'
 import { formatEur } from '../../lib/money'
 import { paymentSummary } from '../../lib/paymentSummary'
+import { colorLabel, finishLabel } from '../../lib/stats'
 import { TRACKING_NUMBER_REGEX } from '../../lib/postShipping'
 import styles from './OrderDetailPage.module.css'
 
@@ -307,8 +308,8 @@ function CancelOrderDialog({ busy, order, items, onClose, onConfirm }: { busy: b
     <p>The order and payment record will be kept. Painting reservations are released. This cannot be undone.</p>
     <p>Received: {formatEur(paid, 'en')}.{paid > 0 ? ` Refund it manually${order.source === 'web' ? ' in Stripe' : ''}; cancelling does not issue a refund.` : ''}</p>
     <p>{items.length} {items.length === 1 ? 'ornament' : 'ornaments'} are cancelled. Only unpainted bases and eligible finished stock return to inventory.</p>
-    {painted.length > 0 && <p>Painting already started: {painted.map(item => item.petName || `${item.color} ${item.finish} ornament`).join(', ')}. These bases will not be restocked.</p>}
-    <label htmlFor="cancel-reason">Reason (optional)</label><textarea id="cancel-reason" maxLength={500} value={reason} onChange={event => setReason(event.target.value)} disabled={busy} />
+    {painted.length > 0 && <p>Painting already started: {painted.map(item => item.petName || `${colorLabel(item.color ?? '')} · ${finishLabel(item.finish ?? 'shiny')} ornament`).join(', ')}. These bases will not be restocked.</p>}
+    <Field label="Reason (optional)" htmlFor="cancel-reason"><textarea id="cancel-reason" rows={3} maxLength={500} value={reason} onChange={event => setReason(event.target.value)} disabled={busy} /></Field>
     <Button tone="staff" variant="danger" disabled={busy} onClick={() => onConfirm(reason)}>{busy ? 'Cancelling…' : 'Cancel order'}</Button>
   </StaffDialog>
 }

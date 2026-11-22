@@ -10,6 +10,7 @@ import type { MarketDay, OrderItem, ProductionStatus, TimeBlock } from '../../do
 import { agendaSlotPath, handoffArrivalLabel, handoffLabel, paintSlotLabel } from '../../lib/handoff'
 import { formatEur } from '../../lib/money'
 import { handoverBlocker } from '../../lib/deliveryFacts'
+import { colorLabel, finishLabel } from '../../lib/stats'
 import styles from './OrderItemCard.module.css'
 
 type Props = {
@@ -65,7 +66,7 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
         </div>
       </div>
       <dl className={styles.specs}>
-        {item.kind === 'custom' ? <div><dt>Colour</dt><dd>{item.color ? <><i className={styles.swatch} data-color={item.color} role="img" aria-label={`${item.color} colour`} />{item.finish ?? 'shiny'}</> : 'Not recorded'}</dd></div> : null}
+        {item.kind === 'custom' ? <div><dt>Colour</dt><dd>{item.color ? <><i className={styles.swatch} data-color={item.color} role="img" aria-hidden="true" />{`${colorLabel(item.color)} · ${finishLabel(item.finish ?? 'shiny')}`}</> : 'Not recorded'}</dd></div> : null}
         {item.withName ? <div><dt>Name to paint</dt><dd className={styles.name}>{item.backName || 'Waiting for form'}</dd></div> : null}
       </dl>
       {item.note ? <div className={styles.note}><strong>Painter’s note</strong><p>{item.note}</p></div> : null}

@@ -4,7 +4,7 @@ import { OrderReceipt } from '../../components/public/OrderReceipt'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
-import { InstagramIcon, INSTAGRAM_URL } from '../../components/public/InstagramLink'
+import { CONTACT_EMAIL, InstagramIcon, INSTAGRAM_URL, MailIcon } from '../../components/public/InstagramLink'
 import { GiftBoxReady } from '../../components/public/GiftBoxReady'
 import { PaintingOrnament } from '../../components/public/PaintingOrnament'
 import { SleighWipe } from '../../components/public/SleighWipe'
@@ -208,10 +208,16 @@ export function TrackPage() {
 
             <OrderReceipt items={view.items} total={view.total} paymentState={view.paymentState} shipping={shippingFee} />
 
-            <a className={styles.instagram} href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer">
-              <InstagramIcon className={styles.instagramIcon} />
-              <span>{t('trackInstagram')}</span>
-            </a>
+            <div className={styles.contact}>
+              <a className={styles.instagram} href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer">
+                <InstagramIcon className={styles.instagramIcon} />
+                <span>{t('trackInstagram')}</span>
+              </a>
+              <a className={styles.instagram} href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(view.code)}`}>
+                <MailIcon className={styles.instagramIcon} />
+                <span>{t('trackEmail')} <span className={styles.noBreak}>{CONTACT_EMAIL}</span></span>
+              </a>
+            </div>
 
             <div className={styles.actions}>
               <ButtonLink to="/" variant="secondary">
