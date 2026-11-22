@@ -54,6 +54,8 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-}
       OWNER_EMAIL: ${OWNER_EMAIL:-}
+      MAIL_REPLY_TO: ${MAIL_REPLY_TO:-}
+      MAIL_CONTACT: ${MAIL_CONTACT:-artwithgab@gmail.com}
     volumes:
       - uploads_data:/data/uploads
     depends_on:

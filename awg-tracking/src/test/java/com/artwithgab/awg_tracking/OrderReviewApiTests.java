@@ -60,6 +60,17 @@ class OrderReviewApiTests extends ApiTestSupport {
         assertFalse(attention.contains(cancelled));
     }
 
+    @Test void reviewingAnUnpaidCheckoutDoesNotHideItsLaterPayment() throws Exception {
+        String token = login();
+        String id = webOrder(token, CheckoutStatus.PENDING);
+        mvc.perform(post("/api/orders/" + id + "/reviewed").header("Authorization", bearer(token))).andExpect(status().isOk());
+        var order = orders.findById(UUID.fromString(id)).orElseThrow();
+        assertNull(order.getReviewedAt());
+        order.setCheckoutStatus(CheckoutStatus.CONFIRMED);
+        orders.saveAndFlush(order);
+        assertTrue(orders.findById(UUID.fromString(id)).orElseThrow().needsReview());
+    }
+
     @Test void reviewNeedsAStaffSession() throws Exception {
         String id = webOrder(login(), CheckoutStatus.CONFIRMED);
         mvc.perform(post("/api/orders/" + id + "/reviewed")).andExpect(status().isUnauthorized());

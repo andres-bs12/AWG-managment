@@ -588,11 +588,14 @@ public class OrderService {
                 .map(OrderService::summary).toList();
     }
 
-    /** Staff confirms they saw a new web order; repeating it keeps the first time. */
+    /**
+     * Staff confirms they saw a new paid web order; repeating it keeps the first time. Anything else
+     * (an unpaid checkout, a stall sale) is left untouched, so a later payment still reaches the queue.
+     */
     @Transactional
     public OrderDto markReviewed(UUID orderId) {
         Order order = orderRepository.findById(orderId).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
-        if (order.getReviewedAt() == null) order.setReviewedAt(clock.instant());
+        if (order.needsReview()) order.setReviewedAt(clock.instant());
         return getOrder(orderId);
     }
 

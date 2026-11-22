@@ -11,7 +11,6 @@ import com.artwithgab.awg_tracking.service.OrderNotification;
 import com.artwithgab.awg_tracking.support.AustrianPost;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -46,8 +45,12 @@ public class CustomerMailComposer {
 
     enum Template { CONFIRMED, PAYMENT, READY, SHIPPED, THANKS, ADDRESS, CANCELLED }
 
-    @EventListener
-    @org.springframework.transaction.annotation.Transactional
+    /**
+     * Runs after the order transaction committed, in its own read-only transaction: a problem here can
+     * never mark the payment or staff action for rollback.
+     */
+    @org.springframework.transaction.event.TransactionalEventListener(phase = org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT)
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW, readOnly = true)
     public void onOrderNotification(OrderNotification event) {
         if (event.unconfirmedWeb() || event.orderId() == null) return;
         try {
@@ -67,7 +70,14 @@ public class CustomerMailComposer {
         if (template == null) return;
         // Address edits share a small budget so a customer cannot flood their own inbox.
         if (template == Template.ADDRESS && !limiter.tryAcquire("order-edit-customer-mail", order.getId().toString(), 1, Duration.ofMinutes(15))) return;
-        events.publishEvent(new CustomerMail(email.trim(), render(template, view(order))));
+        var view = view(order);
+        if (template == Template.ADDRESS && view.post() == null) {
+            // Legacy Vienna deliveries have no Post data; confirm the saved address all the same.
+            view = new CustomerMailTemplates.View(view.en(), view.code(), view.firstName(), view.lines(), view.shippingFee(), view.total(),
+                    view.paid(), view.pickup(), new CustomerMailTemplates.Post(null, null, null, address(order.getDeliveryAddress())),
+                    view.paymentMethod(), view.today(), view.trackUrl(), view.contactEmail(), view.siteUrl());
+        }
+        events.publishEvent(new CustomerMail(email.trim(), render(template, view)));
     }
 
     static Template choose(OrderNotification.Kind kind, Order order) {
