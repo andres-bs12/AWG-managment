@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -60,13 +59,16 @@ class NotificationServiceTests {
         } finally {
             orders.cancelOrder(id);
         }
-        // Owner notices stay plain text: sale created, payment, cancellation.
-        var notices = org.mockito.ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mail, timeout(5000).times(3)).send(notices.capture());
-        assertTrue(notices.getAllValues().stream().allMatch(m -> m.getTo()[0].equals("owner@example.com") && m.getText().contains(order.code())));
-        // The customer gets one HTML e-mail per event, plus the invoice (seller data is configured in this test).
-        var mime = org.mockito.ArgumentCaptor.forClass(jakarta.mail.internet.MimeMessage.class);
-        verify(mail, timeout(5000).times(4)).send(mime.capture());
+        // Owner notices (sale created, payment, cancellation) and customer mails are all HTML now; the
+        // customer gets one e-mail per event, plus the invoice (seller data is configured in this test).
+        var all = org.mockito.ArgumentCaptor.forClass(jakarta.mail.internet.MimeMessage.class);
+        verify(mail, timeout(5000).times(7)).send(all.capture());
+        var notices = all.getAllValues().stream().filter(m -> "owner@example.com".equals(recipient(m))).toList();
+        assertEquals(3, notices.size());
+        assertTrue(notices.stream().allMatch(m -> subjectOf(m).startsWith("ArtWithGab: ") && subjectOf(m).endsWith(order.code())));
+        var mime = new Object() { List<jakarta.mail.internet.MimeMessage> getAllValues() {
+            return all.getAllValues().stream().filter(m -> "customer@example.com".equals(recipient(m))).toList(); } };
+        assertEquals(4, mime.getAllValues().size());
         try {
             var bySubject = new java.util.HashMap<String, jakarta.mail.internet.MimeMessage>();
             for (var m : mime.getAllValues()) { m.saveChanges(); bySubject.put(m.getSubject(), m); }
@@ -117,9 +119,15 @@ class NotificationServiceTests {
         orders.setHandedOver(id, true, lastPost);
         orders.setHandedOver(id, true, lastPost);
         // Customer: order confirmed, ready for the market pickup, and exactly one "on its way".
-        var message = org.mockito.ArgumentCaptor.forClass(jakarta.mail.internet.MimeMessage.class);
-        verify(mail, timeout(5000).times(3)).send(message.capture());
-        var shipped = message.getAllValues().stream().filter(m -> subject.equals(subjectOf(m))).toList();
+        // Owner notices go to another address; wait for the async sends, then read every sent message once.
+        verify(mail, timeout(5000).atLeast(3)).send(any(jakarta.mail.internet.MimeMessage.class));
+        try { Thread.sleep(800); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        var customer = org.mockito.Mockito.mockingDetails(mail).getInvocations().stream()
+                .filter(i -> i.getMethod().getName().equals("send") && i.getArgument(0) instanceof jakarta.mail.internet.MimeMessage)
+                .map(i -> (jakarta.mail.internet.MimeMessage) i.getArgument(0))
+                .filter(m -> "customer@example.com".equals(recipient(m))).toList();
+        assertEquals(3, customer.size(), "order confirmed, ready for the market pickup, on its way");
+        var shipped = customer.stream().filter(m -> subject.equals(subjectOf(m))).toList();
         assertEquals(1, shipped.size());
         try {
             String text = textPart(shipped.getFirst(), "text/plain");
@@ -146,8 +154,7 @@ class NotificationServiceTests {
         });
         assertEquals(before, invoices.count());
         assertEquals(numberBefore, counters.findById(1L).orElseThrow().getLastNumber());
-        verify(mail, after(300).never()).send(any(SimpleMailMessage.class));
-        verify(mail, never()).send(any(jakarta.mail.internet.MimeMessage.class));
+        verify(mail, after(300).never()).send(any(jakarta.mail.internet.MimeMessage.class));
     }
 
     private String readyMarketPiece() {
@@ -155,6 +162,11 @@ class NotificationServiceTests {
         piece.setId("RM" + UUID.randomUUID().toString().substring(0, 6));
         piece.setStatus("painted");
         return marketStock.saveAndFlush(piece).getId();
+    }
+
+    private static String recipient(jakarta.mail.internet.MimeMessage m) {
+        try { return m.getRecipients(jakarta.mail.Message.RecipientType.TO)[0].toString(); }
+        catch (jakarta.mail.MessagingException e) { throw new IllegalStateException(e); }
     }
 
     private static String subjectOf(jakarta.mail.internet.MimeMessage message) {

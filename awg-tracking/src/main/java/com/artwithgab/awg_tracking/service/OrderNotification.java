@@ -35,11 +35,7 @@ public record OrderNotification(Kind kind, String code, String customerName, Str
         var a = order.getDeliveryAddress();
         String address = a == null ? "Not provided" : Stream.of(a.getLine1(), a.getLine2(), a.getPostalCode(), a.getCity())
                 .filter(s -> s != null && !s.isBlank()).collect(Collectors.joining(", "));
-        String items = order.getOrderItems().stream().map(i -> String.format(
-                "%s, %s, color: %s, pet: %s, name: %s, note: %s, handoff: %s %s %s, painting: %s, price: %s EUR",
-                i.getItemKind(), i.getProductionStatus(), i.getCustomColor(), i.getPetName(), i.getNameInOrnament(),
-                i.getNote(), i.getDeliveryKind(), i.getHandoffDate(), i.getPickUpTime(), i.getPaintStart(), i.getCost()))
-                .collect(Collectors.joining("\n"));
+        String items = order.getOrderItems().stream().map(OrderNotification::itemLine).collect(Collectors.joining("\n"));
         var post = kind == Kind.POST_SHIPPED ? order.postItems() : java.util.List.<OrderItem>of();
         LocalDate from = post.stream().map(OrderItem::getArrivalFrom).min(Comparator.naturalOrder()).orElse(null);
         LocalDate to = post.stream().map(OrderItem::getArrivalTo).max(Comparator.naturalOrder()).orElse(null);
@@ -47,5 +43,32 @@ public record OrderNotification(Kind kind, String code, String customerName, Str
                 order.getTotal(), order.getAmountPaid(), String.valueOf(order.getPaymentState()), address, items,
                 order.getId() == null ? null : order.getId().toString(), order.isUnconfirmedWeb(), from, to,
                 kind == Kind.POST_SHIPPED ? AustrianPost.trackingUrl(order.getTrackingNumber()) : null);
+    }
+
+    /** One readable line per item for the owner, e.g. "Custom · Green · Luna · name LUNA · Post Fri 27 Nov · paint Thu 26 Nov 10:00 · Painted · 60.00 EUR". */
+    static String itemLine(OrderItem i) {
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        parts.add(i.getItemKind() == com.artwithgab.awg_tracking.enums.ItemKind.CUSTOM ? "Custom" : "Finished" + (i.getMarketOrnamentId() == null ? "" : " " + i.getMarketOrnamentId()));
+        if (i.getCustomColor() != null) parts.add(cap(i.getCustomColor().name()) + (i.getCustomFinish() == null ? "" : " " + i.getCustomFinish().name().toLowerCase(java.util.Locale.ROOT)));
+        if (i.getPetName() != null && !i.getPetName().isBlank()) parts.add(i.getPetName());
+        if (i.getNameInOrnament() != null && !i.getNameInOrnament().isBlank()) parts.add("name " + i.getNameInOrnament());
+        if (i.getDeliveryKind() != null) {
+            String when = i.getHandoffDate() == null ? "" : " " + DAY.format(i.getHandoffDate());
+            String time = i.getPickUpTime() == null ? "" : " " + i.getPickUpTime();
+            parts.add(cap(i.getDeliveryKind().name()) + when + time);
+        }
+        if (i.getPaintStart() != null) parts.add("paint " + PAINT.format(i.getPaintStart()));
+        if (i.getProductionStatus() != null) parts.add(cap(i.getProductionStatus().name().replace('_', ' ')));
+        if (i.getNote() != null && !i.getNote().isBlank()) parts.add("note: " + i.getNote());
+        parts.add((i.getCost() == null ? "0.00" : i.getCost().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()) + " EUR");
+        return String.join(" · ", parts);
+    }
+
+    private static final java.time.format.DateTimeFormatter DAY = java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", java.util.Locale.UK);
+    private static final java.time.format.DateTimeFormatter PAINT = java.time.format.DateTimeFormatter.ofPattern("EEE d MMM HH:mm", java.util.Locale.UK);
+
+    private static String cap(String value) {
+        String lower = value.toLowerCase(java.util.Locale.ROOT);
+        return lower.isEmpty() ? lower : Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
     }
 }

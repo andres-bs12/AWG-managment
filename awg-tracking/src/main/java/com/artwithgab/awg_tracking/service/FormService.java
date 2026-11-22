@@ -98,6 +98,7 @@ public class FormService {
         customer.setName(payload.customerName().trim());
         customer.setPhone(payload.phone().trim());
         customer.setEmail(payload.email().trim());
+        String addressBefore = addressKey(order.getDeliveryAddress());
         boolean post = !order.postItems().isEmpty();
         if (post) {
             if (payload.address() != null || order.getDeliveryAddress() == null) {
@@ -146,6 +147,10 @@ public class FormService {
         order.setFormSubmitted(true);
         if (payload.locale() != null) order.setLocale(payload.locale());
         events.publishEvent(OrderNotification.from(order, first ? OrderNotification.Kind.FORM_COMPLETED : OrderNotification.Kind.FORM_SUBMITTED));
+        // A later edit that moves the parcel also confirms the new address to the customer.
+        if (!first && addressBefore != null && !addressBefore.equals(addressKey(order.getDeliveryAddress()))) {
+            events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.ADDRESS_CHANGED));
+        }
         return new SubmitFormResponse(order.getCode());
     }
 
@@ -182,4 +187,9 @@ public class FormService {
         }
     }
 
+    private static String addressKey(com.artwithgab.awg_tracking.model.Address a) {
+        if (a == null) return null;
+        return String.join("|", java.util.Arrays.asList(a.getLine1(), a.getLine2(), a.getPostalCode(), a.getCity()).stream()
+                .map(v -> v == null ? "" : v.trim()).toList());
+    }
 }

@@ -26,6 +26,11 @@ Every finding goes here and, when it is a code fix, onto branch `fix/qa-real-tes
 | 16 | Not tested live | Address change after the form, waitlist opt-in. Web payment tested 2026-11-22 (`AWG5CFZGE`, 4242): customer mail, owner copy, red dot and Mark reviewed all work. | Pending: the two left. |
 | 17 | Mail · artwork | Gmail strips inline SVG, so the approved peaks, ornament icons and contact icons were missing. | Fixed: hosted PNGs in `frontend/public/mail/`. |
 | 18 | Mail · Brevo | Gmail shows "Unsubscribe" next to the sender of an order mail; Brevo probably adds `List-Unsubscribe`. | To check in Brevo (transactional mails should not carry it). |
+| 20 | Mail · sender | Inboxes showed the bare "hello@artwithgab.com". | Fixed: sent as "ArtWithGab <hello@…>". |
+| 21 | Mail · owner | Owner notices were plain technical text. | Fixed: HTML with the same look, readable item lines, "Open in staff"; replies go to the customer. |
+| 22 | Mail · form address | Changing the address in the QR form after sending it sent no confirmation (only the Track page did). | Fixed: a changed address sends the address mail. |
+| 23 | Mail · duplicate | Collecting the rest at handover sent "Zahlung erhalten" and "Danke für deinen Besuch". | Fixed: only the thank-you mail, which shows the payment. |
+| 24 | Order page · payment | After a deposit, "Correct payment" shows "Unpaid" selected and the "Mark deposit" button stays. | To check. |
 | 19 | Shop · price | The shop charges +€5.00 for the name on the back; docs say €12.99 by default. | Owner: confirm the price in Stock. |
 
 ## Test orders left in production
@@ -34,4 +39,6 @@ Every finding goes here and, when it is a code fix, onto branch `fix/qa-real-tes
 - `AWGWXP98K` Post: card paid → ready → handed to Post with fake tracking `RR123456785AT`. 4 customer mails.
 - `AWGH7NAF6` cancelled. 1 customer mail.
 - `AWG5CFZGE` web order paid with Stripe test card, Post to a fake address, marked reviewed.
+- `AWGK4KG7P` stall pickup (DE): form → deposit → ready → handed over with the rest.
+- `AWGVFBZWB` stall Post (DE): form → address edit → cancelled.
 - Market "TEST correos (borrar)" (22 Nov, cost 0).

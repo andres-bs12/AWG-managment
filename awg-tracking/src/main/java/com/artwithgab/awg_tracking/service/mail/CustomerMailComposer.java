@@ -66,7 +66,7 @@ public class CustomerMailComposer {
         if (order == null) return;
         String email = order.getCustomer() == null ? null : order.getCustomer().getEmail();
         if (email == null || email.isBlank()) return;
-        Template template = choose(event.kind(), order);
+        Template template = choose(event.kind(), order, clock.instant());
         if (template == null) return;
         // Address edits share a small budget so a customer cannot flood their own inbox.
         if (template == Template.ADDRESS && !limiter.tryAcquire("order-edit-customer-mail", order.getId().toString(), 1, Duration.ofMinutes(15))) return;
@@ -80,10 +80,13 @@ public class CustomerMailComposer {
         events.publishEvent(new CustomerMail(email.trim(), render(template, view)));
     }
 
-    static Template choose(OrderNotification.Kind kind, Order order) {
+    static Template choose(OrderNotification.Kind kind, Order order) { return choose(kind, order, java.time.Instant.now()); }
+
+    static Template choose(OrderNotification.Kind kind, Order order, java.time.Instant now) {
         return switch (kind) {
             case WEB_PAID, SALE_CREATED, FORM_COMPLETED -> Template.CONFIRMED;
-            case PAYMENT_CHANGED -> order.getPaymentState() == PaymentState.UNPAID ? null : Template.PAYMENT;
+            // Collecting the rest at handover: the thank-you mail already shows the payment, so one mail is enough.
+            case PAYMENT_CHANGED -> order.getPaymentState() == PaymentState.UNPAID || handedOverJustNow(order, now) ? null : Template.PAYMENT;
             // Post parcels get "on its way" next; a "ready" mail would only add noise.
             case ALL_FINISHED -> order.getOrderItems().stream().anyMatch(i -> i.getDeliveryKind() != DeliveryKind.POST && !i.isHandedOver())
                     ? Template.READY : null;
@@ -93,6 +96,10 @@ public class CustomerMailComposer {
             case ADDRESS_CHANGED -> order.getDeliveryAddress() == null ? null : Template.ADDRESS;
             case FORM_SUBMITTED, PAYMENT_REVIEW -> null;
         };
+    }
+
+    private static boolean handedOverJustNow(Order order, java.time.Instant now) {
+        return order.isHandedOver() && order.getHandedOverAt() != null && !order.getHandedOverAt().isBefore(now.minus(Duration.ofMinutes(2)));
     }
 
     static CustomerMailTemplates.Rendered render(Template template, CustomerMailTemplates.View view) {

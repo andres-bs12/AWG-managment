@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -31,22 +30,24 @@ public class NotificationService {
         // Both edit kinds share one budget; changing endpoint must not double the mail allowance.
         if (publicEdit && !limiter.tryAcquire("order-edit-mail", event.orderId() == null ? event.code() : event.orderId(),
                 1, java.time.Duration.ofMinutes(15))) return;
-        String link = properties.shop().publicBaseUrl().replaceAll("/+$", "") + "/track/" + URLEncoder.encode(event.code(), StandardCharsets.UTF_8);
-        String subject = "ArtWithGab: " + event.kind().owner + " - " + event.code();
-        String ownerBody = "Order: " + event.code() + "\nCustomer: " + event.customerName() + "\nEmail: " + event.customerEmail()
-                + "\nTotal: " + event.total() + " EUR\nAmount paid: " + event.amountPaid() + " EUR\nPayment: " + event.paymentState()
-                + "\nAddress: " + event.address() + "\nItems:\n" + event.items() + "\nTrack: " + link
-                // Staff detail page (the only way to open an order kept off the agenda, e.g. a payment review).
-                + (event.orderId() == null || event.kind() == OrderNotification.Kind.CANCELLED ? ""
-                        : "\nStaff: " + properties.shop().publicBaseUrl().replaceAll("/+$", "") + "/staff/orders/" + event.orderId());
-        for (String owner : properties.mail().ownerEmails()) send(owner, subject, ownerBody);
+        String base = properties.shop().publicBaseUrl().replaceAll("/+$", "");
+        String link = base + "/track/" + URLEncoder.encode(event.code(), StandardCharsets.UTF_8);
+        // Staff detail page (the only way to open an order kept off the agenda, e.g. a payment review).
+        String staff = event.orderId() == null || event.kind() == OrderNotification.Kind.CANCELLED ? null : base + "/staff/orders/" + event.orderId();
+        var notice = com.artwithgab.awg_tracking.service.mail.CustomerMailTemplates.owner(new com.artwithgab.awg_tracking.service.mail.CustomerMailTemplates.OwnerNotice(
+                event.kind().owner, event.code(), event.customerName(), event.customerEmail(), plain(event.total()), plain(event.amountPaid()),
+                event.paymentState(), event.address(), event.items() == null || event.items().isBlank() ? java.util.List.of() : java.util.List.of(event.items().split("\n")),
+                staff, link, base));
+        // The owner can answer the customer straight from the notice.
+        String replyTo = event.customerEmail() == null || event.customerEmail().isBlank() ? null : event.customerEmail();
+        for (String owner : properties.mail().ownerEmails()) sendHtml(owner, notice.subject(), notice.text(), notice.html(), replyTo);
         // Customer e-mails are chosen and rendered by CustomerMailComposer and arrive here as CustomerMail.
     }
 
     @Async("notificationExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCustomerMail(com.artwithgab.awg_tracking.service.mail.CustomerMail mail) {
-        sendHtml(mail.recipient(), mail.subject(), mail.text(), mail.html());
+        sendHtml(mail.recipient(), mail.subject(), mail.text(), mail.html(), properties.mail().replyTo());
     }
 
     @Async("notificationExecutor")
@@ -64,7 +65,7 @@ public class NotificationService {
             }
             var message = mail.createMimeMessage();
             var helper = new org.springframework.mail.javamail.MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
-            helper.setFrom(header(properties.mail().from()));
+            helper.setFrom(from());
             helper.setTo(header(invoice.getRecipient()));
             helper.setSubject(header(invoice.getSubject()));
             String html = "<!doctype html><html><body><pre style=\"font-family:Arial,sans-serif;white-space:pre-wrap\">"
@@ -91,34 +92,11 @@ public class NotificationService {
         boolean en = "en".equals(event.locale());
         var rendered = com.artwithgab.awg_tracking.service.mail.CustomerMailTemplates.waitlist(en, confirm, leave,
                 properties.mail().contactEmail(), base);
-        sendHtml(event.email(), rendered.subject(), rendered.text(), rendered.html());
+        sendHtml(event.email(), rendered.subject(), rendered.text(), rendered.html(), properties.mail().replyTo());
     }
 
-    private void send(String recipient, String subject, String body) {
-        subject = header(subject);
-        try {
-            JavaMailSender mail = sender.getIfAvailable();
-            if (host == null || host.isBlank() || properties.mail().from() == null || properties.mail().from().isBlank() || mail == null) {
-                log.info("E-mail not sent (mail not configured): {}", subject);
-                return;
-            }
-            if (recipient == null || recipient.isBlank()) {
-                log.info("E-mail not sent (no recipient yet): {}", subject);
-                return;
-            }
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(header(properties.mail().from()));
-            message.setTo(header(recipient));
-            message.setSubject(subject);
-            message.setText(body);
-            mail.send(message);
-        } catch (Exception e) {
-            logMailFailure(e);
-        }
-    }
-
-    /** Customer e-mail: HTML with a plain-text alternative; replies go to the configured reply-to address. */
-    private void sendHtml(String recipient, String subject, String text, String html) {
+    /** HTML mail with a plain-text alternative, sent as "ArtWithGab <from>". */
+    private void sendHtml(String recipient, String subject, String text, String html, String replyTo) {
         subject = header(subject);
         try {
             JavaMailSender mail = sender.getIfAvailable();
@@ -132,9 +110,8 @@ public class NotificationService {
             }
             var message = mail.createMimeMessage();
             var helper = new org.springframework.mail.javamail.MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
-            helper.setFrom(header(properties.mail().from()));
+            helper.setFrom(from());
             helper.setTo(header(recipient));
-            String replyTo = properties.mail().replyTo();
             if (replyTo != null && !replyTo.isBlank()) helper.setReplyTo(header(replyTo));
             helper.setSubject(subject);
             helper.setText(text, html);
@@ -160,6 +137,18 @@ public class NotificationService {
             if (current instanceof org.springframework.mail.MailSendException mail) pending.addAll(java.util.List.of(mail.getMessageExceptions()));
         }
         log.warn("Mail delivery failed: exception={} smtpCode={}", failure.getClass().getSimpleName(), smtpCode);
+    }
+
+    /** Inboxes show the brand instead of the bare "hello@" address. */
+    private String from() {
+        String from = header(properties.mail().from());
+        return from.contains("<") ? from : SENDER_NAME + " <" + from + ">";
+    }
+
+    static final String SENDER_NAME = "ArtWithGab";
+
+    private static String plain(java.math.BigDecimal value) {
+        return (value == null ? java.math.BigDecimal.ZERO : value).setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
     }
 
     private static String header(String value) { return value == null ? "" : value.replace("\r", "").replace("\n", ""); }

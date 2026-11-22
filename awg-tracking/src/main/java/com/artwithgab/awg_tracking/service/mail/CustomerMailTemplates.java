@@ -190,6 +190,35 @@ public final class CustomerMailTemplates {
         return m.render(subject, pre, contactEmail, siteUrl);
     }
 
+    /** What the owner notice shows; optional parts are null. */
+    public record OwnerNotice(String title, String code, String customerName, String customerEmail, String total, String paid,
+                              String paymentState, String address, List<String> items, String staffUrl, String trackUrl, String siteUrl) {}
+
+    /** Notice to the owner (English, the staff language) with the same look as the customer mails. */
+    public static Rendered owner(OwnerNotice n) {
+        String subject = "ArtWithGab: " + n.title() + " - " + n.code();
+        Mail m = new Mail(true);
+        m.owner = true;
+        m.title(n.title());
+        m.text("Order " + n.code() + (n.customerName() == null || n.customerName().isBlank() ? "" : " · " + n.customerName()));
+        String facts = fact("Customer", blank(n.customerName(), "Not given yet"), blank(n.customerEmail(), "No e-mail yet"))
+                + fact("Payment", n.paymentState(), "Total " + n.total() + " EUR · paid " + n.paid() + " EUR");
+        if (n.address() != null && !n.address().isBlank() && !"Not provided".equals(n.address())) facts += fact("Delivery address", n.address(), null);
+        m.card(facts);
+        if (n.items() != null && !n.items().isEmpty()) {
+            StringBuilder rows = new StringBuilder();
+            for (String item : n.items()) {
+                rows.append("<tr><td style=\"padding:6px 0;font-size:15px;color:").append(INK).append(";\">").append(esc(item)).append("</td></tr>");
+            }
+            m.card(rows.toString());
+        }
+        if (n.staffUrl() != null) m.buttons("Open in staff", n.staffUrl(), "Customer view", n.trackUrl());
+        else m.button("Customer view", n.trackUrl());
+        return m.render(subject, n.title() + " · " + n.code(), null, n.siteUrl());
+    }
+
+    private static String blank(String value, String fallback) { return value == null || value.isBlank() ? fallback : value; }
+
     // ─── Shared blocks ──────────────────────────────────────────────────────
 
     private static void deliveryFacts(Mail m, View v, boolean withCode) {
@@ -263,6 +292,8 @@ public final class CustomerMailTemplates {
     /** Collects blocks in order and writes both the HTML and the plain-text version. */
     private static final class Mail {
         private final boolean en;
+        /** Owner notices drop the customer contact footer. */
+        private boolean owner;
         private final StringBuilder html = new StringBuilder();
         private final List<String> text = new ArrayList<>();
 
@@ -412,16 +443,17 @@ public final class CustomerMailTemplates {
                     + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-family:" + BODY + ";font-size:16px;line-height:1.55;color:" + INK + ";\">"
                     + html + "</table></td></tr>"
                     + "<tr><td style=\"padding:18px 28px 22px;background:" + RAISED + ";border-top:1px solid " + BORDER + ";font-family:" + BODY + ";font-size:15px;color:" + INK + ";\">"
+                    + (owner ? "<div style=\"color:" + MUTED + ";font-size:14px;padding-bottom:6px;\">Staff notice from artwithgab.com</div>" : ""
                     + "<div style=\"color:" + MUTED + ";font-size:14px;padding-bottom:6px;\">" + esc(contactQ) + "</div>"
                     + "<div style=\"font-weight:600;padding-bottom:10px;\"><a href=\"" + INSTAGRAM_URL + "\" style=\"color:" + GREEN + ";text-decoration:none;white-space:nowrap;\">"
                     + icon(site, "instagram") + "Instagram " + INSTAGRAM_HANDLE + "</a>"
                     + " &nbsp;·&nbsp; <a href=\"mailto:" + esc(contactEmail) + "\" style=\"color:" + GREEN + ";text-decoration:none;white-space:nowrap;\">"
-                    + icon(site, "email") + esc(contactEmail) + "</a></div>"
+                    + icon(site, "email") + esc(contactEmail) + "</a></div>")
                     + "<div style=\"color:" + MUTED + ";font-size:12px;\">" + esc(legal) + " · <a href=\"" + esc(site) + "/impressum\" style=\"color:" + MUTED + ";\">" + imprint
                     + "</a> · <a href=\"" + esc(site) + "/datenschutz\" style=\"color:" + MUTED + ";\">" + privacy + "</a></div>"
                     + "</td></tr></table></td></tr></table></body></html>";
-            String plain = String.join("\n\n", text) + "\n\n---\n" + contactQ + "\nInstagram " + INSTAGRAM_HANDLE + " · " + contactEmail
-                    + "\n" + legal + "\n" + site + "/impressum";
+            String plain = String.join("\n\n", text) + "\n\n---\n"
+                    + (owner ? "Staff notice from artwithgab.com" : contactQ + "\nInstagram " + INSTAGRAM_HANDLE + " · " + contactEmail + "\n" + legal + "\n" + site + "/impressum");
             return new Rendered(subject, plain, out);
         }
     }

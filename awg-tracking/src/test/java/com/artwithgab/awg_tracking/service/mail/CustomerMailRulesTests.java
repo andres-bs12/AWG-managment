@@ -48,6 +48,16 @@ class CustomerMailRulesTests {
         assertEquals(READY, CustomerMailComposer.choose(Kind.ALL_FINISHED, order(PaymentState.PAID, DeliveryKind.POST, DeliveryKind.MARKET)));
     }
 
+    @Test void collectingTheRestAtHandoverSendsOnlyTheThankYou() {
+        Order order = order(PaymentState.PAID, DeliveryKind.MARKET);
+        java.time.Instant now = java.time.Instant.parse("2026-11-22T18:26:13Z");
+        order.setHandedOver(true);
+        order.setHandedOverAt(now.minusSeconds(1));
+        assertNull(CustomerMailComposer.choose(Kind.PAYMENT_CHANGED, order, now), "the thank-you mail carries the payment");
+        assertEquals(THANKS, CustomerMailComposer.choose(Kind.HANDED_OVER, order, now));
+        assertEquals(PAYMENT, CustomerMailComposer.choose(Kind.PAYMENT_CHANGED, order, now.plusSeconds(600)), "a later payment is confirmed");
+    }
+
     @Test void handoverShippingCancelAndAddressEachHaveTheirOwnMail() {
         Order order = order(PaymentState.PAID, DeliveryKind.POST);
         assertEquals(THANKS, CustomerMailComposer.choose(Kind.HANDED_OVER, order));
