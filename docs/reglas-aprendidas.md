@@ -123,6 +123,7 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 - **Migraciones Flyway:** nunca editar ni reutilizar números ya aplicados en producción (V1–V17). Un cambio de entidad necesita migración nueva. Backup antes de cada despliegue.
 - Build de producción solo con `VITE_DATA_SOURCE=http`; `build:mock` nunca se despliega.
 - Tras desplegar algo que toca pagos: la compra de prueba 4242 sigue pendiente (ver `docs/checklist-lanzamiento.md`).
+- Al pasar valores por `ssh host comando args`, citarlos con `printf %q`: ssh une los argumentos y el shell remoto expande `$…`. Un hash bcrypt sin citar quedó guardado roto y bloqueó el login (2026-11-22, `deploy/reset-staff-password.sh`).
 
 ## 7. Staff
 

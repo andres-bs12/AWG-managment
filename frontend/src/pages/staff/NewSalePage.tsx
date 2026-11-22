@@ -895,7 +895,8 @@ export function NewSalePage() {
       throw new Error(`${marketOrnamentLabel(duplicatePiece)} is already in this sale. Remove the duplicate or choose another piece.`)
     }
     writeStoredDraft({ ...draft, idempotencyKey: saleKey.current })
-    const soldOnMarketDayId = activeMarketDay?.id ?? (stalls.length <= 1 ? today?.id : undefined)
+    // Only an open market stall can be the place of sale; a home painting day ("Casa") never is.
+    const soldOnMarketDayId = activeMarketDay?.id ?? (stalls.length <= 1 ? marketTodayDays[0]?.id : undefined)
     const created = await api.orders.createSale({
       soldOnMarketDayId,
       items: toCreateItems(draft.items, days, today, draft.postAddress),

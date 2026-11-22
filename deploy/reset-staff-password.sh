@@ -20,7 +20,9 @@ HASH="$(htpasswd -inBC 12 "" <<<"$PW" | tr -d ':\n')"
 unset PW PW2
 [[ "$HASH" == \$2y\$* ]] || { echo "Could not hash the password."; exit 1; }
 
-ssh -i "$KEY" -o ConnectTimeout=10 "$HOST" bash -s -- "$EMAIL" "$HASH" <<'REMOTE'
+# ssh joins its arguments into one string for the remote shell, so quote them here: an unquoted bcrypt hash
+# would lose every "$2", "$1"... to remote parameter expansion and store a broken hash.
+ssh -i "$KEY" -o ConnectTimeout=10 "$HOST" "bash -s -- $(printf '%q' "$EMAIL") $(printf '%q' "$HASH")" <<'REMOTE'
 set -euo pipefail
 cd /opt/awg
 sudo docker compose --env-file .env exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v email="$1" -v hash="$2"' sh "$1" "$2" <<'SQL'
