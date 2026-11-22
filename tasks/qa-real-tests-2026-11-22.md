@@ -27,7 +27,7 @@ Every finding goes here and, when it is a code fix, onto branch `fix/qa-real-tes
 
 ## Test orders left in production
 
-- `AWGMK7894` market pickup: deposit → ready → handed over with the rest in cash. 6 customer mails.
+- `AWGMK7894` market pickup: deposit → ready → handed over with the rest in cash. 5 customer mails.
 - `AWGWXP98K` Post: card paid → ready → handed to Post with fake tracking `RR123456785AT`. 4 customer mails.
 - `AWGH7NAF6` cancelled. 1 customer mail.
 - Market "TEST correos (borrar)" (22 Nov, cost 0).
