@@ -1,6 +1,6 @@
 # Contexto del proyecto — ArtWithGab (AWG)
 
-**Actualizado:** 2026-11-22 (producción sirve `1bbfddf` de la rama `fix/qa-real-tests-2026-11-22`: v3.1.0 + correos HTML (remitente «ArtWithGab», avisos al dueño en HTML), «Mark reviewed» y conector MCP con `delete_market_day`; Flyway V18–V19 aplicadas; backup `~/backups/pre-v3.2-20261122T1723.sql.gz`; `main` sigue en v3.1.0 hasta unir la rama)
+**Actualizado:** 2026-11-22 (producción sirve `5dcdd02` de la rama `fix/qa-real-tests-2026-11-22`: v3.1.0 + correos HTML (remitente «ArtWithGab», avisos al dueño en HTML), «Mark reviewed» y conector MCP con `delete_market_day`, `list_recent_orders`, `set_painting_hours` y `record_stock_sale`; Flyway V18–V19 aplicadas; backup `~/backups/pre-v3.2-20261122T1723.sql.gz`; `main` sigue en v3.1.0 hasta unir la rama)
 **Propósito de este archivo:** memoria persistente para el dueño del proyecto y los agentes que trabajen en este repositorio.
 
 ## Instrucción de mantenimiento
@@ -133,6 +133,7 @@ Conector personalizado de claude.ai para manejar AWG por chat (plan Max, sin cos
 ## Pruebas
 
 - Backend: `cd awg-tracking && ./mvnw test`. Frontend: `npm run lint`, `node --test tests/*.test.mjs` y `VITE_DATA_SOURCE=http npm run build` desde `frontend/`.
+- Una clase de prueba con `@TestPropertySource` crea otro contexto de Spring: dale su propia `spring.datasource.url` de H2, o recrea el esquema compartido `awg` y rompe otras pruebas según el orden.
 - Playwright usa mock, con `PW_PORT` y `PW_WORKERS` configurables. Las comprobaciones de geometría se validan en CI. Ejecutar `e2e-full` para el commit exacto antes de desplegar. Ver §0.1 de [reglas aprendidas](docs/reglas-aprendidas.md).
 
 ## Estado y siguientes tareas
