@@ -26,7 +26,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "awg.mcp.allowed-redirect-uris=https://claude.ai/api/mcp/auth_callback",
         "awg.mcp.allowed-emails=gaby@artwithgab.com"
 })
+@org.springframework.test.context.event.RecordApplicationEvents
 class McpStockSaleApiTests extends ApiTestSupport {
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.test.context.event.ApplicationEvents events;
+
     private static final String CALLBACK = "https://claude.ai/api/mcp/auth_callback";
     private static final String VERIFIER = "stock-sale-verifier-0123456789-abcdefghijklmnopqrstuvwxyz";
 
@@ -55,6 +59,10 @@ class McpStockSaleApiTests extends ApiTestSupport {
         assertThat(((Number) JsonPath.read(order, "$.amountPaid")).doubleValue())
                 .isEqualTo(((Number) JsonPath.read(order, "$.total")).doubleValue());
         assertThat(stockStatus(app, piece)).isEqualTo("sold");
+        // Collect-and-hand-over in one call: one "handed over" notice, no separate payment notice.
+        var kinds = events.stream(com.artwithgab.awg_tracking.service.OrderNotification.class).map(n -> n.kind()).toList();
+        assertThat(kinds).containsOnlyOnce(com.artwithgab.awg_tracking.service.OrderNotification.Kind.HANDED_OVER)
+                .doesNotContain(com.artwithgab.awg_tracking.service.OrderNotification.Kind.PAYMENT_CHANGED);
 
         // A retry (lost response) cannot sell the same piece twice.
         String again = tool(token, "record_stock_sale", args, true);

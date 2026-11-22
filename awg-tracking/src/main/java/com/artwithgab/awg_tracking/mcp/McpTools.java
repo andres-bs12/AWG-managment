@@ -45,8 +45,8 @@ import java.util.function.Function;
  * The MCP tools. Each one calls an existing service, exactly as the staff REST controllers do, so
  * business rules and error messages stay in one place. Read tools are side-effect free; write
  * tools only act with {@code confirm=true} and otherwise return a preview. The only payment the
- * connector records is a finished stock piece sold and paid in full at an open stall (the same
- * three steps as New sale). No cancellations, refunds or payment edits; the only deletion is a
+ * connector records is a finished stock piece sold and paid in full at an open stall (New sale,
+ * then collect-and-hand-over). No cancellations, refunds or payment edits; the only deletion is a
  * market day, which the service refuses while the day has orders, sales, pickups or painting.
  */
 @Slf4j
@@ -444,10 +444,9 @@ public class McpTools {
             // No idempotency key: a retry finds the piece already sold (the service refuses MARKET_STOCK_SOLD),
             // and a fixed key would wrongly return a cancelled earlier sale of the same piece.
             OrderDto created = orderService.createSale(request, null).order();
-            orderService.updatePaymentState(UUID.fromString(created.id()), com.artwithgab.awg_tracking.enums.PaymentState.PAID,
-                    "cash".equals(method) ? com.artwithgab.awg_tracking.enums.PaymentMethod.CASH : com.artwithgab.awg_tracking.enums.PaymentMethod.CARD,
-                    created.total());
-            orderService.setHandedOver(UUID.fromString(created.id()), true, null);
+            // Collect-and-hand-over in one call: paid in full at the server price, one owner notification.
+            orderService.setHandedOver(UUID.fromString(created.id()), true, null, null,
+                    "cash".equals(method) ? com.artwithgab.awg_tracking.enums.PaymentMethod.CASH : com.artwithgab.awg_tracking.enums.PaymentMethod.CARD);
             return orderService.getOrder(UUID.fromString(created.id()));
         });
         log.info("MCP record_stock_sale by staff user {}: {} order {}", user.getId(), ornamentId, sold.id());

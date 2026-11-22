@@ -44,7 +44,7 @@ Nunca queda abierto: `/mcp` exige rol STAFF y, con `MCP_ENABLED=false`, `/mcp` y
 | `get_customer_contact` (teléfono, e-mail y dirección de un pedido) | lectura | `getOrderByCode` + `getOrderBundle` |
 | `list_recent_orders` (pedidos entre dos fechas; por defecto ayer y hoy) | lectura | `OrderService.listSales` |
 | `set_painting_hours` (horas de pintura de un día, o cerrarlo) | escritura con `confirm` | `PaintingDayService.update` |
-| `record_stock_sale` (pieza numerada vendida hoy en un puesto abierto hoy, pagada completa en efectivo o tarjeta, entregada) | escritura con `confirm`, registra un pago | `createSale` + `updatePaymentState` + `setHandedOver` en una transacción |
+| `record_stock_sale` (pieza numerada vendida hoy en un puesto abierto hoy, pagada completa en efectivo o tarjeta, entregada) | escritura con `confirm`, registra un pago | `createSale` + `setHandedOver(…, collectMethod)` en una transacción (un solo aviso) |
 | `create_market` | escritura con `confirm` | `MarketService.saveMarket` |
 | `add_market_day` (amplía la temporada si hace falta) | escritura con `confirm` | `MarketService.saveMarket` |
 | `delete_market_day` (solo días de mercado sin pedidos, ventas, recogidas ni pintura; el servicio lo impone) | borrado con `confirm` | `MarketService.deleteMarketDay` |
