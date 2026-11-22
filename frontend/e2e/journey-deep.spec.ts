@@ -122,7 +122,7 @@ for (const locale of ['de', 'en'] as const) {
       // Only the generated photo id is variable. Assert the ENTIRE payload,
       // including no accidental UID, preview data URL or client-side price.
       expect(parsed).toEqual({
-        ...contact, deliveryKind: 'post', address, expectedArrivalTo: quote.arrivalTo, acceptTerms: true,
+        ...contact, deliveryKind: 'post', address, expectedArrivalTo: quote.arrivalTo, acceptTerms: true, locale,
         items: [{ kind: 'custom', color: 'red', finish: 'shiny', withName: true,
           backName: 'Luna', petName: 'Luna', note, photos: [{ id: expect.stringMatching(/^pho-/), name: 'pet.png' }] }],
       })

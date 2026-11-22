@@ -78,7 +78,7 @@ for (const locale of ['de', 'en'] as const) {
     const sent = await page.evaluate(() => JSON.parse(sessionStorage.getItem('e2e-checkout') ?? 'null'))
     expect(sent).toEqual({
       customerName: 'Alex Example', email: 'alex@example.com', phone: '123456789',
-      deliveryKind: 'market', marketDayId, pickupTime: '15:30', deliveryDate: '2026-12-04', acceptTerms: true,
+      deliveryKind: 'market', marketDayId, pickupTime: '15:30', deliveryDate: '2026-12-04', acceptTerms: true, locale,
       items: [{ kind: 'custom', withName: false, color: 'red', finish: 'shiny', petName: '', photos: 1 }],
     })
     // The handoff step shows what on one line and where/when on the next.
