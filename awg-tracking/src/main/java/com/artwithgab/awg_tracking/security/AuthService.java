@@ -43,23 +43,41 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(String email, String password) {
+        StaffUser user = verifyCredentials(email, password);
+        return new AuthResponse(createSession(user.getId(), StaffSession.APP), mapper.staff(user));
+    }
+
+    /**
+     * Checks an e-mail and password without creating a session. Unknown e-mails cost the same as
+     * wrong passwords (no user enumeration by timing).
+     */
+    @Transactional(readOnly = true)
+    public StaffUser verifyCredentials(String email, String password) {
         // The encoder throws on longer input; no stored password can be that long, so it is simply wrong.
         if (password.getBytes(StandardCharsets.UTF_8).length > MAX_PASSWORD_BYTES) throw new UnauthorizedException("Wrong e-mail or password.");
         Optional<StaffUser> user = staffUserRepository.findByEmail(email.trim().toLowerCase(Locale.ROOT));
         boolean ok = passwordEncoder.matches(password, user.map(StaffUser::getPasswordHash).orElseGet(this::dummyHash));
         if (user.isEmpty() || !ok) throw new UnauthorizedException("Wrong e-mail or password.");
+        return user.get();
+    }
 
+    /** Opens a session for an already verified user (the Claude connector redeems its OAuth code here). */
+    @Transactional
+    public String createSession(java.util.UUID staffUserId, String audience) {
+        StaffUser current = staffUserRepository.findById(staffUserId)
+                .orElseThrow(() -> new UnauthorizedException("Sign in again."));
         byte[] bytes = new byte[32];
         RANDOM.nextBytes(bytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         StaffSession session = new StaffSession();
         session.setTokenHash(hash(token));
-        session.setStaffUser(user.get());
+        session.setStaffUser(current);
+        session.setAudience(audience);
         Instant now = clock.instant();
         session.setCreatedAt(now);
         session.setExpiresAt(now.plus(props.session().ttl()));
         sessionRepository.save(session);
-        return new AuthResponse(token, mapper.staff(user.get()));
+        return token;
     }
 
     /**
@@ -91,10 +109,17 @@ public class AuthService {
      */
     @Transactional
     public Optional<StaffUser> authenticate(String token) {
+        return authenticate(token, StaffSession.APP);
+    }
+
+    /** Like {@link #authenticate(String)}, but only for sessions opened for {@code audience}. */
+    @Transactional
+    public Optional<StaffUser> authenticate(String token, String audience) {
         if (token == null || token.isBlank() || token.length() > 100) return Optional.empty();
         Instant now = clock.instant();
         return sessionRepository.findByTokenHash(hash(token))
                 .filter(s -> s.getExpiresAt().isAfter(now))
+                .filter(s -> audience.equals(s.getAudience()))
                 .map(s -> {
                     java.time.Duration ttl = props.session().ttl();
                     Instant renewed = now.plus(ttl);

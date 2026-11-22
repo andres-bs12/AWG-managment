@@ -156,3 +156,11 @@ Las facturas conservan su propia copia contable aunque se borren/anonicen los da
 Following the [Cloudflare rate-limiting rule documentation](https://developers.cloudflare.com/waf/rate-limiting-rules/), create and enable a WAF rate-limiting rule for `GET` requests where `http.request.uri.path` starts with `/api/track/`. Start with **30 requests per client IP per minute**, blocking excess requests with 429 for one minute; use the closest supported period/threshold if the account plan differs. Use Cloudflare's IPv6 /64 grouping where available. Keep the application's /64 and global missing-order budgets active because an IP-only edge rule cannot stop a client rotating IPv6 addresses.
 
 This edge rule must be configured by the owner in the Cloudflare dashboard; it was **not applied by this code change**. Do not challenge or rate-limit Stripe's webhook with this Track rule. Verify a normal Track lookup, an excess-request 429, and real client IP forwarding after deployment. Keep origin ingress restricted to Cloudflare ranges as described above.
+
+## Claude connector (MCP), 2026-11-22
+
+- `.env`: `MCP_ENABLED=true` turns it on. `MCP_PUBLIC_URL` defaults to `https://artwithgab.com` in `docker-compose.yml`. `MCP_REDIRECT_URIS` is optional; it defaults to the claude.ai and claude.com callbacks.
+- Flyway applies **V19__session_audience.sql**, which needs V18 first. It adds `staff_session.audience` with a default, so existing sessions keep working.
+- `frontend/nginx.conf` sends `/mcp`, `/oauth/*` and `/.well-known/oauth-*` to the backend without the site CSP, because the sign-in page has to redirect to claude.ai. Caddy needs no change, since it proxies every path to nginx.
+- Cloudflare: claude.ai calls `/mcp` from Anthropic's servers. If Bot Fight Mode or a WAF rule challenges those requests, the connector fails, so add a skip rule for `/mcp` and `/oauth/` when that happens. Do not cache these paths.
+- Check after the deploy: `curl -si -X POST https://artwithgab.com/mcp` must return 401 with `WWW-Authenticate: Bearer resource_metadata=…`. Then add the connector in claude.ai (Settings → Connectors → custom → `https://artwithgab.com/mcp`) and sign in with a staff account.

@@ -1,0 +1,380 @@
+package com.artwithgab.awg_tracking;
+
+import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/** Remote MCP server: OAuth 2.1 connector flow, token enforcement and each tool. */
+@TestPropertySource(properties = {
+        "awg.mcp.enabled=true",
+        "awg.mcp.public-url=https://awg.test",
+        "awg.mcp.allowed-redirect-uris=https://claude.ai/api/mcp/auth_callback"
+})
+class McpServerApiTests extends ApiTestSupport {
+    private static final String CALLBACK = "https://claude.ai/api/mcp/auth_callback";
+    private static final String VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXkverifier";
+    private static int rpcId = 1;
+
+    // ---- authentication ------------------------------------------------------------------
+
+    @Test
+    void mcpWithoutTokenIs401WithResourceMetadataPointer() throws Exception {
+        mvc.perform(post("/mcp").contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM)
+                        .content(rpc("tools/list", Map.of())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("WWW-Authenticate",
+                        "Bearer resource_metadata=\"https://awg.test/.well-known/oauth-protected-resource/mcp\""));
+    }
+
+    @Test
+    void mcpWithUnknownTokenIs401() throws Exception {
+        mvc.perform(post("/mcp").header("Authorization", bearer("not-a-session")).contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM).content(rpc("tools/list", Map.of())))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void discoveryDocumentsPointToThisServer() throws Exception {
+        mvc.perform(get("/.well-known/oauth-protected-resource/mcp"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resource").value("https://awg.test/mcp"))
+                .andExpect(jsonPath("$.authorization_servers[0]").value("https://awg.test"));
+        mvc.perform(get("/.well-known/oauth-authorization-server"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token_endpoint").value("https://awg.test/oauth/token"))
+                .andExpect(jsonPath("$.code_challenge_methods_supported[0]").value("S256"));
+    }
+
+    @Test
+    void fullOAuthFlowGivesATokenThatOpensMcp() throws Exception {
+        String clientId = register();
+        mvc.perform(get("/oauth/authorize").params(toParams(authorizeParams(clientId))))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Security-Policy", containsString("form-action 'self' https://claude.ai")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(containsString("Connect Claude to ArtWithGab")));
+
+        String code = authorize(clientId, PASSWORD);
+        String token = exchange(clientId, code, VERIFIER).andExpect(status().isOk())
+                .andExpect(jsonPath("$.token_type").value("Bearer"))
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = JsonPath.read(token, "$.access_token");
+
+        String init = mcp(accessToken, "initialize", Map.of("protocolVersion", "2025-06-18", "capabilities", Map.of(),
+                "clientInfo", Map.of("name", "test", "version", "1")));
+        assertThat((String) JsonPath.read(init, "$.result.serverInfo.name")).isEqualTo("artwithgab");
+
+        List<String> names = JsonPath.read(mcp(accessToken, "tools/list", Map.of()), "$.result.tools[*].name");
+        assertThat(names).contains("search_orders", "get_order", "get_agenda_day", "list_market_stock", "list_inventory",
+                "list_markets", "list_needs_attention", "create_market", "add_market_day");
+        assertThat(names).noneMatch(n -> n.contains("cancel") || n.contains("delete") || n.contains("pay"));
+    }
+
+    @Test
+    void wrongPasswordShowsTheFormAgainWithoutACode() throws Exception {
+        String clientId = register();
+        Map<String, String> form = authorizeParams(clientId);
+        form.put("email", "gaby@artwithgab.com");
+        form.put("password", "wrong-password");
+        mvc.perform(withIp(post("/oauth/authorize")).contentType(MediaType.APPLICATION_FORM_URLENCODED).params(toParams(form)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().doesNotExist("Location"));
+    }
+
+    @Test
+    void codeNeedsTheRightVerifierAndWorksOnlyOnce() throws Exception {
+        String clientId = register();
+        String code = authorize(clientId, PASSWORD);
+        exchange(clientId, code, "x".repeat(50)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_grant"));
+        // A rejected attempt burns the code.
+        exchange(clientId, code, VERIFIER).andExpect(status().isBadRequest());
+
+        String second = authorize(clientId, PASSWORD);
+        exchange(clientId, second, VERIFIER).andExpect(status().isOk());
+        exchange(clientId, second, VERIFIER).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void unknownRedirectUriIsRefusedEverywhere() throws Exception {
+        mvc.perform(withIp(post("/oauth/register")).contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("redirect_uris", List.of("https://evil.example/callback")))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_redirect_uri"));
+        Map<String, String> params = authorizeParams("awg-mcp-test");
+        params.put("redirect_uri", "https://evil.example/callback");
+        mvc.perform(get("/oauth/authorize").params(toParams(params))).andExpect(status().isBadRequest());
+        params.put("email", "gaby@artwithgab.com");
+        params.put("password", PASSWORD);
+        mvc.perform(withIp(post("/oauth/authorize")).contentType(MediaType.APPLICATION_FORM_URLENCODED).params(toParams(params)))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().doesNotExist("Location"));
+    }
+
+    @Test
+    void authorizeWithoutPkceIsRefused() throws Exception {
+        Map<String, String> params = authorizeParams("awg-mcp-test");
+        params.remove("code_challenge");
+        mvc.perform(get("/oauth/authorize").params(toParams(params))).andExpect(status().isBadRequest());
+    }
+
+    // ---- read tools ----------------------------------------------------------------------
+
+    @Test
+    void searchAndGetOrderHideCapabilityTokens() throws Exception {
+        String app = login();
+        String token = mcpToken();
+        String orderId = saleOk(app, customItem(false, TUE, 10.0, 11.0, "market", dayId(app, SAT), 14.0));
+        String code = JsonPath.read(mvc.perform(get("/api/orders/" + orderId).header("Authorization", bearer(app)))
+                .andReturn().getResponse().getContentAsString(), "$.code");
+
+        String found = toolText(token, "search_orders", Map.of("query", code));
+        assertThat(found).contains(code);
+
+        String order = toolText(token, "get_order", Map.of("code", code));
+        assertThat((String) JsonPath.read(order, "$.order.code")).isEqualTo(code);
+        assertThat(order).doesNotContain("trackToken").doesNotContain("formToken");
+    }
+
+    @Test
+    void marketStockFiltersByColourDecodedFromTheId() throws Exception {
+        String token = mcpToken();
+        String red = readyMarketPiece(); // RS..., red shiny, painted
+        String reds = toolText(token, "list_market_stock", Map.of("color", "red", "status", "painted"));
+        assertThat(reds).contains(red);
+        assertThat((Integer) JsonPath.read(reds, "$.availableToSell")).isGreaterThanOrEqualTo(1);
+        String wines = toolText(token, "list_market_stock", Map.of("color", "wine"));
+        assertThat(wines).doesNotContain(red);
+
+        String bad = mcp(token, "tools/call", Map.of("name", "list_market_stock", "arguments", Map.of("color", "purple")));
+        assertThat((Boolean) JsonPath.read(bad, "$.result.isError")).isTrue();
+    }
+
+    @Test
+    void agendaInventoryMarketsAndAttentionAnswer() throws Exception {
+        String token = mcpToken();
+        String agenda = toolText(token, "get_agenda_day", Map.of("date", SAT));
+        assertThat((String) JsonPath.read(agenda, "$.date")).isEqualTo(SAT);
+        assertThat(agenda).doesNotContain("\"marketDays\"").doesNotContain("\"email\"");
+
+        String today = toolText(token, "get_agenda_day", Map.of());
+        assertThat((String) JsonPath.read(today, "$.date")).isEqualTo(TUE);
+
+        assertThat(toolText(token, "list_inventory", Map.of())).contains("quantity");
+        String markets = toolText(token, "list_markets", Map.of());
+        assertThat((List<?>) JsonPath.read(markets, "$[?(@.kind=='market')].days")).isNotEmpty();
+        assertThat(toolText(token, "list_needs_attention", Map.of())).startsWith("[");
+    }
+
+    // ---- write tools ---------------------------------------------------------------------
+
+    @Test
+    void createMarketOnlySavesWithConfirm() throws Exception {
+        String token = mcpToken();
+        Map<String, Object> args = new LinkedHashMap<>(Map.of("name", "Spittelberg", "startDate", "2026-12-04",
+                "finishDate", "2026-12-06", "stall", 7, "totalCost", 300,
+                "days", List.of(Map.of("date", "2026-12-06", "openHour", 11, "closeHour", 20))));
+
+        String preview = toolText(token, "create_market", args);
+        assertThat(preview).startsWith("PREVIEW").contains("Spittelberg");
+        assertThat(toolText(token, "list_markets", Map.of())).doesNotContain("Spittelberg");
+
+        args.put("confirm", true);
+        assertThat(toolText(token, "create_market", args)).startsWith("Created.");
+        assertThat(toolText(token, "list_markets", Map.of())).contains("Spittelberg");
+    }
+
+    @Test
+    void createMarketOnAMondayReturnsTheServiceError() throws Exception {
+        String token = mcpToken();
+        Map<String, Object> args = Map.of("name", "Montag", "startDate", "2027-01-01", "finishDate", "2027-01-10",
+                "stall", 3, "days", List.of(Map.of("date", "2027-01-04", "openHour", 12, "closeHour", 18)), "confirm", true);
+        String result = mcp(token, "tools/call", Map.of("name", "create_market", "arguments", args));
+        assertThat((Boolean) JsonPath.read(result, "$.result.isError")).isTrue();
+        assertThat(result).contains("is not a Friday, Saturday, or Sunday");
+    }
+
+    @Test
+    void addMarketDayExtendsTheSeasonAfterConfirm() throws Exception {
+        String token = mcpToken();
+        Map<String, Object> created = new LinkedHashMap<>(Map.of("name", "Am Hof", "startDate", "2027-01-01",
+                "finishDate", "2027-01-03", "stall", 2,
+                "days", List.of(Map.of("date", "2027-01-02", "openHour", 12, "closeHour", 18)), "confirm", true));
+        toolText(token, "create_market", created);
+        String markets = toolText(token, "list_markets", Map.of());
+        String marketId = ((List<String>) JsonPath.read(markets, "$[?(@.name=='Am Hof')].id")).getFirst();
+
+        Map<String, Object> args = new LinkedHashMap<>(Map.of("marketId", marketId, "date", "2027-01-09", "openHour", 11, "closeHour", 19.5));
+        String preview = toolText(token, "add_market_day", args);
+        assertThat(preview).startsWith("PREVIEW").contains("season end moves").contains("11:00–19:30");
+
+        args.put("confirm", true);
+        assertThat(toolText(token, "add_market_day", args)).startsWith("Added.");
+        List<String> dates = JsonPath.read(toolText(token, "list_markets", Map.of()), "$[?(@.name=='Am Hof')].days[*].date");
+        assertThat(dates).containsExactlyInAnyOrder("2027-01-02", "2027-01-09");
+    }
+
+    // ---- audit fixes (2026-11-22 cross-model security review) ---------------------------
+
+    @Test
+    void connectorAndAppTokensDoNotCross() throws Exception {
+        String app = login();
+        mvc.perform(post("/mcp").header("Authorization", bearer(app)).contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM).content(rpc("tools/list", Map.of())))
+                .andExpect(status().isUnauthorized());
+        String connector = mcpToken();
+        mvc.perform(get("/api/orders/attention").header("Authorization", bearer(connector)))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/staff/password").header("Authorization", bearer(connector)).contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("currentPassword", PASSWORD, "newPassword", "another-long-password"))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void stateIsFullyEncodedInTheRedirect() throws Exception {
+        String clientId = register();
+        Map<String, String> form = authorizeParams(clientId);
+        form.put("state", "a&injected=1 x");
+        form.put("email", "gaby@artwithgab.com");
+        form.put("password", PASSWORD);
+        String location = mvc.perform(withIp(post("/oauth/authorize")).contentType(MediaType.APPLICATION_FORM_URLENCODED).params(toParams(form)))
+                .andExpect(status().isFound()).andReturn().getResponse().getHeader("Location");
+        var query = UriComponentsBuilder.fromUriString(location).build().getQueryParams();
+        assertThat(query.containsKey("injected")).isFalse();
+        assertThat(java.net.URLDecoder.decode(query.getFirst("state"), StandardCharsets.UTF_8)).isEqualTo("a&injected=1 x");
+    }
+
+    @Test
+    void crossSiteLoginPostsAreRefused() throws Exception {
+        String clientId = register();
+        Map<String, String> form = authorizeParams(clientId);
+        form.put("email", "gaby@artwithgab.com");
+        form.put("password", PASSWORD);
+        mvc.perform(withIp(post("/oauth/authorize")).header("Sec-Fetch-Site", "cross-site")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED).params(toParams(form)))
+                .andExpect(status().isForbidden()).andExpect(header().doesNotExist("Location"));
+        mvc.perform(withIp(post("/oauth/authorize")).header("Origin", "https://evil.example")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED).params(toParams(form)))
+                .andExpect(status().isForbidden());
+        mvc.perform(withIp(post("/oauth/authorize")).header("Origin", "https://awg.test").header("Sec-Fetch-Site", "same-origin")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED).params(toParams(form)))
+                .andExpect(status().isFound());
+    }
+
+    @Test
+    void codeRequestedForTheResourceMustBeRedeemedForIt() throws Exception {
+        String clientId = register();
+        String code = authorize(clientId, PASSWORD);
+        mvc.perform(withIp(post("/oauth/token")).contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("grant_type", "authorization_code").param("code", code).param("client_id", clientId)
+                        .param("redirect_uri", CALLBACK).param("code_verifier", VERIFIER))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("invalid_grant"));
+    }
+
+    @Test
+    void overlongSeasonIsRefusedBeforeAnyWork() throws Exception {
+        String token = mcpToken();
+        String result = mcp(token, "tools/call", Map.of("name", "create_market", "arguments", Map.of("name", "Forever",
+                "startDate", "2027-01-01", "finishDate", "9999-12-31", "stall", 1,
+                "days", List.of(Map.of("date", "2027-01-02", "openHour", 12, "closeHour", 18)))));
+        assertThat((Boolean) JsonPath.read(result, "$.result.isError")).isTrue();
+        assertThat(result).contains("at most 120 days");
+    }
+
+    // ---- helpers -------------------------------------------------------------------------
+
+    /** Runs the whole connector OAuth flow and returns an MCP access token. */
+    private String mcpToken() throws Exception {
+        String clientId = register();
+        String code = authorize(clientId, PASSWORD);
+        return JsonPath.read(exchange(clientId, code, VERIFIER).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(), "$.access_token");
+    }
+
+
+    private String register() throws Exception {
+        MvcResult res = mvc.perform(withIp(post("/oauth/register")).contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("client_name", "Claude", "redirect_uris", List.of(CALLBACK)))))
+                .andExpect(status().isCreated()).andReturn();
+        return read(res, "$.client_id");
+    }
+
+    private static Map<String, String> authorizeParams(String clientId) throws Exception {
+        Map<String, String> p = new LinkedHashMap<>();
+        p.put("response_type", "code");
+        p.put("client_id", clientId);
+        p.put("redirect_uri", CALLBACK);
+        p.put("state", "xyz-state");
+        p.put("code_challenge", challenge(VERIFIER));
+        p.put("code_challenge_method", "S256");
+        p.put("resource", "https://awg.test/mcp");
+        return p;
+    }
+
+    private String authorize(String clientId, String password) throws Exception {
+        Map<String, String> form = authorizeParams(clientId);
+        form.put("email", "gaby@artwithgab.com");
+        form.put("password", password);
+        MvcResult res = mvc.perform(withIp(post("/oauth/authorize")).contentType(MediaType.APPLICATION_FORM_URLENCODED).params(toParams(form)))
+                .andExpect(status().isFound()).andReturn();
+        String location = res.getResponse().getHeader("Location");
+        assertThat(location).startsWith(CALLBACK + "?");
+        var query = UriComponentsBuilder.fromUriString(location).build().getQueryParams();
+        assertThat(query.getFirst("state")).isEqualTo("xyz-state");
+        return query.getFirst("code");
+    }
+
+    private org.springframework.test.web.servlet.ResultActions exchange(String clientId, String code, String verifier) throws Exception {
+        return mvc.perform(withIp(post("/oauth/token")).contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .param("grant_type", "authorization_code").param("code", code).param("client_id", clientId)
+                .param("redirect_uri", CALLBACK).param("code_verifier", verifier).param("resource", "https://awg.test/mcp"));
+    }
+
+    private static org.springframework.util.MultiValueMap<String, String> toParams(Map<String, String> map) {
+        var params = new org.springframework.util.LinkedMultiValueMap<String, String>();
+        map.forEach(params::add);
+        return params;
+    }
+
+    private static String challenge(String verifier) throws Exception {
+        byte[] digest = MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII));
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
+    }
+
+    private String rpc(String method, Map<String, Object> params) {
+        return json(Map.of("jsonrpc", "2.0", "id", rpcId++, "method", method, "params", params));
+    }
+
+    private String mcp(String token, String method, Map<String, Object> params) throws Exception {
+        MvcResult res = mvc.perform(post("/mcp").header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM)
+                        .content(rpc(method, params)))
+                .andExpect(status().isOk()).andReturn();
+        return res.getResponse().getContentAsString(StandardCharsets.UTF_8);
+    }
+
+    /** Calls a tool that must succeed and returns its first text block. */
+    private String toolText(String token, String tool, Map<String, Object> args) throws Exception {
+        String res = mcp(token, "tools/call", Map.of("name", tool, "arguments", args));
+        Boolean isError = JsonPath.read(res, "$.result.isError");
+        if (Boolean.TRUE.equals(isError)) throw new AssertionError(tool + " failed: " + res);
+        return JsonPath.read(res, "$.result.content[0].text");
+    }
+}

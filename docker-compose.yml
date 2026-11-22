@@ -56,6 +56,9 @@ services:
       OWNER_EMAIL: ${OWNER_EMAIL:-}
       MAIL_REPLY_TO: ${MAIL_REPLY_TO:-}
       MAIL_CONTACT: ${MAIL_CONTACT:-artwithgab@gmail.com}
+      # Claude connector (MCP server, tasks/mcp-server-plan-2026-11-22.md). Off unless MCP_ENABLED=true.
+      MCP_ENABLED: ${MCP_ENABLED:-false}
+      MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-https://artwithgab.com}
     volumes:
       - uploads_data:/data/uploads
     depends_on:
