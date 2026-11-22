@@ -16,13 +16,17 @@ La conexión dura **7 días sin usarla** y como máximo **30 días**. Después C
 
 ## En el mercado
 
-Abre un chat nuevo en la app de Claude y escribe como le hablarías a una persona:
+Abre un chat nuevo en la app de Claude y escribe como le hablarías a una persona, en español, alemán o inglés:
 
 - «¿Cuántas bolas Wine pintadas me quedan?»
 - «Busca a la clienta Müller»
 - «Muéstrame el pedido K7Q2ZX»
 - «Dame el teléfono de la clienta del pedido K7Q2ZX» (los teléfonos, e-mails y direcciones solo salen cuando los pides así, pedido por pedido)
 - «¿Qué recogidas hay hoy?» o «¿Qué recogidas hay el sábado?»
+- «¿Qué bolas pinto hoy?» o «¿Qué tengo que entregar hoy?»
+- «¿Hay pedidos nuevos desde ayer?» o «¿Qué vendimos esta semana en la web?»
+- «Hoy pinto de 10 a 13» o «Mañana no pinto» (si alguna sesión ya reservada queda fuera, Claude te avisa; no se mueve sola)
+- «Vendí la WM03 en Spittelberg, pagó en efectivo» (pieza numerada del stock, vendida hoy en un mercado abierto hoy, pagada completa y entregada; Claude te muestra el precio antes de guardar)
 - «¿Qué pedidos web necesitan revisión?»
 - «¿Cuántas bases rojas mate quedan?»
 - «Añade un día de mercado el 6 de diciembre de 11 a 20 en Spittelberg»
@@ -30,9 +34,9 @@ Abre un chat nuevo en la app de Claude y escribe como le hablarías a una person
 
 Si Claude no usa el conector, toca el botón **+** (o «Herramientas») del chat y comprueba que **ArtWithGab** está activado.
 
-**Para crear mercados, añadir o borrar días**, Claude primero te muestra un resumen y no guarda nada hasta que dices «sí». La app de Claude también te pide permiso antes de usar esa herramienta.
+**Para crear mercados, añadir o borrar días, cambiar horas de pintura o registrar una venta**, Claude primero te muestra un resumen y no guarda nada hasta que dices «sí». La app de Claude también te pide permiso antes de usar esa herramienta.
 
-**Lo que no hace:** cobrar, marcar pagos, cancelar pedidos, ni borrar mercados completos, pedidos o clientas. Para eso usa la app del staff, como siempre.
+**Lo que no hace:** cobrar con tarjeta, registrar depósitos, cambiar pagos, vender personalizados, cancelar pedidos, ni borrar mercados completos, pedidos o clientas. Una venta registrada por error se cancela en la app del staff. Para eso usa la app del staff, como siempre.
 
 ## Si algo falla
 

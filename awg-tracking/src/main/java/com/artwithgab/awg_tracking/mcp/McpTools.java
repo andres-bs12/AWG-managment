@@ -44,9 +44,10 @@ import java.util.function.Function;
 /**
  * The MCP tools. Each one calls an existing service, exactly as the staff REST controllers do, so
  * business rules and error messages stay in one place. Read tools are side-effect free; write
- * tools only act with {@code confirm=true} and otherwise return a preview. No payments or
- * cancellations are exposed; the only deletion is a market day, which the service refuses while
- * the day has orders, sales, pickups or painting.
+ * tools only act with {@code confirm=true} and otherwise return a preview. The only payment the
+ * connector records is a finished stock piece sold and paid in full at an open stall (New sale,
+ * then collect-and-hand-over). No cancellations, refunds or payment edits; the only deletion is a
+ * market day, which the service refuses while the day has orders, sales, pickups or painting.
  */
 @Slf4j
 @Component
@@ -69,6 +70,8 @@ public class McpTools {
     private final InventoryService inventoryService;
     private final JsonMapper json;
     private final com.artwithgab.awg_tracking.service.CalendarService calendarService;
+    private final com.artwithgab.awg_tracking.service.PaintingDayService paintingDayService;
+    private final com.artwithgab.awg_tracking.service.PricingService pricingService;
     private final org.springframework.transaction.support.TransactionTemplate transactions;
     private final Clock clock;
     private final ZoneId zone;
@@ -76,9 +79,13 @@ public class McpTools {
     public McpTools(OrderService orderService, AgendaService agendaService, MarketService marketService,
                     MarketStockService marketStockService, InventoryService inventoryService, JsonMapper json,
                     com.artwithgab.awg_tracking.service.CalendarService calendarService,
+                    com.artwithgab.awg_tracking.service.PaintingDayService paintingDayService,
+                    com.artwithgab.awg_tracking.service.PricingService pricingService,
                     org.springframework.transaction.support.TransactionTemplate transactions,
                     Clock clock, com.artwithgab.awg_tracking.config.AwgProperties props) {
         this.calendarService = calendarService;
+        this.paintingDayService = paintingDayService;
+        this.pricingService = pricingService;
         this.transactions = transactions;
         this.orderService = orderService;
         this.agendaService = agendaService;
@@ -120,6 +127,12 @@ public class McpTools {
                         "All markets with stall number, season dates, cost and their opening days and hours.",
                         schema(Map.of(), List.of()),
                         a -> markets()),
+                read("list_recent_orders", "Recent orders",
+                        "Orders created between two dates (Europe/Vienna), newest first, up to 50: code, customer name, source (stall or web), payment state, total, items and next handoff date. Use it for 'new orders since yesterday' or 'sales this week'.",
+                        schema(Map.of("from", str("YYYY-MM-DD, first day included; omit for yesterday"),
+                                "to", str("YYYY-MM-DD, last day included; omit for today"),
+                                "source", str("stall or web; omit for both")), List.of()),
+                        this::recentOrders),
                 read("list_needs_attention", "Needs attention",
                         "Web orders waiting for Stripe confirmation or flagged for payment review.",
                         schema(Map.of(), List.of()),
@@ -146,6 +159,25 @@ public class McpTools {
                                 "closeHour", Map.of("type", "number", "description", "Closing hour, e.g. 20"),
                                 "confirm", confirmSchema()), List.of("marketId", "date", "openHour", "closeHour")),
                         this::addMarketDay),
+                write("set_painting_hours", "Set painting hours",
+                        "Sets the hours Gaby paints on one day (the gear in the Agenda), or closes/opens the day for painting. The daily maximum is recalculated from the hours. Existing bookings are never moved: the preview lists any that would fall outside the new hours. "
+                                + "Without confirm=true it only returns a preview; call again with confirm=true after the owner agrees.",
+                        schema(Map.of(
+                                "date", str("YYYY-MM-DD; omit for today"),
+                                "openHour", Map.of("type", "number", "description", "Start, e.g. 10 or 10.25 (15-minute steps)"),
+                                "closeHour", Map.of("type", "number", "description", "End, e.g. 13"),
+                                "open", Map.of("type", "boolean", "description", "false closes the day for painting, true opens it"),
+                                "confirm", confirmSchema()), List.of()),
+                        this::setPaintingHours),
+                write("record_stock_sale", "Record stock sale",
+                        "Records that a numbered ready-made ornament (e.g. WM03) was sold today at a market stall that is open today, paid in full by cash or card and taken away now — the same as New sale → finished → Paid → handed over. "
+                                + "Without confirm=true it only returns a preview with the price; call again with confirm=true after the owner agrees.",
+                        schema(Map.of(
+                                "ornamentId", str("Numbered piece, e.g. WM03"),
+                                "marketId", str("Market UUID from list_markets; it must be open today"),
+                                "paymentMethod", str("cash or card"),
+                                "confirm", confirmSchema()), List.of("ornamentId", "marketId", "paymentMethod")),
+                        this::recordStockSale),
                 destructive("delete_market_day", "Delete market day",
                         "Removes one opening day from a stall market (use list_markets for the id). The app refuses when that day has orders, sales, pickups or painting, so only empty days can go. "
                                 + "Without confirm=true it only returns a preview; call again with confirm=true after the owner agrees.",
@@ -301,6 +333,124 @@ public class McpTools {
         });
         log.info("MCP delete_market_day by staff user {}: market {} day {}", user.getId(), marketId, date);
         return McpSchema.CallToolResult.builder().addTextContent("Deleted. " + summary).build();
+    }
+
+    private Object recentOrders(Map<String, Object> a) {
+        LocalDate today = LocalDate.now(clock.withZone(zone));
+        String fromText = optionalString(a, "from");
+        String toText = optionalString(a, "to");
+        LocalDate from = fromText == null ? today.minusDays(1) : parseDate(fromText, "from");
+        LocalDate to = toText == null ? today : parseDate(toText, "to");
+        if (from.plusDays(400).isBefore(to)) throw new ToolInputException("Choose a range of at most 400 days.");
+        var page = orderService.listSales(null, lower(optionalString(a, "source")), from, to, 0, 50, null);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("from", from.toString());
+        out.put("to", to.toString());
+        out.put("total", page.totalElements());
+        out.put("shown", page.orders().size());
+        out.put("orders", page.orders());
+        return out;
+    }
+
+    private McpSchema.CallToolResult setPaintingHours(Map<String, Object> a, StaffUser user) {
+        LocalDate date = optionalDate(a, "date");
+        Double open = a.get("openHour") == null ? null : requiredNumber(a, "openHour");
+        Double close = a.get("closeHour") == null ? null : requiredNumber(a, "closeHour");
+        Object rawOpen = a.get("open");
+        if (rawOpen != null && !(rawOpen instanceof Boolean)) throw new ToolInputException("open must be true or false.");
+        Boolean openDay = (Boolean) rawOpen;
+        if ((open == null) != (close == null)) throw new ToolInputException("Give both openHour and closeHour.");
+        if (open == null && openDay == null) throw new ToolInputException("Give the new hours, or open=false to close the day.");
+        if (Boolean.FALSE.equals(openDay) && open != null) throw new ToolInputException("Either close the day (open=false) or give new hours, not both.");
+        if (open != null && (!quarterHour(open) || !quarterHour(close) || open >= close)) {
+            throw new ToolInputException("Use hours from 00:00 to 23:45 in 15-minute steps, with the end after the start (e.g. 10 to 13.5).");
+        }
+        LocalDate today = LocalDate.now(clock.withZone(zone));
+        if (date.isBefore(today)) throw new ToolInputException("That day is in the past.");
+        if (date.isAfter(today.plusYears(1))) throw new ToolInputException("Choose a day within the next year.");
+
+        var current = paintingDayService.list(date, date).getFirst();
+        List<String> warnings = new ArrayList<>();
+        if (open != null) {
+            for (var slot : agendaService.getDay(date).slots()) {
+                var block = slot.block();
+                if (block != null && (block.startHour() < open || block.endHour() > close)) {
+                    warnings.add("Order " + (slot.order() == null ? "?" : slot.order().code()) + " is booked " + hours(block.startHour())
+                            + "–" + hours(block.endHour()) + ", outside the new hours; it stays booked (move it in the Agenda if needed).");
+                }
+            }
+        }
+        if (Boolean.FALSE.equals(openDay) && current.booked() > 0) {
+            warnings.add(current.booked() + " painting session(s) are already booked that day; they stay booked.");
+        }
+        String was = (current.open() ? "open " + hours(current.openHour()) + "–" + hours(current.closeHour()) : "closed")
+                + ", max " + current.maxPaintings() + ", " + current.booked() + " booked";
+        String becomes = Boolean.FALSE.equals(openDay) ? "closed for painting"
+                : (open != null ? hours(open) + "–" + hours(close) : "open with its usual hours");
+        String summary = "Painting on " + CalendarRules.label(date) + ": now " + was + " → " + becomes + ".";
+        if (!isConfirmed(a)) return preview(summary, warnings);
+
+        var input = new com.artwithgab.awg_tracking.dto.agenda.UpdatePaintingDayRequest();
+        if (openDay != null) input.setOpen(openDay);
+        else if (open != null) input.setOpen(true);
+        if (open != null) {
+            input.setOpenHour(open);
+            input.setCloseHour(close);
+        }
+        var saved = paintingDayService.update(date, input);
+        log.info("MCP set_painting_hours by staff user {}: {}", user.getId(), date);
+        return done("Saved. Painting on " + CalendarRules.label(date) + ": "
+                + (saved.open() ? hours(saved.openHour()) + "–" + hours(saved.closeHour()) + ", max " + saved.maxPaintings() : "closed") + ".", saved);
+    }
+
+    private static boolean quarterHour(double hour) {
+        return Double.isFinite(hour) && hour >= 0 && hour < 24 && hour * 4 == Math.rint(hour * 4);
+    }
+
+    private McpSchema.CallToolResult recordStockSale(Map<String, Object> a, StaffUser user) {
+        String ornamentId = requiredString(a, "ornamentId").toUpperCase(Locale.ROOT);
+        UUID marketId = uuid(requiredString(a, "marketId"), "marketId");
+        String method = lower(requiredString(a, "paymentMethod"));
+        if (!method.equals("cash") && !method.equals("card")) throw new ToolInputException("paymentMethod must be cash or card.");
+        var piece = marketStockService.list().stream().filter(o -> o.id().equals(ornamentId)).findFirst()
+                .orElseThrow(() -> new ToolInputException("There is no piece " + ornamentId + ". Use list_market_stock."));
+        if (!"painted".equals(piece.status())) {
+            throw new ToolInputException(ornamentId + " is " + piece.status() + ("sold".equals(piece.status()) && piece.orderCode() != null
+                    ? " (order " + piece.orderCode() + ")" : "") + ", so it cannot be sold now.");
+        }
+        LocalDate today = LocalDate.now(clock.withZone(zone));
+        MarketDto market = marketService.listMarkets().stream().filter(m -> m.id().equals(marketId.toString())).findFirst()
+                .orElseThrow(() -> new ToolInputException("Market not found. Use list_markets for the id."));
+        MarketDayDto day = marketService.listMarketDays(marketId).stream().filter(d -> LocalDate.parse(d.date()).equals(today)).findFirst()
+                .orElseThrow(() -> new ToolInputException(market.name() + " is not open today, so the sale cannot be recorded there."));
+        if (market.startDate() == null) throw new ToolInputException("Sales are recorded at a market stall, not at home.");
+
+        String c = STOCK_COLORS.getOrDefault(ornamentId.charAt(0), "?");
+        String f = ornamentId.length() > 1 ? STOCK_FINISHES.getOrDefault(ornamentId.charAt(1), "?") : "?";
+        String summary = "Sell " + ornamentId + " (" + c + ", " + f + ") at " + market.name() + " today, paid in full by "
+                + method + ", handed over now.";
+        if (!isConfirmed(a)) {
+            return preview(summary + " Price: EUR " + pricingService.current().finishedPrice().toPlainString() + ".",
+                    List.of("This records a payment; it can only be undone in the staff app (cancel the order)."));
+        }
+
+        UUID dayId = UUID.fromString(day.id());
+        var item = new com.artwithgab.awg_tracking.dto.order.CreateSaleItemRequest(
+                com.artwithgab.awg_tracking.enums.ItemKind.GENERIC, false, null, null, null, null, null,
+                com.artwithgab.awg_tracking.enums.DeliveryKind.MARKET, marketId, dayId, null, null, ornamentId);
+        var request = new com.artwithgab.awg_tracking.dto.order.CreateSaleRequest(null, null, null, null, List.of(item), dayId);
+        // All or nothing: never a sale without its payment, or a payment without the handover.
+        OrderDto sold = transactions.execute(status -> {
+            // No idempotency key: a retry finds the piece already sold (the service refuses MARKET_STOCK_SOLD),
+            // and a fixed key would wrongly return a cancelled earlier sale of the same piece.
+            OrderDto created = orderService.createSale(request, null).order();
+            // Collect-and-hand-over in one call: paid in full at the server price, one owner notification.
+            orderService.setHandedOver(UUID.fromString(created.id()), true, null, null,
+                    "cash".equals(method) ? com.artwithgab.awg_tracking.enums.PaymentMethod.CASH : com.artwithgab.awg_tracking.enums.PaymentMethod.CARD);
+            return orderService.getOrder(UUID.fromString(created.id()));
+        });
+        log.info("MCP record_stock_sale by staff user {}: {} order {}", user.getId(), ornamentId, sold.id());
+        return done("Sold. " + ornamentId + " · order " + sold.code() + " · EUR " + sold.total().toPlainString() + " paid by " + method + ".", sold);
     }
 
     private record AddDayPlan(MarketDto market, SaveMarketRequest request, List<String> notes) {}
