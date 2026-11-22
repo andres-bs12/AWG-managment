@@ -33,13 +33,6 @@ Every finding goes here and, when it is a code fix, onto branch `fix/qa-real-tes
 | 24 | Order page · payment | After a deposit, "Correct payment" shows "Unpaid" selected and the "Mark deposit" button stays. | Fixed: a deposit order only offers "Mark paid"; the correction starts on the recorded state, amount and method, follows refreshes and is disabled until something changes. |
 | 19 | Shop · price | The shop charges +€5.00 for the name on the back; docs say €12.99 by default. | Production `price_setting.name_extra = 5.00` was saved in Stock on 2026-11-21 (revision 3), so it is a staff choice; the 12,99 € in the docs is only the config fallback. Owner: change it in Stock if 5 € was not intended. |
 
-## Test orders left in production
+## Test data
 
-- `AWGMK7894` market pickup: deposit → ready → handed over with the rest in cash. 5 customer mails.
-- `AWGWXP98K` Post: card paid → ready → handed to Post with fake tracking `RR123456785AT`. 4 customer mails.
-- `AWGH7NAF6` cancelled. 1 customer mail.
-- `AWG5CFZGE` web order paid with Stripe test card, Post to a fake address, marked reviewed.
-- `AWGK4KG7P` stall pickup (DE): form → deposit → ready → handed over with the rest.
-- `AWGVFBZWB` stall Post (DE): form → address edit → cancelled.
-- `AWGRZBNFV` stall sale (MCP test).
-- Market "TEST correos (borrar)" (22 Nov, cost 0).
+All test orders (the 7 of 2026-11-22 and 17 older ones), their customers, photos and receipts, and the markets "TEST correos (borrar)" and "Test 1" were deleted on 2026-11-22/23 after backups (`~/backups/pre-cleanup-*.sql.gz`, `uploads-pre-cleanup*.tgz`). Bases taken by the 2026-11-22 tests went back to stock; the older ones did not.
