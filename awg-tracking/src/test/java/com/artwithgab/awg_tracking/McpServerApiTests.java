@@ -85,9 +85,10 @@ class McpServerApiTests extends ApiTestSupport {
 
         List<String> names = JsonPath.read(mcp(accessToken, "tools/list", Map.of()), "$.result.tools[*].name");
         assertThat(names).contains("search_orders", "get_order", "get_agenda_day", "list_market_stock", "list_inventory",
-                "list_markets", "list_needs_attention", "create_market", "add_market_day", "get_customer_contact", "delete_market_day");
+                "list_markets", "list_needs_attention", "create_market", "add_market_day", "get_customer_contact", "delete_market_day", "list_recent_orders", "set_painting_hours", "record_stock_sale");
         // The only deletion is an empty market day; no payments, cancellations or other deletes.
-        assertThat(names).noneMatch(n -> n.contains("cancel") || n.contains("pay") || (n.contains("delete") && !n.equals("delete_market_day")));
+        assertThat(names).noneMatch(n -> n.contains("cancel") || n.contains("refund") || n.contains("payment")
+                || (n.contains("delete") && !n.equals("delete_market_day")));
     }
 
     @Test
@@ -457,6 +458,61 @@ class McpServerApiTests extends ApiTestSupport {
                 "arguments", Map.of("marketId", stallId, "date", "2030-01-05", "confirm", true)));
         assertThat((Boolean) JsonPath.read(unknown, "$.result.isError")).isTrue();
         assertThat(unknown).contains("does not open on");
+    }
+
+    // ---- list_recent_orders and set_painting_hours (owner request 2026-11-22) ----------
+
+    @Test
+    void recentOrdersListsTodaysSalesWithoutContactData() throws Exception {
+        String app = login();
+        String token = mcpToken();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("customerName", "Lena Neu");
+        body.put("phone", "+43 660 7654321");
+        body.put("items", List.of(customItem(false, TUE, 10.0, 11.0, "market", dayId(app, SAT), 14.0)));
+        String code = read(mvc.perform(post("/api/orders").header("Authorization", bearer(app)).contentType(MediaType.APPLICATION_JSON)
+                .content(json(body))).andExpect(status().isCreated()).andReturn(), "$.code");
+
+        String recent = toolText(token, "list_recent_orders", Map.of());
+        assertThat((String) JsonPath.read(recent, "$.from")).isEqualTo("2026-11-23");
+        assertThat(recent).contains(code).contains("Lena Neu").doesNotContain("7654321");
+        assertThat(toolText(token, "list_recent_orders", Map.of("source", "web"))).doesNotContain(code);
+    }
+
+    @Test
+    void paintingHoursArePreviewedThenSavedAndWarnAboutBookingsOutside() throws Exception {
+        String app = login();
+        String token = mcpToken();
+        String orderId = saleOk(app, customItem(false, TUE, 10.0, 11.0, "market", dayId(app, SAT), 14.0));
+        String code = read(mvc.perform(get("/api/orders/" + orderId).header("Authorization", bearer(app))).andReturn(), "$.code");
+
+        Map<String, Object> args = new LinkedHashMap<>(Map.of("date", TUE, "openHour", 11.5, "closeHour", 13));
+        String preview = toolText(token, "set_painting_hours", args);
+        assertThat(preview).startsWith("PREVIEW").contains("11:30–13:00").contains(code).contains("outside the new hours");
+        assertThat(paintingHours(app, TUE)).isNotEqualTo("11.5-13.0");
+
+        args.put("confirm", true);
+        assertThat(toolText(token, "set_painting_hours", args)).startsWith("Saved.").contains("11:30–13:00");
+        assertThat(paintingHours(app, TUE)).isEqualTo("11.5-13.0");
+
+        assertThat(toolText(token, "set_painting_hours", Map.of("date", WED, "open", false, "confirm", true))).contains("closed");
+        String bad = mcp(token, "tools/call", Map.of("name", "set_painting_hours", "arguments", Map.of("date", "2026-11-20", "openHour", 10, "closeHour", 12)));
+        assertThat((Boolean) JsonPath.read(bad, "$.result.isError")).isTrue();
+        for (Map<String, Object> wrong : List.<Map<String, Object>>of(
+                Map.of("date", "2026-11-26", "open", "false", "openHour", 10, "closeHour", 13),
+                Map.of("date", "2026-11-26", "open", false, "openHour", 10, "closeHour", 13),
+                Map.of("date", "2026-11-26", "openHour", 15, "closeHour", 10),
+                Map.of("date", "2026-11-26", "openHour", 10.1, "closeHour", 13),
+                Map.of("date", "2028-11-26", "openHour", 10, "closeHour", 13))) {
+            String res = mcp(token, "tools/call", Map.of("name", "set_painting_hours", "arguments", wrong));
+            assertThat((Boolean) JsonPath.read(res, "$.result.isError")).as(wrong.toString()).isTrue();
+        }
+    }
+
+    private String paintingHours(String app, String date) throws Exception {
+        String list = mvc.perform(get("/api/painting-days").param("from", date).param("to", date).header("Authorization", bearer(app)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return JsonPath.read(list, "$[0].openHour") + "-" + JsonPath.read(list, "$[0].closeHour");
     }
 
     // ---- helpers -------------------------------------------------------------------------
