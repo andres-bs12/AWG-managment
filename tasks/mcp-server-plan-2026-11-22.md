@@ -25,7 +25,7 @@ claude.ai exige OAuth para conectores remotos. Se implementó el flujo mínimo c
 3. Registro dinámico `POST /oauth/register` (RFC 7591): solo acepta redirect URIs de una lista fija (`MCP_REDIRECT_URIS`, por defecto los callbacks de claude.ai y claude.com).
 4. `GET /oauth/authorize` muestra una página de login staff (e-mail y contraseña). Exige PKCE S256 y valida `resource` (RFC 8707). Usa los mismos límites de intentos que el login del staff.
 5. `POST /oauth/token` canjea el código (de un solo uso, 2 minutos, guardado con hash) con el `code_verifier`. Si el código se pidió para `resource`, el canje también debe nombrarlo.
-6. **El access token es una sesión staff con `audience = mcp`** (V19), creada recién al canjear el código. Funciona **solo en `/mcp`**: `/api/**` lo rechaza y `/mcp` rechaza los tokens de la app. Usa la misma caducidad (12 h deslizantes, máximo 7 días) y se cierra al cambiar la contraseña.
+6. **El access token es una sesión staff con `audience = mcp`** (V19), creada recién al canjear el código. Funciona **solo en `/mcp`**: `/api/**` lo rechaza y `/mcp` rechaza los tokens de la app. Dura 7 días sin uso y 30 días como máximo, para que no caduque de noche en un fin de semana de mercado. Se cierra al cambiar la contraseña.
 7. El login rechaza los envíos desde otro sitio (`Origin`/`Sec-Fetch-Site`) y codifica `state` completo en la redirección.
 
 Nunca queda abierto: `/mcp` exige rol STAFF y, con `MCP_ENABLED=false`, `/mcp` y `/oauth` caen en la cadena principal, que los niega.
@@ -41,12 +41,15 @@ Nunca queda abierto: `/mcp` exige rol STAFF y, con `MCP_ENABLED=false`, `/mcp` y
 | `list_inventory` | lectura | `InventoryService.list` |
 | `list_markets` (con sus días y horas) | lectura | `MarketService.listMarkets/listMarketDays` |
 | `list_needs_attention` | lectura | `OrderService.needingAttention` |
+| `get_customer_contact` (teléfono, e-mail y dirección de un pedido) | lectura | `getOrderByCode` + `getOrderBundle` |
 | `create_market` | escritura con `confirm` | `MarketService.saveMarket` |
 | `add_market_day` (amplía la temporada si hace falta) | escritura con `confirm` | `MarketService.saveMarket` |
 
 - Las escrituras sin `confirm=true` solo devuelven una vista previa con advertencias (día que no es vie/sáb/dom, fecha pasada, horas). Con `confirm=true` el servicio valida todo de nuevo y guarda. Cada escritura queda en el log con el id del usuario staff.
 - No hay pagos, cancelaciones ni borrados.
-- Las respuestas ocultan `trackToken`, `formToken`, fotos y listas de calendario repetidas. La agenda del día oculta además e-mail y dirección (siguen en `get_order`).
+- Las respuestas ocultan `trackToken`, `formToken`, fotos y listas de calendario repetidas. Teléfono, e-mail y dirección solo salen con `get_customer_contact`, un pedido a la vez y con registro en el log.
+- Solo las cuentas de `MCP_ALLOWED_EMAILS` pueden conectarse (vacía = nadie). Se comprueba al emitir el código, al canjearlo y en cada llamada a `/mcp`.
+- Los tokens del conector se guardan con hash `SHA-256("mcp:" + token)`: un backend anterior a V19 no los encuentra tras un rollback.
 - El stock numerado se decodifica por el id: R rojo, W vino, G verde y C champán (Beige); S brillante, M mate.
 
 ## Riesgos y pendientes
@@ -54,7 +57,7 @@ Nunca queda abierto: `/mcp` exige rol STAFF y, con `MCP_ENABLED=false`, `/mcp` y
 - **Datos personales:** nombres, teléfonos y direcciones de clientes pasan a Anthropic al usarse en el chat. Hay que mencionarlo en la Datenschutzerklärung (consultar al asesor) y pedir solo lo necesario.
 - **Una cuenta comprometida da acceso por chat.** Mismo riesgo que el login staff; mitigado con límites de intentos y la lista fija de redirect URIs. Se recomienda una contraseña larga para Andrés. Un token del conector filtrado solo abre `/mcp` (lectura y crear mercados), no pagos, cancelaciones ni cambio de contraseña.
 - **Inyección de instrucciones:** una nota de clienta podría pedirle a Claude que cree un mercado. Las escrituras son de bajo impacto, claude.ai pide permiso para herramientas que no son de solo lectura y el servidor exige `confirm=true`; no hay herramientas de pagos, cancelación ni borrado.
-- **Sin refresh token:** tras 12 h sin uso (o 7 días en total) claude.ai pide reconectar. Si molesta, añadir refresh tokens persistentes en una migración **V19**.
+- **Sin refresh token:** tras 7 días sin uso (o 30 en total) claude.ai pide reconectar. Guía para el dueño: `docs/conector-claude.md`. Prueba tras desplegar, sin contraseña: `scripts/mcp-smoke.sh`.
 - **Los códigos OAuth viven en memoria:** un reinicio en medio del login obliga a repetirlo. Funciona porque hay una sola instancia del backend.
 - **V19** se probó en una base PostgreSQL nueva y desechable (V1–V19 y flujo completo), no en la base local del dueño, porque la otra sesión prepara V18 allí. Al desplegar va después de V18.
 - **Despliegue (no hecho; decisión del dueño: entra en la próxima subida, Claude elige cuándo y lo muestra funcionando):** nginx (`frontend/nginx.conf`) solo envía `/api/` al backend. Hay que añadir `location` para `/mcp`, `/oauth/` y `/.well-known/oauth-`, fijar `MCP_ENABLED=true` y `MCP_PUBLIC_URL=https://artwithgab.com`, y revisar que Cloudflare no bloquee ni guarde en caché esas rutas.

@@ -70,12 +70,12 @@ public class AuthService {
         RANDOM.nextBytes(bytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         StaffSession session = new StaffSession();
-        session.setTokenHash(hash(token));
+        session.setTokenHash(hash(token, audience));
         session.setStaffUser(current);
         session.setAudience(audience);
         Instant now = clock.instant();
         session.setCreatedAt(now);
-        session.setExpiresAt(now.plus(props.session().ttl()));
+        session.setExpiresAt(now.plus(idleTtl(audience)));
         sessionRepository.save(session);
         return token;
     }
@@ -117,13 +117,13 @@ public class AuthService {
     public Optional<StaffUser> authenticate(String token, String audience) {
         if (token == null || token.isBlank() || token.length() > 100) return Optional.empty();
         Instant now = clock.instant();
-        return sessionRepository.findByTokenHash(hash(token))
+        return sessionRepository.findByTokenHash(hash(token, audience))
                 .filter(s -> s.getExpiresAt().isAfter(now))
                 .filter(s -> audience.equals(s.getAudience()))
                 .map(s -> {
-                    java.time.Duration ttl = props.session().ttl();
+                    java.time.Duration ttl = idleTtl(s.getAudience());
                     Instant renewed = now.plus(ttl);
-                    Instant cap = s.getCreatedAt().plus(MAX_SESSION_LIFETIME);
+                    Instant cap = s.getCreatedAt().plus(maxLifetime(s.getAudience()));
                     if (s.getExpiresAt().isBefore(now.plus(ttl.dividedBy(2))) && s.getExpiresAt().isBefore(cap)) {
                         s.setExpiresAt(renewed.isAfter(cap) ? cap : renewed);
                     }
@@ -133,9 +133,27 @@ public class AuthService {
 
     static final java.time.Duration MAX_SESSION_LIFETIME = java.time.Duration.ofDays(7);
 
+    /**
+     * The Claude connector cannot refresh tokens yet, and a 12-hour idle limit would sign the owner
+     * out every night of a market weekend. Its sessions only open /mcp (read tools and market
+     * creation), so they may idle for a week and live for the whole season (30 days).
+     */
+    static final java.time.Duration MCP_IDLE_TTL = java.time.Duration.ofDays(7);
+    static final java.time.Duration MCP_MAX_LIFETIME = java.time.Duration.ofDays(30);
+
+    public java.time.Duration idleTtl(String audience) {
+        return StaffSession.MCP.equals(audience) ? MCP_IDLE_TTL : props.session().ttl();
+    }
+
+    private static java.time.Duration maxLifetime(String audience) {
+        return StaffSession.MCP.equals(audience) ? MCP_MAX_LIFETIME : MAX_SESSION_LIFETIME;
+    }
+
     @Transactional
     public void logout(String token) {
-        if (token != null) sessionRepository.deleteByTokenHash(hash(token));
+        if (token == null) return;
+        sessionRepository.deleteByTokenHash(hash(token));
+        sessionRepository.deleteByTokenHash(hash(token, StaffSession.MCP));
     }
 
     @Scheduled(fixedDelayString = "PT1H")
@@ -147,6 +165,15 @@ public class AuthService {
     private String dummyHash() {
         if (dummyHash == null) dummyHash = passwordEncoder.encode("not-a-real-password");
         return dummyHash;
+    }
+
+    /**
+     * Connector tokens are hashed in their own namespace. A backend from before V19 ignores the
+     * audience column and looks tokens up by SHA-256(token) only, so after a rollback it simply does
+     * not find connector sessions instead of letting them into the staff API.
+     */
+    static String hash(String token, String audience) {
+        return StaffSession.MCP.equals(audience) ? hash("mcp:" + token) : hash(token);
     }
 
     static String hash(String token) {

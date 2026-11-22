@@ -20,3 +20,15 @@ Revisores de solo lectura, distinta familia que el autor (Claude): **Gemini 4 Ne
 Áreas que ambos revisaron sin hallazgos: PKCE, open redirect, XSS, clickjacking, orden de las cadenas de seguridad con el flag encendido o apagado, enumeración de usuarios, fugas en logs y caché.
 
 Verificación tras las correcciones: `./mvnw test` 290 en verde; V19 aplicada en una base PostgreSQL nueva (V1–V19) con el flujo OAuth real, `tools/list` con 9 herramientas y el mismo token rechazado con 401 en `/api/orders/attention`.
+
+## Revisión de Codex (sobre `1ceeb17..436dba6`, pedida por la sesión de despliegue)
+
+| # | Hallazgo | Veredicto | Acción |
+|---|---|---|---|
+| C1 | Alta: tras un rollback, un backend anterior a V19 ignora `audience` y aceptaría los tokens del conector en `/api/**` | Real | Hash con espacio de nombres `SHA-256("mcp:" + token)`; nota en `docs/deploy.md` para borrar las sesiones `mcp` antes de un rollback. Prueba `connectorTokensAreHashedInTheirOwnNamespace` |
+| C2 | Cualquier cuenta staff puede conectar Claude | Real | `MCP_ALLOWED_EMAILS` (vacía = nadie), comprobada al emitir, al canjear y en cada llamada a `/mcp`. Pruebas `onlyAllowedEmailsCanConnect`, `codeForAnAccountNotAllowedCannotBeRedeemed`, `connectorSessionOfAnAccountNotAllowedCannotUseMcp` |
+| C3 | Un código de 2 minutos obtenido antes de un cambio de contraseña aún se puede canjear | **Riesgo aceptado** (decisión de la sesión de despliegue): ventana de 2 min, código de un solo uso y ligado a PKCE |
+| C4 | `confirm=true` lo envía el cliente; el servidor no tiene prueba de la aprobación del dueño | **Riesgo aceptado**: escrituras de bajo impacto (crear mercado o día), claude.ai pide permiso para herramientas que no son de solo lectura, sin pagos, cancelaciones ni borrados |
+| C5 | Secretos en query string de los POST de OAuth terminarían en los logs | Real | 400 si los POST traen query string; nginx registra esas rutas sin query string ni referrer (`log_format oauth_safe`). Prueba `oauthPostsWithAQueryStringAreRefused` |
+| C6 | Las consultas normales de pedidos exportan teléfono, e-mail y dirección | Real | Ocultos en todas las herramientas salvo `get_customer_contact` (un pedido, registrado en el log). Prueba `contactDataOnlyComesFromTheContactTool` |
+| C7 | `add_market_day` lee los días antes del lock y podría borrar un día añadido en paralelo | Real | Relee y guarda dentro de una transacción con `CalendarService.lockSchedule()` (el mismo lock que usa `saveMarket`) |

@@ -1,8 +1,8 @@
 package com.artwithgab.awg_tracking.mcp;
 
-import com.artwithgab.awg_tracking.config.AwgProperties;
 import com.artwithgab.awg_tracking.model.StaffSession;
 import com.artwithgab.awg_tracking.model.StaffUser;
+import com.artwithgab.awg_tracking.repository.StaffUserRepository;
 import com.artwithgab.awg_tracking.exception.UnauthorizedException;
 import com.artwithgab.awg_tracking.security.AuthService;
 import com.artwithgab.awg_tracking.security.RateLimiter;
@@ -44,16 +44,16 @@ import java.util.Map;
 @ConditionalOnProperty(prefix = "awg.mcp", name = "enabled", havingValue = "true")
 public class McpOAuthController {
     private final McpProperties mcp;
-    private final AwgProperties props;
     private final AuthService authService;
     private final RateLimiter rateLimiter;
     private final AuthorizationCodeStore codes;
+    private final StaffUserRepository staffUsers;
     private final Clock clock;
 
-    public McpOAuthController(McpProperties mcp, AwgProperties props, AuthService authService, RateLimiter rateLimiter,
-                              AuthorizationCodeStore codes, Clock clock) {
+    public McpOAuthController(McpProperties mcp, AuthService authService, RateLimiter rateLimiter,
+                              AuthorizationCodeStore codes, StaffUserRepository staffUsers, Clock clock) {
+        this.staffUsers = staffUsers;
         this.mcp = mcp;
-        this.props = props;
         this.authService = authService;
         this.rateLimiter = rateLimiter;
         this.codes = codes;
@@ -122,6 +122,8 @@ public class McpOAuthController {
 
     @PostMapping(value = "/oauth/authorize", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> authorize(@RequestParam Map<String, String> params, HttpServletRequest request) {
+        // Credentials belong in the body only; a query string would end up in proxy access logs.
+        if (request.getQueryString() != null) return page(HttpStatus.BAD_REQUEST, errorPage("Open the sign-in page from Claude again."));
         String problem = invalidAuthorizeRequest(params);
         if (problem != null) return page(HttpStatus.BAD_REQUEST, errorPage(problem));
         // The form only posts to itself: refuse cross-site posts (login CSRF, burning the staff login limit).
@@ -147,6 +149,10 @@ public class McpOAuthController {
             }
             return page(HttpStatus.UNAUTHORIZED, loginPage(params, "Wrong e-mail or password."));
         }
+        if (!mcp.isAllowed(user.getEmail())) {
+            log.info("MCP connector refused for staff user {} (not in MCP_ALLOWED_EMAILS)", user.getId());
+            return page(HttpStatus.FORBIDDEN, errorPage("This account is not allowed to connect Claude."));
+        }
         String resource = params.get("resource") == null || params.get("resource").isBlank() ? null : mcp.resource();
         String code = codes.issue(params.get("client_id"), params.get("redirect_uri"), params.get("code_challenge"), resource, user.getId());
         log.info("MCP connector authorized for staff user {}", user.getId());
@@ -168,6 +174,9 @@ public class McpOAuthController {
     @PostMapping(value = "/oauth/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<Map<String, Object>> token(@RequestParam Map<String, String> params, HttpServletRequest request) {
         rateLimiter.check("mcp-token", request.getRemoteAddr(), 30);
+        if (request.getQueryString() != null) {
+            return oauthError(HttpStatus.BAD_REQUEST, "invalid_request", "Send the parameters in the request body");
+        }
         if (!"authorization_code".equals(params.get("grant_type"))) {
             return oauthError(HttpStatus.BAD_REQUEST, "unsupported_grant_type", "Only authorization_code is supported");
         }
@@ -181,6 +190,9 @@ public class McpOAuthController {
                 || (grant.resource() != null && (params.get("resource") == null || params.get("resource").isBlank()))) {
             return oauthError(HttpStatus.BAD_REQUEST, "invalid_grant", "The authorization code is invalid or expired");
         }
+        // Re-checked here: the account may have been removed from the list since the code was issued.
+        boolean allowed = staffUsers.findById(grant.staffUserId()).map(u -> mcp.isAllowed(u.getEmail())).orElse(false);
+        if (!allowed) return oauthError(HttpStatus.BAD_REQUEST, "invalid_grant", "The authorization code is invalid or expired");
         String accessToken;
         try {
             accessToken = authService.createSession(grant.staffUserId(), StaffSession.MCP);
@@ -190,7 +202,7 @@ public class McpOAuthController {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("access_token", accessToken);
         body.put("token_type", "Bearer");
-        body.put("expires_in", props.session().ttl().toSeconds());
+        body.put("expires_in", authService.idleTtl(StaffSession.MCP).toSeconds());
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("Pragma", "no-cache").body(body);
     }
 

@@ -59,6 +59,8 @@ services:
       # Claude connector (MCP server, tasks/mcp-server-plan-2026-11-22.md). Off unless MCP_ENABLED=true.
       MCP_ENABLED: ${MCP_ENABLED:-false}
       MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-https://artwithgab.com}
+      # Staff e-mails allowed to connect Claude; empty = nobody.
+      MCP_ALLOWED_EMAILS: ${MCP_ALLOWED_EMAILS:-}
     volumes:
       - uploads_data:/data/uploads
     depends_on:

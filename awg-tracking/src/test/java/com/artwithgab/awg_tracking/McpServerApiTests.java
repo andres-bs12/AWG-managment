@@ -26,7 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties = {
         "awg.mcp.enabled=true",
         "awg.mcp.public-url=https://awg.test",
-        "awg.mcp.allowed-redirect-uris=https://claude.ai/api/mcp/auth_callback"
+        "awg.mcp.allowed-redirect-uris=https://claude.ai/api/mcp/auth_callback",
+        "awg.mcp.allowed-emails=gaby@artwithgab.com"
 })
 class McpServerApiTests extends ApiTestSupport {
     private static final String CALLBACK = "https://claude.ai/api/mcp/auth_callback";
@@ -74,6 +75,7 @@ class McpServerApiTests extends ApiTestSupport {
         String code = authorize(clientId, PASSWORD);
         String token = exchange(clientId, code, VERIFIER).andExpect(status().isOk())
                 .andExpect(jsonPath("$.token_type").value("Bearer"))
+                .andExpect(jsonPath("$.expires_in").value(7 * 24 * 3600))
                 .andReturn().getResponse().getContentAsString();
         String accessToken = JsonPath.read(token, "$.access_token");
 
@@ -83,7 +85,7 @@ class McpServerApiTests extends ApiTestSupport {
 
         List<String> names = JsonPath.read(mcp(accessToken, "tools/list", Map.of()), "$.result.tools[*].name");
         assertThat(names).contains("search_orders", "get_order", "get_agenda_day", "list_market_stock", "list_inventory",
-                "list_markets", "list_needs_attention", "create_market", "add_market_day");
+                "list_markets", "list_needs_attention", "create_market", "add_market_day", "get_customer_contact");
         assertThat(names).noneMatch(n -> n.contains("cancel") || n.contains("delete") || n.contains("pay"));
     }
 
@@ -172,7 +174,7 @@ class McpServerApiTests extends ApiTestSupport {
         String token = mcpToken();
         String agenda = toolText(token, "get_agenda_day", Map.of("date", SAT));
         assertThat((String) JsonPath.read(agenda, "$.date")).isEqualTo(SAT);
-        assertThat(agenda).doesNotContain("\"marketDays\"").doesNotContain("\"email\"");
+        assertThat(agenda).doesNotContain("\"marketDays\"").doesNotContain("\"email\"").doesNotContain("\"phone\"");
 
         String today = toolText(token, "get_agenda_day", Map.of());
         assertThat((String) JsonPath.read(today, "$.date")).isEqualTo(TUE);
@@ -296,6 +298,110 @@ class McpServerApiTests extends ApiTestSupport {
                 "days", List.of(Map.of("date", "2027-01-02", "openHour", 12, "closeHour", 18)))));
         assertThat((Boolean) JsonPath.read(result, "$.result.isError")).isTrue();
         assertThat(result).contains("at most 120 days");
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.artwithgab.awg_tracking.repository.StaffSessionRepository sessions;
+
+    @Test
+    void connectorSessionSurvivesAMarketWeekendIdle() throws Exception {
+        String token = mcpToken();
+        login();
+        var now = java.time.Instant.parse("2026-11-24T08:00:00Z");
+        var byAudience = sessions.findAll().stream().collect(java.util.stream.Collectors.groupingBy(
+                com.artwithgab.awg_tracking.model.StaffSession::getAudience,
+                java.util.stream.Collectors.mapping(com.artwithgab.awg_tracking.model.StaffSession::getExpiresAt, java.util.stream.Collectors.toList())));
+        assertThat(byAudience.get("mcp")).contains(now.plus(java.time.Duration.ofDays(7)));
+        assertThat(byAudience.get("app")).allMatch(e -> !e.isAfter(now.plus(java.time.Duration.ofHours(12))));
+        assertThat(token).isNotBlank();
+    }
+
+    // ---- Codex review fixes (2026-11-22) ------------------------------------------------
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.artwithgab.awg_tracking.security.AuthService authService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.artwithgab.awg_tracking.mcp.AuthorizationCodeStore codeStore;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.artwithgab.awg_tracking.repository.StaffUserRepository staffUsers;
+
+    @Test
+    void connectorTokensAreHashedInTheirOwnNamespace() throws Exception {
+        String token = mcpToken();
+        var hashes = sessions.findAll().stream().filter(s -> "mcp".equals(s.getAudience()))
+                .map(com.artwithgab.awg_tracking.model.StaffSession::getTokenHash).toList();
+        // A pre-V19 backend looks up SHA-256(token): it must not find the connector session.
+        assertThat(hashes).doesNotContain(sha256Hex(token)).contains(sha256Hex("mcp:" + token));
+    }
+
+    @Test
+    void onlyAllowedEmailsCanConnect() throws Exception {
+        String clientId = register();
+        Map<String, String> form = authorizeParams(clientId);
+        form.put("email", "andres@artwithgab.com");
+        form.put("password", "andres-test-pw");
+        mvc.perform(withIp(post("/oauth/authorize")).contentType(MediaType.APPLICATION_FORM_URLENCODED).params(toParams(form)))
+                .andExpect(status().isForbidden()).andExpect(header().doesNotExist("Location"));
+    }
+
+    @Test
+    void codeForAnAccountNotAllowedCannotBeRedeemed() throws Exception {
+        String clientId = register();
+        var andres = staffUsers.findByEmail("andres@artwithgab.com").orElseThrow();
+        String code = codeStore.issue(clientId, CALLBACK, challenge(VERIFIER), "https://awg.test/mcp", andres.getId());
+        exchange(clientId, code, VERIFIER).andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("invalid_grant"));
+    }
+
+    @Test
+    void connectorSessionOfAnAccountNotAllowedCannotUseMcp() throws Exception {
+        var andres = staffUsers.findByEmail("andres@artwithgab.com").orElseThrow();
+        String token = authService.createSession(andres.getId(), com.artwithgab.awg_tracking.model.StaffSession.MCP);
+        mvc.perform(post("/mcp").header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM).content(rpc("tools/list", Map.of())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void oauthPostsWithAQueryStringAreRefused() throws Exception {
+        String clientId = register();
+        Map<String, String> form = authorizeParams(clientId);
+        form.put("email", "gaby@artwithgab.com");
+        mvc.perform(withIp(post("/oauth/authorize?password=" + PASSWORD)).contentType(MediaType.APPLICATION_FORM_URLENCODED).params(toParams(form)))
+                .andExpect(status().isBadRequest()).andExpect(header().doesNotExist("Location"));
+        String code = authorize(clientId, PASSWORD);
+        mvc.perform(withIp(post("/oauth/token?code_verifier=" + VERIFIER)).contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("grant_type", "authorization_code").param("code", code).param("client_id", clientId)
+                        .param("redirect_uri", CALLBACK).param("resource", "https://awg.test/mcp"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("invalid_request"));
+    }
+
+    @Test
+    void contactDataOnlyComesFromTheContactTool() throws Exception {
+        String app = login();
+        String token = mcpToken();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("customerName", "Maria Muster");
+        body.put("phone", "+43 660 1234567");
+        body.put("email", "maria@example.com");
+        body.put("items", List.of(customItem(false, TUE, 10.0, 11.0, "market", dayId(app, SAT), 14.0)));
+        MvcResult sale = mvc.perform(post("/api/orders").header("Authorization", bearer(app)).contentType(MediaType.APPLICATION_JSON)
+                .content(json(body))).andExpect(status().isCreated()).andReturn();
+        String code = read(sale, "$.code");
+
+        String order = toolText(token, "get_order", Map.of("code", code));
+        String search = toolText(token, "search_orders", Map.of("query", "Muster"));
+        String agenda = toolText(token, "get_agenda_day", Map.of("date", TUE));
+        for (String text : List.of(order, search, agenda)) {
+            assertThat(text).doesNotContain("1234567").doesNotContain("maria@example.com");
+        }
+        assertThat(search).contains("Maria Muster");
+
+        String contact = toolText(token, "get_customer_contact", Map.of("code", code));
+        assertThat(contact).contains("+43 660 1234567").contains("maria@example.com");
+    }
+
+    private static String sha256Hex(String value) throws Exception {
+        return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
     }
 
     // ---- helpers -------------------------------------------------------------------------
