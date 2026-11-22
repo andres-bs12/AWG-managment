@@ -421,14 +421,15 @@ public class OrderService {
             if (order.isAwaitingPayment() || order.isPaymentReview()) {
                 throw new ConflictException("Check the online payment in Stripe before handover.").code("PAYMENT_PENDING");
             }
-            paid = applyPayment(order, PaymentState.PAID, collectMethod, null);
+            // A stale dialog must not rewrite a payment another device already recorded.
+            if (order.getPaymentState() != PaymentState.PAID) paid = applyPayment(order, PaymentState.PAID, collectMethod, null);
         }
         boolean alreadyShipped = order.isPostShipped();
         selected.forEach(i -> i.setHandedOver(handedOver));
         boolean completed = updateHandover(order);
         boolean shipped = !alreadyShipped && order.isPostShipped();
-        // The thank-you mail already shows the payment; any other step still confirms the collected rest.
-        if (paid && (shipped || !completed)) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.PAYMENT_CHANGED));
+        // The thank-you and "on its way" mails show the payment; a partial hand-over still confirms the collected rest.
+        if (paid && !shipped && !completed) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.PAYMENT_CHANGED));
         if (shipped) {
             events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.POST_SHIPPED));
         } else if (completed) {

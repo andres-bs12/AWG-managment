@@ -176,8 +176,9 @@ export const mockApi: Api = {
       }),
     setHandedOver: (orderId, handedOver, itemIds, trackingNumber, collectMethod) =>
       later(() => {
-        if (handedOver && collectMethod) setPaymentState(orderId, 'paid', collectMethod)
+        // Hand-over validates first, so a refused hand-over leaves the payment untouched.
         setHandedOver(orderId, handedOver, itemIds, trackingNumber)
+        if (handedOver && collectMethod) setPaymentState(orderId, 'paid', collectMethod)
       }),
   },
   payments: {

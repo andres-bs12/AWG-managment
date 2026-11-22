@@ -126,6 +126,8 @@ public final class CustomerMailTemplates {
         m.card(fact(en ? "Estimated delivery" : "Zustellung voraussichtlich", p.arrival(), null)
                 + (p.trackingNumber() == null ? "" : fact(en ? "Tracking number" : "Sendungsnummer", p.trackingNumber(), null))
                 + (p.address() == null ? "" : fact(en ? "Delivery address" : "Lieferadresse", p.address(), null)));
+        // The rest may be collected in the same step as the hand-off, so the parcel mail also confirms the payment.
+        if (v.paid().signum() > 0) { m.money(v, null); confirmation(m, v); }
         if (p.trackingUrl() != null) m.buttons(en ? "Track parcel" : "Sendung verfolgen", p.trackingUrl(), en ? "View order" : "Bestellung ansehen", v.trackUrl());
         else m.button(en ? "View order" : "Bestellung ansehen", v.trackUrl());
         return m.render(subject, pre, v);
