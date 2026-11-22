@@ -113,7 +113,8 @@ public class CustomerMailComposer {
         var calendar = new CalendarIndex(days.findAllWithMarket(), LocalDateTime.now(clock.withZone(zone)));
         String site = props.shop().publicBaseUrl() == null ? "" : props.shop().publicBaseUrl().replaceAll("/+$", "");
         List<OrderItem> items = order.getOrderItems();
-        List<CustomerMailTemplates.Line> lines = items.stream().map(i -> new CustomerMailTemplates.Line(title(i, en), detail(i, en), i.getCost())).toList();
+        List<CustomerMailTemplates.Line> lines = items.stream().map(i -> new CustomerMailTemplates.Line(title(i, en), detail(i, en), i.getCost(),
+                i.getCustomColor() == null ? null : i.getCustomColor().name().toLowerCase(java.util.Locale.ROOT))).toList();
 
         CustomerMailTemplates.Pickup pickup = items.stream()
                 .filter(i -> i.getDeliveryKind() == DeliveryKind.MARKET || i.getDeliveryKind() == DeliveryKind.DELIVERY)

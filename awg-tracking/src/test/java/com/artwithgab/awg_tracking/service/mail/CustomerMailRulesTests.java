@@ -66,6 +66,21 @@ class CustomerMailRulesTests {
                 null, "CASH", "22.11.2026", "https://artwithgab.com/track/AWGTEST12", "artwithgab@gmail.com", "https://artwithgab.com");
     }
 
+    @Test void artworkIsHostedOnTheSiteBecauseGmailStripsInlineSvg() {
+        var v = view(true, "Andrés");
+        var colored = new CustomerMailTemplates.View(true, v.code(), v.firstName(),
+                List.of(new CustomerMailTemplates.Line("Custom ornament", "Green · Matte", new BigDecimal("60.00"), "green")), null,
+                v.total(), v.paid(), v.pickup(), null, v.paymentMethod(), v.today(), v.trackUrl(), v.contactEmail(), v.siteUrl());
+        String html = CustomerMailTemplates.confirmed(colored).html();
+        assertFalse(html.contains("<svg"), "no inline SVG");
+        for (String asset : List.of("brand.png", "peaks.png", "ornament-green.png", "instagram.png", "email.png")) {
+            assertTrue(html.contains("src=\"https://artwithgab.com/mail/" + asset + "\""), asset);
+        }
+        var local = new CustomerMailTemplates.View(true, v.code(), v.firstName(), colored.lines(), null, v.total(), v.paid(), v.pickup(), null,
+                v.paymentMethod(), v.today(), v.trackUrl(), v.contactEmail(), "");
+        assertFalse(CustomerMailTemplates.confirmed(local).html().contains("<img"), "no broken images without an absolute site URL");
+    }
+
     @Test void everyTemplateEscapesCustomerTextAndShowsBothContacts() {
         var v = view(false, "<script>alert(1)</script>");
         var post = new CustomerMailTemplates.Post("1.–2. Dezember 2026", "RR123456785AT", "https://www.post.at/s/sendungsdetails?snr=RR123456785AT", "<b>Gasse</b> 1\n1010 Wien");

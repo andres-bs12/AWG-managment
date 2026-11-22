@@ -36,8 +36,13 @@ public final class CustomerMailTemplates {
 
     public record Rendered(String subject, String text, String html) {}
 
-    /** One line of the order: title ("Personalisierte Kugel"), detail ("Rot · Glänzend") and the item price. */
-    public record Line(String title, String detail, BigDecimal price) {}
+    /**
+     * One line of the order: title ("Personalisierte Kugel"), detail ("Rot · Glänzend"), the item price and
+     * the ornament colour key ("red", "green", ...) that picks the hosted ornament image, or null for none.
+     */
+    public record Line(String title, String detail, BigDecimal price, String color) {
+        public Line(String title, String detail, BigDecimal price) { this(title, detail, price, null); }
+    }
 
     /** Pickup at a market stall (or a legacy Vienna delivery when {@code mapsUrl} is null). */
     public record Pickup(String when, String place, String mapsUrl) {}
@@ -285,6 +290,12 @@ public final class CustomerMailTemplates {
             text.add(value + "\n" + linkLabel + ": " + url);
         }
 
+        /** Base URL of the hosted e-mail artwork (frontend/public/mail), or null when the site URL is not absolute. */
+        static String assets(String siteUrl) {
+            if (siteUrl == null || !siteUrl.matches("https?://.+")) return null;
+            return esc(siteUrl.replaceAll("/+$", "")) + "/mail/";
+        }
+
         void card(String rows) { block(RAISED, "1px solid " + BORDER, rows); textFromRows(rows); }
 
         void cart(String rows) { block(CART, "0", rows); textFromRows(rows); }
@@ -307,9 +318,19 @@ public final class CustomerMailTemplates {
 
         void lines(View v) {
             StringBuilder rows = new StringBuilder();
+            String art = assets(v.siteUrl());
             for (Line line : v.lines()) {
-                rows.append("<tr><td style=\"padding:6px 0;\"><div style=\"font-weight:700;color:").append(INK).append(";\">").append(esc(line.title())).append("</div>")
-                        .append("<div style=\"font-size:14px;color:").append(MUTED).append(";\">").append(esc(line.detail())).append("</div></td>")
+                boolean pic = art != null && line.color() != null && line.color().matches("[a-z]+");
+                rows.append("<tr><td style=\"padding:6px 0;\">");
+                // The picture sits in a nested table so every row of the card keeps two columns.
+                if (pic) {
+                    rows.append("<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr><td valign=\"middle\" style=\"padding-right:12px;\"><img src=\"")
+                            .append(art).append("ornament-").append(line.color())
+                            .append(".png\" width=\"40\" height=\"48\" alt=\"\" style=\"display:block;border:0;width:40px;height:48px;\"></td><td valign=\"middle\">");
+                }
+                rows.append("<div style=\"font-weight:700;color:").append(INK).append(";\">").append(esc(line.title())).append("</div>")
+                        .append("<div style=\"font-size:14px;color:").append(MUTED).append(";\">").append(esc(line.detail())).append("</div>")
+                        .append(pic ? "</td></tr></table>" : "").append("</td>")
                         .append("<td align=\"right\" valign=\"top\" style=\"padding:6px 0;white-space:nowrap;font-weight:600;\">").append(esc(CustomerMailTemplates.money(line.price(), en))).append("</td></tr>");
             }
             if (v.shippingFee() != null && v.shippingFee().signum() > 0) rows.append(row(en ? "Shipping by post" : "Versand per Post", CustomerMailTemplates.money(v.shippingFee(), en), false, false));
@@ -346,6 +367,29 @@ public final class CustomerMailTemplates {
             text.add(value);
         }
 
+        /** Sky header with the brand ornament and the snowy peaks of the website, as hosted PNGs (Gmail strips inline SVG). */
+        private static String header(String site) {
+            String art = assets(site);
+            String sky = "bgcolor=\"" + SKY_TOP + "\" style=\"background:" + SKY_TOP + ";background-image:linear-gradient(180deg," + SKY_TOP + "," + SKY_LOW + ");";
+            String brand = "<a href=\"" + esc(site) + "\" style=\"color:#ffffff;text-decoration:none;font-family:" + DISPLAY + ";font-size:24px;font-weight:700;\">";
+            if (art == null) {
+                return "<tr><td " + sky + "padding:22px 28px 30px;\">" + brand + "&#10052;&nbsp;ArtWithGab</a></td></tr>";
+            }
+            // One cell carries the whole gradient, so the sky has no seam between the name and the peaks.
+            return "<tr><td " + sky + "padding:20px 0 0;\">"
+                    + "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 28px;\"><tr>"
+                    + "<td valign=\"middle\" style=\"padding-right:10px;\"><img src=\"" + art + "brand.png\" width=\"30\" height=\"36\" alt=\"\" style=\"display:block;border:0;width:30px;height:36px;\"></td>"
+                    + "<td valign=\"middle\">" + brand + "ArtWithGab</a></td></tr></table>"
+                    + "<img src=\"" + art + "peaks.png\" width=\"600\" height=\"40\" alt=\"\""
+                    + " style=\"display:block;border:0;width:100%;max-width:600px;height:40px;margin-top:6px;\"></td></tr>";
+        }
+
+        private static String icon(String site, String name) {
+            String art = assets(site);
+            return art == null ? "" : "<img src=\"" + art + name + ".png\" width=\"18\" height=\"18\" alt=\"\""
+                    + " style=\"display:inline-block;border:0;width:18px;height:18px;vertical-align:-3px;margin-right:6px;\">";
+        }
+
         Rendered render(String subject, String preheader, View v) { return render(subject, preheader, v.contactEmail(), v.siteUrl()); }
 
         Rendered render(String subject, String preheader, String contactEmail, String siteUrl) {
@@ -362,16 +406,16 @@ public final class CustomerMailTemplates {
                     + "<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;\">" + esc(preheader) + "</div>"
                     + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:" + PAGE + ";\"><tr><td align=\"center\" style=\"padding:24px 12px;\">"
                     + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;background:" + SURFACE + ";border-radius:16px;overflow:hidden;\">"
-                    + "<tr><td bgcolor=\"" + SKY_TOP + "\" style=\"background:" + SKY_TOP + ";background-image:linear-gradient(180deg," + SKY_TOP + "," + SKY_LOW + ");padding:22px 28px 30px;"
-                    + "font-family:" + DISPLAY + ";font-size:24px;font-weight:700;color:#ffffff;\">"
-                    + "<a href=\"" + esc(site) + "\" style=\"color:#ffffff;text-decoration:none;\">&#10052;&nbsp;ArtWithGab</a></td></tr>"
-                    + "<tr><td style=\"padding:24px 28px 8px;font-family:" + BODY + ";font-size:16px;line-height:1.55;color:" + INK + ";\">"
+                    + header(site)
+                    + "<tr><td style=\"padding:16px 28px 8px;font-family:" + BODY + ";font-size:16px;line-height:1.55;color:" + INK + ";\">"
                     + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-family:" + BODY + ";font-size:16px;line-height:1.55;color:" + INK + ";\">"
                     + html + "</table></td></tr>"
                     + "<tr><td style=\"padding:18px 28px 22px;background:" + RAISED + ";border-top:1px solid " + BORDER + ";font-family:" + BODY + ";font-size:15px;color:" + INK + ";\">"
                     + "<div style=\"color:" + MUTED + ";font-size:14px;padding-bottom:6px;\">" + esc(contactQ) + "</div>"
-                    + "<div style=\"font-weight:600;padding-bottom:10px;\"><a href=\"" + INSTAGRAM_URL + "\" style=\"color:" + GREEN + ";text-decoration:none;\">Instagram " + INSTAGRAM_HANDLE + "</a>"
-                    + "&nbsp;&nbsp;·&nbsp;&nbsp;<a href=\"mailto:" + esc(contactEmail) + "\" style=\"color:" + GREEN + ";text-decoration:none;\">" + esc(contactEmail) + "</a></div>"
+                    + "<div style=\"font-weight:600;padding-bottom:10px;\"><a href=\"" + INSTAGRAM_URL + "\" style=\"color:" + GREEN + ";text-decoration:none;white-space:nowrap;\">"
+                    + icon(site, "instagram") + "Instagram " + INSTAGRAM_HANDLE + "</a>"
+                    + "&nbsp;&nbsp;·&nbsp;&nbsp;<a href=\"mailto:" + esc(contactEmail) + "\" style=\"color:" + GREEN + ";text-decoration:none;white-space:nowrap;\">"
+                    + icon(site, "email") + esc(contactEmail) + "</a></div>"
                     + "<div style=\"color:" + MUTED + ";font-size:12px;\">" + esc(legal) + " · <a href=\"" + esc(site) + "/impressum\" style=\"color:" + MUTED + ";\">" + imprint
                     + "</a> · <a href=\"" + esc(site) + "/datenschutz\" style=\"color:" + MUTED + ";\">" + privacy + "</a></div>"
                     + "</td></tr></table></td></tr></table></body></html>";

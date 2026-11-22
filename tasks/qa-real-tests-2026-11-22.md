@@ -23,11 +23,15 @@ Every finding goes here and, when it is a code fix, onto branch `fix/qa-real-tes
 | 13 | New sale · Post | Staff New sale demands the full Post address, while the backend lets custom-only parcels take the address from the QR form. | Owner to decide which rule wins. |
 | 14 | Cancel dialog | "Reason (optional)" label and its field are misaligned and the field is tiny. | To fix. |
 | 15 | Track page | Contact offers Instagram only; owner wants Instagram **and** e-mail always visible. | To fix. |
-| 16 | Not tested live | Web payment (Stripe 4242: owner types the test card), address change after the form, waitlist opt-in. | Pending. |
+| 16 | Not tested live | Address change after the form, waitlist opt-in. Web payment tested 2026-11-22 (`AWG5CFZGE`, 4242): customer mail, owner copy, red dot and Mark reviewed all work. | Pending: the two left. |
+| 17 | Mail · artwork | Gmail strips inline SVG, so the approved peaks, ornament icons and contact icons were missing. | Fixed: hosted PNGs in `frontend/public/mail/`. |
+| 18 | Mail · Brevo | Gmail shows "Unsubscribe" next to the sender of an order mail; Brevo probably adds `List-Unsubscribe`. | To check in Brevo (transactional mails should not carry it). |
+| 19 | Shop · price | The shop charges +€5.00 for the name on the back; docs say €12.99 by default. | Owner: confirm the price in Stock. |
 
 ## Test orders left in production
 
 - `AWGMK7894` market pickup: deposit → ready → handed over with the rest in cash. 5 customer mails.
 - `AWGWXP98K` Post: card paid → ready → handed to Post with fake tracking `RR123456785AT`. 4 customer mails.
 - `AWGH7NAF6` cancelled. 1 customer mail.
+- `AWG5CFZGE` web order paid with Stripe test card, Post to a fake address, marked reviewed.
 - Market "TEST correos (borrar)" (22 Nov, cost 0).
