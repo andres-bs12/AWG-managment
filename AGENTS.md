@@ -1,6 +1,6 @@
 # Contexto del proyecto — ArtWithGab (AWG)
 
-**Actualizado:** 2026-11-20 (**v3.1.0 desplegada** en producción: etiqueta `v3.1.0` y `origin/main` en `389a1b3`; `release/v3.1` añade el registro documental `f455a37`; migraciones V14–V17 aplicadas; backup `~/backups/pre-v3.1-20261120T2038.sql.gz`)
+**Actualizado:** 2026-11-22 (producción sirve `eddee9d` de la rama `fix/qa-real-tests-2026-11-22`: v3.1.0 + correos HTML, «Mark reviewed» y conector MCP; Flyway V18–V19 aplicadas; backup `~/backups/pre-v3.2-20261122T1723.sql.gz`; `main` sigue en v3.1.0 hasta unir la rama)
 **Propósito de este archivo:** memoria persistente para el dueño del proyecto y los agentes que trabajen en este repositorio.
 
 ## Instrucción de mantenimiento
@@ -96,16 +96,18 @@ Scripts disponibles en `frontend/package.json`: `dev`, `build`, `build:mock`, `l
 - **Make room:** `POST /api/agenda/blocks/{itemId}/make-room` mueve una sesión elegible y `POST /api/agenda/make-room` libera un hueco con `Idempotency-Key`. Ambos conservan la fecha de entrega o recogida. Ver [contrato de Post](tasks/post-shipping-contract-2026-11-20.md) y [contrato HTTP vigente](docs/frontend-api-swap.md).
 - **Verificación de la versión según el registro de entrega:** 270 pruebas de backend, 106 Node y `e2e-full` en verde en CI.
 
-## Correos y revisión (rama `fix/qa-real-tests-2026-11-22`, 2026-11-22)
+## Correos y revisión (rama `fix/qa-real-tests-2026-11-22`, desplegada 2026-11-22)
 
 - Prueba real en producción: llegaron los 10 correos al cliente. Hallazgos en `tasks/qa-real-tests-2026-11-22.md`; página visual de plantillas: https://claude.ai/artifact/FT1twyvR5Vx9uZ5eZcSNpr.
 - Plantillas HTML aprobadas por el dueño: `service/mail/CustomerMailTemplates` (vista) y `CustomerMailComposer` (qué correo toca por evento, uno como máximo). Avisos al dueño siguen en texto en `NotificationService`; `OWNER_EMAIL` admite varias direcciones. Sin datos fiscales no hay comprobante aparte.
 - V18: `orders.reviewed_at` (pedido web pagado queda en Needs attention hasta «Mark reviewed», `POST /api/orders/{id}/reviewed`) y `orders.locale` (idioma de los correos).
 - Arreglados: script de contraseña (hash sin citar por ssh) y ventas en días con solo «Casa».
+- Gmail elimina el SVG en línea: montañas, adornos e íconos de los correos son PNG en `frontend/public/mail/`. Compra web real con 4242 verificada (`AWG5CFZGE`).
+- Producción: `OWNER_EMAIL` incluye el correo personal del dueño, `MAIL_REPLY_TO=artwithgab@gmail.com`, `MCP_ENABLED=true` y `MCP_ALLOWED_EMAILS` con las cuentas de Andrés y Gaby.
 
 ## Backend actual
 
-- Paquete `com.artwithgab.awg_tracking`. API REST con sesiones staff bearer opacas, PostgreSQL y Flyway **V1–V18** (V18 en la rama de correos, sin desplegar aún) con `ddl-auto=validate`. V14 guarda precios y recargos por nombre, V15 añade stock numerado, V16 guarda el puesto de recogida y de pintura, y V17 añade Post y los replays de Make room. Los tests usan H2 sin Flyway.
+- Paquete `com.artwithgab.awg_tracking`. API REST con sesiones staff bearer opacas, PostgreSQL y Flyway **V1–V19** (V18 revisión e idioma, V19 audiencia de sesión MCP; ambas en producción desde 2026-11-22) con `ddl-auto=validate`. V14 guarda precios y recargos por nombre, V15 añade stock numerado, V16 guarda el puesto de recogida y de pintura, y V17 añade Post y los replays de Make room. Los tests usan H2 sin Flyway.
 - Cada bloque de pintura se deriva de `OrderItem.paintStart/paintEnd` y usa el ID del ítem. Toda reserva de pintura o stock toma `ScheduleLock` (fila 1). Métricas usan la fila 2. Precios del servidor en `price_setting`, con valores de configuración como respaldo.
 - Ventas staff idempotentes. Un checkout web `PENDING` o `REVIEW` ocupa horas como reserva sin datos del cliente en Agenda, queda fuera de Entregas y aparece en Needs attention. Stripe se confirma en el servidor y un importe inesperado requiere revisión.
 - Los enlaces de formulario caducan 30 días tras la entrega. `RetentionService` borra fotos y datos personales, incluido el número de envío, 60 días después de entregar o a los 365 días si sigue sin entregar. La lista de espera usa doble opt-in y borra altas sin confirmar a los siete días.
@@ -120,9 +122,9 @@ Scripts disponibles en `frontend/package.json`: `dev`, `build`, `build:mock`, `l
 - En ambos formularios la barra de acciones va al final del contenido. La franja de varias Kugeln es sticky en móvil al bajar por el editor. Diseño y copy en [el sistema público](docs/design-system.md) y [las reglas aprendidas](docs/reglas-aprendidas.md).
 - `/impressum`, `/agb` y `/datenschutz` publican los textos sin aviso de borrador. El Impressum identifica a la vendedora privada Gabriella Vesovic, Jedleseer Straße 89/36/11, 1210 Wien, `artwithgab@gmail.com`, +43 676 3347163. La política de privacidad identifica a AWS, Cloudflare y Brevo entre los proveedores. Las revisiones pendientes están en [el backlog](tasks/todo.md).
 
-## Servidor MCP (2026-11-22, rama `claude/mcp-server-prototype-c0ceba`)
+## Servidor MCP (desplegado 2026-11-22)
 
-Conector personalizado de claude.ai para manejar AWG por chat (plan Max, sin costo de API): paquete `mcp` del backend, `/mcp` sin estado, OAuth 2.1 con PKCE contra las cuentas staff, 7 herramientas de lectura y 2 de escritura con `confirm=true`; apagado salvo `MCP_ENABLED=true`. El token del conector es una sesión con `audience = mcp` (V19) que solo abre `/mcp`. **Decisión del dueño: entra en la próxima subida; Claude avisa y, ya desplegado, lo prueba en claude.ai y se lo muestra** (ver `tasks/mcp-server-plan-2026-11-22.md` y `tasks/audit-results/mcp-security-2026-11-22.md`).
+Conector personalizado de claude.ai para manejar AWG por chat (plan Max, sin costo de API): paquete `mcp` del backend, `/mcp` sin estado, OAuth 2.1 con PKCE contra las cuentas staff, 7 herramientas de lectura y 2 de escritura con `confirm=true`; apagado salvo `MCP_ENABLED=true`. El token del conector es una sesión con `audience = mcp` (V19) que solo abre `/mcp`. En producción y conectado en el claude.ai del dueño; solo entran los correos de `MCP_ALLOWED_EMAILS`. Antes de cualquier rollback, borrar las sesiones `audience = mcp` (ver `tasks/mcp-server-plan-2026-11-22.md` y `tasks/audit-results/mcp-security-2026-11-22.md`).
 
 ## Panel de agentes
 
