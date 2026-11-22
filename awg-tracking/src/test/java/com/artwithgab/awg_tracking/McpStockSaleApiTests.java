@@ -24,7 +24,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "awg.mcp.enabled=true",
         "awg.mcp.public-url=https://awg.test",
         "awg.mcp.allowed-redirect-uris=https://claude.ai/api/mcp/auth_callback",
-        "awg.mcp.allowed-emails=gaby@artwithgab.com"
+        "awg.mcp.allowed-emails=gaby@artwithgab.com",
+        // Own in-memory database: a second Spring context must not recreate the schema the shared "awg" tests use.
+        "spring.datasource.url=jdbc:h2:mem:awgMcpStock;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1"
 })
 @org.springframework.test.context.event.RecordApplicationEvents
 class McpStockSaleApiTests extends ApiTestSupport {
