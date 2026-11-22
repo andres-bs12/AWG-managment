@@ -44,8 +44,9 @@ import java.util.function.Function;
 /**
  * The MCP tools. Each one calls an existing service, exactly as the staff REST controllers do, so
  * business rules and error messages stay in one place. Read tools are side-effect free; write
- * tools only act with {@code confirm=true} and otherwise return a preview. No payments,
- * cancellations or deletions are exposed.
+ * tools only act with {@code confirm=true} and otherwise return a preview. No payments or
+ * cancellations are exposed; the only deletion is a market day, which the service refuses while
+ * the day has orders, sales, pickups or painting.
  */
 @Slf4j
 @Component
@@ -144,7 +145,15 @@ public class McpTools {
                                 "openHour", Map.of("type", "number", "description", "Opening hour, e.g. 11 or 10.5"),
                                 "closeHour", Map.of("type", "number", "description", "Closing hour, e.g. 20"),
                                 "confirm", confirmSchema()), List.of("marketId", "date", "openHour", "closeHour")),
-                        this::addMarketDay));
+                        this::addMarketDay),
+                destructive("delete_market_day", "Delete market day",
+                        "Removes one opening day from a stall market (use list_markets for the id). The app refuses when that day has orders, sales, pickups or painting, so only empty days can go. "
+                                + "Without confirm=true it only returns a preview; call again with confirm=true after the owner agrees.",
+                        schema(Map.of(
+                                "marketId", str("Market UUID from list_markets"),
+                                "date", str("YYYY-MM-DD of the day to remove"),
+                                "confirm", confirmSchema()), List.of("marketId", "date")),
+                        this::deleteMarketDay));
     }
 
     // ---- read tools ----------------------------------------------------------------------
@@ -262,6 +271,38 @@ public class McpTools {
         return done("Added. " + summary, saved);
     }
 
+    private McpSchema.CallToolResult deleteMarketDay(Map<String, Object> a, StaffUser user) {
+        UUID marketId = uuid(requiredString(a, "marketId"), "marketId");
+        LocalDate date = requiredDate(a, "date");
+        MarketDto market = marketService.listMarkets().stream().filter(m -> m.id().equals(marketId.toString())).findFirst()
+                .orElseThrow(() -> new ToolInputException("Market not found. Use list_markets for the id."));
+        if (market.startDate() == null || market.finishDate() == null) {
+            throw new ToolInputException("Only days of stall markets can be deleted here; home painting days are managed in the app.");
+        }
+        List<MarketDayDto> days = marketService.listMarketDays(marketId);
+        MarketDayDto day = days.stream().filter(d -> LocalDate.parse(d.date()).equals(date)).findFirst()
+                .orElseThrow(() -> new ToolInputException(market.name() + " does not open on " + CalendarRules.label(date) + "."));
+
+        String summary = "Delete " + CalendarRules.label(date) + " " + hours(day.openHour()) + "–" + hours(day.closeHour())
+                + " from " + market.name() + " (stall " + market.stall() + ").";
+        List<String> warnings = new ArrayList<>();
+        warnings.add("The app refuses if that day has orders, sales, pickups or painting; nothing is lost in that case.");
+        if (days.size() == 1) warnings.add("It is the market's only day: the market stays, with no opening days.");
+        if (date.isBefore(LocalDate.now(clock.withZone(zone)))) warnings.add("The day is in the past.");
+        if (!isConfirmed(a)) return preview(summary, warnings);
+
+        // Re-resolve the day under the schedule lock, so a concurrent edit cannot change what is deleted.
+        transactions.executeWithoutResult(status -> {
+            calendarService.lockSchedule();
+            MarketDayDto current = marketService.listMarketDays(marketId).stream()
+                    .filter(d -> LocalDate.parse(d.date()).equals(date)).findFirst()
+                    .orElseThrow(() -> new ToolInputException(market.name() + " does not open on " + CalendarRules.label(date) + "."));
+            marketService.deleteMarketDay(UUID.fromString(current.id()));
+        });
+        log.info("MCP delete_market_day by staff user {}: market {} day {}", user.getId(), marketId, date);
+        return McpSchema.CallToolResult.builder().addTextContent("Deleted. " + summary).build();
+    }
+
     private record AddDayPlan(MarketDto market, SaveMarketRequest request, List<String> notes) {}
 
     /** The market's current days plus the new one, widening the season to include it. */
@@ -357,6 +398,15 @@ public class McpTools {
     @FunctionalInterface
     private interface WriteHandler {
         McpSchema.CallToolResult apply(Map<String, Object> args, StaffUser user);
+    }
+
+    private SyncToolSpecification destructive(String name, String title, String description, Map<String, Object> inputSchema,
+                                              WriteHandler handler) {
+        McpSchema.Tool tool = McpSchema.Tool.builder().name(name).title(title).description(description)
+                .inputSchema(inputSchema)
+                .annotations(new McpSchema.ToolAnnotations(title, false, true, true, false, null))
+                .build();
+        return new SyncToolSpecification(tool, (ctx, req) -> run(name, () -> handler.apply(args(req), currentStaff())));
     }
 
     private SyncToolSpecification write(String name, String title, String description, Map<String, Object> inputSchema,
