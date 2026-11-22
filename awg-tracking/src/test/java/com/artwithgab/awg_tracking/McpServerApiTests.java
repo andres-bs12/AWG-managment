@@ -74,6 +74,7 @@ class McpServerApiTests extends ApiTestSupport {
         String code = authorize(clientId, PASSWORD);
         String token = exchange(clientId, code, VERIFIER).andExpect(status().isOk())
                 .andExpect(jsonPath("$.token_type").value("Bearer"))
+                .andExpect(jsonPath("$.expires_in").value(7 * 24 * 3600))
                 .andReturn().getResponse().getContentAsString();
         String accessToken = JsonPath.read(token, "$.access_token");
 
@@ -296,6 +297,22 @@ class McpServerApiTests extends ApiTestSupport {
                 "days", List.of(Map.of("date", "2027-01-02", "openHour", 12, "closeHour", 18)))));
         assertThat((Boolean) JsonPath.read(result, "$.result.isError")).isTrue();
         assertThat(result).contains("at most 120 days");
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.artwithgab.awg_tracking.repository.StaffSessionRepository sessions;
+
+    @Test
+    void connectorSessionSurvivesAMarketWeekendIdle() throws Exception {
+        String token = mcpToken();
+        login();
+        var now = java.time.Instant.parse("2026-11-24T08:00:00Z");
+        var byAudience = sessions.findAll().stream().collect(java.util.stream.Collectors.groupingBy(
+                com.artwithgab.awg_tracking.model.StaffSession::getAudience,
+                java.util.stream.Collectors.mapping(com.artwithgab.awg_tracking.model.StaffSession::getExpiresAt, java.util.stream.Collectors.toList())));
+        assertThat(byAudience.get("mcp")).contains(now.plus(java.time.Duration.ofDays(7)));
+        assertThat(byAudience.get("app")).allMatch(e -> !e.isAfter(now.plus(java.time.Duration.ofHours(12))));
+        assertThat(token).isNotBlank();
     }
 
     // ---- helpers -------------------------------------------------------------------------

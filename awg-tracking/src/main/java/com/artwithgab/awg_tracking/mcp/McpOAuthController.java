@@ -1,6 +1,5 @@
 package com.artwithgab.awg_tracking.mcp;
 
-import com.artwithgab.awg_tracking.config.AwgProperties;
 import com.artwithgab.awg_tracking.model.StaffSession;
 import com.artwithgab.awg_tracking.model.StaffUser;
 import com.artwithgab.awg_tracking.exception.UnauthorizedException;
@@ -44,16 +43,14 @@ import java.util.Map;
 @ConditionalOnProperty(prefix = "awg.mcp", name = "enabled", havingValue = "true")
 public class McpOAuthController {
     private final McpProperties mcp;
-    private final AwgProperties props;
     private final AuthService authService;
     private final RateLimiter rateLimiter;
     private final AuthorizationCodeStore codes;
     private final Clock clock;
 
-    public McpOAuthController(McpProperties mcp, AwgProperties props, AuthService authService, RateLimiter rateLimiter,
+    public McpOAuthController(McpProperties mcp, AuthService authService, RateLimiter rateLimiter,
                               AuthorizationCodeStore codes, Clock clock) {
         this.mcp = mcp;
-        this.props = props;
         this.authService = authService;
         this.rateLimiter = rateLimiter;
         this.codes = codes;
@@ -190,7 +187,7 @@ public class McpOAuthController {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("access_token", accessToken);
         body.put("token_type", "Bearer");
-        body.put("expires_in", props.session().ttl().toSeconds());
+        body.put("expires_in", authService.idleTtl(StaffSession.MCP).toSeconds());
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("Pragma", "no-cache").body(body);
     }
 

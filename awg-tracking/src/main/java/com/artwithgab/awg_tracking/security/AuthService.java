@@ -75,7 +75,7 @@ public class AuthService {
         session.setAudience(audience);
         Instant now = clock.instant();
         session.setCreatedAt(now);
-        session.setExpiresAt(now.plus(props.session().ttl()));
+        session.setExpiresAt(now.plus(idleTtl(audience)));
         sessionRepository.save(session);
         return token;
     }
@@ -121,9 +121,9 @@ public class AuthService {
                 .filter(s -> s.getExpiresAt().isAfter(now))
                 .filter(s -> audience.equals(s.getAudience()))
                 .map(s -> {
-                    java.time.Duration ttl = props.session().ttl();
+                    java.time.Duration ttl = idleTtl(s.getAudience());
                     Instant renewed = now.plus(ttl);
-                    Instant cap = s.getCreatedAt().plus(MAX_SESSION_LIFETIME);
+                    Instant cap = s.getCreatedAt().plus(maxLifetime(s.getAudience()));
                     if (s.getExpiresAt().isBefore(now.plus(ttl.dividedBy(2))) && s.getExpiresAt().isBefore(cap)) {
                         s.setExpiresAt(renewed.isAfter(cap) ? cap : renewed);
                     }
@@ -132,6 +132,22 @@ public class AuthService {
     }
 
     static final java.time.Duration MAX_SESSION_LIFETIME = java.time.Duration.ofDays(7);
+
+    /**
+     * The Claude connector cannot refresh tokens yet, and a 12-hour idle limit would sign the owner
+     * out every night of a market weekend. Its sessions only open /mcp (read tools and market
+     * creation), so they may idle for a week and live for the whole season (30 days).
+     */
+    static final java.time.Duration MCP_IDLE_TTL = java.time.Duration.ofDays(7);
+    static final java.time.Duration MCP_MAX_LIFETIME = java.time.Duration.ofDays(30);
+
+    public java.time.Duration idleTtl(String audience) {
+        return StaffSession.MCP.equals(audience) ? MCP_IDLE_TTL : props.session().ttl();
+    }
+
+    private static java.time.Duration maxLifetime(String audience) {
+        return StaffSession.MCP.equals(audience) ? MCP_MAX_LIFETIME : MAX_SESSION_LIFETIME;
+    }
 
     @Transactional
     public void logout(String token) {
