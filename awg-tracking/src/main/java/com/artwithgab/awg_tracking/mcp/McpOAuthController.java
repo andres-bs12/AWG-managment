@@ -1,7 +1,8 @@
 package com.artwithgab.awg_tracking.mcp;
 
 import com.artwithgab.awg_tracking.config.AwgProperties;
-import com.artwithgab.awg_tracking.dto.auth.AuthResponse;
+import com.artwithgab.awg_tracking.model.StaffSession;
+import com.artwithgab.awg_tracking.model.StaffUser;
 import com.artwithgab.awg_tracking.exception.UnauthorizedException;
 import com.artwithgab.awg_tracking.security.AuthService;
 import com.artwithgab.awg_tracking.security.RateLimiter;
@@ -32,8 +33,9 @@ import java.util.Map;
  * allow-list of redirect URIs, authorization code + PKCE S256 with a staff e-mail/password page,
  * and a token endpoint for public clients.
  * <p>
- * The access token is an ordinary opaque staff session from {@link AuthService#login}, so the
- * existing {@code BearerTokenFilter}, expiry, sliding renewal and logout all apply unchanged.
+ * The access token is an opaque staff session with audience {@code mcp}, created only when the code
+ * is redeemed. It reuses the session table, expiry, sliding renewal and logout, but it opens /mcp
+ * only: the staff API ({@code /api/**}) rejects it.
  * Because redirect URIs are allow-listed and PKCE binds each code to the client that started the
  * flow, client registration is stateless (the issued client_id is not stored).
  */
@@ -122,6 +124,8 @@ public class McpOAuthController {
     public ResponseEntity<String> authorize(@RequestParam Map<String, String> params, HttpServletRequest request) {
         String problem = invalidAuthorizeRequest(params);
         if (problem != null) return page(HttpStatus.BAD_REQUEST, errorPage(problem));
+        // The form only posts to itself: refuse cross-site posts (login CSRF, burning the staff login limit).
+        if (isCrossSite(request)) return page(HttpStatus.FORBIDDEN, errorPage("Open the sign-in page from Claude again."));
 
         String email = params.getOrDefault("email", "").trim();
         String password = params.getOrDefault("password", "");
@@ -133,19 +137,29 @@ public class McpOAuthController {
         String account = email.toLowerCase(Locale.ROOT);
         String failureBucket = "login-failed|" + account;
         rateLimiter.requireBelow(failureBucket, request.getRemoteAddr(), 20);
-        AuthResponse session;
+        StaffUser user;
         try {
-            session = authService.login(email, password);
+            user = authService.verifyCredentials(email, password);
         } catch (UnauthorizedException e) {
             rateLimiter.record(failureBucket, request.getRemoteAddr());
+            if (rateLimiter.record("login-failed-account", account) == 200) {
+                log.warn("Staff account failed-login warning threshold reached (200/minute).");
+            }
             return page(HttpStatus.UNAUTHORIZED, loginPage(params, "Wrong e-mail or password."));
         }
-        String code = codes.issue(params.get("client_id"), params.get("redirect_uri"), params.get("code_challenge"), session.token());
-        log.info("MCP connector authorized for staff user {}", session.user().id());
-        UriComponentsBuilder redirect = UriComponentsBuilder.fromUriString(params.get("redirect_uri")).queryParam("code", code);
-        if (params.get("state") != null) redirect.queryParam("state", params.get("state"));
+        String resource = params.get("resource") == null || params.get("resource").isBlank() ? null : mcp.resource();
+        String code = codes.issue(params.get("client_id"), params.get("redirect_uri"), params.get("code_challenge"), resource, user.getId());
+        log.info("MCP connector authorized for staff user {}", user.getId());
+        // Values go through template variables so they are fully percent-encoded ('&' and '=' in state included).
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("code", code);
+        UriComponentsBuilder redirect = UriComponentsBuilder.fromUriString(params.get("redirect_uri")).queryParam("code", "{code}");
+        if (params.get("state") != null) {
+            redirect.queryParam("state", "{state}");
+            values.put("state", params.get("state"));
+        }
         return ResponseEntity.status(HttpStatus.FOUND)
-                .header("Location", redirect.encode().build().toUriString())
+                .header("Location", redirect.encode().buildAndExpand(values).toUriString())
                 .cacheControl(CacheControl.noStore()).build();
     }
 
@@ -162,13 +176,19 @@ public class McpOAuthController {
                 || !grant.clientId().equals(params.get("client_id"))
                 || !grant.redirectUri().equals(params.get("redirect_uri"))
                 || !AuthorizationCodeStore.verifierMatches(params.get("code_verifier"), grant.codeChallenge())
-                || !resourceMatches(params.get("resource"))) {
-            // A redeemed-but-rejected code leaves an unused staff session; it expires with the normal TTL.
-            if (grant != null) authService.logout(grant.accessToken());
+                || !resourceMatches(params.get("resource"))
+                // RFC 8707: a code requested for this resource must be redeemed for it too.
+                || (grant.resource() != null && (params.get("resource") == null || params.get("resource").isBlank()))) {
+            return oauthError(HttpStatus.BAD_REQUEST, "invalid_grant", "The authorization code is invalid or expired");
+        }
+        String accessToken;
+        try {
+            accessToken = authService.createSession(grant.staffUserId(), StaffSession.MCP);
+        } catch (UnauthorizedException e) {
             return oauthError(HttpStatus.BAD_REQUEST, "invalid_grant", "The authorization code is invalid or expired");
         }
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("access_token", grant.accessToken());
+        body.put("access_token", accessToken);
         body.put("token_type", "Bearer");
         body.put("expires_in", props.session().ttl().toSeconds());
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("Pragma", "no-cache").body(body);
@@ -189,6 +209,22 @@ public class McpOAuthController {
         if (p.get("state") != null && p.get("state").length() > 500) return "state is too long.";
         if (!resourceMatches(p.get("resource"))) return "Unknown resource.";
         return null;
+    }
+
+    /**
+     * Browsers send Origin on form posts and Sec-Fetch-Site on modern engines; either one naming
+     * another site means the post did not come from our own sign-in page.
+     */
+    private boolean isCrossSite(HttpServletRequest request) {
+        String fetchSite = request.getHeader("Sec-Fetch-Site");
+        if (fetchSite != null && !fetchSite.equals("same-origin") && !fetchSite.equals("none")) return true;
+        String origin = request.getHeader("Origin");
+        return origin != null && !origin.equals("null") && !origin.equalsIgnoreCase(originOf(mcp.publicUrl()));
+    }
+
+    private static String originOf(String url) {
+        java.net.URI uri = java.net.URI.create(url);
+        return uri.getScheme() + "://" + uri.getAuthority();
     }
 
     /** RFC 8707: the resource is optional, but when sent it must be this server's MCP endpoint. */

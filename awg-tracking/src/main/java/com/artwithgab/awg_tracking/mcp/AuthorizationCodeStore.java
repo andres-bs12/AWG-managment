@@ -14,12 +14,14 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Short-lived, single-use OAuth authorization codes (RFC 6749 §4.1.2 with PKCE, RFC 7636).
  * Kept in memory: a code lives two minutes and the backend runs as one instance, so a restart only
- * means the owner clicks "Connect" again. Codes are stored hashed.
+ * means the owner clicks "Connect" again. Codes are stored hashed, and the staff session is only
+ * created when a code is redeemed, so an abandoned login never leaves a live session behind.
  */
 @Component
 @ConditionalOnProperty(prefix = "awg.mcp", name = "enabled", havingValue = "true")
@@ -27,8 +29,9 @@ public class AuthorizationCodeStore {
     static final Duration CODE_TTL = Duration.ofMinutes(2);
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    /** What the token endpoint needs to redeem a code; {@code accessToken} is an opaque staff session token. */
-    public record Grant(String clientId, String redirectUri, String codeChallenge, String accessToken, Instant expiresAt) {}
+    /** What the token endpoint needs to redeem a code. {@code resource} is null when the client sent none. */
+    public record Grant(String clientId, String redirectUri, String codeChallenge, String resource, UUID staffUserId,
+                        Instant expiresAt) {}
 
     private final Map<String, Grant> grants = new ConcurrentHashMap<>();
     private final Clock clock;
@@ -37,10 +40,10 @@ public class AuthorizationCodeStore {
         this.clock = clock;
     }
 
-    public String issue(String clientId, String redirectUri, String codeChallenge, String accessToken) {
+    public String issue(String clientId, String redirectUri, String codeChallenge, String resource, UUID staffUserId) {
         purgeExpired();
         String code = randomToken();
-        grants.put(hash(code), new Grant(clientId, redirectUri, codeChallenge, accessToken, clock.instant().plus(CODE_TTL)));
+        grants.put(hash(code), new Grant(clientId, redirectUri, codeChallenge, resource, staffUserId, clock.instant().plus(CODE_TTL)));
         return code;
     }
 

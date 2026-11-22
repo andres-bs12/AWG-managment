@@ -30,4 +30,11 @@ public class StaffSession {
 
     @Column(nullable = false)
     private Instant expiresAt;
+
+    /** {@link #APP} for the staff web app, {@link #MCP} for the Claude connector (only valid on /mcp). */
+    @Column(nullable = false, length = 8)
+    private String audience = APP;
+
+    public static final String APP = "app";
+    public static final String MCP = "mcp";
 }

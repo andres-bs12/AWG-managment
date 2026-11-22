@@ -53,8 +53,10 @@ import java.util.function.Function;
 public class McpTools {
     /** Capability tokens, photo payloads and bulky calendar copies never leave through the connector. */
     private static final Set<String> HIDDEN_FIELDS = Set.of("trackToken", "formToken", "photos", "photoUrl",
-            "hasUploadedPhoto", "markets", "marketDays", "itemIds", "customerId");
+            "dataUrl", "hasUploadedPhoto", "markets", "marketDays", "itemIds", "customerId");
 
+    private static final Set<String> AGENDA_HIDDEN_FIELDS = Set.of("email", "address", "addressLabel");
+    private static final int MAX_SEASON_DAYS = 120;
     private static final Map<Character, String> STOCK_COLORS = Map.of('R', "red", 'W', "wine", 'G', "green", 'C', "beige");
     private static final Map<Character, String> STOCK_FINISHES = Map.of('S', "shiny", 'M', "matte");
 
@@ -200,7 +202,10 @@ public class McpTools {
     private Object withDate(Map<String, Object> a, Object agendaDay) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("date", optionalDate(a, "date").toString());
-        out.put("day", agendaDay);
+        JsonNode day = json.valueToTree(agendaDay);
+        // A day lists many customers; contact details and street addresses stay in get_order.
+        prune(day, AGENDA_HIDDEN_FIELDS);
+        out.put("day", day);
         return out;
     }
 
@@ -278,6 +283,10 @@ public class McpTools {
     private List<String> precheck(SaveMarketRequest r) {
         List<String> problems = new ArrayList<>();
         if (r.finishDate().isBefore(r.startDate())) problems.add("Season end must be on or after the start.");
+        if (r.startDate().plusDays(MAX_SEASON_DAYS).isBefore(r.finishDate())) {
+            // Also keeps the day-by-day checks below bounded.
+            throw new ToolInputException("A season can last at most " + MAX_SEASON_DAYS + " days.");
+        }
         if (r.stall() == null || r.stall() < 1) problems.add("Stall number must be 1 or more.");
         if (r.totalCost() != null && r.totalCost().signum() < 0) problems.add("Season cost must be zero or more.");
         Set<LocalDate> allowed = new HashSet<>(CalendarRules.marketPickupDates(r.startDate(), r.finishDate()));
@@ -360,16 +369,16 @@ public class McpTools {
 
     private String toJson(Object value) {
         JsonNode tree = json.valueToTree(value);
-        prune(tree);
+        prune(tree, HIDDEN_FIELDS);
         return json.writeValueAsString(tree);
     }
 
-    private static void prune(JsonNode node) {
+    private static void prune(JsonNode node, Set<String> hidden) {
         if (node instanceof ObjectNode object) {
-            object.remove(HIDDEN_FIELDS);
-            object.forEach(McpTools::prune);
+            object.remove(hidden);
+            object.forEach(child -> prune(child, hidden));
         } else if (node != null && node.isArray()) {
-            node.forEach(McpTools::prune);
+            node.forEach(child -> prune(child, hidden));
         }
     }
 

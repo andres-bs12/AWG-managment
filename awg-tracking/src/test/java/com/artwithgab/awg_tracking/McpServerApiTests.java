@@ -139,9 +139,10 @@ class McpServerApiTests extends ApiTestSupport {
 
     @Test
     void searchAndGetOrderHideCapabilityTokens() throws Exception {
-        String token = login();
-        String orderId = saleOk(token, customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0));
-        String code = JsonPath.read(mvc.perform(get("/api/orders/" + orderId).header("Authorization", bearer(token)))
+        String app = login();
+        String token = mcpToken();
+        String orderId = saleOk(app, customItem(false, TUE, 10.0, 11.0, "market", dayId(app, SAT), 14.0));
+        String code = JsonPath.read(mvc.perform(get("/api/orders/" + orderId).header("Authorization", bearer(app)))
                 .andReturn().getResponse().getContentAsString(), "$.code");
 
         String found = toolText(token, "search_orders", Map.of("query", code));
@@ -154,7 +155,7 @@ class McpServerApiTests extends ApiTestSupport {
 
     @Test
     void marketStockFiltersByColourDecodedFromTheId() throws Exception {
-        String token = login();
+        String token = mcpToken();
         String red = readyMarketPiece(); // RS..., red shiny, painted
         String reds = toolText(token, "list_market_stock", Map.of("color", "red", "status", "painted"));
         assertThat(reds).contains(red);
@@ -168,10 +169,10 @@ class McpServerApiTests extends ApiTestSupport {
 
     @Test
     void agendaInventoryMarketsAndAttentionAnswer() throws Exception {
-        String token = login();
+        String token = mcpToken();
         String agenda = toolText(token, "get_agenda_day", Map.of("date", SAT));
         assertThat((String) JsonPath.read(agenda, "$.date")).isEqualTo(SAT);
-        assertThat(agenda).doesNotContain("\"marketDays\"");
+        assertThat(agenda).doesNotContain("\"marketDays\"").doesNotContain("\"email\"");
 
         String today = toolText(token, "get_agenda_day", Map.of());
         assertThat((String) JsonPath.read(today, "$.date")).isEqualTo(TUE);
@@ -186,7 +187,7 @@ class McpServerApiTests extends ApiTestSupport {
 
     @Test
     void createMarketOnlySavesWithConfirm() throws Exception {
-        String token = login();
+        String token = mcpToken();
         Map<String, Object> args = new LinkedHashMap<>(Map.of("name", "Spittelberg", "startDate", "2026-12-04",
                 "finishDate", "2026-12-06", "stall", 7, "totalCost", 300,
                 "days", List.of(Map.of("date", "2026-12-06", "openHour", 11, "closeHour", 20))));
@@ -202,7 +203,7 @@ class McpServerApiTests extends ApiTestSupport {
 
     @Test
     void createMarketOnAMondayReturnsTheServiceError() throws Exception {
-        String token = login();
+        String token = mcpToken();
         Map<String, Object> args = Map.of("name", "Montag", "startDate", "2027-01-01", "finishDate", "2027-01-10",
                 "stall", 3, "days", List.of(Map.of("date", "2027-01-04", "openHour", 12, "closeHour", 18)), "confirm", true);
         String result = mcp(token, "tools/call", Map.of("name", "create_market", "arguments", args));
@@ -212,7 +213,7 @@ class McpServerApiTests extends ApiTestSupport {
 
     @Test
     void addMarketDayExtendsTheSeasonAfterConfirm() throws Exception {
-        String token = login();
+        String token = mcpToken();
         Map<String, Object> created = new LinkedHashMap<>(Map.of("name", "Am Hof", "startDate", "2027-01-01",
                 "finishDate", "2027-01-03", "stall", 2,
                 "days", List.of(Map.of("date", "2027-01-02", "openHour", 12, "closeHour", 18)), "confirm", true));
@@ -230,7 +231,83 @@ class McpServerApiTests extends ApiTestSupport {
         assertThat(dates).containsExactlyInAnyOrder("2027-01-02", "2027-01-09");
     }
 
+    // ---- audit fixes (2026-11-22 cross-model security review) ---------------------------
+
+    @Test
+    void connectorAndAppTokensDoNotCross() throws Exception {
+        String app = login();
+        mvc.perform(post("/mcp").header("Authorization", bearer(app)).contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM).content(rpc("tools/list", Map.of())))
+                .andExpect(status().isUnauthorized());
+        String connector = mcpToken();
+        mvc.perform(get("/api/orders/attention").header("Authorization", bearer(connector)))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/staff/password").header("Authorization", bearer(connector)).contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("currentPassword", PASSWORD, "newPassword", "another-long-password"))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void stateIsFullyEncodedInTheRedirect() throws Exception {
+        String clientId = register();
+        Map<String, String> form = authorizeParams(clientId);
+        form.put("state", "a&injected=1 x");
+        form.put("email", "gaby@artwithgab.com");
+        form.put("password", PASSWORD);
+        String location = mvc.perform(withIp(post("/oauth/authorize")).contentType(MediaType.APPLICATION_FORM_URLENCODED).params(toParams(form)))
+                .andExpect(status().isFound()).andReturn().getResponse().getHeader("Location");
+        var query = UriComponentsBuilder.fromUriString(location).build().getQueryParams();
+        assertThat(query.containsKey("injected")).isFalse();
+        assertThat(java.net.URLDecoder.decode(query.getFirst("state"), StandardCharsets.UTF_8)).isEqualTo("a&injected=1 x");
+    }
+
+    @Test
+    void crossSiteLoginPostsAreRefused() throws Exception {
+        String clientId = register();
+        Map<String, String> form = authorizeParams(clientId);
+        form.put("email", "gaby@artwithgab.com");
+        form.put("password", PASSWORD);
+        mvc.perform(withIp(post("/oauth/authorize")).header("Sec-Fetch-Site", "cross-site")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED).params(toParams(form)))
+                .andExpect(status().isForbidden()).andExpect(header().doesNotExist("Location"));
+        mvc.perform(withIp(post("/oauth/authorize")).header("Origin", "https://evil.example")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED).params(toParams(form)))
+                .andExpect(status().isForbidden());
+        mvc.perform(withIp(post("/oauth/authorize")).header("Origin", "https://awg.test").header("Sec-Fetch-Site", "same-origin")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED).params(toParams(form)))
+                .andExpect(status().isFound());
+    }
+
+    @Test
+    void codeRequestedForTheResourceMustBeRedeemedForIt() throws Exception {
+        String clientId = register();
+        String code = authorize(clientId, PASSWORD);
+        mvc.perform(withIp(post("/oauth/token")).contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("grant_type", "authorization_code").param("code", code).param("client_id", clientId)
+                        .param("redirect_uri", CALLBACK).param("code_verifier", VERIFIER))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("invalid_grant"));
+    }
+
+    @Test
+    void overlongSeasonIsRefusedBeforeAnyWork() throws Exception {
+        String token = mcpToken();
+        String result = mcp(token, "tools/call", Map.of("name", "create_market", "arguments", Map.of("name", "Forever",
+                "startDate", "2027-01-01", "finishDate", "9999-12-31", "stall", 1,
+                "days", List.of(Map.of("date", "2027-01-02", "openHour", 12, "closeHour", 18)))));
+        assertThat((Boolean) JsonPath.read(result, "$.result.isError")).isTrue();
+        assertThat(result).contains("at most 120 days");
+    }
+
     // ---- helpers -------------------------------------------------------------------------
+
+    /** Runs the whole connector OAuth flow and returns an MCP access token. */
+    private String mcpToken() throws Exception {
+        String clientId = register();
+        String code = authorize(clientId, PASSWORD);
+        return JsonPath.read(exchange(clientId, code, VERIFIER).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(), "$.access_token");
+    }
+
 
     private String register() throws Exception {
         MvcResult res = mvc.perform(withIp(post("/oauth/register")).contentType(MediaType.APPLICATION_JSON)

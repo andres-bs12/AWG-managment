@@ -1,5 +1,6 @@
 package com.artwithgab.awg_tracking.mcp;
 
+import com.artwithgab.awg_tracking.model.StaffSession;
 import com.artwithgab.awg_tracking.security.AuthService;
 import com.artwithgab.awg_tracking.security.BearerTokenFilter;
 import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
@@ -67,7 +68,8 @@ public class McpServerConfig {
     }
 
     /**
-     * Ordered before the main API chain. /mcp needs a staff bearer token; a missing or expired one
+     * Ordered before the main API chain. /mcp needs a connector session (audience mcp; staff app
+     * tokens are refused here, and connector tokens are refused by /api/**); a missing or expired one
      * gets 401 with the RFC 9728 pointer so claude.ai can start the OAuth flow.
      */
     @Bean
@@ -99,7 +101,7 @@ public class McpServerConfig {
                             res.getWriter().write("{\"error\":\"invalid_token\",\"error_description\":\"Sign in to ArtWithGab.\"}");
                         })
                         .accessDeniedHandler((req, res, ex) -> res.sendError(403)))
-                .addFilterBefore(new BearerTokenFilter(authService), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new BearerTokenFilter(authService, StaffSession.MCP), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

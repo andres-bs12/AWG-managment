@@ -120,6 +120,10 @@ Scripts disponibles en `frontend/package.json`: `dev`, `build`, `build:mock`, `l
 - En ambos formularios la barra de acciones va al final del contenido. La franja de varias Kugeln es sticky en móvil al bajar por el editor. Diseño y copy en [el sistema público](docs/design-system.md) y [las reglas aprendidas](docs/reglas-aprendidas.md).
 - `/impressum`, `/agb` y `/datenschutz` publican los textos sin aviso de borrador. El Impressum identifica a la vendedora privada Gabriella Vesovic, Jedleseer Straße 89/36/11, 1210 Wien, `artwithgab@gmail.com`, +43 676 3347163. La política de privacidad identifica a AWS, Cloudflare y Brevo entre los proveedores. Las revisiones pendientes están en [el backlog](tasks/todo.md).
 
+## Servidor MCP (2026-11-22, rama `claude/mcp-server-prototype-c0ceba`)
+
+Conector personalizado de claude.ai para manejar AWG por chat (plan Max, sin costo de API): paquete `mcp` del backend, `/mcp` sin estado, OAuth 2.1 con PKCE contra las cuentas staff, 7 herramientas de lectura y 2 de escritura con `confirm=true`; apagado salvo `MCP_ENABLED=true`. El token del conector es una sesión con `audience = mcp` (V19) que solo abre `/mcp`. **Decisión del dueño: entra en la próxima subida; Claude avisa y, ya desplegado, lo prueba en claude.ai y se lo muestra** (ver `tasks/mcp-server-plan-2026-11-22.md` y `tasks/audit-results/mcp-security-2026-11-22.md`).
+
 ## Panel de agentes
 
 `scripts/agents/` muestra agentes, uso y horas de reinicio de cuota, último cambio de archivo y la cola «Pendiente». Gestionar la cola con `node scripts/agents/agent-run.mjs pending add|done|list`. Registrar los chats y agentes con `agent-run.mjs run` o `start`/`finish`, y refrescar el uso de Claude al inicio. El panel local usa `localhost:4747` y el estado compartido de `~/.awg-agents/`. Detalles en [agent-routing.md](docs/agent-routing.md).
