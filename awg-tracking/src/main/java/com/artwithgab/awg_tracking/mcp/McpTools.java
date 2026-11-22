@@ -55,7 +55,8 @@ public class McpTools {
     private static final Set<String> HIDDEN_FIELDS = Set.of("trackToken", "formToken", "photos", "photoUrl",
             "dataUrl", "hasUploadedPhoto", "markets", "marketDays", "itemIds", "customerId");
 
-    private static final Set<String> AGENDA_HIDDEN_FIELDS = Set.of("email", "address", "addressLabel");
+    /** Contact data only leaves through get_customer_contact, one order at a time. */
+    private static final Set<String> CONTACT_FIELDS = Set.of("phone", "email", "address", "addressLabel");
     private static final int MAX_SEASON_DAYS = 120;
     private static final Map<Character, String> STOCK_COLORS = Map.of('R', "red", 'W', "wine", 'G', "green", 'C', "beige");
     private static final Map<Character, String> STOCK_FINISHES = Map.of('S', "shiny", 'M', "matte");
@@ -66,12 +67,18 @@ public class McpTools {
     private final MarketStockService marketStockService;
     private final InventoryService inventoryService;
     private final JsonMapper json;
+    private final com.artwithgab.awg_tracking.service.CalendarService calendarService;
+    private final org.springframework.transaction.support.TransactionTemplate transactions;
     private final Clock clock;
     private final ZoneId zone;
 
     public McpTools(OrderService orderService, AgendaService agendaService, MarketService marketService,
                     MarketStockService marketStockService, InventoryService inventoryService, JsonMapper json,
+                    com.artwithgab.awg_tracking.service.CalendarService calendarService,
+                    org.springframework.transaction.support.TransactionTemplate transactions,
                     Clock clock, com.artwithgab.awg_tracking.config.AwgProperties props) {
+        this.calendarService = calendarService;
+        this.transactions = transactions;
         this.orderService = orderService;
         this.agendaService = agendaService;
         this.marketService = marketService;
@@ -92,6 +99,9 @@ public class McpTools {
                         "Full order by code (e.g. 'K7Q2ZX') or id: customer, items with colour, finish, name, production and handover, painting blocks and payments.",
                         schema(Map.of("code", str("Order code"), "id", str("Order UUID")), List.of()),
                         this::getOrder),
+                contact("get_customer_contact", "Customer contact",
+                        "Phone, e-mail and shipping address of the customer of ONE order (by code). Use only when the owner asks how to reach or ship to that customer; other tools never return contact data.",
+                        schema(Map.of("code", str("Order code")), List.of("code"))),
                 read("get_agenda_day", "Agenda of a day",
                         "Painting sessions and pickups/shipments for one day, plus which market is open and where Gaby paints. Defaults to today (Europe/Vienna).",
                         schema(Map.of("date", str("YYYY-MM-DD; omit for today")), List.of()),
@@ -202,10 +212,7 @@ public class McpTools {
     private Object withDate(Map<String, Object> a, Object agendaDay) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("date", optionalDate(a, "date").toString());
-        JsonNode day = json.valueToTree(agendaDay);
-        // A day lists many customers; contact details and street addresses stay in get_order.
-        prune(day, AGENDA_HIDDEN_FIELDS);
-        out.put("day", day);
+        out.put("day", agendaDay);
         return out;
     }
 
@@ -240,6 +247,25 @@ public class McpTools {
         LocalDate date = requiredDate(a, "date");
         double open = requiredNumber(a, "openHour");
         double close = requiredNumber(a, "closeHour");
+        AddDayPlan plan = planAddDay(marketId, date, open, close);
+        List<String> warnings = precheck(plan.request());
+        warnings.addAll(0, plan.notes());
+        String summary = "Add " + CalendarRules.label(date) + " " + hours(open) + "–" + hours(close) + " to " + plan.market().name()
+                + " (stall " + plan.market().stall() + ").";
+        if (!isConfirmed(a)) return preview(summary, warnings);
+        // Re-read and save under the schedule lock, so a concurrent edit is never overwritten by a stale day list.
+        SaveMarketResponse saved = transactions.execute(status -> {
+            calendarService.lockSchedule();
+            return marketService.saveMarket(planAddDay(marketId, date, open, close).request());
+        });
+        log.info("MCP add_market_day by staff user {}: market {} day {}", user.getId(), marketId, date);
+        return done("Added. " + summary, saved);
+    }
+
+    private record AddDayPlan(MarketDto market, SaveMarketRequest request, List<String> notes) {}
+
+    /** The market's current days plus the new one, widening the season to include it. */
+    private AddDayPlan planAddDay(UUID marketId, LocalDate date, double open, double close) {
         MarketDto market = marketService.listMarkets().stream().filter(m -> m.id().equals(marketId.toString())).findFirst()
                 .orElseThrow(() -> new ToolInputException("Market not found. Use list_markets for the id."));
         if (market.startDate() == null || market.finishDate() == null) throw new ToolInputException("Only stall markets can get extra days.");
@@ -264,16 +290,7 @@ public class McpTools {
             notes.add("The season end moves from " + finish + " to " + date + ".");
             finish = date;
         }
-        SaveMarketRequest request = new SaveMarketRequest(marketId, market.name(), start, finish, market.totalCost(), market.stall(), days);
-        List<String> warnings = precheck(request);
-        warnings.addAll(0, notes);
-
-        String summary = "Add " + CalendarRules.label(date) + " " + hours(open) + "–" + hours(close) + " to " + market.name()
-                + " (stall " + market.stall() + ").";
-        if (!isConfirmed(a)) return preview(summary, warnings);
-        SaveMarketResponse saved = marketService.saveMarket(request);
-        log.info("MCP add_market_day by staff user {}: market {} day {}", user.getId(), marketId, date);
-        return done("Added. " + summary, saved);
+        return new AddDayPlan(market, new SaveMarketRequest(marketId, market.name(), start, finish, market.totalCost(), market.stall(), days), notes);
     }
 
     /**
@@ -304,6 +321,26 @@ public class McpTools {
     }
 
     // ---- tool plumbing -------------------------------------------------------------------
+
+    private SyncToolSpecification contact(String name, String title, String description, Map<String, Object> inputSchema) {
+        McpSchema.Tool tool = McpSchema.Tool.builder().name(name).title(title).description(description)
+                .inputSchema(inputSchema)
+                .annotations(new McpSchema.ToolAnnotations(title, true, false, true, false, null))
+                .build();
+        return new SyncToolSpecification(tool, (ctx, req) -> run(name, () -> {
+            Map<String, Object> a = args(req);
+            OrderDto order = orderService.getOrderByCode(requiredString(a, "code"));
+            var bundle = orderService.getOrderBundle(UUID.fromString(order.id()));
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("orderCode", order.code());
+            out.put("customer", bundle.customer());
+            out.put("shippingAddresses", bundle.items().stream()
+                    .map(i -> i.delivery() == null ? null : i.delivery().address())
+                    .filter(java.util.Objects::nonNull).distinct().toList());
+            log.info("MCP get_customer_contact by staff user {} for order {}", currentStaff().getId(), order.id());
+            return McpSchema.CallToolResult.builder().addTextContent(toJson(out, false)).build();
+        }));
+    }
 
     private SyncToolSpecification read(String name, String title, String description, Map<String, Object> inputSchema,
                                        Function<Map<String, Object>, Object> handler) {
@@ -368,8 +405,13 @@ public class McpTools {
     }
 
     private String toJson(Object value) {
+        return toJson(value, true);
+    }
+
+    private String toJson(Object value, boolean hideContact) {
         JsonNode tree = json.valueToTree(value);
         prune(tree, HIDDEN_FIELDS);
+        if (hideContact) prune(tree, CONTACT_FIELDS);
         return json.writeValueAsString(tree);
     }
 

@@ -159,9 +159,10 @@ This edge rule must be configured by the owner in the Cloudflare dashboard; it w
 
 ## Claude connector (MCP), 2026-11-22
 
-- `.env`: `MCP_ENABLED=true` turns it on. `MCP_PUBLIC_URL` defaults to `https://artwithgab.com` in `docker-compose.yml`. `MCP_REDIRECT_URIS` is optional; it defaults to the claude.ai and claude.com callbacks.
+- `.env`: `MCP_ENABLED=true` turns it on, and `MCP_ALLOWED_EMAILS=andres@artwithgab.com` says who may connect (empty = nobody, not even with a right password). `MCP_PUBLIC_URL` defaults to `https://artwithgab.com` in `docker-compose.yml`. `MCP_REDIRECT_URIS` is optional; it defaults to the claude.ai and claude.com callbacks.
 - Flyway applies **V19__session_audience.sql**, which needs V18 first. It adds `staff_session.audience` with a default, so existing sessions keep working.
 - `frontend/nginx.conf` sends `/mcp`, `/oauth/*` and `/.well-known/oauth-*` to the backend without the site CSP, because the sign-in page has to redirect to claude.ai. Caddy needs no change, since it proxies every path to nginx.
 - Cloudflare: claude.ai calls `/mcp` from Anthropic's servers. If Bot Fight Mode or a WAF rule challenges those requests, the connector fails, so add a skip rule for `/mcp` and `/oauth/` when that happens. Do not cache these paths.
 - Check after the deploy: run `scripts/mcp-smoke.sh`, which needs no password and makes 10 checks. `curl -si -X POST https://artwithgab.com/mcp` must return 401 with `WWW-Authenticate: Bearer resource_metadata=…`. Then add the connector in claude.ai (Settings → Connectors → custom → `https://artwithgab.com/mcp`) and sign in with a staff account.
 - Owner's quick guide (Spanish, market day): `docs/conector-claude.md`.
+- **Before any rollback to a build without V19**, revoke connector sessions: `sudo docker compose exec postgres psql -U "$DB_USERNAME" -d "$POSTGRES_DB" -c "DELETE FROM staff_session WHERE audience = 'mcp';"`. Connector tokens are hashed as SHA-256("mcp:" + token), so an old build would not find them anyway; deleting them makes that certain.

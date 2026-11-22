@@ -41,12 +41,15 @@ Nunca queda abierto: `/mcp` exige rol STAFF y, con `MCP_ENABLED=false`, `/mcp` y
 | `list_inventory` | lectura | `InventoryService.list` |
 | `list_markets` (con sus días y horas) | lectura | `MarketService.listMarkets/listMarketDays` |
 | `list_needs_attention` | lectura | `OrderService.needingAttention` |
+| `get_customer_contact` (teléfono, e-mail y dirección de un pedido) | lectura | `getOrderByCode` + `getOrderBundle` |
 | `create_market` | escritura con `confirm` | `MarketService.saveMarket` |
 | `add_market_day` (amplía la temporada si hace falta) | escritura con `confirm` | `MarketService.saveMarket` |
 
 - Las escrituras sin `confirm=true` solo devuelven una vista previa con advertencias (día que no es vie/sáb/dom, fecha pasada, horas). Con `confirm=true` el servicio valida todo de nuevo y guarda. Cada escritura queda en el log con el id del usuario staff.
 - No hay pagos, cancelaciones ni borrados.
-- Las respuestas ocultan `trackToken`, `formToken`, fotos y listas de calendario repetidas. La agenda del día oculta además e-mail y dirección (siguen en `get_order`).
+- Las respuestas ocultan `trackToken`, `formToken`, fotos y listas de calendario repetidas. Teléfono, e-mail y dirección solo salen con `get_customer_contact`, un pedido a la vez y con registro en el log.
+- Solo las cuentas de `MCP_ALLOWED_EMAILS` pueden conectarse (vacía = nadie). Se comprueba al emitir el código, al canjearlo y en cada llamada a `/mcp`.
+- Los tokens del conector se guardan con hash `SHA-256("mcp:" + token)`: un backend anterior a V19 no los encuentra tras un rollback.
 - El stock numerado se decodifica por el id: R rojo, W vino, G verde y C champán (Beige); S brillante, M mate.
 
 ## Riesgos y pendientes

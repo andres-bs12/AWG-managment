@@ -7,7 +7,7 @@ Habla con Claude y pídele datos del negocio sin abrir la app del staff. Funcion
 1. Abre **claude.ai** en Safari o en la computadora e inicia sesión con tu cuenta de Claude.
 2. Ve a **Ajustes → Conectores → Añadir conector personalizado**.
 3. Nombre: `ArtWithGab`. URL: `https://artwithgab.com/mcp`. Toca **Añadir** y después **Conectar**.
-4. Se abre la página «Connect Claude to ArtWithGab». Pon tu e-mail y tu contraseña del staff y toca **Sign in and connect**.
+4. Se abre la página «Connect Claude to ArtWithGab». Pon tu e-mail y tu contraseña del staff y toca **Sign in and connect**. Solo pueden conectarse las cuentas autorizadas (hoy, la tuya).
 5. Listo. El conector queda guardado en tu cuenta de Claude y aparece también en la app de Claude del iPad y del iPhone.
 
 La conexión dura **7 días sin usarla** y como máximo **30 días**. Después Claude te pide volver a conectar: toca **Conectar** y repite el paso 4.
@@ -19,6 +19,7 @@ Abre un chat nuevo en la app de Claude y escribe como le hablarías a una person
 - «¿Cuántas bolas Wine pintadas me quedan?»
 - «Busca a la clienta Müller»
 - «Muéstrame el pedido K7Q2ZX»
+- «Dame el teléfono de la clienta del pedido K7Q2ZX» (los teléfonos, e-mails y direcciones solo salen cuando los pides así, pedido por pedido)
 - «¿Qué recogidas hay hoy?» o «¿Qué recogidas hay el sábado?»
 - «¿Qué pedidos web necesitan revisión?»
 - «¿Cuántas bases rojas mate quedan?»

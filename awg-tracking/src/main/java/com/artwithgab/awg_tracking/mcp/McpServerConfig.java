@@ -1,6 +1,8 @@
 package com.artwithgab.awg_tracking.mcp;
 
 import com.artwithgab.awg_tracking.model.StaffSession;
+import com.artwithgab.awg_tracking.model.StaffUser;
+import org.springframework.security.authorization.AuthorizationDecision;
 import com.artwithgab.awg_tracking.security.AuthService;
 import com.artwithgab.awg_tracking.security.BearerTokenFilter;
 import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
@@ -91,7 +93,9 @@ public class McpServerConfig {
                         .requestMatchers(HttpMethod.GET, "/.well-known/**").permitAll()
                         .requestMatchers("/oauth/authorize").permitAll()
                         .requestMatchers(HttpMethod.POST, "/oauth/register", "/oauth/token").permitAll()
-                        .requestMatchers("/mcp", "/mcp/**").hasRole("STAFF")
+                        // Signed-in connector session AND an account still in MCP_ALLOWED_EMAILS.
+                        .requestMatchers("/mcp", "/mcp/**").access((auth, ctx) -> new AuthorizationDecision(
+                                auth.get() != null && auth.get().getPrincipal() instanceof StaffUser user && mcp.isAllowed(user.getEmail())))
                         .anyRequest().denyAll())
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((req, res, ex) -> {
