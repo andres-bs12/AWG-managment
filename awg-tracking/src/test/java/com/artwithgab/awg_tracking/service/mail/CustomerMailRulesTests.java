@@ -73,6 +73,8 @@ class CustomerMailRulesTests {
                 v.total(), v.paid(), v.pickup(), null, v.paymentMethod(), v.today(), v.trackUrl(), v.contactEmail(), v.siteUrl());
         String html = CustomerMailTemplates.confirmed(colored).html();
         assertFalse(html.contains("<svg"), "no inline SVG");
+        String text = CustomerMailTemplates.confirmed(colored).text();
+        assertTrue(text.contains("Custom ornament\nGreen · Matte: €60.00"), "plain text keeps one line per item: " + text);
         for (String asset : List.of("brand.png", "peaks.png", "ornament-green.png", "instagram.png", "email.png")) {
             assertTrue(html.contains("src=\"https://artwithgab.com/mail/" + asset + "\""), asset);
         }

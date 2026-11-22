@@ -310,7 +310,8 @@ public final class CustomerMailTemplates {
 
         /** Plain text mirrors the HTML rows: label, value and extra lines, without markup. */
         private void textFromRows(String rows) {
-            String plain = rows.replaceAll("<a href=\"([^\"]*)\"[^>]*>([^<]*)</a>", "$2: $1")
+            String plain = rows.replaceAll("<table[^>]*><tr><td[^>]*><img[^>]*></td><td[^>]*>", "").replace("</td></tr></table>", "")
+                    .replaceAll("<a href=\"([^\"]*)\"[^>]*>([^<]*)</a>", "$2: $1")
                     .replaceAll("<br>", "\n").replaceAll("</td><td[^>]*>", ": ").replaceAll("</div><div[^>]*>", "\n")
                     .replaceAll("</tr>", "\n").replaceAll("<[^>]+>", "");
             text.add(HtmlUtils.htmlUnescape(plain).strip());
@@ -414,7 +415,7 @@ public final class CustomerMailTemplates {
                     + "<div style=\"color:" + MUTED + ";font-size:14px;padding-bottom:6px;\">" + esc(contactQ) + "</div>"
                     + "<div style=\"font-weight:600;padding-bottom:10px;\"><a href=\"" + INSTAGRAM_URL + "\" style=\"color:" + GREEN + ";text-decoration:none;white-space:nowrap;\">"
                     + icon(site, "instagram") + "Instagram " + INSTAGRAM_HANDLE + "</a>"
-                    + "&nbsp;&nbsp;·&nbsp;&nbsp;<a href=\"mailto:" + esc(contactEmail) + "\" style=\"color:" + GREEN + ";text-decoration:none;white-space:nowrap;\">"
+                    + " &nbsp;·&nbsp; <a href=\"mailto:" + esc(contactEmail) + "\" style=\"color:" + GREEN + ";text-decoration:none;white-space:nowrap;\">"
                     + icon(site, "email") + esc(contactEmail) + "</a></div>"
                     + "<div style=\"color:" + MUTED + ";font-size:12px;\">" + esc(legal) + " · <a href=\"" + esc(site) + "/impressum\" style=\"color:" + MUTED + ";\">" + imprint
                     + "</a> · <a href=\"" + esc(site) + "/datenschutz\" style=\"color:" + MUTED + ";\">" + privacy + "</a></div>"
