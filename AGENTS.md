@@ -1,6 +1,6 @@
 # Contexto del proyecto — ArtWithGab (AWG)
 
-**Actualizado:** 2026-11-22 (producción sirve `eddee9d` de la rama `fix/qa-real-tests-2026-11-22`: v3.1.0 + correos HTML, «Mark reviewed» y conector MCP; Flyway V18–V19 aplicadas; backup `~/backups/pre-v3.2-20261122T1723.sql.gz`; `main` sigue en v3.1.0 hasta unir la rama)
+**Actualizado:** 2026-11-22 (producción sirve `1bbfddf` de la rama `fix/qa-real-tests-2026-11-22`: v3.1.0 + correos HTML (remitente «ArtWithGab», avisos al dueño en HTML), «Mark reviewed» y conector MCP con `delete_market_day`; Flyway V18–V19 aplicadas; backup `~/backups/pre-v3.2-20261122T1723.sql.gz`; `main` sigue en v3.1.0 hasta unir la rama)
 **Propósito de este archivo:** memoria persistente para el dueño del proyecto y los agentes que trabajen en este repositorio.
 
 ## Instrucción de mantenimiento
@@ -102,7 +102,7 @@ Scripts disponibles en `frontend/package.json`: `dev`, `build`, `build:mock`, `l
 - Plantillas HTML aprobadas por el dueño: `service/mail/CustomerMailTemplates` (vista) y `CustomerMailComposer` (qué correo toca por evento, uno como máximo). Avisos al dueño siguen en texto en `NotificationService`; `OWNER_EMAIL` admite varias direcciones. Sin datos fiscales no hay comprobante aparte.
 - V18: `orders.reviewed_at` (pedido web pagado queda en Needs attention hasta «Mark reviewed», `POST /api/orders/{id}/reviewed`) y `orders.locale` (idioma de los correos).
 - Arreglados: script de contraseña (hash sin citar por ssh) y ventas en días con solo «Casa».
-- Gmail elimina el SVG en línea: montañas, adornos e íconos de los correos son PNG en `frontend/public/mail/`. Compra web real con 4242 verificada (`AWG5CFZGE`).
+- Gmail elimina el SVG en línea: montañas, adornos e íconos de los correos son PNG en `frontend/public/mail/`. Compra web real con 4242 verificada (`AWG5CFZGE`). Los 8 correos al cliente probados en producción (DE/EN). «Cobrar y entregar» es una sola llamada (`collectMethod` en `/handed-over`): un solo correo al cliente.
 - Producción: `OWNER_EMAIL` incluye el correo personal del dueño, `MAIL_REPLY_TO=artwithgab@gmail.com`, `MCP_ENABLED=true` y `MCP_ALLOWED_EMAILS` con las cuentas de Andrés y Gaby.
 
 ## Backend actual
