@@ -119,13 +119,8 @@ class NotificationServiceTests {
         orders.setHandedOver(id, true, lastPost);
         orders.setHandedOver(id, true, lastPost);
         // Customer: order confirmed, ready for the market pickup, and exactly one "on its way".
-        // Owner notices go to another address; wait for the async sends, then read every sent message once.
-        verify(mail, timeout(5000).atLeast(3)).send(any(jakarta.mail.internet.MimeMessage.class));
-        try { Thread.sleep(800); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-        var customer = org.mockito.Mockito.mockingDetails(mail).getInvocations().stream()
-                .filter(i -> i.getMethod().getName().equals("send") && i.getArgument(0) instanceof jakarta.mail.internet.MimeMessage)
-                .map(i -> (jakarta.mail.internet.MimeMessage) i.getArgument(0))
-                .filter(m -> "customer@example.com".equals(recipient(m))).toList();
+        // Owner notices go to another address; wait until the customer's three mails were sent.
+        var customer = customerMails(3);
         assertEquals(3, customer.size(), "order confirmed, ready for the market pickup, on its way");
         var shipped = customer.stream().filter(m -> subject.equals(subjectOf(m))).toList();
         assertEquals(1, shipped.size());
@@ -162,6 +157,38 @@ class NotificationServiceTests {
         piece.setId("RM" + UUID.randomUUID().toString().substring(0, 6));
         piece.setStatus("painted");
         return marketStock.saveAndFlush(piece).getId();
+    }
+
+    /** Polls the async mail sends until {@code expected} customer mails arrived (or 5 s passed), then waits for strays. */
+    private List<jakarta.mail.internet.MimeMessage> customerMails(int expected) {
+        long end = System.currentTimeMillis() + 5000;
+        List<jakarta.mail.internet.MimeMessage> found = List.of();
+        while (System.currentTimeMillis() < end) {
+            found = org.mockito.Mockito.mockingDetails(mail).getInvocations().stream()
+                    .filter(i -> i.getMethod().getName().equals("send") && i.getArgument(0) instanceof jakarta.mail.internet.MimeMessage)
+                    .map(i -> (jakarta.mail.internet.MimeMessage) i.getArgument(0))
+                    .filter(m -> "customer@example.com".equals(recipient(m))).toList();
+            if (found.size() >= expected) break;
+            try { Thread.sleep(50); } catch (InterruptedException e) { Thread.currentThread().interrupt(); break; }
+        }
+        try { Thread.sleep(300); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        return org.mockito.Mockito.mockingDetails(mail).getInvocations().stream()
+                .filter(i -> i.getMethod().getName().equals("send") && i.getArgument(0) instanceof jakarta.mail.internet.MimeMessage)
+                .map(i -> (jakarta.mail.internet.MimeMessage) i.getArgument(0))
+                .filter(m -> "customer@example.com".equals(recipient(m))).toList();
+    }
+
+    @Test void collectingTheRestAtHandoverSendsOnlyTheThankYou() {
+        var piece = readyMarketPiece();
+        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null, piece);
+        var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(item), null));
+        UUID id = UUID.fromString(order.id());
+        orders.setHandedOver(id, true, null, null, PaymentMethod.CASH);
+        var subjects = customerMails(2).stream().map(NotificationServiceTests::subjectOf).toList();
+        assertTrue(subjects.contains("Deine Bestellung " + order.code() + " ist bestätigt"), subjects.toString());
+        assertTrue(subjects.stream().anyMatch(s -> s.startsWith("Danke für deinen Besuch")), subjects.toString());
+        assertFalse(subjects.stream().anyMatch(s -> s.startsWith("Zahlung erhalten")), "the thank-you already shows the payment: " + subjects);
+        assertEquals(PaymentState.PAID, orders.getOrder(id).paymentState());
     }
 
     private static String recipient(jakarta.mail.internet.MimeMessage m) {

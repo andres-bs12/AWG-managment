@@ -53,9 +53,9 @@ export function useHandover(onChanged: (change: { orderId: string; code: string;
     }
     lock.current = true; setBusy(true); setError('')
     try {
-      if (collect) await api.payments.setPaymentState(pending.bundle.order.id, 'paid', method)
       const sendTracking = hasSelectedPost && cleanTracking ? cleanTracking : undefined
-      await api.orders.setHandedOver(pending.bundle.order.id, pending.target, ids, sendTracking)
+      // One call: payment and handover land together, so the customer gets a single e-mail.
+      await api.orders.setHandedOver(pending.bundle.order.id, pending.target, ids, sendTracking, collect && method ? method : undefined)
       setPending(null)
       await onChanged({ orderId: pending.bundle.order.id, code: pending.bundle.order.code, target: pending.target, itemIds: ids })
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not update handover.') }

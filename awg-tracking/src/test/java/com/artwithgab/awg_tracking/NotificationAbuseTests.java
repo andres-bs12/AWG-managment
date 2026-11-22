@@ -127,14 +127,14 @@ class NotificationAbuseTests {
         }
     }
 
-    @Test void ownerNoticeIsHtmlFromTheBrandAndRepliesGoToTheCustomer() throws Exception {
+    @Test void ownerNoticeIsHtmlFromTheBrandWithoutCustomerReplyTo() throws Exception {
         service.onOrderNotification(OrderNotification.from(order(), OrderNotification.Kind.WEB_PAID));
         var sent = org.mockito.ArgumentCaptor.forClass(MimeMessage.class);
         verify(mail).send(sent.capture());
         MimeMessage m = sent.getValue();
         m.saveChanges();
         assertEquals("ArtWithGab <shop@example.com>", m.getFrom()[0].toString());
-        assertEquals("customer@example.com", m.getReplyTo()[0].toString());
+        assertEquals("ArtWithGab <shop@example.com>", m.getReplyTo()[0].toString(), "no unverified customer address as Reply-To");
         assertTrue(m.getContentType().startsWith("multipart/"), "HTML with a text alternative");
     }
 

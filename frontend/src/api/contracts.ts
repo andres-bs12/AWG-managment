@@ -103,7 +103,8 @@ export type OrderService = {
   ) => Promise<void>
   /** Mark (or undo) market pickup / Post shipping / Vienna handoff — Track becomes `delivered`. */
   /** `trackingNumber`: Post parcel number stored on the order when present (blank clears it). */
-  setHandedOver: (orderId: string, handedOver: boolean, itemIds?: string[], trackingNumber?: string | null) => Promise<void>
+  /** `collectMethod`: record the rest as paid in the same step, so the customer gets one e-mail. */
+  setHandedOver: (orderId: string, handedOver: boolean, itemIds?: string[], trackingNumber?: string | null, collectMethod?: PaymentMethod) => Promise<void>
 }
 
 export type PaymentService = {

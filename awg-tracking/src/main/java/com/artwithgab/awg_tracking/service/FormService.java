@@ -98,7 +98,7 @@ public class FormService {
         customer.setName(payload.customerName().trim());
         customer.setPhone(payload.phone().trim());
         customer.setEmail(payload.email().trim());
-        String addressBefore = addressKey(order.getDeliveryAddress());
+        java.util.List<String> addressBefore = addressKey(order.getDeliveryAddress());
         boolean post = !order.postItems().isEmpty();
         if (post) {
             if (payload.address() != null || order.getDeliveryAddress() == null) {
@@ -187,9 +187,8 @@ public class FormService {
         }
     }
 
-    private static String addressKey(com.artwithgab.awg_tracking.model.Address a) {
+    private static java.util.List<String> addressKey(com.artwithgab.awg_tracking.model.Address a) {
         if (a == null) return null;
-        return String.join("|", java.util.Arrays.asList(a.getLine1(), a.getLine2(), a.getPostalCode(), a.getCity()).stream()
-                .map(v -> v == null ? "" : v.trim()).toList());
+        return java.util.stream.Stream.of(a.getLine1(), a.getLine2(), a.getPostalCode(), a.getCity()).map(v -> v == null ? "" : v.trim()).toList();
     }
 }

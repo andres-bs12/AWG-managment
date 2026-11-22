@@ -76,7 +76,7 @@ public class OrderController {
 
     @RequestMapping(path = "/{id}/handed-over", method = {RequestMethod.PATCH, RequestMethod.PUT})
     public ResponseEntity<Void> setHandedOver(@PathVariable UUID id, @Valid @RequestBody HandedOverRequest body) {
-        orderService.setHandedOver(id, body.handedOver(), body.itemIds(), body.trackingNumber());
+        orderService.setHandedOver(id, body.handedOver(), body.itemIds(), body.trackingNumber(), body.collectMethod());
         return ResponseEntity.noContent().build();
     }
 

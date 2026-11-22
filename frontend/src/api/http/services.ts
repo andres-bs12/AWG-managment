@@ -270,10 +270,10 @@ export const httpApi: Api = {
         jsonInit('PATCH', { status }),
         staff,
       ),
-    setHandedOver: (orderId, handedOver, itemIds, trackingNumber) =>
+    setHandedOver: (orderId, handedOver, itemIds, trackingNumber, collectMethod) =>
       request(
         `/api/orders/${enc(orderId)}/handed-over`,
-        jsonInit('PATCH', { handedOver, itemIds, ...(trackingNumber !== undefined ? { trackingNumber } : {}) }),
+        jsonInit('PATCH', { handedOver, itemIds, ...(trackingNumber !== undefined ? { trackingNumber } : {}), ...(collectMethod ? { collectMethod } : {}) }),
         staff,
       ),
   },

@@ -174,8 +174,9 @@ export const mockApi: Api = {
       later(() => {
         setItemStatus(orderId, itemId, status)
       }),
-    setHandedOver: (orderId, handedOver, itemIds, trackingNumber) =>
+    setHandedOver: (orderId, handedOver, itemIds, trackingNumber, collectMethod) =>
       later(() => {
+        if (handedOver && collectMethod) setPaymentState(orderId, 'paid', collectMethod)
         setHandedOver(orderId, handedOver, itemIds, trackingNumber)
       }),
   },

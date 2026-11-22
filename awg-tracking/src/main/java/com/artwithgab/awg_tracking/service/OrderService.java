@@ -355,6 +355,13 @@ public class OrderService {
             }
             order.setCheckoutStatus(com.artwithgab.awg_tracking.enums.CheckoutStatus.CONFIRMED);
         }
+        boolean changed = applyPayment(order, state, method, amountPaid);
+        if (changed) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.PAYMENT_CHANGED));
+        return mapper.order(order);
+    }
+
+    /** Sets the payment fields; returns whether the state or amount changed. Publishes nothing. */
+    private boolean applyPayment(Order order, PaymentState state, PaymentMethod method, BigDecimal amountPaid) {
         BigDecimal total = order.getTotal();
         BigDecimal received = switch (state) {
             case UNPAID -> BigDecimal.ZERO;
@@ -371,8 +378,7 @@ public class OrderService {
         order.setAmountPaid(received);
         if (state == PaymentState.UNPAID) order.setPaymentMethod(null);
         else if (method != null) order.setPaymentMethod(method);
-        if (changed) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.PAYMENT_CHANGED));
-        return mapper.order(order);
+        return changed;
     }
 
     @Transactional
@@ -382,6 +388,15 @@ public class OrderService {
 
     @Transactional
     public void setHandedOver(UUID orderId, boolean handedOver, List<UUID> itemIds, String trackingNumber) {
+        setHandedOver(orderId, handedOver, itemIds, trackingNumber, null);
+    }
+
+    /**
+     * Hands items over; with {@code collectMethod} the rest is recorded as paid in the same transaction, so the
+     * customer gets one e-mail: the thank-you (which shows the payment) or, for a parcel, "on its way" plus the payment.
+     */
+    @Transactional
+    public void setHandedOver(UUID orderId, boolean handedOver, List<UUID> itemIds, String trackingNumber, PaymentMethod collectMethod) {
         Order order = orderRepository.findForHandover(orderId).orElseThrow(() -> new ResourceNotFoundException("Order not found"));
         requireActive(order);
         var items = order.getOrderItems();
@@ -401,10 +416,20 @@ public class OrderService {
             }
             order.setTrackingNumber(AustrianPost.trackingNumber(trackingNumber));
         }
+        boolean paid = false;
+        if (handedOver && collectMethod != null) {
+            if (order.isAwaitingPayment() || order.isPaymentReview()) {
+                throw new ConflictException("Check the online payment in Stripe before handover.").code("PAYMENT_PENDING");
+            }
+            paid = applyPayment(order, PaymentState.PAID, collectMethod, null);
+        }
         boolean alreadyShipped = order.isPostShipped();
         selected.forEach(i -> i.setHandedOver(handedOver));
         boolean completed = updateHandover(order);
-        if (!alreadyShipped && order.isPostShipped()) {
+        boolean shipped = !alreadyShipped && order.isPostShipped();
+        // The thank-you mail already shows the payment; any other step still confirms the collected rest.
+        if (paid && (shipped || !completed)) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.PAYMENT_CHANGED));
+        if (shipped) {
             events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.POST_SHIPPED));
         } else if (completed) {
             events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.HANDED_OVER));

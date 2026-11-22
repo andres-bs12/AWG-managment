@@ -38,9 +38,8 @@ public class NotificationService {
                 event.kind().owner, event.code(), event.customerName(), event.customerEmail(), plain(event.total()), plain(event.amountPaid()),
                 event.paymentState(), event.address(), event.items() == null || event.items().isBlank() ? java.util.List.of() : java.util.List.of(event.items().split("\n")),
                 staff, link, base));
-        // The owner can answer the customer straight from the notice.
-        String replyTo = event.customerEmail() == null || event.customerEmail().isBlank() ? null : event.customerEmail();
-        for (String owner : properties.mail().ownerEmails()) sendHtml(owner, notice.subject(), notice.text(), notice.html(), replyTo);
+        // No customer Reply-To: the QR form accepts any address, so a reply could reach a stranger.
+        for (String owner : properties.mail().ownerEmails()) sendHtml(owner, notice.subject(), notice.text(), notice.html(), null);
         // Customer e-mails are chosen and rendered by CustomerMailComposer and arrive here as CustomerMail.
     }
 
