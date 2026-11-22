@@ -26,12 +26,13 @@ Abre un chat nuevo en la app de Claude y escribe como le hablarías a una person
 - «¿Qué pedidos web necesitan revisión?»
 - «¿Cuántas bases rojas mate quedan?»
 - «Añade un día de mercado el 6 de diciembre de 11 a 20 en Spittelberg»
+- «Borra el sábado 19 de diciembre de Test 1» (solo días sin pedidos; si el día tiene pedidos, la app no lo deja borrar)
 
 Si Claude no usa el conector, toca el botón **+** (o «Herramientas») del chat y comprueba que **ArtWithGab** está activado.
 
-**Para crear o cambiar mercados**, Claude primero te muestra un resumen y no guarda nada hasta que dices «sí». La app de Claude también te pide permiso antes de usar esa herramienta.
+**Para crear mercados, añadir o borrar días**, Claude primero te muestra un resumen y no guarda nada hasta que dices «sí». La app de Claude también te pide permiso antes de usar esa herramienta.
 
-**Lo que no hace:** cobrar, marcar pagos, cancelar ni borrar. Para eso usa la app del staff, como siempre.
+**Lo que no hace:** cobrar, marcar pagos, cancelar pedidos, ni borrar mercados completos, pedidos o clientas. Para eso usa la app del staff, como siempre.
 
 ## Si algo falla
 

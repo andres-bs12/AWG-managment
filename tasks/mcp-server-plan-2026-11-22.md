@@ -44,9 +44,10 @@ Nunca queda abierto: `/mcp` exige rol STAFF y, con `MCP_ENABLED=false`, `/mcp` y
 | `get_customer_contact` (teléfono, e-mail y dirección de un pedido) | lectura | `getOrderByCode` + `getOrderBundle` |
 | `create_market` | escritura con `confirm` | `MarketService.saveMarket` |
 | `add_market_day` (amplía la temporada si hace falta) | escritura con `confirm` | `MarketService.saveMarket` |
+| `delete_market_day` (solo días de mercado sin pedidos, ventas, recogidas ni pintura; el servicio lo impone) | borrado con `confirm` | `MarketService.deleteMarketDay` |
 
 - Las escrituras sin `confirm=true` solo devuelven una vista previa con advertencias (día que no es vie/sáb/dom, fecha pasada, horas). Con `confirm=true` el servicio valida todo de nuevo y guarda. Cada escritura queda en el log con el id del usuario staff.
-- No hay pagos, cancelaciones ni borrados.
+- No hay pagos ni cancelaciones. El único borrado es un día de mercado vacío (decisión del dueño, 2026-11-22); mercados completos, pedidos y clientas solo se borran desde la app.
 - Las respuestas ocultan `trackToken`, `formToken`, fotos y listas de calendario repetidas. Teléfono, e-mail y dirección solo salen con `get_customer_contact`, un pedido a la vez y con registro en el log.
 - Lo usan Andrés y Gaby, cada uno desde su cuenta de Claude y con su usuario staff; cada sesión del conector queda ligada a su usuario. Solo las cuentas de `MCP_ALLOWED_EMAILS` pueden conectarse (vacía = nadie). Se comprueba al emitir el código, al canjearlo y en cada llamada a `/mcp`.
 - Los tokens del conector se guardan con hash `SHA-256("mcp:" + token)`: un backend anterior a V19 no los encuentra tras un rollback.

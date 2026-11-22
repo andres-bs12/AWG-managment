@@ -32,3 +32,7 @@ Verificación tras las correcciones: `./mvnw test` 290 en verde; V19 aplicada en
 | C5 | Secretos en query string de los POST de OAuth terminarían en los logs | Real | 400 si los POST traen query string; nginx registra esas rutas sin query string ni referrer (`log_format oauth_safe`). Prueba `oauthPostsWithAQueryStringAreRefused` |
 | C6 | Las consultas normales de pedidos exportan teléfono, e-mail y dirección | Real | Ocultos en todas las herramientas salvo `get_customer_contact` (un pedido, registrado en el log). Prueba `contactDataOnlyComesFromTheContactTool` |
 | C7 | `add_market_day` lee los días antes del lock y podría borrar un día añadido en paralelo | Real | Relee y guarda dentro de una transacción con `CalendarService.lockSchedule()` (el mismo lock que usa `saveMarket`) |
+
+## `delete_market_day` (2026-11-22, pedido del dueño)
+
+Revisión rápida con Gemini 4 Neon medium (solo lectura, diff pegado): sin hallazgos en borrado de días no vacíos o de Casa, día equivocado, fugas en los mensajes de error ni anotaciones. Una nota baja (TOCTOU entre la búsqueda y el borrado, sin riesgo porque el servicio vuelve a validar bajo el lock) aplicada igual: la búsqueda y el borrado confirmados corren dentro de la misma transacción con `lockSchedule()`. Pruebas: `deleteMarketDayOnlyDeletesWithConfirm`, `deleteMarketDayWithOrdersIsRefusedByTheApp`, `deleteMarketDayRefusesHomeDaysAndUnknownDates`.

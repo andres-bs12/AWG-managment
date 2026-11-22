@@ -85,8 +85,9 @@ class McpServerApiTests extends ApiTestSupport {
 
         List<String> names = JsonPath.read(mcp(accessToken, "tools/list", Map.of()), "$.result.tools[*].name");
         assertThat(names).contains("search_orders", "get_order", "get_agenda_day", "list_market_stock", "list_inventory",
-                "list_markets", "list_needs_attention", "create_market", "add_market_day", "get_customer_contact");
-        assertThat(names).noneMatch(n -> n.contains("cancel") || n.contains("delete") || n.contains("pay"));
+                "list_markets", "list_needs_attention", "create_market", "add_market_day", "get_customer_contact", "delete_market_day");
+        // The only deletion is an empty market day; no payments, cancellations or other deletes.
+        assertThat(names).noneMatch(n -> n.contains("cancel") || n.contains("pay") || (n.contains("delete") && !n.equals("delete_market_day")));
     }
 
     @Test
@@ -402,6 +403,60 @@ class McpServerApiTests extends ApiTestSupport {
 
     private static String sha256Hex(String value) throws Exception {
         return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    // ---- delete_market_day (owner request 2026-11-22) -----------------------------------
+
+    @Test
+    void deleteMarketDayOnlyDeletesWithConfirm() throws Exception {
+        String token = mcpToken();
+        toolText(token, "create_market", new LinkedHashMap<>(Map.of("name", "Freyung", "startDate", "2027-01-01",
+                "finishDate", "2027-01-10", "stall", 4, "confirm", true,
+                "days", List.of(Map.of("date", "2027-01-02", "openHour", 12, "closeHour", 18),
+                        Map.of("date", "2027-01-09", "openHour", 12, "closeHour", 18)))));
+        String marketId = ((List<String>) JsonPath.read(toolText(token, "list_markets", Map.of()), "$[?(@.name=='Freyung')].id")).getFirst();
+
+        Map<String, Object> args = new LinkedHashMap<>(Map.of("marketId", marketId, "date", "2027-01-09"));
+        assertThat(toolText(token, "delete_market_day", args)).startsWith("PREVIEW").contains("Sat 9 Jan");
+        assertThat((List<String>) JsonPath.read(toolText(token, "list_markets", Map.of()), "$[?(@.name=='Freyung')].days[*].date"))
+                .containsExactlyInAnyOrder("2027-01-02", "2027-01-09");
+
+        args.put("confirm", true);
+        assertThat(toolText(token, "delete_market_day", args)).startsWith("Deleted.");
+        assertThat((List<String>) JsonPath.read(toolText(token, "list_markets", Map.of()), "$[?(@.name=='Freyung')].days[*].date"))
+                .containsExactly("2027-01-02");
+    }
+
+    @Test
+    void deleteMarketDayWithOrdersIsRefusedByTheApp() throws Exception {
+        String app = login();
+        String token = mcpToken();
+        String sat = dayId(app, SAT);
+        saleOk(app, customItem(false, TUE, 10.0, 11.0, "market", sat, 14.0));
+        String marketId = read(mvc.perform(get("/api/agenda/days/" + SAT).header("Authorization", bearer(app))).andReturn(), "$.market.id");
+
+        String result = mcp(token, "tools/call", Map.of("name", "delete_market_day",
+                "arguments", Map.of("marketId", marketId, "date", SAT, "confirm", true)));
+        assertThat((Boolean) JsonPath.read(result, "$.result.isError")).isTrue();
+        assertThat(result).contains("has orders and cannot be deleted");
+        assertThat(toolText(token, "list_markets", Map.of())).contains(SAT);
+    }
+
+    @Test
+    void deleteMarketDayRefusesHomeDaysAndUnknownDates() throws Exception {
+        String token = mcpToken();
+        String markets = toolText(token, "list_markets", Map.of());
+        String homeId = ((List<String>) JsonPath.read(markets, "$[?(@.kind=='home')].id")).getFirst();
+        String home = mcp(token, "tools/call", Map.of("name", "delete_market_day",
+                "arguments", Map.of("marketId", homeId, "date", TUE, "confirm", true)));
+        assertThat((Boolean) JsonPath.read(home, "$.result.isError")).isTrue();
+        assertThat(home).contains("home painting days");
+
+        String stallId = ((List<String>) JsonPath.read(markets, "$[?(@.kind=='market')].id")).getFirst();
+        String unknown = mcp(token, "tools/call", Map.of("name", "delete_market_day",
+                "arguments", Map.of("marketId", stallId, "date", "2030-01-05", "confirm", true)));
+        assertThat((Boolean) JsonPath.read(unknown, "$.result.isError")).isTrue();
+        assertThat(unknown).contains("does not open on");
     }
 
     // ---- helpers -------------------------------------------------------------------------
