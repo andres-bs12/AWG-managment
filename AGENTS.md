@@ -1,6 +1,6 @@
 # Contexto del proyecto — ArtWithGab (AWG)
 
-**Actualizado:** 2026-11-22 (producción sirve `5dcdd02` de la rama `fix/qa-real-tests-2026-11-22`: v3.1.0 + correos HTML (remitente «ArtWithGab», avisos al dueño en HTML), «Mark reviewed» y conector MCP con `delete_market_day`, `list_recent_orders`, `set_painting_hours` y `record_stock_sale`; Flyway V18–V19 aplicadas; backup `~/backups/pre-v3.2-20261122T1723.sql.gz`; `main` sigue en v3.1.0 hasta unir la rama)
+**Actualizado:** 2026-11-22 (v3.2.0 en `main` y en producción: correos HTML, «Mark reviewed», conector MCP y arreglos de la prueba real; Flyway V18–V19; datos de prueba del 22 nov borrados, backup `~/backups/pre-cleanup-20261122T2218.sql.gz`)
 **Propósito de este archivo:** memoria persistente para el dueño del proyecto y los agentes que trabajen en este repositorio.
 
 ## Instrucción de mantenimiento
@@ -25,7 +25,7 @@ ArtWithGab es una herramienta para registrar ventas y coordinar la producción y
 - El formulario del cliente recoge datos y fotos; no cobra. El staff confirma manualmente un pago después de verificar que se recibió.
 - Estados de pago acordados en la documentación: `unpaid`, `deposit` y `paid`. `deposit` guarda el importe recibido en `amountPaid`: 50 % por defecto, editable a un importe mayor que cero y menor que el total. El saldo se calcula con ese importe real.
 - En el puesto no se integra ningún procesador de pagos. **Excepción decidida por el dueño (2026-11-04):** la tienda web pública (`/buy`, envío por Correos a Austria o recogida en el puesto) cobra con Stripe Checkout.
-- El nombre personalizado en el adorno cuesta 12,99 € por defecto, editable en Stock. No se puede quitar después del pedido, así que la UI pública ya no muestra un aviso de «sin reembolso» (dueño, 2026-11-12).
+- El nombre personalizado en el adorno cuesta 12,99 € como respaldo de configuración, editable en Stock (en producción está en 5 €, guardado el 21 nov). No se puede quitar después del pedido, así que la UI pública ya no muestra un aviso de «sin reembolso» (dueño, 2026-11-12).
 - Un pedido puede mezclar adornos `custom` y `finished`. Pintura y recogida/entrega son eventos distintos; comprobar capacidad antes de comprometer un bloque.
 - Recogida en mercado: viernes, sábado o domingo. **Desde v3.1.0 se envía por Österreichische Post a toda Austria (+5 €, editable en Stock)**. Los pedidos antiguos `vienna` siguen legibles.
 - Capacidad de pintura en casa: lunes, martes y jueves, 3 huecos entre 10:00–13:00; miércoles y viernes, 2 huecos entre 10:00–12:00. Un bloque suele durar 60 minutos, unos 75 si incluye nombre.
@@ -96,13 +96,14 @@ Scripts disponibles en `frontend/package.json`: `dev`, `build`, `build:mock`, `l
 - **Make room:** `POST /api/agenda/blocks/{itemId}/make-room` mueve una sesión elegible y `POST /api/agenda/make-room` libera un hueco con `Idempotency-Key`. Ambos conservan la fecha de entrega o recogida. Ver [contrato de Post](tasks/post-shipping-contract-2026-11-20.md) y [contrato HTTP vigente](docs/frontend-api-swap.md).
 - **Verificación de la versión según el registro de entrega:** 270 pruebas de backend, 106 Node y `e2e-full` en verde en CI.
 
-## Correos y revisión (rama `fix/qa-real-tests-2026-11-22`, desplegada 2026-11-22)
+## v3.2.0: correos, revisión y MCP (desplegada 2026-11-22)
 
 - Prueba real en producción: llegaron los 10 correos al cliente. Hallazgos en `tasks/qa-real-tests-2026-11-22.md`; página visual de plantillas: https://claude.ai/artifact/FT1twyvR5Vx9uZ5eZcSNpr.
 - Plantillas HTML aprobadas por el dueño: `service/mail/CustomerMailTemplates` (vista) y `CustomerMailComposer` (qué correo toca por evento, uno como máximo). Avisos al dueño siguen en texto en `NotificationService`; `OWNER_EMAIL` admite varias direcciones. Sin datos fiscales no hay comprobante aparte.
 - V18: `orders.reviewed_at` (pedido web pagado queda en Needs attention hasta «Mark reviewed», `POST /api/orders/{id}/reviewed`) y `orders.locale` (idioma de los correos).
 - Arreglados: script de contraseña (hash sin citar por ssh) y ventas en días con solo «Casa».
 - Gmail elimina el SVG en línea: montañas, adornos e íconos de los correos son PNG en `frontend/public/mail/`. Compra web real con 4242 verificada (`AWG5CFZGE`). Los 8 correos al cliente probados en producción (DE/EN). «Cobrar y entregar» es una sola llamada (`collectMethod` en `/handed-over`): un solo correo al cliente.
+- Arreglos de la prueba real (hallazgos 12–15 y 24): Track ofrece Instagram y correo, la ficha muestra «Red · Shiny», el panel de pago tras un depósito solo ofrece «Mark paid» y corrige desde el estado real, y en New sale la dirección de Post es opcional si todo lo que va por Post es personalizado (el cliente la pone en el formulario QR). Brevo añade `List-Unsubscribe` y seguimiento de aperturas/clics: no se apaga sin plan Enterprise (pregunta al asesor en `tasks/todo.md`).
 - Producción: `OWNER_EMAIL` incluye el correo personal del dueño, `MAIL_REPLY_TO=artwithgab@gmail.com`, `MCP_ENABLED=true` y `MCP_ALLOWED_EMAILS` con las cuentas de Andrés y Gaby.
 
 ## Backend actual
@@ -124,7 +125,7 @@ Scripts disponibles en `frontend/package.json`: `dev`, `build`, `build:mock`, `l
 
 ## Servidor MCP (desplegado 2026-11-22)
 
-Conector personalizado de claude.ai para manejar AWG por chat (plan Max, sin costo de API): paquete `mcp` del backend, `/mcp` sin estado, OAuth 2.1 con PKCE contra las cuentas staff, 7 herramientas de lectura y 2 de escritura con `confirm=true`; apagado salvo `MCP_ENABLED=true`. El token del conector es una sesión con `audience = mcp` (V19) que solo abre `/mcp`. En producción y conectado en el claude.ai del dueño; solo entran los correos de `MCP_ALLOWED_EMAILS`. Antes de cualquier rollback, borrar las sesiones `audience = mcp` (ver `tasks/mcp-server-plan-2026-11-22.md` y `tasks/audit-results/mcp-security-2026-11-22.md`).
+Conector personalizado de claude.ai para manejar AWG por chat (plan Max, sin costo de API): paquete `mcp` del backend, `/mcp` sin estado, OAuth 2.1 con PKCE contra las cuentas staff, herramientas de lectura y de escritura (estas con `confirm=true`); `get_order` incluye el teléfono del cliente y correo/dirección solo salen por `get_customer_contact`; apagado salvo `MCP_ENABLED=true`. El token del conector es una sesión con `audience = mcp` (V19) que solo abre `/mcp`. En producción y conectado en el claude.ai del dueño; solo entran los correos de `MCP_ALLOWED_EMAILS`. Antes de cualquier rollback, borrar las sesiones `audience = mcp` (ver `tasks/mcp-server-plan-2026-11-22.md` y `tasks/audit-results/mcp-security-2026-11-22.md`).
 
 ## Panel de agentes
 
@@ -138,7 +139,7 @@ Conector personalizado de claude.ai para manejar AWG por chat (plan Max, sin cos
 
 ## Estado y siguientes tareas
 
-Producción sirve v3.1.0. Para desplegar, `deploy/deploy.sh` requiere cambios rastreados limpios y CI completo en verde para el commit exacto. SSH usa el puerto 22 del grupo `awg-web`. El dueño ejecuta el script local `deploy/reset-staff-password.sh <email>` para restablecer una contraseña, enviando solo el hash bcrypt como credencial. Ver [operación y despliegue](docs/deploy.md).
+Producción sirve v3.2.0 (`main`). Siguiente tarea: Stripe con claves live. Quedan en producción 16 pedidos antiguos de prueba (6–12 nov) y el mercado «Test 1», a la espera de que el dueño confirme si se borran. Para desplegar, `deploy/deploy.sh` requiere cambios rastreados limpios y CI completo en verde para el commit exacto. SSH usa el puerto 22 del grupo `awg-web`. El dueño ejecuta el script local `deploy/reset-staff-password.sh <email>` para restablecer una contraseña, enviando solo el hash bcrypt como credencial. Ver [operación y despliegue](docs/deploy.md).
 
 Para la base de una rama, el trabajo en paralelo y la revisión cruzada, aplicar [las reglas aprendidas](docs/reglas-aprendidas.md) y [el reparto de agentes](docs/agent-routing.md).
 
@@ -146,5 +147,5 @@ Las comprobaciones de pago y correo y las decisiones abiertas del dueño y el as
 
 ## Histórico
 
-- v3.0.2 se desplegó el 2026-11-12 con V12–V13. v3.1.0 la sustituyó el 2026-11-20.
+- v3.0.2 se desplegó el 2026-11-12 con V12–V13. v3.1.0 la sustituyó el 2026-11-20 y v3.2.0 el 2026-11-22.
 - Revisiones anteriores de seguridad y UX en [tasks/audit-results/](tasks/audit-results/). El [handoff público de v1.1](docs/v1.1-public-mobile-handoff.md) conserva la evidencia de esa versión.
