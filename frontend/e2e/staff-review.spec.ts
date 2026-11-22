@@ -444,10 +444,11 @@ test('handover with balance due requires confirmation and can mark paid before h
   await collect.click()
   await expect(page.getByRole('button', { name: 'Undo handover', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Undo pickup', exact: true })).toHaveCount(0)
-  const payment = fixture.mutations.findIndex(entry => entry.path.endsWith('/payment-state'))
-  const handover = fixture.mutations.findIndex(entry => entry.path.endsWith('/handed-over'))
-  expect(payment).toBeGreaterThanOrEqual(0)
-  expect(handover).toBeGreaterThan(payment)
+  // One call records the payment and the handover together, so the customer gets a single e-mail.
+  expect(fixture.mutations.some(entry => entry.path.endsWith('/payment-state'))).toBe(false)
+  const handover = fixture.mutations.filter(entry => entry.path.endsWith('/handed-over'))
+  expect(handover).toHaveLength(1)
+  expect(handover[0].body).toMatchObject({ handedOver: true, collectMethod: 'cash' })
   await expect(page.getByRole('button', { name: 'Cancel order', exact: true })).toBeDisabled()
 })
 

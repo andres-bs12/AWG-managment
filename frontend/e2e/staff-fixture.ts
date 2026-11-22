@@ -242,6 +242,8 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
         }
         for (const row of list) if (!body.itemIds || body.itemIds.includes(row.id)) row.handedOver = body.handedOver
         parent.handedOver = list.every(row => row.handedOver)
+        // Collecting the rest rides on the same call, like the real backend.
+        if (body.handedOver && body.collectMethod) Object.assign(parent, { paymentState: 'paid', paymentMethod: body.collectMethod, amountPaid: parent.total })
         return route.fulfill({ status: 204 })
       }
       const cancelled = /^\/api\/orders\/([^/]+)\/cancel$/.exec(path)
