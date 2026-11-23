@@ -9,6 +9,8 @@ import java.util.List;
  * deliveryFee is the Post shipping fee. The hours are for legacy Vienna deliveries.
  */
 public record ShopConfigDto(boolean enabled, BigDecimal customPrice, BigDecimal finishedPrice, BigDecimal nameExtra,
+                            /* Letters allowed in the name painted on the back (staff setting). */
+                            int backNameMax,
                             BigDecimal deliveryFee, int maxItems, List<ShopColorOptionDto> colors,
                             String seasonEnd, boolean seasonOver, String deliveriesFrom,
                             String deliveryWindowStart, String deliveryWindowEnd,

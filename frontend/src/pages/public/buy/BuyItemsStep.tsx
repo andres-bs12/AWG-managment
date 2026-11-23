@@ -6,6 +6,7 @@ import { useLocale } from '../../../i18n/LocaleContext'
 import styles from '../BuyPage.module.css'
 import type { BuyStepProps } from './shared'
 import { BackNameField } from '../../../components/public/BackNameField'
+import { DEFAULT_BACK_NAME_MAX } from '../../../lib/paintedName'
 import { formatEur } from '../../../lib/money'
 import { colorKeys } from './shared'
 
@@ -35,7 +36,7 @@ export function BuyItemsStep({ t, draft, config, patchItem, err, described, acti
             <span data-label={withName ? t('multiNameYes', { price: formatEur(config.nameExtra, locale) }) : t('multiNameNo')}>{withName ? t('multiNameYes', { price: formatEur(config.nameExtra, locale) }) : t('multiNameNo')}</span>
           </label>)}</div>
         </fieldset>
-        {item.withName && <div className={styles.nameDetails}><BackNameField id={`back-${item.uid}`} label={t('backNameField')} hint={t('shopBackNameHint')} value={item.backName} error={err(`back-${item.uid}`)} tooLongMessage={t('paintedNameTooLong')} describedBy={described(`back-${item.uid}`, true)} onChange={backName => patchItem(item.uid, { backName })} /></div>}
+        {item.withName && <div className={styles.nameDetails}><BackNameField id={`back-${item.uid}`} label={t('backNameField')} hint={t('shopBackNameHint', { max: config.backNameMax ?? DEFAULT_BACK_NAME_MAX })} value={item.backName} max={config.backNameMax ?? DEFAULT_BACK_NAME_MAX} error={err(`back-${item.uid}`)} tooLongMessage={t('paintedNameTooLong', { max: config.backNameMax ?? DEFAULT_BACK_NAME_MAX })} describedBy={described(`back-${item.uid}`, true)} onChange={backName => patchItem(item.uid, { backName })} /></div>}
       </div></div>
     </div>)}
   </>

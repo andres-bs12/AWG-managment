@@ -31,6 +31,7 @@ public class FormService {
     private final CalendarService calendarService;
     private final ViewMapper mapper;
     private final FormLinkPolicy formLinks;
+    private final PricingService pricingService;
 
     private Order find(String token) {
         if (token == null || token.length() < 20 || token.length() > 100) throw new ResourceNotFoundException("This form link is not valid.");
@@ -131,11 +132,9 @@ public class FormService {
             item.setPetName(row.petName() == null ? "" : row.petName().trim());
             item.setNote(row.note() == null ? "" : row.note().trim());
             if (item.isWithName()) {
-                String back = row.backName() == null ? "" : row.backName().trim().toUpperCase(Locale.ROOT);
-                if (back.isEmpty() || back.codePointCount(0, back.length()) > 6) {
-                    throw new BadRequestException("Use 1–6 letters for the painted name.").code("VALIDATION")
-                            .field("items[" + payload.items().indexOf(row) + "].backName");
-                }
+                // A name saved under an older, higher limit may be re-sent unchanged.
+                String back = pricingService.requireBackName(row.backName(), item.getNameInOrnament(),
+                        "items[" + payload.items().indexOf(row) + "].backName");
                 item.setNameInOrnament(back);
             }
             if (item.getItemKind() == ItemKind.CUSTOM && row.photos().isEmpty()) {

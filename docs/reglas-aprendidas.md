@@ -100,7 +100,7 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 - `/buy`: tres pantallas (diseño → entrega → revisión), sin subpasos en móvil; una Kugel = una página. «Weiter» lleva al primer campo que falta de la primera Kugel incompleta.
 - Con 2+ Kugeln: fichas lado a lado «In deiner Bestellung»; con una sola, solo «Weitere Kugel hinzufügen». Las etiquetas reflejan lo que escribió el cliente (nombre en vez de «Kugel 1»).
 - Vista previa: gato/perro ilustrado, **nunca la foto subida**; fondo teñido por el color; giro de esfera; nombre en cursiva artística. En móvil la vista previa grande no es sticky.
-- Solo el nombre pagado del reverso es editable (máx. 6 letras); también es `petName`. No volver a pedir el nombre del animal por separado.
+- Solo el nombre pagado del reverso es editable (máx. de letras editable en Stock, 5 por defecto desde 2026-11-23; nunca escribir el número fijo en código ni en copy); también es `petName`. No volver a pedir el nombre del animal por separado.
 - Tarjetas de revisión compactas: un «… ändern» junto al título, atributos combinados («Rot · Glänzend»), sin repetir el nombre, fotos sin título.
 - Un atajo «Frühester Termin» + calendario, no varios atajos casi iguales.
 - Restricciones explicadas una vez, junto a la decisión, con (?) (p. ej. envíos solo dentro de Austria). Ayudas (?) junto a lo que explican, nunca sueltas bajo un párrafo.

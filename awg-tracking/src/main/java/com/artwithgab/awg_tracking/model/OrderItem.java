@@ -126,7 +126,7 @@ public class OrderItem {
     /** Name surcharge charged at sale time; null for items sold before prices became editable. */
     @Column(precision = 10, scale = 2)
     private java.math.BigDecimal nameExtra;
-    /** Text painted on the back (max 6 characters, upper case). */
+    /** Text painted on the back (upper case; the limit is a staff setting, older names may be longer). */
     private String nameInOrnament;
     private String petName;
 

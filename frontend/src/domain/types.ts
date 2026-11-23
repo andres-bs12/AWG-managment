@@ -384,6 +384,8 @@ export type Prices = {
   postCollectionDays: PostCollectionWeekday[]
   /** Read-only server policy: finished pieces may ship by Post only with a custom Post piece in the same order. */
   finishedWithCustom: boolean
+  /** Letters allowed in the name painted on the back (1–20). Optional with older servers (then 5). */
+  backNameMax?: number
   revision: number
 }
 export type PricesUpdate = Omit<Prices, 'revision' | 'finishedWithCustom'> & { expectedRevision: number }
@@ -410,6 +412,8 @@ export type ShopConfig = {
   customPrice: number
   finishedPrice: number
   nameExtra: number
+  /** Letters allowed in the name painted on the back (staff setting). Optional with older servers (then 5). */
+  backNameMax?: number
   deliveryFee: number
   maxItems: number
   colors: ShopColorOption[]

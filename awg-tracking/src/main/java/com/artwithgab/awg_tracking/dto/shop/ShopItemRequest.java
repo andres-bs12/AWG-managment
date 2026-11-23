@@ -1,5 +1,6 @@
 package com.artwithgab.awg_tracking.dto.shop;
 
+import com.artwithgab.awg_tracking.service.PricingService;
 import com.artwithgab.awg_tracking.dto.form.FormPhotoRef;
 import com.artwithgab.awg_tracking.enums.CustomColor;
 import com.artwithgab.awg_tracking.enums.CustomFinish;
@@ -17,7 +18,7 @@ public record ShopItemRequest(
         CustomColor color,
         CustomFinish finish,
         @Size(max = 60) String petName,
-        @Size(max = 6) String backName,
+        @Size(max = PricingService.BACK_NAME_MAX_LIMIT) String backName,
         @Size(max = 1000) String note,
         @Size(max = 6) @Valid List<FormPhotoRef> photos
 ) {

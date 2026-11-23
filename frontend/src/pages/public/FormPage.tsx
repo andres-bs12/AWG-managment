@@ -1,4 +1,4 @@
-import { paintedNameValid } from '../../lib/paintedName'
+import { DEFAULT_BACK_NAME_MAX, paintedNameValid } from '../../lib/paintedName'
 import { keepFormFocusVisible } from '../../lib/publicFormFocus'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -73,6 +73,9 @@ function CustomerForm({ token }: { token: string }) {
   const [storageError, setStorageError] = useState(false)
   const navigate = useNavigate()
   const sendingRef = useRef(false)
+  // The letter limit is a staff setting; the server re-checks it, so the default is only a fallback.
+  const [backNameMax, setBackNameMax] = useState(DEFAULT_BACK_NAME_MAX)
+  useEffect(() => { let active = true; api.shop.getConfig().then(config => { if (active && config.backNameMax) setBackNameMax(config.backNameMax) }).catch(() => {}); return () => { active = false } }, [])
   const uploads = useRef(new Set<string>())
   const focusRequest = useRef<string | null>('form-heading')
   const heading = useRef<HTMLHeadingElement>(null)
@@ -112,7 +115,7 @@ function CustomerForm({ token }: { token: string }) {
   }, [loading, terminal, step, view, t])
 
   const formItems = view ? targets(view) : []
-  const displayedErrors = { ...Object.fromEntries(Object.entries(errors).map(([id, key]) => [id, t(key)])), ...(serverField ? { [serverField.id]: apiError(serverField.issue, locale, t('shopFixErrors')).text } : {}) }
+  const displayedErrors = { ...Object.fromEntries(Object.entries(errors).map(([id, key]) => [id, t(key, { max: backNameMax })])), ...(serverField ? { [serverField.id]: apiError(serverField.issue, locale, t('shopFixErrors')).text } : {}) }
   const allItems = view ? view.items ?? [view.item] : []
   const summaryErrors = Object.fromEntries(Object.entries(displayedErrors).map(([id, message]) => {
     const index = allItems.findIndex(item => ['pet', 'back', 'photos', 'note'].some(prefix => id === `${prefix}-${item.id}`))
@@ -146,8 +149,8 @@ function CustomerForm({ token }: { token: string }) {
   function validate(): Record<string, string> {
     const found: Record<string, string> = {}
     for (const item of draft.items) {
-      const named = formItems.find(source => source.id === item.orderItemId)?.withName
-      if (named && !paintedNameValid(item.backName)) found[`back-${item.orderItemId}`] = item.backName ? 'formPaintedNameTooLong' : 'formNeedBackName'
+      const source = formItems.find(row => row.id === item.orderItemId)
+      if (source?.withName && !paintedNameValid(item.backName, backNameMax, source.backName)) found[`back-${item.orderItemId}`] = item.backName ? 'formPaintedNameTooLong' : 'formNeedBackName'
       if (!item.photos.length) found[`photos-${item.orderItemId}`] = 'shopNeedPhotoShop'
     }
     if (!draft.customerName.trim()) found['form-name'] = 'formNeedName'
@@ -232,7 +235,7 @@ function CustomerForm({ token }: { token: string }) {
       </header>
       <ErrorSummary errors={summaryErrors} onFocus={id => { const control = document.getElementById(id) ?? document.getElementById(id.replace('photos-', 'photos-block-')); const details = control?.closest('details'); if (details) details.open = true; control?.focus() }} />
       {step === 'details' ? <div className={styles.details}>
-        <div className={styles.ornaments}><FormItems items={view.items ?? [view.item]} draft={draft.items} errors={displayedErrors} photoErrors={Object.fromEntries(Object.entries(photoErrors).map(([id, key]) => [id, key ? t(key) : '']))} patch={patchItem} addFiles={addFiles} validate={validateField} /></div>
+        <div className={styles.ornaments}><FormItems backNameMax={backNameMax} items={view.items ?? [view.item]} draft={draft.items} errors={displayedErrors} photoErrors={Object.fromEntries(Object.entries(photoErrors).map(([id, key]) => [id, key ? t(key) : '']))} patch={patchItem} addFiles={addFiles} validate={validateField} /></div>
         <div className={styles.contact}><ContactFields prefix="form" values={{ ...draft, ...draft.address, line2: draft.address.line2 ?? '' }} onChange={patchContact} error={id => displayedErrors[id]} onBlur={validateField} withAddress={view.needsAddress} announceErrors={false} validFields={validFields} deliveryPhone={view.needsAddress} /></div>
       </div> : <FormReview view={view} draft={draft} handoffs={handoffs} edit={edit} />}
     </section>

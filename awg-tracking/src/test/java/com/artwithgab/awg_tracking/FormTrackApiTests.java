@@ -51,21 +51,54 @@ class FormTrackApiTests extends ApiTestSupport {
     }
 
     @Test
-    void rejectsLetteringThatExpandsBeyondSixOnUppercase() throws Exception {
+    void rejectsLetteringThatExpandsBeyondTheLimitOnUppercase() throws Exception {
         Created c = customOrder(login(), "market", SAT, 14.0);
-        var res = submitNamed(c, "Straße", new MockMultipartFile("photo-p1", "bella.jpg", "image/jpeg", JPEG));
+        var res = submitNamed(c, "ßßß", new MockMultipartFile("photo-p1", "bella.jpg", "image/jpeg", JPEG));
         assertEquals(400, res.getResponse().getStatus());
         assertEquals("VALIDATION", this.<String>read(res, "$.code"));
         assertEquals("items[0].backName", this.<String>read(res, "$.field"));
     }
 
     @Test
-    void acceptsSixLettersAfterUppercaseExpansion() throws Exception {
+    void acceptsFiveLettersAfterUppercaseExpansion() throws Exception {
         Created c = customOrder(login(), "market", SAT, 14.0);
-        var res = submitNamed(c, "ßßß", new MockMultipartFile("photo-p1", "bella.jpg", "image/jpeg", JPEG));
+        var res = submitNamed(c, "ßßa", new MockMultipartFile("photo-p1", "bella.jpg", "image/jpeg", JPEG));
         assertEquals(200, res.getResponse().getStatus());
         mvc.perform(withIp(get("/api/forms/" + c.formToken())))
-                .andExpect(jsonPath("$.items[0].backName").value("SSSSSS"));
+                .andExpect(jsonPath("$.items[0].backName").value("SSSSA"));
+    }
+
+    private void setBackNameMax(String token, int max) throws Exception {
+        MvcResult prices = mvc.perform(get("/api/prices").header("Authorization", bearer(token))).andReturn();
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("customPrice", read(prices, "$.customPrice"));
+        body.put("finishedPrice", read(prices, "$.finishedPrice"));
+        body.put("nameExtra", read(prices, "$.nameExtra"));
+        body.put("shippingFee", read(prices, "$.shippingFee"));
+        body.put("postCollectionDays", read(prices, "$.postCollectionDays"));
+        body.put("backNameMax", max);
+        body.put("expectedRevision", ((Number) read(prices, "$.revision")).longValue());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/prices")
+                        .header("Authorization", bearer(token))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void aNameSavedUnderAHigherLimitStaysValidWhenResent() throws Exception {
+        String staff = login();
+        Created c = customOrder(staff, "market", SAT, 14.0);
+        setBackNameMax(staff, 6);
+        assertEquals(200, submitNamed(c, "Bellaa", new MockMultipartFile("photo-p1", "bella.jpg", "image/jpeg", JPEG))
+                .getResponse().getStatus());
+        setBackNameMax(staff, 5);
+        // The saved six-letter name may be sent again unchanged...
+        assertEquals(200, submitNamed(c, "BELLAA", new MockMultipartFile("photo-p1", "bella.jpg", "image/jpeg", JPEG))
+                .getResponse().getStatus());
+        // ...but a different six-letter name follows the new limit.
+        var res = submitNamed(c, "BELLAB", new MockMultipartFile("photo-p1", "bella.jpg", "image/jpeg", JPEG));
+        assertEquals(400, res.getResponse().getStatus());
+        assertEquals("items[0].backName", this.<String>read(res, "$.field"));
     }
 
     @Test

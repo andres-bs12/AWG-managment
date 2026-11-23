@@ -163,8 +163,8 @@ class ShopApiTests extends ApiTestSupport {
     }
 
     @Test
-    void rejectsLetteringThatExpandsBeyondSixOnUppercase() throws Exception {
-        var res = checkoutNamed("1070", "2026-12-04", 1, "eva@example.com", freshIp(), "Straße");
+    void rejectsLetteringThatExpandsBeyondTheLimitOnUppercase() throws Exception {
+        var res = checkoutNamed("1070", "2026-12-04", 1, "eva@example.com", freshIp(), "ßßß");
         assertThat(res.getResponse().getStatus()).isEqualTo(400);
         assertThat(this.<String>read(res, "$.code")).isEqualTo("VALIDATION");
         assertThat(this.<String>read(res, "$.field")).isEqualTo("items[0].backName");
@@ -172,11 +172,11 @@ class ShopApiTests extends ApiTestSupport {
     }
 
     @Test
-    void acceptsSixLettersAfterUppercaseExpansion() throws Exception {
-        var res = checkoutNamed("1070", "2026-12-04", 1, "eva@example.com", freshIp(), "ßßß");
+    void acceptsFiveLettersAfterUppercaseExpansion() throws Exception {
+        var res = checkoutNamed("1070", "2026-12-04", 1, "eva@example.com", freshIp(), "ßßa");
         assertThat(res.getResponse().getStatus()).isEqualTo(200);
         String code = read(res, "$.orderCode");
-        assertThat(orderRepository.findByCodeIgnoreCase(code).orElseThrow().getOrderItems().getFirst().getNameInOrnament()).isEqualTo("SSSSSS");
+        assertThat(orderRepository.findByCodeIgnoreCase(code).orElseThrow().getOrderItems().getFirst().getNameInOrnament()).isEqualTo("SSSSA");
     }
 
     private void webhook(String type, String paymentStatus, long amount) throws Exception {

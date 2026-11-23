@@ -66,6 +66,7 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
     shippingFee: number
     postCollectionDays: PostCollectionWeekday[]
     finishedWithCustom: boolean
+    backNameMax: number
     revision: number
   } = {
     customPrice: config.customPrice,
@@ -74,6 +75,7 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
     shippingFee: 5,
     postCollectionDays: ['tuesday', 'friday'],
     finishedWithCustom: true,
+    backNameMax: 5,
     revision: 0,
   }
   const collectionOverrides: Record<string, boolean> = {}
@@ -210,6 +212,7 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
           nameExtra: body.nameExtra,
           shippingFee: body.shippingFee ?? prices.shippingFee,
           postCollectionDays: body.postCollectionDays ?? prices.postCollectionDays,
+          backNameMax: body.backNameMax ?? prices.backNameMax,
           revision: prices.revision + 1,
         })
         return json(route, prices)

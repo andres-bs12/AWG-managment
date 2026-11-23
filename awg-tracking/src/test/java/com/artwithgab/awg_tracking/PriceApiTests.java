@@ -41,7 +41,9 @@ class PriceApiTests extends ApiTestSupport {
                 .andExpect(jsonPath("$.shippingFee").value(5.0))
                 .andExpect(jsonPath("$.postCollectionDays[0]").value("tuesday"))
                 .andExpect(jsonPath("$.postCollectionDays[1]").value("friday"))
+                .andExpect(jsonPath("$.backNameMax").value(5))
                 .andExpect(jsonPath("$.revision").value(0));
+        mvc.perform(withIp(get("/api/shop/config"))).andExpect(jsonPath("$.backNameMax").value(5));
     }
 
     @Test void anExistingPriceRowWithoutShippingSettingsUsesDefaults() throws Exception {
@@ -59,6 +61,29 @@ class PriceApiTests extends ApiTestSupport {
                 .andExpect(jsonPath("$.customPrice").value(51))
                 .andExpect(jsonPath("$.shippingFee").value(5))
                 .andExpect(jsonPath("$.postCollectionDays[0]").value("tuesday"));
+    }
+
+    private MvcResult putBackNameMax(String token, Object max, long revision) throws Exception {
+        Map<String, Object> body = new java.util.HashMap<>(Map.of("customPrice", new BigDecimal("49.99"),
+                "finishedPrice", new BigDecimal("39.99"), "nameExtra", new BigDecimal("12.99"), "expectedRevision", revision,
+                "shippingFee", new BigDecimal("5.00"), "postCollectionDays", java.util.List.of("tuesday", "friday")));
+        body.put("backNameMax", max);
+        return mvc.perform(put("/api/prices").header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON)
+                .content(json(body))).andReturn();
+    }
+
+    @Test void backNameMaxIsEditableAndBounded() throws Exception {
+        String token = login();
+        assertEquals(400, putBackNameMax(token, 0, 0).getResponse().getStatus());
+        assertEquals(400, putBackNameMax(token, 21, 0).getResponse().getStatus());
+        MvcResult saved = putBackNameMax(token, 8, 0);
+        assertEquals(200, saved.getResponse().getStatus(), saved.getResponse().getContentAsString());
+        assertEquals(8, this.<Integer>read(saved, "$.backNameMax"));
+        mvc.perform(withIp(get("/api/shop/config"))).andExpect(jsonPath("$.backNameMax").value(8));
+        // Omitting the field keeps the saved limit.
+        MvcResult kept = putPrices(token, "49.99", "39.99", "12.99", 1);
+        assertEquals(200, kept.getResponse().getStatus());
+        assertEquals(8, this.<Integer>read(kept, "$.backNameMax"));
     }
 
     @Test void pricesAreStaffOnly() throws Exception {

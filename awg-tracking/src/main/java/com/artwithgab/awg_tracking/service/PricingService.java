@@ -33,6 +33,11 @@ public class PricingService {
     private final ObjectProvider<CalendarService> calendarService;
     private final Clock clock;
 
+    /** Letters allowed in the name painted on the back until staff choose another limit. */
+    public static final int DEFAULT_BACK_NAME_MAX = 5;
+    /** Highest limit staff may set; request DTOs accept back names up to this length. */
+    public static final int BACK_NAME_MAX_LIMIT = 20;
+
     @Transactional(readOnly = true)
     public PricesDto current() {
         return view(repository.findById(PriceSetting.ID).orElse(null));
@@ -45,10 +50,30 @@ public class PricingService {
                 : Arrays.asList(row.getPostCollectionDays().split(","));
         List<String> weekdays = days.stream().map(day -> day.toLowerCase(Locale.ROOT)).toList();
         if (row == null) return new PricesDto(defaults.custom(), defaults.finished(), defaults.nameExtra(),
-                defaults.shipping(), weekdays, props.post().finishedWithCustom(), 0);
+                defaults.shipping(), weekdays, props.post().finishedWithCustom(), DEFAULT_BACK_NAME_MAX, 0);
         return new PricesDto(row.getCustomPrice(), row.getFinishedPrice(), row.getNameExtra(),
                 row.getShippingFee() == null ? defaults.shipping() : row.getShippingFee(), weekdays,
-                props.post().finishedWithCustom(), row.getRevision());
+                props.post().finishedWithCustom(),
+                row.getBackNameMax() == null ? DEFAULT_BACK_NAME_MAX : row.getBackNameMax(), row.getRevision());
+    }
+
+    /** Current letter limit for the name painted on the back. */
+    public int backNameMax() {
+        return current().backNameMax();
+    }
+
+    /**
+     * Normalizes a back name (trimmed, upper case) and checks it against the current limit.
+     * A name equal to {@code saved} is accepted as is, so orders taken under an older, higher limit stay valid.
+     */
+    public String requireBackName(String raw, String saved, String field) {
+        String back = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
+        if (!back.isEmpty() && back.equals(saved)) return back;
+        int max = backNameMax();
+        if (back.isEmpty() || back.codePointCount(0, back.length()) > max) {
+            throw new BadRequestException("Use 1–" + max + " letters for the painted name.").code("VALIDATION").field(field);
+        }
+        return back;
     }
 
     public BigDecimal itemCost(ItemKind kind, boolean withName) {
@@ -89,12 +114,14 @@ public class PricingService {
         row.setNameExtra(body.nameExtra());
         row.setShippingFee(body.shippingFee());
         row.setPostCollectionDays(String.join(",", body.postCollectionDays()).toUpperCase(Locale.ROOT));
+        if (body.backNameMax() != null) row.setBackNameMax(body.backNameMax());
         row.setRevision(now.revision() + 1);
         row.setUpdatedAt(clock.instant());
         repository.save(row);
         // Audit trail for price changes (no customer data): old -> new, revision.
-        log.info("Prices changed to revision {}: custom {} -> {}, finished {} -> {}, name {} -> {}", row.getRevision(),
-                now.customPrice(), body.customPrice(), now.finishedPrice(), body.finishedPrice(), now.nameExtra(), body.nameExtra());
+        log.info("Prices changed to revision {}: custom {} -> {}, finished {} -> {}, name {} -> {}, back-name max {} -> {}",
+                row.getRevision(), now.customPrice(), body.customPrice(), now.finishedPrice(), body.finishedPrice(),
+                now.nameExtra(), body.nameExtra(), now.backNameMax(), row.getBackNameMax() == null ? now.backNameMax() : row.getBackNameMax());
         return view(row);
     }
 }

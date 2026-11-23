@@ -29,7 +29,9 @@ test('the back-name field keeps letters only and never cuts a long name off', ()
   assert.equal(backNameInput('Lu-na 2'), 'Luna')
   assert.equal(backNameInput('Maximilian'), 'Maximilian')
   assert.equal(backNameTooLong('Maximilian'), true)
-  assert.equal(backNameTooLong('Müller'), false)
+  assert.equal(backNameTooLong('Müller'), true)
+  assert.equal(backNameTooLong('Müller', 6), false)
+  assert.equal(backNameTooLong('Mülla'), false)
 })
 
 test('a phone number needs at least 6 digits in /buy and /form', () => {

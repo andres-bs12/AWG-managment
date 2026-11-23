@@ -30,6 +30,8 @@ public class PriceSetting {
     private BigDecimal shippingFee;
     @Column(length = 80)
     private String postCollectionDays;
+    /** Maximum letters of the name painted on the back; null means PricingService.DEFAULT_BACK_NAME_MAX. */
+    private Integer backNameMax;
     /** Bumped on every save; the screen sends the revision it showed to detect concurrent edits. */
     @Column(nullable = false)
     private long revision;

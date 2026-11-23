@@ -1,4 +1,4 @@
-import { paintedNameValid } from '../../lib/paintedName'
+import { DEFAULT_BACK_NAME_MAX, paintedNameValid } from '../../lib/paintedName'
 import { PageHeader, PublicPage, PublicState, FormActions } from '../../components/public/PublicForm'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import publicForm from '../../components/public/PublicForm.module.css'
@@ -186,11 +186,12 @@ export function BuyPage() {
   if (!config.enabled) return <PublicState title={t('shopSoonTitle')}><p>{t('shopSoonBody')}</p></PublicState>
 
   const shopConfig = config
+  const backNameMax = shopConfig.backNameMax ?? DEFAULT_BACK_NAME_MAX
   const itemPrice = (item: BuyItem) => shopConfig.customPrice + (item.withName ? shopConfig.nameExtra : 0)
   const itemsTotal = draft.items.reduce((sum, item) => sum + itemPrice(item), 0)
   const deliveryFee = draft.deliveryKind === 'market' ? 0 : shopConfig.deliveryFee
   const total = draft.items.length ? itemsTotal + deliveryFee : 0
-  const err = (key: string) => errors[key]?.startsWith('api:') ? apiError({ code: errors[key].slice(4) }, locale, t('shopCheckoutError')).text : errors[key] ? t(errors[key]) : undefined
+  const err = (key: string) => errors[key]?.startsWith('api:') ? apiError({ code: errors[key].slice(4) }, locale, t('shopCheckoutError')).text : errors[key] ? t(errors[key], { max: backNameMax }) : undefined
   const described = (key: string, hint = false) => [hint ? `${key}-hint` : '', err(key) ? `${key}-error` : ''].filter(Boolean).join(' ') || undefined
   function patch(partial: Partial<BuyDraft>) { if (partial.deliveryKind && partial.deliveryKind !== draft.deliveryKind) void api.metrics.track({ event: 'buy_choice', field: 'delivery', value: partial.deliveryKind }).catch(() => {}); const changedFields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', postalCode: 'buy-postal', city: 'buy-city' }; setValidFields(current => current.filter(id => !Object.keys(partial).some(key => changedFields[key] === id))); setDraft((current) => ({ ...current, ...partial })); const fields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', line2: 'buy-line2', postalCode: 'buy-postal', city: 'buy-city', deliveryDate: 'buy-date', pickupTime: 'buy-time', deliveryKind: 'buy-date', acceptTerms: 'buy-terms' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[fields[key]]); return next }); setServerError('') }
   function patchItem(uid: string, partial: Partial<BuyItem>) {
@@ -209,7 +210,7 @@ export function BuyPage() {
       for (const item of draft.items) {
         if (!shopConfig.colors.some((option) => option.color === item.color && option.inStock)) found[`color-${item.uid}`] = 'shopChooseColor'
         if (!item.finish || (item.color && !shopConfig.colors.some(option => option.color === item.color && option.finish === item.finish && option.inStock))) found[`finish-${item.uid}`] = 'shopChooseFinish'
-        if (item.withName && !paintedNameValid(item.backName)) found[`back-${item.uid}`] = item.backName ? 'paintedNameTooLong' : 'shopBackNameRequired'
+        if (item.withName && !paintedNameValid(item.backName, backNameMax)) found[`back-${item.uid}`] = item.backName ? 'paintedNameTooLong' : 'shopBackNameRequired'
       }
     }
     if (currentStep === 1) for (const item of draft.items) {

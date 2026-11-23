@@ -29,6 +29,7 @@ import type {
   TrackWhen,
 } from '../../domain/types'
 import { itemCost } from '../../lib/money'
+import { DEFAULT_BACK_NAME_MAX, paintedNameValid } from '../../lib/paintedName'
 import {
   AUSTRIAN_POSTAL_REGEX,
   isCollectionOn,
@@ -315,6 +316,7 @@ export function updatePrices(input: PricesUpdate): Prices {
     finishedPrice: input.finishedPrice,
     nameExtra: input.nameExtra,
     shippingFee: input.shippingFee ?? current.shippingFee,
+    backNameMax: input.backNameMax ?? current.backNameMax,
     postCollectionDays: [...(input.postCollectionDays ?? current.postCollectionDays)],
     finishedWithCustom: current.finishedWithCustom,
     revision: current.revision + 1,
@@ -610,6 +612,7 @@ export function createMockCheckout(input: ShopCheckoutInput) {
   const counts = new Map<string, number>()
   for (const item of input.items) {
     if (!item.finish || !item.color || !['red', 'green', 'beige'].includes(item.color)) throw Object.assign(new Error('Choose a valid colour and finish.'), { code: 'VALIDATION', field: `items[${input.items.indexOf(item)}].${!item.finish ? 'finish' : 'color'}` })
+    if (item.withName) requireBackName(item.backName, null, `items[${input.items.indexOf(item)}].backName`)
     const id = `custom-${item.color}-${item.finish}`
     counts.set(id, (counts.get(id) ?? 0) + 1)
   }
@@ -662,7 +665,7 @@ export function createMockCheckout(input: ShopCheckoutInput) {
   const market = state.markets.find(row => row.id === pickupDay?.marketId)
   const items: OrderItem[] = input.items.map(item => ({
     id: uid('orn'), orderId, kind: 'custom', marketOrnamentId: null, petName: item.petName ?? '', withName: item.withName,
-    color: item.color ?? 'red', finish: item.finish, backName: item.backName ?? '', note: item.note ?? '',
+    color: item.color ?? 'red', finish: item.finish, backName: item.withName ? (item.backName ?? '').trim().toUpperCase() : '', note: item.note ?? '',
     cost: itemCost('custom', item.withName, prices), productionStatus: 'not_started', photos: item.photos,
     formComplete: true, delivery: pickup
       ? { kind: 'market', marketDayId: pickupDay?.id, marketId: market?.id, marketName: market?.name, deliveryDate: input.deliveryDate ?? pickupDay?.date, pickupHour: input.pickupTime ? Number(input.pickupTime.slice(0, 2)) + Number(input.pickupTime.slice(3)) / 60 : null }
@@ -1760,6 +1763,14 @@ export function getForm(token: string): CustomerFormView {
   }
 }
 
+/** Same rule as PricingService.requireBackName: the staff limit, except a name already saved and re-sent unchanged. */
+function requireBackName(raw: string | undefined, saved: string | null, field: string): void {
+  const max = currentPrices().backNameMax ?? DEFAULT_BACK_NAME_MAX
+  if (!paintedNameValid((raw ?? '').trim(), max, saved)) {
+    throw Object.assign(new Error(`Use 1–${max} letters for the painted name.`), { code: 'VALIDATION', field, status: 400 })
+  }
+}
+
 export function submitForm(token: string, payload: CustomerFormPayload): { orderCode: string } {
   const order = state.orders.find((o) => o.formToken === token)
   if (!order || order.status === 'CANCELLED') throw new Error('This form link is not valid.')
@@ -1769,6 +1780,10 @@ export function submitForm(token: string, payload: CustomerFormPayload): { order
   const item = items.find((i) => i.kind === 'custom') ?? items[0]
   if (!customer || !item) throw new Error('Form data missing')
   if (!getForm(token).editable) throw Object.assign(new Error('Form is locked.'), { code: 'FORM_LOCKED', status: 409 })
+  payload.items.forEach((incoming, index) => {
+    const row = items.find(entry => entry.id === incoming.orderItemId)
+    if (row?.withName) requireBackName(incoming.backName, row.backName || null, `items[${index}].backName`)
+  })
   if (getForm(token).needsAddress) {
     if (!payload.address?.line1?.trim() || !payload.address?.city?.trim()) throw Object.assign(new Error('Address required.'), { code: 'VALIDATION', field: 'address' })
     if (!AUSTRIAN_POSTAL_REGEX.test(payload.address.postalCode?.trim() ?? '')) throw Object.assign(new Error('Invalid postal code.'), { code: 'POSTAL_INVALID', field: 'address.postalCode' })
@@ -1788,7 +1803,7 @@ export function submitForm(token: string, payload: CustomerFormPayload): { order
     if (!row) continue
     row.petName = incoming.petName.trim()
     row.note = incoming.note?.trim() ?? ''
-    if (row.withName) row.backName = (incoming.backName ?? '').trim().slice(0, 6).toUpperCase()
+    if (row.withName) row.backName = (incoming.backName ?? '').trim().toUpperCase()
     row.photos = incoming.photos
   }
   items.forEach((row) => {

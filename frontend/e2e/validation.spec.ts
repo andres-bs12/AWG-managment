@@ -82,9 +82,9 @@ for (const field of ['petName', 'backName']) test(`server ${field} rejection foc
 test('paid lettering is checked after uppercase expansion before leaving design', async ({ page }) => {
   await open(page, 'en'); await choose(page)
   await page.getByRole('radio', { name: /^Yes,/ }).check()
-  await page.locator('input[id^="back-"]').fill('Straße')
+  await page.locator('input[id^="back-"]').fill('ßßß')
   await pet(page)
   await next(page).click()
   await expect(page.locator('input[id^="back-"]')).toBeFocused()
-  await expect(page.locator('[id^="back-"][id$="-error"]')).toContainText('1–6')
+  await expect(page.locator('[id^="back-"][id$="-error"]')).toContainText('1–5')
 })
