@@ -127,13 +127,30 @@ class PriceApiTests extends ApiTestSupport {
         assertEquals(0, new BigDecimal("44.00").compareTo(new BigDecimal(this.<Object>read(mediumSale, "$.total").toString())));
     }
 
-    @Test void customOrnamentsNeedASize() throws Exception {
+    @Autowired com.artwithgab.awg_tracking.repository.OrderRepository orderRepository;
+
+    @Test void aSaleFromAnOldScreenWithoutSizeIsBig() throws Exception {
+        // An iPad still showing the New sale screen from before sizes existed sends no size.
         String token = login();
         var item = customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0);
         item.remove("size");
         MvcResult res = sale(token, item);
-        assertEquals(400, res.getResponse().getStatus());
-        assertEquals("items[0].size", this.<String>read(res, "$.field"));
+        assertEquals(201, res.getResponse().getStatus(), res.getResponse().getContentAsString());
+        assertEquals(0, new BigDecimal("50.00").compareTo(new BigDecimal(this.<Object>read(res, "$.total").toString())));
+        var order = orderRepository.findById(UUID.fromString(read(res, "$.id"))).orElseThrow();
+        assertEquals(com.artwithgab.awg_tracking.enums.OrnamentSize.BIG, order.getOrderItems().getFirst().getOrnamentSize());
+    }
+
+    @Test void anOldStockScreenWithoutMediumPriceKeepsIt() throws Exception {
+        String token = login();
+        assertEquals(200, putPrices(token, "50.00", "35.00", "5.00", 0).getResponse().getStatus()); // medium 44.00
+        Map<String, Object> body = new java.util.HashMap<>(Map.of("customPrice", new BigDecimal("52.00"), "finishedPrice", new BigDecimal("35.00"),
+                "nameExtra", new BigDecimal("5.00"), "expectedRevision", 1, "shippingFee", new BigDecimal("5.00"),
+                "postCollectionDays", java.util.List.of("tuesday", "friday")));
+        mvc.perform(put("/api/prices").header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.customPrice").value(52.0))
+                .andExpect(jsonPath("$.customMediumPrice").value(44.0));
     }
 
     @Test void staleRevisionIsAConflict() throws Exception {
