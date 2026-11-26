@@ -127,6 +127,7 @@ public class ViewMapper {
                 i.isWithName(),
                 i.getCustomColor(),
                 i.getCustomFinish(),
+                i.getOrnamentSize(),
                 nz(i.getNameInOrnament()),
                 nz(i.getNote()),
                 i.getCost(),

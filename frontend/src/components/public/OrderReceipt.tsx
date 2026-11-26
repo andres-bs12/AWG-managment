@@ -1,10 +1,11 @@
-import type { OrnamentColor, PaymentState } from '../../domain/types'
+import type { OrnamentColor, OrnamentSize, PaymentState } from '../../domain/types'
 import { useLocale } from '../../i18n/LocaleContext'
 import { receiptTitle } from '../../lib/ornamentTitle'
 import { colorKeys } from '../../lib/ornamentPresentation'
+import { sizeKey } from '../../lib/ornamentSize'
 import styles from './OrderReceipt.module.css'
 
-type ReceiptItem = { petName: string; kind: 'custom' | 'finished'; withName?: boolean; color?: OrnamentColor; cost?: number; backName: string }
+type ReceiptItem = { petName: string; kind: 'custom' | 'finished'; withName?: boolean; color?: OrnamentColor; size?: OrnamentSize | null; cost?: number; backName: string }
 
 /** `shipping`: the Post fee line (Track passes total minus the ornaments for Post orders). */
 export function OrderReceipt({ items, total, paymentState, shipping }: { items: ReceiptItem[]; total?: number; paymentState?: PaymentState; shipping?: number }) {
@@ -19,7 +20,7 @@ export function OrderReceipt({ items, total, paymentState, shipping }: { items: 
             <div>
               <strong>{receiptTitle(item, index, items.length, t)}</strong>
               <span className={styles.meta}>
-                {item.color ? <span className={styles.color}><i data-color={item.color} aria-hidden="true" />{t(colorKeys[item.color])}{item.color === 'grey' || item.color === 'white' ? ` (${t('legacyColour')})` : ''}</span> : item.kind === 'custom' ? <span>{t('colorUnknown')}</span> : null}
+                {item.color ? <span className={styles.color}><i data-color={item.color} aria-hidden="true" />{t(colorKeys[item.color])}{item.color === 'grey' || item.color === 'white' ? ` (${t('legacyColour')})` : ''}{item.size ? ` · ${t(sizeKey(item.size))}` : ''}</span> : item.kind === 'custom' ? <span>{t('colorUnknown')}</span> : null}
               </span>
             </div>
             {item.cost != null ? <span>{money(item.cost)}</span> : null}

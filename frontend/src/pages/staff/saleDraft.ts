@@ -1,4 +1,4 @@
-import type { Address, CapacityResult, CustomFinish, CreateSaleItemInput, ItemKind, Market, MarketDay, OrnamentColor, ShippingQuote } from '../../domain/types'
+import type { Address, CapacityResult, CustomFinish, CreateSaleItemInput, ItemKind, Market, MarketDay, OrnamentColor, OrnamentSize, ShippingQuote } from '../../domain/types'
 import { marketOrnamentLabel, marketOrnamentParts } from '../../domain/marketStock'
 import { isMarketPickupWeekday } from '../../lib/calendar'
 import { earliestPickupHourAfterPaint, PAINT_HANDLING_HOURS } from '../../lib/newSaleRules'
@@ -30,6 +30,8 @@ export type DraftItem = {
   withName: boolean
   color: OrnamentColor
   finish: CustomFinish
+  /** Custom only: staff must choose it (no default), since it sets the price. */
+  size?: OrnamentSize
   durationMinutes: number
   durationPreset: DurationPreset
   paintDate?: string
@@ -194,7 +196,7 @@ export function applySlot(item: DraftItem, date: string, start: number, end: num
 }
 
 export function draftTotal(items: DraftItem[], prices: Pricing): number {
-  const itemsSum = items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0)
+  const itemsSum = items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices, item.size), 0)
   const shipping = items.some(item => item.delivery.mode === 'post') ? (prices.shippingFee ?? 0) : 0
   return Math.round((itemsSum + shipping) * 100) / 100
 }
@@ -274,6 +276,7 @@ export function toCreateItems(items: DraftItem[], days: MarketDay[], today?: Mar
         withName: item.kind === 'custom' && item.withName,
         color: item.kind === 'custom' ? item.color : undefined,
         finish: item.kind === 'custom' ? item.finish ?? 'shiny' : undefined,
+        size: item.kind === 'custom' ? item.size : undefined,
         paintDate: item.kind === 'custom' ? item.paintDate : undefined,
         paintStart: item.kind === 'custom' ? item.paintStart : undefined,
         paintEnd: item.kind === 'custom' ? item.paintEnd : undefined,
@@ -292,6 +295,7 @@ export function toCreateItems(items: DraftItem[], days: MarketDay[], today?: Mar
       marketOrnamentId: item.kind === 'finished' ? item.marketOrnamentId : undefined,
       withName: item.kind === 'custom' && item.withName,
       color: item.kind === 'custom' ? item.color : undefined,
+      size: item.kind === 'custom' ? item.size : undefined,
       finish: item.kind === 'custom' ? item.finish ?? 'shiny' : undefined,
       paintDate: item.kind === 'custom' ? item.paintDate : undefined,
       paintStart: item.kind === 'custom' ? item.paintStart : undefined,

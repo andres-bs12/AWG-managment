@@ -44,7 +44,7 @@ test('mock Ready releases the original booking and undo keeps its recorded inter
   const sale = await store.createSale({
     soldOnMarketDayId: 'md-28',
     customerName: 'New appointment',
-    items: [{ kind: 'custom', color: 'red', finish: 'matte', withName: false, deliveryKind: 'market',
+    items: [{ kind: 'custom', size: 'big', color: 'red', finish: 'matte', withName: false, deliveryKind: 'market',
       marketDayId: 'md-04', pickupHour: 14, paintDate: '2026-11-30', paintStart: 10, paintEnd: 11 }],
   })
   assert.ok(sale.code)
@@ -73,7 +73,9 @@ test('mock web Post checkout reserves planned paint blocks so a second purchase 
   // 2026-11-30 already has a booked block from the earlier test; open 2026-12-03 with exactly 1 hour (10:00–11:00).
   store.updatePaintingDay('2026-12-03', true, { openHour: 10, closeHour: 11 })
 
-  const items = [{ kind: 'custom', color: 'red', finish: 'shiny', withName: false, petName: 'Luna', photos: [] }]
+  // Medium bases start at 0 (counted per size); stock two so both checkouts reach the shipping check.
+  store.updateInventory('custom-red-shiny-medium', 2)
+  const items = [{ kind: 'custom', size: 'medium', color: 'red', finish: 'shiny', withName: false, petName: 'Luna', photos: [] }]
   const quote1 = store.getShippingQuote(items)
   assert.equal(quote1.available, true)
   assert.equal(quote1.collectionDate, '2026-12-04')

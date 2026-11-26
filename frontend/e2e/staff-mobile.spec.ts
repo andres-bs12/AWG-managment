@@ -1,6 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { axe } from './helpers'
-import { httpFixture, signedIn, navigation, today, spareMarket } from './staff-fixture'
+import { httpFixture, signedIn, navigation, today, spareMarket, chooseSizes } from './staff-fixture'
 
 async function openFilters(page: Page) {
   const button = page.getByRole('button', { name: /^Filters \(/ })
@@ -209,13 +209,17 @@ test('stock groups accessible swatches and independent finish saves on a full-he
     const card = page.getByRole('article', { name: `${color} bases`, exact: true })
     await expect(card.getByRole('heading', { level: 2 })).toHaveAccessibleName(color)
     await expect(card.getByRole('img', { name: color, exact: true })).toHaveCount(1)
-    await expect(card.getByRole('heading', { name: 'Shiny', exact: true })).toHaveCount(1)
-    await expect(card.getByRole('heading', { name: 'Matte', exact: true })).toHaveCount(1)
-    const shiny = card.getByRole('group', { name: `Custom · ${color} · shiny`, exact: true })
+    // One Shiny and one Matte row per size.
+    await expect(card.getByRole('heading', { name: 'Shiny', exact: true })).toHaveCount(2)
+    await expect(card.getByRole('heading', { name: 'Matte', exact: true })).toHaveCount(2)
+    await expect(card.getByText('Big 10 cm', { exact: true })).toBeVisible()
+    await expect(card.getByText('Medium 8 cm', { exact: true })).toBeVisible()
+    await expect(card.getByRole('spinbutton', { name: `Custom · ${color} · shiny · Medium 8 cm quantity`, exact: true })).toHaveValue('0')
+    const shiny = card.getByRole('group', { name: `Custom · ${color} · shiny · Big 10 cm`, exact: true })
     await shiny.getByRole('button', { name: /^Increase/ }).click()
     await shiny.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(shiny.getByRole('status')).toHaveText('Saved')
-    await expect(card.getByRole('spinbutton', { name: `Custom · ${color} · matte quantity`, exact: true })).toHaveValue('3')
+    await expect(card.getByRole('spinbutton', { name: `Custom · ${color} · matte · Big 10 cm quantity`, exact: true })).toHaveValue('3')
   }
   expect(fixture.mutations.filter(row => row.path.startsWith('/api/inventory/'))).toHaveLength(3)
   await expect(page.getByRole('heading', { name: 'Unnumbered finished stock', exact: true })).toHaveCount(0)
@@ -285,6 +289,7 @@ test('a calendar sale appears in the calendar and opens its order from a legacy 
   const continueButton = page.getByRole('button', { name: 'Continue', exact: true })
   await clearAction(continueButton)
   await expect(continueButton).toHaveJSProperty('disabled', false)
+  await chooseSizes(page)
   await continueButton.click()
   await expect(page.getByRole('heading', { name: 'Painting plan', exact: true })).toBeVisible()
   await expect(page.getByText(/^Fri,? 6 Nov · 13:00–14:00$/, { exact: true }).first()).toBeVisible()

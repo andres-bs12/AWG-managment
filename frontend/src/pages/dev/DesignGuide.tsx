@@ -110,7 +110,7 @@ function ShopFixture() {
   const patch: BuyStepProps['patch'] = partial => setDraft(current => ({ ...current, ...partial }))
   const patchItem: BuyStepProps['patchItem'] = (uid, partial) => setDraft(current => ({ ...current, items: current.items.map(item => item.uid === uid ? { ...item, ...partial } : item) }))
   const shared: BuyStepProps = {
-    t, draft, config: state === 'sold-out' ? { ...guideConfig, colors: guideConfig.colors.map(option => ({ ...option, inStock: false })) } : guideConfig, itemPrice: item => guideConfig.customPrice + (item.withName ? guideConfig.nameExtra : 0), patch, patchItem,
+    t, draft, config: state === 'sold-out' ? { ...guideConfig, colors: guideConfig.colors.map(option => ({ ...option, inStock: false })) } : guideConfig, itemPrice: item => (item.size === 'medium' ? guideConfig.customMediumPrice : guideConfig.customPrice) + (item.withName ? guideConfig.nameExtra : 0), patch, patchItem,
     err: key => state === 'error' ? t(key.startsWith('photos') ? 'photoInvalid' : 'required') : undefined,
     described: key => state === 'error' ? `${key}-error` : undefined,
     photoErrors: state === 'upload-error' ? { [active.uid]: t('photoInvalid') } : {},

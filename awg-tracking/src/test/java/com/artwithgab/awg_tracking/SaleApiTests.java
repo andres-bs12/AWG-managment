@@ -40,7 +40,7 @@ class SaleApiTests extends ApiTestSupport {
 
         MvcResult res = sale(token, custom, finished);
         assertEquals(201, res.getResponse().getStatus(), res.getResponse().getContentAsString());
-        assertEquals(0, new BigDecimal("102.97").compareTo(new BigDecimal(this.<Object>read(res, "$.total").toString())));
+        assertEquals(0, new BigDecimal("97.99").compareTo(new BigDecimal(this.<Object>read(res, "$.total").toString())));
 
         assertEquals(redBefore - 1, inventory.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity());
         assertEquals(genericBefore, inventory.findFirstByItemKind(ItemKind.GENERIC).orElseThrow().getQuantity());

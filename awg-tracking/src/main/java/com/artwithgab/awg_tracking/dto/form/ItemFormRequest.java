@@ -1,5 +1,6 @@
 package com.artwithgab.awg_tracking.dto.form;
 
+import com.artwithgab.awg_tracking.service.PricingService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -12,7 +13,7 @@ import java.util.UUID;
 public record ItemFormRequest(
         @NotNull UUID orderItemId,
         @Size(max = 60) String petName,
-        @Size(max = 6) String backName,
+        @Size(max = PricingService.BACK_NAME_MAX_LIMIT) String backName,
         @Size(max = 1000) String note,
         @NotNull @Size(max = 6) @Valid List<FormPhotoRef> photos
 ) {

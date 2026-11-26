@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { axe } from './helpers'
-import { staffUser, token, today, marketDay, spareMarket, httpFixture, navigation, signedIn } from './staff-fixture'
+import { staffUser, token, today, marketDay, spareMarket, httpFixture, navigation, signedIn, chooseSizes } from './staff-fixture'
 
 async function addInlineFinishedPiece(page: Page, id = 'RM01') {
   await page.getByRole('button', { name: /Add finished/ }).click()
@@ -10,6 +10,7 @@ async function addInlineFinishedPiece(page: Page, id = 'RM01') {
 
 async function newInlineFinishedSale(page: Page) {
   await addInlineFinishedPiece(page)
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.getByRole('radio', { name: 'Paid', exact: true }).locator('..').click()
   await page.getByRole('radio', { name: 'Cash', exact: true }).locator('..').click()
@@ -101,6 +102,7 @@ test('a fresh sale consumes the query once, survives reload, and sends a new HTT
   expect(secondKey).not.toBe(first.key)
   await page.reload()
   await expect(page.getByRole('heading', { name: /RM02 · Red · Matte/ })).toBeVisible()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.getByRole('radio', { name: 'Paid', exact: true }).locator('..').click()
   await page.getByRole('radio', { name: 'Cash', exact: true }).locator('..').click()
@@ -118,6 +120,7 @@ for (const status of ['sold', 'unpainted'] as const) {
     const fixture = await httpFixture(page)
     await signedIn(page, '/staff/sales/new')
     await addInlineFinishedPiece(page)
+    await chooseSizes(page)
     await page.getByRole('button', { name: 'Continue', exact: true }).click()
     await page.getByRole('radio', { name: 'Cash', exact: true }).locator('..').click()
     fixture.marketPieces[0].status = status
@@ -128,6 +131,7 @@ for (const status of ['sold', 'unpainted'] as const) {
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await page.getByRole('list', { name: 'Ready ornaments' }).getByRole('button', { name: /^RM02 ·/ }).click()
     await expect(page.getByRole('heading', { name: /^RM02 · Red · Matte/ })).toBeVisible()
+    await chooseSizes(page)
     await page.getByRole('button', { name: 'Continue', exact: true }).click()
     await page.getByRole('button', { name: 'Done', exact: true }).click()
     await expect(page.getByRole('link', { name: 'Open order', exact: true })).toBeVisible()
@@ -139,6 +143,7 @@ test('custom calendar sale reaches QR, and fresh starts a second custom order wi
   const fixture = await httpFixture(page)
   await signedIn(page, `/staff/sales/new?date=${today}&start=13&end=14`)
   await expect(page.getByRole('heading', { name: /Custom 1/ })).toBeVisible()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(page.getByText(/^Fri,? 6 Nov · 13:00–14:00$/, { exact: true }).first()).toBeVisible()
   await page.getByRole('button', { name: 'Create order & show QR', exact: true }).click()
@@ -155,6 +160,7 @@ test('custom calendar sale reaches QR, and fresh starts a second custom order wi
   await page.locator('a[href="/staff/sales/new?fresh=1"]:visible').first().click()
   await expect(page).toHaveURL(/\/staff\/sales\/new$/)
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.route('**/api/agenda/capacity', route => route.fulfill({ json: { ok: true, slot: { date: today, startHour: 14, endHour: 15 }, remainingHours: 3, message: 'Available' } }))
   await page.getByRole('button', { name: '17:00', exact: true }).click()
@@ -211,6 +217,7 @@ test('New sale Back confirms discarding a draft and restores the start choices',
   await expect(progress.locator('li')).toHaveCount(3)
   await expect(progress.locator('[aria-current="step"]')).toContainText('Items')
   await expect(progress.locator('[aria-hidden="true"]')).toHaveText(['1', '2', '3'])
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(progress.locator('[aria-current="step"]')).toContainText('Pickup')
   await expect(progress.locator('[aria-hidden="true"]')).toHaveText(['✓', '2', '3'])
@@ -235,6 +242,31 @@ test('New sale Back confirms discarding a draft and restores the start choices',
   await expect(progress).toHaveCount(0)
 })
 
+test('New sale counts bases per size: Medium with no bases is sold out and a medium base unlocks it', async ({ page }) => {
+  await httpFixture(page)
+  await signedIn(page, '/staff/sales/new')
+  await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  const medium = page.getByRole('radio', { name: /^Medium 8 cm/ })
+  // The fixture starts every medium base at 0, like production after V22.
+  await expect(medium).toBeDisabled()
+  await expect(medium.locator('..')).toContainText('Sold out')
+  await expect(page.getByRole('radio', { name: /^Big 10 cm/ })).toBeEnabled()
+  await page.evaluate(async () => {
+    const path = '/src/api/client.ts'
+    const { api } = await import(path)
+    const row = (await api.inventory.list()).find((r: { color?: string; finish?: string; size?: string }) => r.color === 'beige' && r.finish === 'matte' && r.size === 'medium')!
+    await api.inventory.update(row.id, 1, row.quantity)
+  })
+  // The draft survives the reload and the new count unlocks Medium.
+  await page.reload()
+  await expect(page.getByRole('radio', { name: /^Medium 8 cm/ })).toBeEnabled()
+  await page.getByRole('radio', { name: /^Medium 8 cm/ }).locator('..').click()
+  // Choosing Medium moves the ornament to the only combination that has a medium base.
+  await expect(page.getByRole('radio', { name: /^Beige/ })).toBeChecked()
+  await expect(page.getByRole('radio', { name: /^Matte/ })).toBeChecked()
+  await expect(page.getByRole('radio', { name: /^Red/ })).toBeDisabled()
+})
+
 test('staff totals use server prices, stock is explicit, and deposit records the displayed amount', async ({ page }) => {
   const fixture = await httpFixture(page)
   await signedIn(page, '/staff/sales/new')
@@ -245,8 +277,17 @@ test('staff totals use server prices, stock is explicit, and deposit records the
     const rows = await api.inventory.list()
     const matteGreen = rows.find((row: { color?: string; finish?: string }) => row.color === 'green' && row.finish === 'matte')!
     await api.inventory.update(matteGreen.id, 0, matteGreen.quantity)
+    // Bases are counted per size; the fixture starts medium at 0, so stock one medium base to choose Medium.
+    const mediumRed = rows.find((row: { color?: string; finish?: string; size?: string }) => row.color === 'red' && row.finish === 'shiny' && row.size === 'medium')!
+    await api.inventory.update(mediumRed.id, 1, mediumRed.quantity)
   })
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  // No size yet: the price waits for the choice, and each size shows its own server price.
+  await expect(page.getByRole('heading', { name: /Custom 1/ })).toContainText('Choose size')
+  await expect(page.getByRole('radio', { name: /^Medium 8 cm/ }).locator('..')).toContainText('€52.00')
+  await page.getByRole('radio', { name: /^Medium 8 cm/ }).locator('..').click()
+  await expect(page.getByRole('heading', { name: /Custom 1/ })).toContainText('52')
+  await chooseSizes(page)
   await expect(page.getByRole('heading', { name: /Custom 1/ })).toContainText('57')
   await expect(page.getByRole('radio', { name: /^Green/ }).locator('..')).toContainText('3 left')
   await page.getByRole('radio', { name: /^Green/ }).locator('..').click()
@@ -261,6 +302,7 @@ test('staff totals use server prices, stock is explicit, and deposit records the
   await page.getByRole('dialog', { name: 'Discard this sale?', exact: true }).getByRole('button', { name: 'Discard', exact: true }).click()
   await addInlineFinishedPiece(page)
   await expect(page.getByRole('heading', { name: /RM01 · Red · Matte/ })).toContainText('41')
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(page.getByLabel(/Deposit received/)).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeDisabled()
@@ -765,6 +807,7 @@ test('leaving a created sale is explicit, the QR stays reachable from payment, a
   await signedIn(page, `/staff/sales/new?date=${today}&start=13&end=14`)
   const proceed = page.getByRole('button', { name: 'Continue', exact: true })
   expect((await proceed.boundingBox())!.height).toBeGreaterThanOrEqual(56)
+  await chooseSizes(page)
   await proceed.click()
   await page.getByRole('button', { name: 'Create order & show QR', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Enlarge customer QR code', exact: true })).toBeVisible()
@@ -791,6 +834,7 @@ test('leaving a created sale is explicit, the QR stays reachable from payment, a
 test('after the QR, Change date asks first, cancels the order and offers only pickup hours with paint time', async ({ page }) => {
   const fixture = await httpFixture(page)
   await signedIn(page, `/staff/sales/new?date=${today}&start=13&end=14`)
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.getByRole('button', { name: 'Create order & show QR', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Enlarge customer QR code', exact: true })).toBeVisible()
@@ -843,6 +887,7 @@ test('after the QR, Change date asks first, cancels the order and offers only pi
 test('Change date refuses to cancel an order that already has a payment', async ({ page }) => {
   const fixture = await httpFixture(page)
   await signedIn(page, `/staff/sales/new?date=${today}&start=13&end=14`)
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.getByRole('button', { name: 'Create order & show QR', exact: true }).click()
   await expect.poll(() => fixture.saleRequests.length).toBe(1)
@@ -868,6 +913,7 @@ test('mock: one finished ornament, Deliver now, Paid in cash completes the sale'
   await navigation(page, '/staff/sales/new')
   await addInlineFinishedPiece(page)
   await expect(page.getByRole('heading', { name: /RM01 · Red · Matte/ })).toContainText('€')
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.getByRole('radio', { name: 'Deliver now', exact: true }).locator('..').click()
   await page.getByRole('radio', { name: 'Paid', exact: true }).locator('..').click()
@@ -945,13 +991,13 @@ test('a market day conflict is shown next to Save with focus and marks its day r
 test('stock rows save only when changed and a conflict keeps the server value by default', async ({ page }) => {
   const fixture = await httpFixture(page)
   await signedIn(page, '/staff/inventory')
-  const row = page.getByRole('group', { name: 'Custom · red · shiny', exact: true })
+  const row = page.getByRole('group', { name: 'Custom · red · shiny · Big 10 cm', exact: true })
   const save = row.getByRole('button', { name: 'Save', exact: true })
   await expect(save).toBeDisabled()
   await row.getByRole('button', { name: /^Increase/ }).click()
   await expect(save).toBeEnabled()
   // Another device sells one meanwhile: the server answers STOCK_CHANGED.
-  await page.route(url => url.pathname === '/api/inventory', route => route.fulfill({ json: [{ id: 'stock-0', kind: 'custom', color: 'red', finish: 'shiny', quantity: 2 }] }))
+  await page.route(url => url.pathname === '/api/inventory', route => route.fulfill({ json: [{ id: 'stock-0', kind: 'custom', color: 'red', finish: 'shiny', size: 'big', quantity: 2 }] }))
   await page.route(url => url.pathname === '/api/inventory/stock-0', route => route.fulfill({ status: 409, json: { code: 'STOCK_CHANGED', message: 'Stock changed.' } }))
   await save.click()
   await expect(row.getByRole('alert')).toContainText('Server now has 2')
@@ -1020,7 +1066,8 @@ test('mock: a full Today cannot be chosen and the market-day choice opens instea
     store.updatePaintingDay('2026-11-28', true, { openHour: 15, closeHour: 18 })
   })
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
-  await expect(page.getByRole('heading', { name: /Custom 1 · €/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Custom 1 · (€|Choose size)/ })).toBeVisible()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   const todayOption = page.getByRole('radio', { name: 'Today · full', exact: true })
   await expect(todayOption).toBeDisabled()

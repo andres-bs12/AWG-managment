@@ -3,7 +3,7 @@ import { filterSales } from '../../lib/sales'
 import { readFormToken, rememberFormToken } from '../formTokens'
 import type {
   Prices, PricesUpdate,
-  InventoryItem, PaintingDay, ShopCheckoutInput, ShopItemInput, ShippingQuote,
+  InventoryItem, OrnamentSize, PaintingDay, ShopCheckoutInput, ShopItemInput, ShippingQuote,
   MakeRoomInput, MakeRoomMove, MakeRoomResult, PostCollectionDay,
   AgendaDay,
   AgendaDelivery,
@@ -29,6 +29,7 @@ import type {
   TrackWhen,
 } from '../../domain/types'
 import { itemCost } from '../../lib/money'
+import { DEFAULT_BACK_NAME_MAX, paintedNameValid } from '../../lib/paintedName'
 import {
   AUSTRIAN_POSTAL_REGEX,
   isCollectionOn,
@@ -312,9 +313,11 @@ export function updatePrices(input: PricesUpdate): Prices {
   if (problem) throw Object.assign(new Error(problem), { status: 400 })
   state.prices = {
     customPrice: input.customPrice,
+    customMediumPrice: input.customMediumPrice ?? current.customMediumPrice,
     finishedPrice: input.finishedPrice,
     nameExtra: input.nameExtra,
     shippingFee: input.shippingFee ?? current.shippingFee,
+    backNameMax: input.backNameMax ?? current.backNameMax,
     postCollectionDays: [...(input.postCollectionDays ?? current.postCollectionDays)],
     finishedWithCustom: current.finishedWithCustom,
     revision: current.revision + 1,
@@ -396,16 +399,25 @@ export function getShippingQuote(items: Pick<ShopItemInput, 'kind' | 'withName'>
   return planMockPostShipping(items).quote
 }
 
+/** Stock row id of a custom base; big rows keep the ids they had before sizes existed. */
+function stockId(color: string, finish: string, size: OrnamentSize | null | undefined): string {
+  return size === 'medium' ? `custom-${color}-${finish}-medium` : `custom-${color}-${finish}`
+}
+
 export function listInventory(): InventoryItem[] {
   const rows = state.inventory ??= []
   for (const color of ['red', 'green', 'beige'] as const) for (const finish of ['shiny', 'matte'] as const) {
-    if (!rows.some(row => row.kind === 'custom' && row.color === color && row.finish === finish)) {
+    if (!rows.some(row => row.kind === 'custom' && row.color === color && row.finish === finish && (row.size ?? 'big') === 'big')) {
       const legacy = finish === 'shiny' ? rows.find(row => row.kind === 'custom' && row.color === color && !row.finish) : undefined
-      if (legacy) { legacy.finish = finish; legacy.id = `custom-${color}-${finish}` }
-      else rows.push({ id: `custom-${color}-${finish}`, kind: 'custom', color, finish, quantity: 3 })
+      if (legacy) { legacy.finish = finish; legacy.id = stockId(color, finish, 'big') }
+      else rows.push({ id: stockId(color, finish, 'big'), kind: 'custom', color, finish, size: 'big', quantity: 3 })
+    }
+    // Medium bases start at 0 until staff counts them on Stock, like production (V22).
+    if (!rows.some(row => row.kind === 'custom' && row.color === color && row.finish === finish && row.size === 'medium')) {
+      rows.push({ id: stockId(color, finish, 'medium'), kind: 'custom', color, finish, size: 'medium', quantity: 0 })
     }
   }
-  for (const row of rows) if (row.kind === 'custom' && !row.finish) row.finish = 'shiny'
+  for (const row of rows) if (row.kind === 'custom') { if (!row.finish) row.finish = 'shiny'; if (!row.size) row.size = 'big' }
   if (!rows.some(row => row.kind === 'finished')) rows.push({ id: 'finished', kind: 'finished', color: null, finish: null, quantity: 10 })
   return rows
 
@@ -609,8 +621,10 @@ export function createMockCheckout(input: ShopCheckoutInput) {
   const inventory = listInventory()
   const counts = new Map<string, number>()
   for (const item of input.items) {
+    if (item.size !== 'big' && item.size !== 'medium') throw Object.assign(new Error('Choose Big (10 cm) or Medium (8 cm) for each personalised ornament.'), { code: 'VALIDATION', field: `items[${input.items.indexOf(item)}].size` })
     if (!item.finish || !item.color || !['red', 'green', 'beige'].includes(item.color)) throw Object.assign(new Error('Choose a valid colour and finish.'), { code: 'VALIDATION', field: `items[${input.items.indexOf(item)}].${!item.finish ? 'finish' : 'color'}` })
-    const id = `custom-${item.color}-${item.finish}`
+    if (item.withName) requireBackName(item.backName, null, `items[${input.items.indexOf(item)}].backName`)
+    const id = stockId(item.color, item.finish, item.size)
     counts.set(id, (counts.get(id) ?? 0) + 1)
   }
   for (const [id, count] of counts) {
@@ -662,8 +676,8 @@ export function createMockCheckout(input: ShopCheckoutInput) {
   const market = state.markets.find(row => row.id === pickupDay?.marketId)
   const items: OrderItem[] = input.items.map(item => ({
     id: uid('orn'), orderId, kind: 'custom', marketOrnamentId: null, petName: item.petName ?? '', withName: item.withName,
-    color: item.color ?? 'red', finish: item.finish, backName: item.backName ?? '', note: item.note ?? '',
-    cost: itemCost('custom', item.withName, prices), productionStatus: 'not_started', photos: item.photos,
+    color: item.color ?? 'red', finish: item.finish, size: item.size, backName: item.withName ? (item.backName ?? '').trim().toUpperCase() : '', note: item.note ?? '',
+    cost: itemCost('custom', item.withName, prices, item.size), productionStatus: 'not_started', photos: item.photos,
     formComplete: true, delivery: pickup
       ? { kind: 'market', marketDayId: pickupDay?.id, marketId: market?.id, marketName: market?.name, deliveryDate: input.deliveryDate ?? pickupDay?.date, pickupHour: input.pickupTime ? Number(input.pickupTime.slice(0, 2)) + Number(input.pickupTime.slice(3)) / 60 : null }
       : { kind: 'post', address: cleanAddress, deliveryDate: postQuote!.collectionDate!, arrivalFrom: postQuote!.arrivalFrom, arrivalTo: postQuote!.arrivalTo },
@@ -1007,6 +1021,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         customerName: customer.name,
         color: item.color,
         finish: item.finish,
+        size: item.size,
         backName: item.backName,
         title,
         productionStatus: item.productionStatus,
@@ -1037,6 +1052,7 @@ function deliveriesForDate(date: string): AgendaDelivery[] {
         customerName: customer.name,
         color: item.color,
         finish: item.finish,
+        size: item.size,
         backName: item.backName,
         title,
         productionStatus: item.productionStatus,
@@ -1400,7 +1416,8 @@ function createSaleOrder(input: CreateSaleInput, orderId: string, code: string):
   for (const row of rows) {
     const itemId = uid('orn')
     const withName = row.kind === 'custom' && row.withName
-    const cost = itemCost(row.kind, withName, prices)
+    if (row.kind === 'custom' && row.size !== 'big' && row.size !== 'medium') throw invalidField('Choose Big (10 cm) or Medium (8 cm) for each personalised ornament.', `items[${createdItems.length}].size`)
+    const cost = itemCost(row.kind, withName, prices, row.kind === 'custom' ? row.size : undefined)
     const isPost = row.deliveryKind === 'post'
     const handoff = isPost ? undefined : row.marketDayId ? state.marketDays.find(day => day.id === row.marketDayId)
       : row.kind === 'finished' && row.deliveryKind === 'market' ? soldOn : undefined
@@ -1425,6 +1442,7 @@ function createSaleOrder(input: CreateSaleInput, orderId: string, code: string):
       withName,
       color: row.kind === 'custom' ? row.color ?? 'red' : undefined,
       finish: row.kind === 'custom' ? row.finish ?? 'shiny' : undefined,
+      size: row.kind === 'custom' ? row.size : undefined,
       backName: '',
       note: '',
       cost,
@@ -1489,7 +1507,7 @@ function createSaleOrder(input: CreateSaleInput, orderId: string, code: string):
   const stockCounts = new Map<InventoryItem, number>()
   for (const item of createdItems) {
     if (item.kind !== 'custom') continue
-    const stock = listInventory().find(row => row.kind === 'custom' && row.color === item.color && row.finish === item.finish)
+    const stock = listInventory().find(row => row.id === stockId(item.color ?? '', item.finish ?? 'shiny', item.size))
     if (!stock) throw Object.assign(new Error('Out of stock.'), { code: 'OUT_OF_STOCK' })
     stockCounts.set(stock, (stockCounts.get(stock) ?? 0) + 1)
   }
@@ -1696,6 +1714,7 @@ export function getTrackByCode(code: string): TrackView {
     items: items.map((i) => ({
       color: i.color,
       finish: i.finish,
+      size: i.size,
       cost: i.cost,
       petName: personal ? i.petName : '',
       kind: i.kind,
@@ -1760,6 +1779,14 @@ export function getForm(token: string): CustomerFormView {
   }
 }
 
+/** Same rule as PricingService.requireBackName: the staff limit, except a name already saved and re-sent unchanged. */
+function requireBackName(raw: string | undefined, saved: string | null, field: string): void {
+  const max = currentPrices().backNameMax ?? DEFAULT_BACK_NAME_MAX
+  if (!paintedNameValid((raw ?? '').trim(), max, saved)) {
+    throw Object.assign(new Error(`Use 1–${max} letters for the painted name.`), { code: 'VALIDATION', field, status: 400 })
+  }
+}
+
 export function submitForm(token: string, payload: CustomerFormPayload): { orderCode: string } {
   const order = state.orders.find((o) => o.formToken === token)
   if (!order || order.status === 'CANCELLED') throw new Error('This form link is not valid.')
@@ -1769,6 +1796,10 @@ export function submitForm(token: string, payload: CustomerFormPayload): { order
   const item = items.find((i) => i.kind === 'custom') ?? items[0]
   if (!customer || !item) throw new Error('Form data missing')
   if (!getForm(token).editable) throw Object.assign(new Error('Form is locked.'), { code: 'FORM_LOCKED', status: 409 })
+  payload.items.forEach((incoming, index) => {
+    const row = items.find(entry => entry.id === incoming.orderItemId)
+    if (row?.withName) requireBackName(incoming.backName, row.backName || null, `items[${index}].backName`)
+  })
   if (getForm(token).needsAddress) {
     if (!payload.address?.line1?.trim() || !payload.address?.city?.trim()) throw Object.assign(new Error('Address required.'), { code: 'VALIDATION', field: 'address' })
     if (!AUSTRIAN_POSTAL_REGEX.test(payload.address.postalCode?.trim() ?? '')) throw Object.assign(new Error('Invalid postal code.'), { code: 'POSTAL_INVALID', field: 'address.postalCode' })
@@ -1788,7 +1819,7 @@ export function submitForm(token: string, payload: CustomerFormPayload): { order
     if (!row) continue
     row.petName = incoming.petName.trim()
     row.note = incoming.note?.trim() ?? ''
-    if (row.withName) row.backName = (incoming.backName ?? '').trim().slice(0, 6).toUpperCase()
+    if (row.withName) row.backName = (incoming.backName ?? '').trim().toUpperCase()
     row.photos = incoming.photos
   }
   items.forEach((row) => {

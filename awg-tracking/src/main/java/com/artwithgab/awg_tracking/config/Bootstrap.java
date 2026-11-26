@@ -58,19 +58,22 @@ public class Bootstrap implements ApplicationRunner {
 
     private void seedInventory() {
         int qty = props.bootstrap().initialCustomStock();
-        // One stock row per offered color and finish; rows of colors no longer sold are kept as they are.
+        // One stock row per offered color, finish and size; rows of colors no longer sold are kept as they are.
         // On an existing install, combinations added later start at 0 until staff counts them.
         boolean fresh = inventoryRepository.findByItemKind(ItemKind.CUSTOM).isEmpty();
         for (CustomColor color : CustomColor.values()) {
             if (!color.isOffered()) continue;
             for (com.artwithgab.awg_tracking.enums.CustomFinish finish : com.artwithgab.awg_tracking.enums.CustomFinish.values()) {
-                if (inventoryRepository.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, color, finish).isEmpty()) {
-                    Inventory row = new Inventory();
-                    row.setItemKind(ItemKind.CUSTOM);
-                    row.setCustomColor(color);
-                    row.setCustomFinish(finish);
-                    row.setQuantity(fresh ? qty : 0);
-                    inventoryRepository.save(row);
+                for (com.artwithgab.awg_tracking.enums.OrnamentSize size : com.artwithgab.awg_tracking.enums.OrnamentSize.values()) {
+                    if (inventoryRepository.findByItemKindAndCustomColorAndCustomFinishAndOrnamentSize(ItemKind.CUSTOM, color, finish, size).isEmpty()) {
+                        Inventory row = new Inventory();
+                        row.setItemKind(ItemKind.CUSTOM);
+                        row.setCustomColor(color);
+                        row.setCustomFinish(finish);
+                        row.setOrnamentSize(size);
+                        row.setQuantity(fresh ? qty : 0);
+                        inventoryRepository.save(row);
+                    }
                 }
             }
         }

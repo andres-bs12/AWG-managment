@@ -124,13 +124,13 @@ class StaffReviewFixesTests extends ApiTestSupport {
                 .content(json(java.util.Map.of("state", "deposit", "method", "cash", "amountPaid", 20))))
                 .andExpect(status().isOk());
         mvc.perform(get("/api/agenda/days/" + SAT).header("Authorization", bearer(token)))
-                .andExpect(jsonPath("$.deliveries[0].remaining").value(29.99))
+                .andExpect(jsonPath("$.deliveries[0].remaining").value(30.0))
                 .andExpect(jsonPath("$.deliveries[0].paymentState").value("deposit"));
     }
 
     @Test
     void serverConfigIncludesFinishedOrnamentPrice() throws Exception {
         mvc.perform(get("/api/shop/config")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.finishedPrice").value(39.99));
+                .andExpect(jsonPath("$.finishedPrice").value(35.0));
     }
 }

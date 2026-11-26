@@ -8,8 +8,10 @@ import { MarketStock } from './MarketStock'
 import { NumberStepper } from '../../components/staff/NumberStepper'
 import { formatStaffShortDate } from '../../lib/postShipping'
 import { parseEuroAmount } from '../../lib/staffInput'
+import { BACK_NAME_MAX_LIMIT, DEFAULT_BACK_NAME_MAX } from '../../lib/paintedName'
 import { useStaffClock } from '../../lib/staffClock'
 import { addUtcDays } from '../../lib/time'
+import { ORNAMENT_SIZES, sizeLabel } from '../../lib/ornamentSize'
 import styles from './SettingsRows.module.css'
 
 const LOAD_ERROR = 'Could not load prices and stock. Check the connection and try again.'
@@ -34,7 +36,11 @@ export function InventoryPage() {
   const legacy = (color: InventoryItem['color']) => color === 'grey' || color === 'white'
   const colorCards = (old: boolean) => colors.filter(color => legacy(color) === old).map(color => <article key={color} className={styles.stockCard} aria-label={`${color} bases`}>
     <h2><span className={styles.swatch} style={{ background: `var(--ornament-${color})` }} role="img" aria-label={`${color}`} /></h2>
-    {custom.filter(row => row.color === color).map(row => <StockRow key={row.id} item={row} />)}
+    {/* Bases are counted per size: Big first, then Medium, each with its Shiny and Matte rows. */}
+    {ORNAMENT_SIZES.map(size => {
+      const sized = custom.filter(row => row.color === color && (row.size ?? 'big') === size)
+      return sized.length ? [<p key={size} className={styles.sizeLabel}>{sizeLabel(size)}</p>, ...sized.map(row => <StockRow key={row.id} item={row} />)] : null
+    })}
   </article>)
   useEffect(() => {
     let active = true
@@ -61,21 +67,30 @@ export function InventoryPage() {
   </section>
 }
 
-type PriceField = 'customPrice' | 'finishedPrice' | 'nameExtra' | 'shippingFee'
+type PriceField = 'customPrice' | 'customMediumPrice' | 'finishedPrice' | 'nameExtra' | 'shippingFee' | 'backNameMax'
 type PriceDraft = Record<PriceField, string>
 
-const PRICE_FIELDS: { key: PriceField; label: string; id: string }[] = [
-  { key: 'customPrice', label: 'Custom ornament', id: 'price-custom' },
-  { key: 'finishedPrice', label: 'Finished ornament', id: 'price-finished' },
-  { key: 'nameExtra', label: 'Name on the back (extra)', id: 'price-name' },
-  { key: 'shippingFee', label: 'Post shipping', id: 'price-shipping' },
+const PRICE_FIELDS: { key: PriceField; label: string; id: string; unit: 'euro' | 'letters' }[] = [
+  { key: 'customPrice', label: 'Custom · Big 10 cm', id: 'price-custom', unit: 'euro' },
+  { key: 'customMediumPrice', label: 'Custom · Medium 8 cm', id: 'price-custom-medium', unit: 'euro' },
+  { key: 'finishedPrice', label: 'Finished ornament', id: 'price-finished', unit: 'euro' },
+  { key: 'nameExtra', label: 'Name on the back (extra)', id: 'price-name', unit: 'euro' },
+  { key: 'backNameMax', label: 'Name on the back (max. letters)', id: 'price-name-max', unit: 'letters' },
+  { key: 'shippingFee', label: 'Post shipping', id: 'price-shipping', unit: 'euro' },
 ]
 const MAX_PRICE = 999.99
 const MAX_SHIPPING_FEE = 99.99
 
+/** Parses a draft: whole letters for the back-name limit, euros for the rest. */
+function parseField(field: PriceField, text: string): number {
+  if (field === 'backNameMax') return /^\s*\d+\s*$/.test(text) ? Number(text.trim()) : Number.NaN
+  return parseEuroAmount(text)
+}
+
 /** The message for a draft that the server would reject, or null when it can be sent. */
 function priceError(field: PriceField, text: string): string | null {
-  const value = parseEuroAmount(text)
+  const value = parseField(field, text)
+  if (field === 'backNameMax') return value >= 1 && value <= BACK_NAME_MAX_LIMIT ? null : `Enter a whole number from 1 to ${BACK_NAME_MAX_LIMIT}.`
   if (field === 'shippingFee') return Number.isFinite(value) && value >= 0 && value <= MAX_SHIPPING_FEE ? null : 'Enter an amount from 0.00 to 99.99.'
   if (field === 'nameExtra') return Number.isFinite(value) && value >= 0 && value <= MAX_PRICE ? null : 'Enter an amount from 0.00 to 999.99.'
   return Number.isFinite(value) && value >= 0.5 && value <= MAX_PRICE ? null : 'Enter a price from 0.50 to 999.99.'
@@ -89,9 +104,11 @@ function normalizeWeekdays(days?: PostCollectionWeekday[]): PostCollectionWeekda
 function draftFrom(prices: Prices): PriceDraft {
   return {
     customPrice: prices.customPrice.toFixed(2),
+    customMediumPrice: prices.customMediumPrice.toFixed(2),
     finishedPrice: prices.finishedPrice.toFixed(2),
     nameExtra: prices.nameExtra.toFixed(2),
     shippingFee: (prices.shippingFee ?? 5).toFixed(2),
+    backNameMax: String(prices.backNameMax ?? DEFAULT_BACK_NAME_MAX),
   }
 }
 
@@ -101,9 +118,11 @@ function sameWeekdays(a: PostCollectionWeekday[], b: PostCollectionWeekday[]): b
 
 type QueuedPrices = {
   customPrice: number
+  customMediumPrice: number
   finishedPrice: number
   nameExtra: number
   shippingFee: number
+  backNameMax: number
   postCollectionDays: PostCollectionWeekday[]
   editSeq: number
 }
@@ -131,19 +150,23 @@ function PricesCard({ initial, onSaved }: { initial: Prices; onSaved: () => void
     if (!nextWeekdays.length) return null
     const current = savedRef.current
     const resolve = (field: PriceField, fallback: number) => {
-      if (priceError(field, nextDraft[field]) === null) return parseEuroAmount(nextDraft[field])
+      if (priceError(field, nextDraft[field]) === null) return parseField(field, nextDraft[field])
       return allowSavedPriceFallback ? fallback : Number.NaN
     }
     const customPrice = resolve('customPrice', current.customPrice)
+    const customMediumPrice = resolve('customMediumPrice', current.customMediumPrice)
     const finishedPrice = resolve('finishedPrice', current.finishedPrice)
     const nameExtra = resolve('nameExtra', current.nameExtra)
     const shippingFee = resolve('shippingFee', current.shippingFee ?? 5)
-    if (![customPrice, finishedPrice, nameExtra, shippingFee].every(Number.isFinite)) return null
+    const backNameMax = resolve('backNameMax', current.backNameMax ?? DEFAULT_BACK_NAME_MAX)
+    if (![customPrice, customMediumPrice, finishedPrice, nameExtra, shippingFee, backNameMax].every(Number.isFinite)) return null
     return {
       customPrice,
+      customMediumPrice,
       finishedPrice,
       nameExtra,
       shippingFee,
+      backNameMax,
       postCollectionDays: nextWeekdays,
       editSeq: editSeqRef.current,
     }
@@ -155,9 +178,11 @@ function PricesCard({ initial, onSaved }: { initial: Prices; onSaved: () => void
     const sameMoney = (a: number, b: number) => Math.round(a * 100) === Math.round(b * 100)
     return (
       !sameMoney(payload.customPrice, current.customPrice) ||
+      !sameMoney(payload.customMediumPrice, current.customMediumPrice) ||
       !sameMoney(payload.finishedPrice, current.finishedPrice) ||
       !sameMoney(payload.nameExtra, current.nameExtra) ||
       !sameMoney(payload.shippingFee, current.shippingFee ?? 5) ||
+      payload.backNameMax !== (current.backNameMax ?? DEFAULT_BACK_NAME_MAX) ||
       !sameWeekdays(payload.postCollectionDays, savedDays)
     )
   }
@@ -182,9 +207,11 @@ function PricesCard({ initial, onSaved }: { initial: Prices; onSaved: () => void
         try {
           const updated = await api.prices.update({
             customPrice: next.customPrice,
+            customMediumPrice: next.customMediumPrice,
             finishedPrice: next.finishedPrice,
             nameExtra: next.nameExtra,
             shippingFee: next.shippingFee,
+            backNameMax: next.backNameMax,
             postCollectionDays: next.postCollectionDays,
             expectedRevision: savedRef.current.revision,
           })
@@ -291,7 +318,8 @@ function PricesCard({ initial, onSaved }: { initial: Prices; onSaved: () => void
 
   function tidy(field: PriceField) {
     if (priceError(field, draft[field]) === null) {
-      const nextDraft = { ...draft, [field]: parseEuroAmount(draft[field]).toFixed(2) }
+      const value = parseField(field, draft[field])
+      const nextDraft = { ...draft, [field]: field === 'backNameMax' ? String(value) : value.toFixed(2) }
       setDraft(nextDraft)
       if (timerRef.current !== undefined) {
         scheduleSave(buildPayload(nextDraft, weekdays, false), 0)
@@ -311,17 +339,17 @@ function PricesCard({ initial, onSaved }: { initial: Prices; onSaved: () => void
 
   return <article className={styles.stockCard} aria-labelledby="prices-heading">
     <h2 id="prices-heading">Prices &amp; Post</h2>
-    <p className={styles.hint}>New prices and Post collection days apply to new sales and the web shop. Existing orders keep their price. Changes save automatically.</p>
+    <p className={styles.hint}>New prices, the name limit and Post collection days apply to new sales and the web shop. Existing orders keep their price and name. Changes save automatically.</p>
     <div className={styles.priceFields}>
       {PRICE_FIELDS.map(field => {
         const problem = errors[field.key]
         return <div key={field.key} className={styles.priceField}>
           <label htmlFor={field.id}>{field.label}</label>
           <div className={styles.euroBox}>
-            <span aria-hidden="true">€</span>
+            {field.unit === 'euro' && <span aria-hidden="true">€</span>}
             <input
               id={field.id}
-              inputMode="decimal"
+              inputMode={field.unit === 'euro' ? 'decimal' : 'numeric'}
               autoComplete="off"
               value={draft[field.key]}
               aria-invalid={problem ? true : undefined}
@@ -329,6 +357,7 @@ function PricesCard({ initial, onSaved }: { initial: Prices; onSaved: () => void
               onChange={event => edit(field.key, event.target.value)}
               onBlur={() => tidy(field.key)}
             />
+            {field.unit === 'letters' && <span aria-hidden="true">letters</span>}
           </div>
           {problem && <p id={`${field.id}-error`} className={styles.fieldError}>{problem}</p>}
         </div>
@@ -463,7 +492,7 @@ function StockRow({ item }: { item: InventoryItem }) {
   const [notice, setNotice] = useState('')
   const value = Number(quantity)
   const valid = quantity.trim() !== '' && Number.isInteger(value) && value >= 0 && value <= 10000
-  const name = `Custom · ${item.color} · ${item.finish ?? 'shiny'}`
+  const name = `Custom · ${item.color} · ${item.finish ?? 'shiny'} · ${sizeLabel(item.size ?? 'big')}`
   async function save() {
     if (busy) return
     if (!valid) { setError('Enter a whole number from 0 to 10000.'); return }

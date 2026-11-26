@@ -349,7 +349,7 @@ Paths below are relative to `frontend/src/`. **Existing** is the current impleme
 | Anatomy/sizes | Persistent label → optional hint → control → optional error/count. Input/select min-height 48px, padding 12px; textarea min-height 96px, resize vertically. Text max 34rem; postcode max 8rem. Select retains recognizable arrow and native keyboard interaction. |
 | Association | Stable id/label; merge existing `aria-describedby` IDs with hint/error IDs, never overwrite. `aria-invalid` only when invalid. Field must support an explicit control ID/props interface for composite controls, not depend solely on cloning a direct DOM child. Checkbox/radio uses native input in a 44px labelled row; graphic 24px, gap 12px; grouped options have fieldset/legend. |
 | States | CMP0. Focus dual ring; invalid red border + localized recovery. Validate on blur after interaction and on Continue; clear stale error while editing, do not mark valid until rechecked. Valid check is supplementary; never announces success on each keystroke. |
-| Spacing/do/don't | Exact §4.2; Field has no external margin. Optional is written “(optional)” in label, no blanket required-fields paragraph. Correct autocomplete/type/inputmode; no placeholders as labels. Do not silently remove invalid characters or truncate a suggested back name without showing the choice. Shared policy accepts the backend's supported 1–6 letters and displays uppercase; preserve input and explain errors. |
+| Spacing/do/don't | Exact §4.2; Field has no external margin. Optional is written “(optional)” in label, no blanket required-fields paragraph. Correct autocomplete/type/inputmode; no placeholders as labels. Do not silently remove invalid characters or truncate a suggested back name without showing the choice. Shared policy accepts the backend's letter limit (`ShopConfig.backNameMax`, staff-editable, default 5) and displays uppercase; preserve input and explain errors. |
 
 ### 7.6 Help (?) popover
 
@@ -583,6 +583,7 @@ Use PageHeader/Field/Button inside a panel-radius modal, max `--layout-status-ma
 | Back | Rückseite; control: Hinten | Back | Name side |
 | Back name | Name auf der Rückseite | Name on the back | Paid option/field |
 | Colour | Farbe | Colour | Rot/Red, Grün/Green, Beige/Beige |
+| Size | Größe | Size | Groß 10 cm/Big 10 cm, Mittel 8 cm/Medium 8 cm (custom only, first choice in /buy because it sets the price; the chip shows the price) |
 | Finish | Oberfläche | Finish | Glänzend/Shiny, Matt/Matte |
 | Pet | Dein Tier | Your pet | Prefer inclusive Tier, not dog-only copy |
 | Reference photo | Referenzfoto | Reference photo | Uploaded source, not predicted painting |

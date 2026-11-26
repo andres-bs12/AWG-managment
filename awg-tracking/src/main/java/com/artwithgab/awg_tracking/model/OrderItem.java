@@ -126,7 +126,7 @@ public class OrderItem {
     /** Name surcharge charged at sale time; null for items sold before prices became editable. */
     @Column(precision = 10, scale = 2)
     private java.math.BigDecimal nameExtra;
-    /** Text painted on the back (max 6 characters, upper case). */
+    /** Text painted on the back (upper case; the limit is a staff setting, older names may be longer). */
     private String nameInOrnament;
     private String petName;
 
@@ -135,6 +135,11 @@ public class OrderItem {
 
     @Enumerated(EnumType.STRING)
     private CustomFinish customFinish;
+
+    /** Big 10 cm or Medium 8 cm; required for CUSTOM items, null for GENERIC ones. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ornament_size", length = 16)
+    private com.artwithgab.awg_tracking.enums.OrnamentSize ornamentSize;
 
     /** Reference photos ({@link StoredPhoto}), in display order. */
     @ElementCollection

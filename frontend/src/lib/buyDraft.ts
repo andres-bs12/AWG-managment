@@ -1,10 +1,12 @@
-import type { OrnamentColor, CustomFinish, DeliveryKind, Photo } from '../domain/types'
+import type { OrnamentColor, CustomFinish, DeliveryKind, OrnamentSize, Photo } from '../domain/types'
 import { uid } from './uid.ts'
 
 export const BUY_DRAFT_KEY = 'awg-buy-draft'
 
 export type BuyItem = {
   uid: string
+  /** Big 10 cm or medium 8 cm; chosen first because it sets the price. */
+  size: OrnamentSize | ''
   color: OrnamentColor | ''
   finish: CustomFinish | ''
   withName: boolean
@@ -33,7 +35,7 @@ export type BuyDraft = {
 }
 
 export function newItem(): BuyItem {
-  return { uid: uid(), color: '', finish: '', withName: false, backName: '', petName: '', note: '', photos: [], photosNeedReload: false }
+  return { uid: uid(), size: '', color: '', finish: '', withName: false, backName: '', petName: '', note: '', photos: [], photosNeedReload: false }
 }
 
 const emptyDraft = (): BuyDraft => ({
@@ -48,7 +50,7 @@ export function loadBuyDraft(): BuyDraft {
     // Older drafts carried a screen index that was never restored.
     const { buyStep: _obsoleteStep, ...values } = parsed as Partial<BuyDraft> & { buyStep?: number }
     const items = Array.isArray(parsed.items) ? parsed.items.filter((item) => item && typeof item.uid === 'string' && (!('kind' in item) || item.kind === 'custom')).map((item) => ({
-        ...newItem(), ...item, color: ['red', 'green', 'beige'].includes(item.color) && item.finish ? item.color : '', finish: ['red', 'green', 'beige'].includes(item.color) && (item.finish === 'shiny' || item.finish === 'matte') ? item.finish : '' as const, photos: [], photosNeedReload: !!item.photosNeedReload || (Array.isArray(item.photos) && item.photos.length > 0),
+        ...newItem(), ...item, size: item.size === 'big' || item.size === 'medium' ? item.size : '' as const, color: ['red', 'green', 'beige'].includes(item.color) && item.finish ? item.color : '', finish: ['red', 'green', 'beige'].includes(item.color) && (item.finish === 'shiny' || item.finish === 'matte') ? item.finish : '' as const, photos: [], photosNeedReload: !!item.photosNeedReload || (Array.isArray(item.photos) && item.photos.length > 0),
       })) : []
     return {
       ...emptyDraft(), ...values,

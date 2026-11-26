@@ -55,7 +55,7 @@ class Sprint6ApiTests extends ApiTestSupport {
     }
 
     private MvcResult checkout(String color, String finish) throws Exception {
-        var item = new java.util.HashMap<String, Object>(Map.of("kind", "custom", "withName", false, "color", color, "petName", "Luna",
+        var item = new java.util.HashMap<String, Object>(Map.of("kind", "custom", "size", "big", "withName", false, "color", color, "petName", "Luna",
                 "photos", List.of(Map.of("id", "p0", "name", "luna.jpg"))));
         if (finish != null) item.put("finish", finish);
         Map<String, Object> payload = Map.of("customerName", "Eva Gruber", "email", "eva@example.com", "phone", "+43 1 234",
@@ -77,8 +77,11 @@ class Sprint6ApiTests extends ApiTestSupport {
                 .andExpect(jsonPath("$.deliveriesFrom").value("2026-11-30")).andReturn();
         List<String> colors = read(res, "$.colors[*].color");
         List<String> finishes = read(res, "$.colors[*].finish");
-        assertThat(colors).containsExactly("red", "red", "green", "green", "beige", "beige");
-        assertThat(finishes).containsExactly("shiny", "matte", "shiny", "matte", "shiny", "matte");
+        List<String> sizes = read(res, "$.colors[*].size");
+        // Big first, then medium; each size in every offered colour and finish.
+        assertThat(colors).containsExactly("red", "red", "green", "green", "beige", "beige", "red", "red", "green", "green", "beige", "beige");
+        assertThat(finishes).containsExactly("shiny", "matte", "shiny", "matte", "shiny", "matte", "shiny", "matte", "shiny", "matte", "shiny", "matte");
+        assertThat(sizes).containsExactly("big", "big", "big", "big", "big", "big", "medium", "medium", "medium", "medium", "medium", "medium");
     }
 
     @Test

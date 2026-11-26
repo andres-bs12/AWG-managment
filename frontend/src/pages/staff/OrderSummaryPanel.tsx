@@ -1,5 +1,6 @@
 import { StaffText } from '../../components/staff/StaffText'
 import { formatEur, itemCost, type Pricing } from '../../lib/money'
+import { sizeLabel } from '../../lib/ornamentSize'
 import { marketOrnamentParts, type MarketOrnament } from '../../domain/marketStock'
 import type { Market, MarketDay, ShippingQuote } from '../../domain/types'
 import { MarketPiecePhoto } from './MarketOrnamentPicker'
@@ -20,6 +21,7 @@ type Props = {
 
 export function OrderSummaryPanel({ items, markets, days, orderCode, prices, marketPieces, postQuote, showHandoff = true }: Props) {
   if (!items.length) return null
+  const sizeMissing = items.some(item => item.kind === 'custom' && !item.size)
   const total = prices ? draftTotal(items, prices) : null
   const hasPost = items.some(item => item.delivery.mode === 'post')
   const hasNowFinished = items.some(item => item.kind === 'finished' && item.delivery.mode === 'now')
@@ -31,7 +33,7 @@ export function OrderSummaryPanel({ items, markets, days, orderCode, prices, mar
       {orderCode ? <p className={styles.code}>{orderCode}</p> : null}
       <ul className={styles.list}>
         {items.map((item, index) => {
-          const priceText = prices ? formatEur(itemCost(item.kind, item.withName, prices), 'en') : 'Loading price…'
+          const priceText = !prices ? 'Loading price…' : item.kind === 'custom' && !item.size ? 'Choose size' : formatEur(itemCost(item.kind, item.withName, prices, item.size), 'en')
           if (item.kind === 'finished' && item.marketOrnamentId) {
             const id = item.marketOrnamentId
             const piece = marketPieces?.find(row => row.id === id)
@@ -70,6 +72,7 @@ export function OrderSummaryPanel({ items, markets, days, orderCode, prices, mar
               </div>
               {showHandoff ? <p><StaffText>{deliveryLabel(item, markets, days, postQuote)}</StaffText></p> : null}
               {slotLabel(item) ? <p><StaffText>{`Paint ${slotLabel(item)}`}</StaffText></p> : null}
+              {item.kind === 'custom' && item.size ? <p>{sizeLabel(item.size)}</p> : null}
               {item.kind === 'custom' && item.withName ? <p>Name on the back · +{prices ? formatEur(prices.nameExtra, 'en') : 'price loading…'}</p> : null}
             </li>
           )
@@ -86,7 +89,7 @@ export function OrderSummaryPanel({ items, markets, days, orderCode, prices, mar
       ) : null}
       <div className={styles.total}>
         <span>Total</span>
-        <strong>{total === null ? 'Price unavailable' : formatEur(total, 'en')}</strong>
+        <strong>{total === null ? 'Price unavailable' : sizeMissing ? 'Choose size' : formatEur(total, 'en')}</strong>
       </div>
     </aside>
   )

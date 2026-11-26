@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import type { CreateSaleInput, Market, MarketDay, PaintingDay } from '../src/domain/types'
-import { staffUser, token, config } from './staff-fixture'
+import { staffUser, token, config, chooseSizes } from './staff-fixture'
 
 const shotPath = path.resolve(process.cwd(), '../tasks/audit-results/staff-round2-shots/two-markets-sale.png')
 
@@ -91,7 +91,7 @@ async function setupOverlapHttp(page: Page) {
     { date: '2026-11-29', open: true, maxPaintings: 6, booked: 0, openHour: 12, closeHour: 18, paintingMarketId: 'mkt-rathaus', paintingMarketName: 'Rathausplatz' },
     { date: '2026-12-04', open: true, maxPaintings: 6, booked: 0, openHour: 12, closeHour: 18, paintingMarketId: 'mkt-rathaus', paintingMarketName: 'Rathausplatz' },
   ]
-  const inventory = config.colors.map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, quantity: 5 }))
+  const inventory = config.colors.filter(row => row.size === 'big').map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, size: row.size, quantity: 5 }))
   const sales: CreateSaleInput[] = []
 
   await page.route(url => url.pathname.startsWith('/api/'), async route => {
@@ -175,7 +175,8 @@ test('New sale at the other stall skips today and defaults to the next eligible 
   await picker.getByRole('button', { name: 'Christkindlmarkt Spittelberg' }).click()
 
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
-  await expect(page.getByRole('heading', { name: /Custom 1 · €/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Custom 1 · (€|Choose size)/ })).toBeVisible()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(page.getByText('Gaby is painting at Rathausplatz today.', { exact: true })).toBeVisible()
   await expect(page.getByRole('radio', { name: /^Today/ })).toHaveCount(0)
@@ -201,6 +202,7 @@ test('New sale at the other stall skips today and defaults to the next eligible 
   await picker.getByRole('button', { name: 'Rathausplatz' }).click()
   await page.goto('/staff/sales/new?fresh=1')
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(page.getByRole('radio', { name: 'Today', exact: true })).toBeChecked()
   await page.getByRole('button', { name: '17:00', exact: true }).click()
@@ -216,7 +218,8 @@ test('mock overlap: New sale offers the next eligible stall and saves cross-stal
   await page.getByLabel('Password', { exact: true }).fill('gaby')
   await page.getByRole('button', { name: /Enter|Sign in/ }).click()
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
-  await expect(page.getByRole('heading', { name: /Custom 1 · €/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Custom 1 · (€|Choose size)/ })).toBeVisible()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(page.getByText('Gaby is painting at Rathausplatz today.', { exact: true })).toBeVisible()
   await expect(page.getByRole('radio', { name: /^Today/ })).toHaveCount(0)

@@ -238,7 +238,7 @@ export const mockApi: Api = {
           deliveryFee: prices.shippingFee,
           maxItems: 10,
           colors: [
-            ...listInventory().filter(row => row.kind === 'custom' && row.color && row.finish && ['red', 'green', 'beige'].includes(row.color)).map(row => ({ color: row.color!, finish: row.finish!, inStock: row.quantity > 0 })),
+            ...listInventory().filter(row => row.kind === 'custom' && row.color && row.finish && ['red', 'green', 'beige'].includes(row.color)).map(row => ({ color: row.color!, finish: row.finish!, size: row.size ?? 'big', inStock: row.quantity > 0 })),
           ],
         }
       }, 80),

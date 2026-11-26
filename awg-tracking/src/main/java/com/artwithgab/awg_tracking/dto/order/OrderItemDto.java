@@ -18,6 +18,8 @@ public record OrderItemDto(
         boolean withName,
         CustomColor color,
         CustomFinish finish,
+        /** big / medium for custom ornaments, null for finished pieces. */
+        com.artwithgab.awg_tracking.enums.OrnamentSize size,
         String backName,
         String note,
         BigDecimal cost,

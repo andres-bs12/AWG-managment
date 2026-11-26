@@ -48,3 +48,24 @@ test('stock labels', () => {
   assert.equal(stockLabel(1), 'Last one')
   assert.equal(stockLabel(4), '4 left')
 })
+
+test('bases are counted per size: medium stock is separate from big stock', async () => {
+  const { remainingSize } = await import('../src/lib/saleStock.ts')
+  const sized = [
+    { kind: 'custom', color: 'red', finish: 'shiny', size: 'big', quantity: 3 },
+    { kind: 'custom', color: 'red', finish: 'shiny', size: 'medium', quantity: 0 },
+    { kind: 'custom', color: 'green', finish: 'matte', size: 'medium', quantity: 1 },
+  ]
+  assert.equal(remainingStock(sized, [], 'custom', 'red', 'shiny', undefined, 'big'), 3)
+  assert.equal(remainingStock(sized, [], 'custom', 'red', 'shiny', undefined, 'medium'), 0)
+  // Before a size is chosen the sizes are added together.
+  assert.equal(remainingStock(sized, [], 'custom', 'red', 'shiny'), 3)
+  assert.deepEqual(firstAvailableCustom(sized, [], undefined, 'medium'), { color: 'green', finish: 'matte' })
+  assert.equal(finishForColor(sized, [], 'red', 'shiny', undefined, 'medium'), null)
+  // A medium ornament in the draft uses the medium base, not a big one.
+  const draft = [{ id: 'a', kind: 'custom', color: 'green', finish: 'matte', size: 'medium' }]
+  assert.equal(remainingSize(sized, draft, 'medium'), 0)
+  assert.equal(remainingSize(sized, draft, 'big'), 3)
+  // Rows saved before sizes existed count as big.
+  assert.equal(remainingStock([{ kind: 'custom', color: 'red', finish: 'shiny', quantity: 2 }], [], 'custom', 'red', 'shiny', undefined, 'big'), 2)
+})

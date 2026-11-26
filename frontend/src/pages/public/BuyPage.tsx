@@ -1,4 +1,6 @@
-import { paintedNameValid } from '../../lib/paintedName'
+import { inStockFor } from '../../lib/ornamentSize'
+import { customBasePrice } from '../../lib/money'
+import { DEFAULT_BACK_NAME_MAX, paintedNameValid } from '../../lib/paintedName'
 import { PageHeader, PublicPage, PublicState, FormActions } from '../../components/public/PublicForm'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import publicForm from '../../components/public/PublicForm.module.css'
@@ -186,30 +188,32 @@ export function BuyPage() {
   if (!config.enabled) return <PublicState title={t('shopSoonTitle')}><p>{t('shopSoonBody')}</p></PublicState>
 
   const shopConfig = config
-  const itemPrice = (item: BuyItem) => shopConfig.customPrice + (item.withName ? shopConfig.nameExtra : 0)
+  const backNameMax = shopConfig.backNameMax ?? DEFAULT_BACK_NAME_MAX
+  const itemPrice = (item: BuyItem) => customBasePrice(item.size, shopConfig) + (item.withName ? shopConfig.nameExtra : 0)
   const itemsTotal = draft.items.reduce((sum, item) => sum + itemPrice(item), 0)
   const deliveryFee = draft.deliveryKind === 'market' ? 0 : shopConfig.deliveryFee
   const total = draft.items.length ? itemsTotal + deliveryFee : 0
-  const err = (key: string) => errors[key]?.startsWith('api:') ? apiError({ code: errors[key].slice(4) }, locale, t('shopCheckoutError')).text : errors[key] ? t(errors[key]) : undefined
+  const err = (key: string) => errors[key]?.startsWith('api:') ? apiError({ code: errors[key].slice(4) }, locale, t('shopCheckoutError')).text : errors[key] ? t(errors[key], { max: backNameMax }) : undefined
   const described = (key: string, hint = false) => [hint ? `${key}-hint` : '', err(key) ? `${key}-error` : ''].filter(Boolean).join(' ') || undefined
   function patch(partial: Partial<BuyDraft>) { if (partial.deliveryKind && partial.deliveryKind !== draft.deliveryKind) void api.metrics.track({ event: 'buy_choice', field: 'delivery', value: partial.deliveryKind }).catch(() => {}); const changedFields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', postalCode: 'buy-postal', city: 'buy-city' }; setValidFields(current => current.filter(id => !Object.keys(partial).some(key => changedFields[key] === id))); setDraft((current) => ({ ...current, ...partial })); const fields: Record<string, string> = { customerName: 'buy-name', email: 'buy-email', phone: 'buy-phone', line1: 'buy-line1', line2: 'buy-line2', postalCode: 'buy-postal', city: 'buy-city', deliveryDate: 'buy-date', pickupTime: 'buy-time', deliveryKind: 'buy-date', acceptTerms: 'buy-terms' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[fields[key]]); return next }); setServerError('') }
   function patchItem(uid: string, partial: Partial<BuyItem>) {
     // Toggling or clearing the name unpins the side, so an empty back never stays selected.
     if (partial.withName !== undefined || partial.backName?.trim() === '') setSides(current => { const next = { ...current }; delete next[uid]; return next })
-    for (const field of ['color', 'finish'] as const) if (partial[field]) void api.metrics.track({ event: 'buy_choice', field, value: partial[field] }).catch(() => {})
+    for (const field of ['size', 'color', 'finish'] as const) if (partial[field]) void api.metrics.track({ event: 'buy_choice', field, value: partial[field] }).catch(() => {})
     if (partial.withName !== undefined) void api.metrics.track({ event: 'buy_choice', field: 'name', value: partial.withName ? 'on' : 'off' }).catch(() => {})
     // A paid name on the back is the pet's name: it is asked once and identifies the ornament too.
     setDraft((current) => ({ ...current, items: current.items.map((item) => { if (item.uid !== uid) return item; const next = { ...item, ...partial }; return { ...next, petName: next.withName ? petNameFromBack(next.backName) : '' } }) }))
-    const fields: Record<string, string> = { color: 'color', finish: 'finish', withName: 'back', backName: 'back', petName: 'pet', note: 'note', photos: 'photos' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[`${fields[key]}-${uid}`]); return next }); setServerError('')
+    const fields: Record<string, string> = { size: 'size', color: 'color', finish: 'finish', withName: 'back', backName: 'back', petName: 'pet', note: 'note', photos: 'photos' }; setErrors(current => { const next = { ...current }; Object.keys(partial).forEach(key => delete next[`${fields[key]}-${uid}`]); return next }); setServerError('')
   }
   function validate(currentStep: number) {
     const found: Record<string, string> = {}
     if (currentStep === 0) {
       if (!draft.items.length) found['buy-add'] = 'shopNeedItem'
       for (const item of draft.items) {
-        if (!shopConfig.colors.some((option) => option.color === item.color && option.inStock)) found[`color-${item.uid}`] = 'shopChooseColor'
-        if (!item.finish || (item.color && !shopConfig.colors.some(option => option.color === item.color && option.finish === item.finish && option.inStock))) found[`finish-${item.uid}`] = 'shopChooseFinish'
-        if (item.withName && !paintedNameValid(item.backName)) found[`back-${item.uid}`] = item.backName ? 'paintedNameTooLong' : 'shopBackNameRequired'
+        if (!item.size) found[`size-${item.uid}`] = 'shopChooseSize'
+        if (!item.color || !inStockFor(shopConfig.colors, { size: item.size, color: item.color })) found[`color-${item.uid}`] = 'shopChooseColor'
+        if (!item.finish || (item.color && !inStockFor(shopConfig.colors, { size: item.size, color: item.color, finish: item.finish }))) found[`finish-${item.uid}`] = 'shopChooseFinish'
+        if (item.withName && !paintedNameValid(item.backName, backNameMax)) found[`back-${item.uid}`] = item.backName ? 'paintedNameTooLong' : 'shopBackNameRequired'
       }
     }
     if (currentStep === 1) for (const item of draft.items) {
@@ -247,7 +251,7 @@ export function BuyPage() {
   }
   /** First problem = first unfinished ornament, in the order its fields are asked. */
   function firstError(found: Record<string, string>) {
-    const fields = ['color', 'finish', 'back', 'pet', 'photos', 'note']
+    const fields = ['size', 'color', 'finish', 'back', 'pet', 'photos', 'note']
     for (const item of draft.items) for (const field of fields) if (found[`${field}-${item.uid}`]) return `${field}-${item.uid}`
     return Object.keys(found)[0]
   }
@@ -334,7 +338,7 @@ export function BuyPage() {
             }),
         acceptTerms: draft.acceptTerms,
         locale,
-        items: draft.items.map((item) => ({ kind: 'custom', withName: item.withName, color: item.color || undefined, finish: item.finish || undefined, petName: item.withName ? petNameFromBack(item.backName) : '', backName: item.withName ? item.backName.trim() : undefined, note: item.note.trim() || undefined, photos: item.photos })),
+        items: draft.items.map((item) => ({ kind: 'custom', withName: item.withName, size: item.size || undefined, color: item.color || undefined, finish: item.finish || undefined, petName: item.withName ? petNameFromBack(item.backName) : '', backName: item.withName ? item.backName.trim() : undefined, note: item.note.trim() || undefined, photos: item.photos })),
       })
       // Only follow Stripe Checkout or a same-origin URL (the mock success page).
       const target = new URL(result.checkoutUrl, window.location.origin)
@@ -353,7 +357,7 @@ export function BuyPage() {
           setDatesRetry(v => v + 1)
         }
       }
-      const problem = apiError(error, locale, t('shopCheckoutError')); const field = problem.field ?? ''; const match = field.match(/^items\[(\d+)\]\.(\w+)/); const item = match ? draft.items[Number(match[1])] : ['petName', 'backName', 'photos'].includes(field) ? draft.items[0] : undefined; const itemFields: Record<string, [number, string]> = { petName: [0, 'back'], photos: [1, 'photos'], color: [0, 'color'], finish: [0, 'finish'], backName: [0, 'back'], note: [1, 'note'] }; const simple: Record<string, [number, string]> = { customerName: [3, 'buy-name'], email: [3, 'buy-email'], phone: [3, 'buy-phone'], 'address.line1': [3, 'buy-line1'], 'address.line2': [3, 'buy-line2'], 'address.city': [3, 'buy-city'], address: [3, 'buy-line1'], 'address.postalCode': [3, 'buy-postal'], deliveryDate: [2, 'buy-date'], delivery: [2, 'buy-date'], expectedArrivalTo: [2, 'buy-date'], deliveryKind: [2, 'buy-date'], pickupTime: [2, 'buy-time'] }; const itemField = match?.[2] ?? field; const target = item && itemFields[itemField] && (itemField !== 'petName' || item.withName) ? [itemFields[itemField][0], `${itemFields[itemField][1]}-${item.uid}`] as const : simple[field];
+      const problem = apiError(error, locale, t('shopCheckoutError')); const field = problem.field ?? ''; const match = field.match(/^items\[(\d+)\]\.(\w+)/); const item = match ? draft.items[Number(match[1])] : ['petName', 'backName', 'photos'].includes(field) ? draft.items[0] : undefined; const itemFields: Record<string, [number, string]> = { petName: [0, 'back'], photos: [1, 'photos'], size: [0, 'size'], color: [0, 'color'], finish: [0, 'finish'], backName: [0, 'back'], note: [1, 'note'] }; const simple: Record<string, [number, string]> = { customerName: [3, 'buy-name'], email: [3, 'buy-email'], phone: [3, 'buy-phone'], 'address.line1': [3, 'buy-line1'], 'address.line2': [3, 'buy-line2'], 'address.city': [3, 'buy-city'], address: [3, 'buy-line1'], 'address.postalCode': [3, 'buy-postal'], deliveryDate: [2, 'buy-date'], delivery: [2, 'buy-date'], expectedArrivalTo: [2, 'buy-date'], deliveryKind: [2, 'buy-date'], pickupTime: [2, 'buy-time'] }; const itemField = match?.[2] ?? field; const target = item && itemFields[itemField] && (itemField !== 'petName' || item.withName) ? [itemFields[itemField][0], `${itemFields[itemField][1]}-${item.uid}`] as const : simple[field];
       if (target) { go(target[0] < 2 ? 0 : 1); showErrors({ [target[1]]: code ? `api:${code}` : 'shopFixErrors' }) } else setServerError(problem.text)
       busyRef.current = false; setBusy(false)
     }

@@ -104,7 +104,7 @@ public class McpTools {
                         schema(Map.of("query", str("Code, name or phone, e.g. 'Müller' or 'K7Q2'")), List.of("query")),
                         a -> orderService.search(requiredString(a, "query"))),
                 read("get_order", "Get order",
-                        "Full order by code (e.g. 'K7Q2ZX') or id: customer name and phone (customerPhone), items with colour, finish, name, production and handover, painting blocks and payments.",
+                        "Full order by code (e.g. 'K7Q2ZX') or id: customer name and phone (customerPhone), items with size (big 10 cm or medium 8 cm), colour, finish, name, production and handover, painting blocks and payments.",
                         schema(Map.of("code", str("Order code"), "id", str("Order UUID")), List.of()),
                         this::getOrder),
                 contact("get_customer_contact", "Customer contact",
@@ -120,7 +120,7 @@ public class McpTools {
                                 "status", str("unpainted, painted or sold")), List.of()),
                         this::marketStock),
                 read("list_inventory", "Base inventory",
-                        "Unpainted bases for custom orders per colour and finish, and the unnumbered finished-ornament counter.",
+                        "Unpainted bases for custom orders per colour, finish and size (big 10 cm / medium 8 cm), and the unnumbered finished-ornament counter.",
                         schema(Map.of(), List.of()),
                         a -> inventoryService.list()),
                 read("list_markets", "Markets and days",
@@ -445,7 +445,7 @@ public class McpTools {
 
         UUID dayId = UUID.fromString(day.id());
         var item = new com.artwithgab.awg_tracking.dto.order.CreateSaleItemRequest(
-                com.artwithgab.awg_tracking.enums.ItemKind.GENERIC, false, null, null, null, null, null,
+                com.artwithgab.awg_tracking.enums.ItemKind.GENERIC, false, null, null, null, null, null, null,
                 com.artwithgab.awg_tracking.enums.DeliveryKind.MARKET, marketId, dayId, null, null, ornamentId);
         var request = new com.artwithgab.awg_tracking.dto.order.CreateSaleRequest(null, null, null, null, List.of(item), dayId);
         // All or nothing: never a sale without its payment, or a payment without the handover.

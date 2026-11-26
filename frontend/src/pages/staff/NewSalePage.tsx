@@ -21,7 +21,7 @@ import { Field } from '../../components/ui/Field'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { marketOrnamentLabel, marketOrnamentParts, type MarketOrnament } from '../../domain/marketStock'
-import type { Address, AgendaDay, CapacityResult, HourSpan, Market, MarketDay, OrnamentColor, PaymentMethod, PaymentState, InventoryItem, PaintingDay, ShippingQuote } from '../../domain/types'
+import type { Address, AgendaDay, CapacityResult, HourSpan, Market, MarketDay, OrnamentColor, OrnamentSize, PaymentMethod, PaymentState, InventoryItem, PaintingDay, ShippingQuote } from '../../domain/types'
 import { isMarketPickupWeekday, paintDatesToTry } from '../../lib/calendar'
 import {
   earliestPickupHourAfterPaint,
@@ -38,7 +38,8 @@ import {
 } from '../../lib/newSaleRules'
 import { AUSTRIAN_POSTAL_REGEX, formatStaffFeeTag, formatStaffPostWindow } from '../../lib/postShipping'
 import { addUtcDays, datesInRange, formatDateLabel, formatHour, hoursOverlap, minutesToHours } from '../../lib/time'
-import { formatEur, itemCost, type Pricing } from '../../lib/money'
+import { customBasePrice, formatEur, itemCost, type Pricing } from '../../lib/money'
+import { ORNAMENT_SIZES, sizeLabel } from '../../lib/ornamentSize'
 import { OrderSummaryPanel } from './OrderSummaryPanel'
 import { MarketOrnamentPicker, MarketPiecePhoto } from './MarketOrnamentPicker'
 import {
@@ -64,7 +65,7 @@ import {
 import styles from './NewSalePage.module.css'
 import { uid } from '../../lib/uid'
 import { upcomingWindows } from '../../lib/dateWindows'
-import { finishForColor, firstAvailableCustom, remainingColor, remainingStock, stockLabel } from '../../lib/saleStock'
+import { finishForColor, firstAvailableCustom, remainingColor, remainingSize, remainingStock, stockLabel } from '../../lib/saleStock'
 import { apiError } from '../../lib/apiError'
 
 const MIN_PAINT_MINUTES = 15
@@ -209,6 +210,7 @@ export function NewSalePage() {
   const [mixedHandedNote, setMixedHandedNote] = useState('')
   const [doneQrOpen, setDoneQrOpen] = useState(false)
   const [finishedHandoff, setFinishedHandoff] = useState(false)
+  const [sizeErrors, setSizeErrors] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
   // null = closed. The order is re-read first: a paid order must not be deleted, and a sent form means a cancellation e-mail.
@@ -258,9 +260,10 @@ export function NewSalePage() {
       api.prices.get().catch(() => null),
     ]).then(async ([m, d, agenda, config, stock, serverPrices]) => {
       if (!active) return
-      if (![config.customPrice, config.finishedPrice, config.nameExtra].every(Number.isFinite)) throw new Error('Server prices are unavailable. Retry before creating a sale.')
+      if (![config.customPrice, config.customMediumPrice, config.finishedPrice, config.nameExtra].every(Number.isFinite)) throw new Error('Server prices are unavailable. Retry before creating a sale.')
       setPrices({
         customPrice: config.customPrice,
+        customMediumPrice: config.customMediumPrice,
         finishedPrice: config.finishedPrice,
         nameExtra: config.nameExtra,
         shippingFee: serverPrices?.shippingFee ?? config.deliveryFee ?? 5,
@@ -328,8 +331,8 @@ export function NewSalePage() {
       let changed = false
       const items: DraftItem[] = []
       for (const item of current.items) {
-        if (item.kind === 'custom' && remainingStock(inventory, items, 'custom', item.color, item.finish) === 0) {
-          const combo = firstAvailableCustom(inventory, items)
+        if (item.kind === 'custom' && remainingStock(inventory, items, 'custom', item.color, item.finish, undefined, item.size) === 0) {
+          const combo = firstAvailableCustom(inventory, items, undefined, item.size)
           if (combo) { changed = true; items.push({ ...item, ...combo }); continue }
         }
         items.push(item)
@@ -706,8 +709,19 @@ export function NewSalePage() {
   }
 
   function setColor(item: DraftItem, color: OrnamentColor) {
-    const finish = finishForColor(inventory, draft.items, color, item.finish, item.id) as DraftItem['finish'] | null
+    const finish = finishForColor(inventory, draft.items, color, item.finish, item.id, item.size) as DraftItem['finish'] | null
     patchItem(item.id, { color, finish: finish ?? item.finish })
+  }
+
+  /** Bases are counted per size: when the chosen colour and finish have none in the new size, move to one that has. */
+  function setSize(item: DraftItem, size: OrnamentSize) {
+    if (item.kind !== 'custom' || remainingStock(inventory, draft.items, 'custom', item.color, item.finish, item.id, size) > 0) {
+      patchItem(item.id, { size })
+      return
+    }
+    const finish = item.color ? finishForColor(inventory, draft.items, item.color, item.finish, item.id, size) as DraftItem['finish'] | null : null
+    const combo = finish ? { color: item.color, finish } : firstAvailableCustom(inventory, draft.items, item.id, size)
+    patchItem(item.id, combo ? { size, ...combo } : { size })
   }
 
   function placeOnBoard(item: DraftItem) {
@@ -1169,7 +1183,7 @@ export function NewSalePage() {
         {error && <p role="alert">{error}</p>}
       </StaffDialog>}
       {finishedHandoff && <StaffDialog title="Balance due" busy={busy} onClose={() => setFinishedHandoff(false)}>
-        <p>Collect the remaining balance before handing over the whole order. {prices ? formatEur((order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0)) - (payState === 'deposit' ? depositValue(depositAmount, order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0)) : 0), 'en') : ''} is still due.</p>
+        <p>Collect the remaining balance before handing over the whole order. {prices ? formatEur((order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices, item.size), 0)) - (payState === 'deposit' ? depositValue(depositAmount, order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices, item.size), 0)) : 0), 'en') : ''} is still due.</p>
         <SegmentedControl legend="Collection method" name="finished-handover-method" value={payMethod} onChange={setPayMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} />
         <Button tone="staff" disabled={busy || !payMethod} onClick={() => void finishFinishedSale('paid')}>Mark paid &amp; hand over</Button>
         <Button tone="staff" variant="secondary" disabled={busy} onClick={() => void finishFinishedSale(payState, false)}>Save without handover</Button>
@@ -1208,6 +1222,8 @@ export function NewSalePage() {
               onToggleName={toggleName}
               onColor={setColor}
               onFinish={(item, finish) => patchItem(item.id, { finish })}
+              onSize={setSize}
+              showSizeErrors={sizeErrors}
               onDuration={setDuration}
               onContinue={() => {
                 if (!draft.items.length) return
@@ -1226,10 +1242,15 @@ export function NewSalePage() {
                   setError(stock?.error ? 'Could not check ready ornaments. Tap Try again in the piece list.' : 'Checking ready ornaments. Try again in a moment.')
                   return
                 }
+                if (draft.items.some(item => item.kind === 'custom' && !item.size)) {
+                  setSizeErrors(true)
+                  setError('Choose Big 10 cm or Medium 8 cm for each custom ornament.')
+                  return
+                }
                 const shortage = draft.items.find(item => item.kind === 'custom' &&
-                  draft.items.filter(other => other.kind === 'custom' && other.color === item.color && other.finish === item.finish).length >
-                    remainingStock(inventory, [], 'custom', item.color, item.finish))
-                if (shortage) { setError(`Out of stock: ${shortage.finish} ${shortage.color} ornaments. Reduce the quantity or choose another combination.`); return }
+                  draft.items.filter(other => other.kind === 'custom' && other.color === item.color && other.finish === item.finish && other.size === item.size).length >
+                    remainingStock(inventory, [], 'custom', item.color, item.finish, undefined, item.size))
+                if (shortage) { setError(`Out of stock: ${shortage.finish} ${shortage.color} ${sizeLabel(shortage.size ?? 'big')} ornaments. Reduce the quantity or choose another combination.`); return }
                 setPhase('delivery')
               }}
             />
@@ -1314,7 +1335,7 @@ export function NewSalePage() {
               {onlyFinished ? (
                 <div className={`${styles.card} ${styles.payCard}`}>
                   <InsetNote><p>No customer form is needed for ready-made ornaments.</p></InsetNote>
-                  <SalePaymentFields state={payState} onState={setPayState} method={payMethod} onMethod={setPayMethod} deposit={depositAmount} onDeposit={setDepositAmount} total={order?.total ?? (prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0) : 0)} />
+                  <SalePaymentFields state={payState} onState={setPayState} method={payMethod} onMethod={setPayMethod} deposit={depositAmount} onDeposit={setDepositAmount} total={order?.total ?? (prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices, item.size), 0) : 0)} />
 
                 </div>
               ) : null}
@@ -1324,7 +1345,7 @@ export function NewSalePage() {
                 <Button
                   tone="staff"
                   size="lg"
-                  disabled={busy || !prices || Boolean(configError) || !draft.items.length || (hasPost && postQuote?.available === false) || draft.items.some(item => item.kind === 'custom' && (item.paintStart == null || (item.delivery.mode === 'market' && (!item.delivery.marketDayId || item.delivery.pickupHour == null)) || !paintFitsHandoff(item, item.delivery) || Boolean(paintingAtOtherMarket(item, agendaDays)))) || draft.items.some(item => isPickupInPast(item.delivery, currentDate, nowHour)) || (onlyFinished && payState !== 'unpaid' && !payMethod) || (onlyFinished && payState === 'deposit' && !validDeposit(depositAmount, prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0) : 0))}
+                  disabled={busy || !prices || Boolean(configError) || !draft.items.length || (hasPost && postQuote?.available === false) || draft.items.some(item => item.kind === 'custom' && (item.paintStart == null || (item.delivery.mode === 'market' && (!item.delivery.marketDayId || item.delivery.pickupHour == null)) || !paintFitsHandoff(item, item.delivery) || Boolean(paintingAtOtherMarket(item, agendaDays)))) || draft.items.some(item => isPickupInPast(item.delivery, currentDate, nowHour)) || (onlyFinished && payState !== 'unpaid' && !payMethod) || (onlyFinished && payState === 'deposit' && !validDeposit(depositAmount, prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices, item.size), 0) : 0))}
                   onClick={() => void continueFromDelivery()}
                 >
                   {busy ? 'Saving…' : onlyFinished ? 'Done' : 'Create order & show QR'}
@@ -1499,6 +1520,8 @@ function ItemsStep({
   onToggleName,
   onColor,
   onFinish,
+  onSize,
+  showSizeErrors,
   onDuration,
   onContinue,
 }: {
@@ -1520,6 +1543,9 @@ function ItemsStep({
   onToggleName: (item: DraftItem) => void
   onColor: (item: DraftItem, color: OrnamentColor) => void
   onFinish: (item: DraftItem, finish: import('../../domain/types').CustomFinish) => void
+  onSize: (item: DraftItem, size: OrnamentSize) => void
+  /** After a Continue with a missing size, each custom card without one says so. */
+  showSizeErrors: boolean
   onDuration: (item: DraftItem, preset: DurationPreset, customMinutes?: number) => void
   onContinue: () => void
 }) {
@@ -1540,7 +1566,7 @@ function ItemsStep({
       ) : (
         <>
           {items.map((item, index) => {
-            const priceText = prices ? formatEur(itemCost(item.kind, item.withName, prices), 'en') : 'Price unavailable'
+            const priceText = !prices ? 'Price unavailable' : item.kind === 'custom' && !item.size ? 'Choose size' : formatEur(itemCost(item.kind, item.withName, prices, item.size), 'en')
             if (item.kind === 'finished' && item.marketOrnamentId) {
               const pieceId = item.marketOrnamentId
               const piece = marketPieces?.find(row => row.id === pieceId)
@@ -1598,23 +1624,37 @@ function ItemsStep({
                 ) : null}
                 {item.kind === 'custom' ? (() => {
                   // Hints show what is left for this ornament after the other ornaments in the draft.
-                  const comboLeft = stockReady ? remainingStock(inventory, items, 'custom', item.color, item.finish, item.id) : 1
-                  const soldOut = comboLeft === 0 && !firstAvailableCustom(inventory, items, item.id)
+                  const comboLeft = stockReady ? remainingStock(inventory, items, 'custom', item.color, item.finish, item.id, item.size) : 1
+                  const soldOut = comboLeft === 0 && !firstAvailableCustom(inventory, items, item.id, item.size)
                   return <>
+                    {/* Size first: it sets the price. No default, so every personalised sale is a deliberate choice. */}
+                    <SegmentedControl
+                      legend="Size"
+                      name={`size-${item.id}`}
+                      value={item.size ?? null}
+                      onChange={(size) => onSize(item, size)}
+                      options={ORNAMENT_SIZES.map(size => {
+                        // Bases are counted per size: a size with no base left in any colour cannot be sold.
+                        const left = stockReady ? remainingSize(inventory, items, size, item.id) : 1
+                        const price = prices ? formatEur(customBasePrice(size, prices), 'en') : undefined
+                        return { value: size, label: sizeLabel(size), hint: left === 0 ? [price, 'Sold out'].filter(Boolean).join(' · ') : price, disabled: left === 0 }
+                      })}
+                    />
+                    {showSizeErrors && !item.size ? <p className={styles.soldOut} role="alert">Choose a size.</p> : null}
                     <label className={styles.check}>
                       <input type="checkbox" aria-describedby={`name-hint-${item.id}`} checked={item.withName} onChange={() => onToggleName(item)} />
                       {`Name on the back · +${prices ? formatEur(prices.nameExtra, 'en') : 'price unavailable'}`}
                     </label>
                     <p className={styles.hint} id={`name-hint-${item.id}`}>The customer types the name in the form.</p>
-                    {soldOut ? <p className={styles.soldOut} role="status">Sold out: no unpainted bases left. Update Stock or remove this ornament.</p> : null}
+                    {soldOut ? <p className={styles.soldOut} role="status">{item.size ? `Sold out: no ${sizeLabel(item.size)} bases left. Choose the other size, update Stock or remove this ornament.` : 'Sold out: no unpainted bases left. Update Stock or remove this ornament.'}</p> : null}
                     <SegmentedControl
                       legend="Colour"
                       name={`colour-${item.id}`}
                       value={soldOut ? null : item.color}
                       onChange={(color) => onColor(item, color)}
-                      options={(['red', 'green', 'beige'] as const).map(color => { const left = remainingColor(inventory, items, color, item.id); return { value: color, color, label: color[0].toUpperCase() + color.slice(1), hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })}
+                      options={(['red', 'green', 'beige'] as const).map(color => { const left = remainingColor(inventory, items, color, item.id, item.size); return { value: color, color, label: color[0].toUpperCase() + color.slice(1), hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })}
                     />
-                    <SegmentedControl legend="Finish" help={<HelpTip label="Explain finishes">Shiny reflects light. Matte has no glossy reflection. Stock refers to unpainted bases.</HelpTip>} name={`finish-${item.id}`} value={soldOut ? null : item.finish ?? 'shiny'} onChange={finish => onFinish(item, finish)} options={(['shiny', 'matte'] as const).map(finish => { const left = remainingStock(inventory, items, 'custom', item.color, finish, item.id); return { value: finish, label: finish === 'shiny' ? 'Shiny' : 'Matte', hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })} />
+                    <SegmentedControl legend="Finish" help={<HelpTip label="Explain finishes">Shiny reflects light. Matte has no glossy reflection. Stock refers to unpainted bases.</HelpTip>} name={`finish-${item.id}`} value={soldOut ? null : item.finish ?? 'shiny'} onChange={finish => onFinish(item, finish)} options={(['shiny', 'matte'] as const).map(finish => { const left = remainingStock(inventory, items, 'custom', item.color, finish, item.id, item.size); return { value: finish, label: finish === 'shiny' ? 'Shiny' : 'Matte', hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })} />
                     <SegmentedControl
                       legend="Paint time"
                       name={`duration-${item.id}`}
@@ -1646,7 +1686,7 @@ function ItemsStep({
               + Add finished
             </Button>
           </div>
-          <StaffActions className={styles.actions} total={prices ? draftTotal(items, prices) : null}>
+          <StaffActions className={styles.actions} total={!prices ? null : items.some(item => item.kind === 'custom' && !item.size) ? 'choose-size' : draftTotal(items, prices)}>
             <Button tone="staff" size="lg" onClick={onContinue}>
               Continue
             </Button>

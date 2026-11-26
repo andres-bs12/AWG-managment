@@ -20,6 +20,7 @@ public class InventoryService {
         return inventoryRepository.findAll().stream()
                 .sorted(java.util.Comparator.comparing((Inventory i) -> i.getItemKind().ordinal())
                         .thenComparing(i -> i.getCustomColor() == null ? 0 : i.getCustomColor().ordinal())
+                        .thenComparing(i -> i.getOrnamentSize() == null ? 0 : i.getOrnamentSize().ordinal())
                         .thenComparing(i -> i.getCustomFinish() == null ? 0 : i.getCustomFinish().ordinal()))
                 .map(InventoryService::view).toList();
     }
@@ -40,12 +41,13 @@ public class InventoryService {
     }
 
     private static com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto view(Inventory i) {
-        return new com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto(i.getId().toString(), i.getItemKind(), i.getCustomColor(), i.getCustomFinish(), i.getQuantity());
+        return new com.artwithgab.awg_tracking.dto.inventory.InventoryItemDto(i.getId().toString(), i.getItemKind(), i.getCustomColor(), i.getCustomFinish(), i.getOrnamentSize(), i.getQuantity());
     }
 
     void deductItem(OrderItem item) {
         Inventory inventory = item.getItemKind() == ItemKind.CUSTOM
-                ? inventoryRepository.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, item.getCustomColor(), item.getCustomFinish())
+                ? inventoryRepository.findByItemKindAndCustomColorAndCustomFinishAndOrnamentSize(ItemKind.CUSTOM, item.getCustomColor(), item.getCustomFinish(),
+                                item.getOrnamentSize() == null ? com.artwithgab.awg_tracking.enums.OrnamentSize.BIG : item.getOrnamentSize())
                         .orElseThrow(() -> new ConflictException("No stock configured for " + label(item) + " ornaments").code("OUT_OF_STOCK"))
                 : inventoryRepository.findFirstByItemKind(ItemKind.GENERIC)
                         .orElseThrow(() -> new ConflictException("No stock configured for finished ornaments"));
@@ -60,6 +62,7 @@ public class InventoryService {
 
     private static String label(OrderItem item) {
         String finish = item.getCustomFinish() == null ? "" : item.getCustomFinish().name().toLowerCase() + " ";
-        return finish + item.getCustomColor().name().toLowerCase();
+        String size = item.getOrnamentSize() == com.artwithgab.awg_tracking.enums.OrnamentSize.MEDIUM ? " medium 8 cm" : " big 10 cm";
+        return finish + item.getCustomColor().name().toLowerCase() + size;
     }
 }

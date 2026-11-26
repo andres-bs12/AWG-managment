@@ -20,6 +20,8 @@ public record CreateSaleItemRequest(
         boolean withName,
         CustomColor color,
         CustomFinish finish,
+        /** Required for custom ornaments: big (10 cm) or medium (8 cm). */
+        com.artwithgab.awg_tracking.enums.OrnamentSize size,
         LocalDate paintDate,
         Double paintStart,
         Double paintEnd,

@@ -8,7 +8,11 @@ import java.util.List;
  * are sold online. deliveriesFrom: no Post collection before this date (null = no limit).
  * deliveryFee is the Post shipping fee. The hours are for legacy Vienna deliveries.
  */
-public record ShopConfigDto(boolean enabled, BigDecimal customPrice, BigDecimal finishedPrice, BigDecimal nameExtra,
+public record ShopConfigDto(boolean enabled,
+                            /* Big (10 cm) and medium (8 cm) personalised ornament. */
+                            BigDecimal customPrice, BigDecimal customMediumPrice, BigDecimal finishedPrice, BigDecimal nameExtra,
+                            /* Letters allowed in the name painted on the back (staff setting). */
+                            int backNameMax,
                             BigDecimal deliveryFee, int maxItems, List<ShopColorOptionDto> colors,
                             String seasonEnd, boolean seasonOver, String deliveriesFrom,
                             String deliveryWindowStart, String deliveryWindowEnd,

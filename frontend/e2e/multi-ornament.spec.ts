@@ -45,8 +45,8 @@ for (const locale of ['de', 'en']) test(`only the second ornament has a back nam
   await expect(page.getByRole('region', { name: /^(Kugel|Ornament) 2 – Max$/ })).toBeVisible()
   await expect(second).toContainText(locale === 'de' ? 'Mit Namen' : 'With name')
   await expect(second).toContainText(/12[,.]99/)
-  await expect(first).toContainText(/49[,.]99/)
-  await expect(second).toContainText(/62[,.]98/)
+  await expect(first).toContainText(/50[,.]00/)
+  await expect(second).toContainText(/62[,.]99/)
   await axe(page)
   await page.evaluate(async () => {
     const path = '/src/api/client.ts'; const { api } = await import(path)

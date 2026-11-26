@@ -437,6 +437,15 @@ test.describe('Agenda iPad', () => {
       shippingFee: 6.5,
       postCollectionDays: ['monday', 'tuesday', 'friday'],
     })
+    // The back-name letter limit sits with the prices and autosaves as a whole number from 1 to 20.
+    const nameMax = page.getByLabel('Name on the back (max. letters)', { exact: true })
+    await expect(nameMax).toHaveValue('5')
+    await nameMax.fill('0')
+    await expect(page.getByText('Enter a whole number from 1 to 20.')).toBeVisible()
+    await nameMax.fill('6')
+    await nameMax.blur()
+    await expect.poll(() => fixture.mutations.filter(m => m.path === '/api/prices').length).toBe(3)
+    expect(fixture.mutations.filter(m => m.path === '/api/prices').at(-1)?.body).toMatchObject({ backNameMax: 6 })
 
     // Simulate PRICES_CHANGED from another device on a subsequent weekday toggle -> reloads fresh values and alerts.
     let conflictOnce = true

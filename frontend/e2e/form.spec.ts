@@ -292,8 +292,11 @@ test('two ornaments keep fixed variants, independent details and the bought name
     const reference = (await api.forms.getForm('frm-abs103')).item.photos
     const choices = [{ kind: 'custom' as const, withName: true }, { kind: 'custom' as const, withName: false }]
     const quote = await api.shop.shippingQuote(choices)
+    // Bases are counted per size and medium starts at 0: stock the medium green matte first.
+    const medium = (await api.inventory.list()).find((row: { id: string }) => row.id === 'custom-green-matte-medium')!
+    await api.inventory.update(medium.id, 2, medium.quantity)
     const result = await api.shop.checkout({ customerName: 'Alex Example', email: 'alex@example.com', phone: '+43 660 1234567', deliveryKind: 'post', address: { line1: 'Street 1', postalCode: '1010', city: 'Wien' }, expectedArrivalTo: quote.arrivalTo, acceptTerms: true,
-      items: [{ ...choices[0], color: 'red', finish: 'shiny', petName: 'Luna', backName: 'Luna', photos: reference }, { ...choices[1], color: 'green', finish: 'matte', petName: 'Otto', photos: reference }],
+      items: [{ ...choices[0], size: 'big', color: 'red', finish: 'shiny', petName: 'Luna', backName: 'Luna', photos: reference }, { ...choices[1], size: 'medium', color: 'green', finish: 'matte', petName: 'Otto', photos: reference }],
     })
     return { token: result.formToken, view: await api.forms.getForm(result.formToken) }
   })
@@ -358,8 +361,8 @@ test('review cards are compact: one Ändern per card, colour and finish on one l
   // Each review card has at most one button: its single Ändern next to the title.
   for (const card of await page.locator('section[class*="card"]').all()) expect(await card.getByRole('button').count()).toBeLessThanOrEqual(1)
   await expect(page.getByRole('button', { name: /ändern/ })).toHaveCount(2)
-  // Same compact product line as /buy: colour and finish on one unlabelled line ("Rot · Glänzend"), never two rows.
-  await expect(page.getByText(/^(Rot|Grün|Beige) · (Glänzend|Matt)$/)).toHaveCount(1)
+  // Same compact product line as /buy: size, colour and finish on one unlabelled line ("Groß 10 cm · Rot · Glänzend"), never two rows.
+  await expect(page.getByText(/^(Groß 10 cm|Mittel 8 cm) · (Rot|Grün|Beige) · (Glänzend|Matt)$/)).toHaveCount(1)
   await expect(page.getByText('Farbe & Oberfläche', { exact: true })).toHaveCount(0)
   await expect(page.locator('dt').filter({ hasText: /^(Farbe|Oberfläche)$/ })).toHaveCount(0)
   await expect(page.getByText(/Fotos deines Tiers/)).toHaveCount(0)

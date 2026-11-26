@@ -45,7 +45,7 @@ class McpStockSaleApiTests extends ApiTestSupport {
 
         Map<String, Object> args = new LinkedHashMap<>(Map.of("ornamentId", piece, "marketId", marketId, "paymentMethod", "cash"));
         String preview = tool(token, "record_stock_sale", args, false);
-        assertThat(preview).startsWith("PREVIEW").contains(piece).contains("cash").contains("Price: EUR 39.99");
+        assertThat(preview).startsWith("PREVIEW").contains(piece).contains("cash").contains("Price: EUR 35.00");
         assertThat(stockStatus(app, piece)).isEqualTo("painted");
 
         args.put("confirm", true);

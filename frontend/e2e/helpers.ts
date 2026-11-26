@@ -12,8 +12,9 @@ export async function open(page: Page, locale = 'de') {
   await page.goto('/buy')
   await expect(page.locator('fieldset[id^="color-"]')).toBeVisible()
 }
-export async function choose(page: Page, color = /^(Rot|Red)$/, finish = /^(Glänzend|Shiny)$/) {
-  for (const name of [color, finish]) {
+export async function choose(page: Page, color = /^(Rot|Red)$/, finish = /^(Glänzend|Shiny)$/, size: RegExp | null = /^(Groß|Big) 10 cm/) {
+  for (const name of [size, color, finish]) {
+    if (!name) continue
     const radio = page.getByRole('radio', { name })
     // A newly added or selected ornament's editor slides in. Clicking during that entrance makes
     // Playwright retry with forced block:'start' scrolling, which parks the chip under the

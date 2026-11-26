@@ -31,7 +31,7 @@ class StatsApiTests extends ApiTestSupport {
         assertEquals(1, delta(before, after, "$.sales.withName"));
         assertEquals(1, delta(before, after, "$.sales.cancelled"));
         assertEquals(2, delta(before, after, "$.delivery.market"));
-        assertEquals(0, new java.math.BigDecimal("102.97").compareTo(
+        assertEquals(0, new java.math.BigDecimal("97.99").compareTo(
                 new java.math.BigDecimal(JsonPath.read(after, "$.sales.revenue").toString())
                         .subtract(new java.math.BigDecimal(JsonPath.read(before, "$.sales.revenue").toString()))));
         assertEquals(1, ((Number) JsonPath.read(after, "$.daily.length()")).intValue());

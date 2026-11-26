@@ -56,7 +56,7 @@ for (const locale of ['de', 'en'] as const) {
         address: { line1: 'Getreidegasse 9', postalCode: '5020', city: 'Salzburg' },
         expectedArrivalTo: quote.arrivalTo,
         acceptTerms: true,
-        items: [{ kind: 'custom', color: 'red', finish: 'shiny', withName: false, petName: '', photos: [{ id: 'p1', name: 'pet.png', dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' }] }],
+        items: [{ kind: 'custom', size: 'big', color: 'red', finish: 'shiny', withName: false, petName: '', photos: [{ id: 'p1', name: 'pet.png', dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' }] }],
       })
       const found = await api.orders.getOrderByCode(created.orderCode)
       const bundle = await api.orders.getOrderBundle(found!.id)
@@ -100,7 +100,7 @@ for (const locale of ['de', 'en'] as const) {
       const created = await api.shop.checkout({
         customerName: 'Mia Markt', email: 'mia@example.at', phone: '+43 660 1234567', deliveryKind: 'market',
         marketDayId: day.marketDayId, deliveryDate: day.date, pickupTime: day.openTime, acceptTerms: true,
-        items: [{ kind: 'custom', color: 'red', finish: 'shiny', withName: false, petName: '', photos: [{ id: 'p1', name: 'pet.png', dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' }] }],
+        items: [{ kind: 'custom', size: 'big', color: 'red', finish: 'shiny', withName: false, petName: '', photos: [{ id: 'p1', name: 'pet.png', dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' }] }],
       })
       return created.orderCode
     })

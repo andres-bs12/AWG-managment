@@ -1,3 +1,4 @@
+import { chooseSizes } from './staff-fixture'
 import { expect, test, type Page } from '@playwright/test'
 import { axe } from './helpers'
 
@@ -105,6 +106,8 @@ for (const vp of viewports) {
       await thirdPicker.getByLabel('Colour', { exact: true }).selectOption('W')
       await thirdPicker.getByLabel('Finish', { exact: true }).selectOption('S')
       await thirdPicker.getByRole('button', { name: /^WS01 ·/ }).click()
+
+      await chooseSizes(page)
 
       await page.getByRole('button', { name: 'Continue', exact: true }).click()
       await expect(page.getByRole('img', { name: 'Ornament RM01' }).first()).toBeVisible()
@@ -247,6 +250,7 @@ test('picker deduplicates rapid double-tap, blocks duplicate drafts on Continue,
   await page.reload()
   await expect(page.getByRole('heading', { name: /^RM06 · Red · Matte/ })).toHaveCount(2)
   await expect(page.getByRole('heading', { name: /^RM06 · Red · Matte/ }).first()).toContainText('€')
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('already in this sale')
 })

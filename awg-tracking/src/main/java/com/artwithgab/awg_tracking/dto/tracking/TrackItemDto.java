@@ -12,6 +12,7 @@ import java.time.LocalDate;
 public record TrackItemDto(
         CustomColor color,
         CustomFinish finish,
+        com.artwithgab.awg_tracking.enums.OrnamentSize size,
         BigDecimal cost,
         String petName,
         ItemKind kind,

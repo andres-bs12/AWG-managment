@@ -49,6 +49,7 @@ public record OrderNotification(Kind kind, String code, String customerName, Str
     static String itemLine(OrderItem i) {
         java.util.List<String> parts = new java.util.ArrayList<>();
         parts.add(i.getItemKind() == com.artwithgab.awg_tracking.enums.ItemKind.CUSTOM ? "Custom" : "Finished" + (i.getMarketOrnamentId() == null ? "" : " " + i.getMarketOrnamentId()));
+        if (i.getOrnamentSize() != null) parts.add(cap(i.getOrnamentSize().name()) + " " + i.getOrnamentSize().centimetres() + " cm");
         if (i.getCustomColor() != null) parts.add(cap(i.getCustomColor().name()) + (i.getCustomFinish() == null ? "" : " " + i.getCustomFinish().name().toLowerCase(java.util.Locale.ROOT)));
         if (i.getPetName() != null && !i.getPetName().isBlank()) parts.add(i.getPetName());
         if (i.getNameInOrnament() != null && !i.getNameInOrnament().isBlank()) parts.add("name " + i.getNameInOrnament());

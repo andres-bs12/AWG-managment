@@ -20,8 +20,12 @@ public class PriceSetting {
 
     @Id
     private Long id;
+    /** Big (10 cm) personalised ornament. */
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal customPrice;
+    /** Medium (8 cm) personalised ornament; null means the awg.pricing.custom-medium default. */
+    @Column(precision = 10, scale = 2)
+    private BigDecimal customMediumPrice;
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal finishedPrice;
     @Column(nullable = false, precision = 10, scale = 2)
@@ -30,6 +34,8 @@ public class PriceSetting {
     private BigDecimal shippingFee;
     @Column(length = 80)
     private String postCollectionDays;
+    /** Maximum letters of the name painted on the back; null means PricingService.DEFAULT_BACK_NAME_MAX. */
+    private Integer backNameMax;
     /** Bumped on every save; the screen sends the revision it showed to detect concurrent edits. */
     @Column(nullable = false)
     private long revision;

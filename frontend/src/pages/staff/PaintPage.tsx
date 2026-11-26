@@ -1,4 +1,5 @@
 import { StaffText } from '../../components/staff/StaffText'
+import { sizeLabel } from '../../lib/ornamentSize'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
@@ -96,7 +97,7 @@ export function PaintPage() {
           <p className={styles.handoff}>{handoff}</p>
           <p className={styles.meta}><StaffText>{`${order.code} · ${customer.name || 'Customer pending'}`}</StaffText></p>
           <p className={styles.meta}>{slot}</p>
-          <p className={styles.paintFacts}>{item.withName && item.backName ? <strong>Name on back: {item.backName}</strong> : null}<span>Colour: {item.color ? `${item.color} · ${item.finish ?? 'shiny'}` : 'not set'}</span></p>
+          <p className={styles.paintFacts}>{item.withName && item.backName ? <strong>Name on back: {item.backName}</strong> : null}{item.kind === 'custom' && item.size ? <span>Size: {sizeLabel(item.size)}</span> : null}<span>Colour: {item.color ? `${item.color} · ${item.finish ?? 'shiny'}` : 'not set'}</span></p>
           {item.note ? <p className={styles.paintNote}>{item.note}</p> : null}
           {statusAction.unconfirmed && <p role="status">Waiting for online payment review. Painting is unavailable.</p>}
           {actionError ? <p role="alert">{actionError}</p> : null}

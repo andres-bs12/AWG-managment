@@ -1,4 +1,5 @@
 import { StaffText } from './StaffText'
+import { sizeShort } from '../../lib/ornamentSize'
 import { formatEur } from '../../lib/money'
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
@@ -64,7 +65,7 @@ export function DeliveryRow({ row, from, showBalance = true }: Props) {
           {row.source === 'web' ? <span className={styles.webTag}>Web</span> : null}
           <StaffText>{`${row.orderCode} · ${ornamentLabel(row)}`}</StaffText>
         </strong>
-        <span><StaffText>{[customerLabel(row.customerName), row.kind !== 'finished' && row.color ? `${row.color} ${row.finish ?? ''}`.trim() : null, handoverBlocker(row) ?? deliveryStatusLabel(row)].filter(Boolean).join(' · ')}</StaffText></span>
+        <span><StaffText>{[customerLabel(row.customerName), row.kind !== 'finished' && row.color ? [row.size ? sizeShort(row.size) : '', row.color, row.finish ?? ''].filter(Boolean).join(' ') : null, handoverBlocker(row) ?? deliveryStatusLabel(row)].filter(Boolean).join(' · ')}</StaffText></span>
       </span>
       <span className={styles.dlvAside}>
 <span>{row.deliveryKind === 'vienna' ? [row.methodLabel, viennaDistrict(row.postalCode)].filter(Boolean).join(' · ') : row.methodLabel}</span>
