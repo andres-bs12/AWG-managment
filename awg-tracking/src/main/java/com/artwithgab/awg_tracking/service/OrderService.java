@@ -389,20 +389,11 @@ public class OrderService {
         }
         order.setDiscount(list.subtract(charged));
         order.setTotal(charged);
-        // Keep received money consistent with the new total. A lower price on a paid (or over-paid) sale
-        // means change was given back; a higher price never books money that was not received, so a
-        // paid sale whose price goes up owes the difference (deposit), or everything if nothing was paid.
-        BigDecimal received = order.getAmountPaid() == null ? BigDecimal.ZERO : order.getAmountPaid();
-        if (order.getPaymentState() != PaymentState.UNPAID) {
-            if (received.compareTo(charged) >= 0) {
-                order.setPaymentState(PaymentState.PAID);
-                order.setAmountPaid(charged);
-            } else if (received.signum() > 0) {
-                order.setPaymentState(PaymentState.DEPOSIT);
-            } else {
-                order.setPaymentState(PaymentState.UNPAID);
-                order.setAmountPaid(BigDecimal.ZERO);
-            }
+        // Keep received money consistent with the new total.
+        if (order.getPaymentState() == PaymentState.PAID
+                || (order.getPaymentState() == PaymentState.DEPOSIT && order.getAmountPaid().compareTo(charged) >= 0)) {
+            order.setPaymentState(PaymentState.PAID);
+            order.setAmountPaid(charged);
         }
         return mapper.order(order);
     }
