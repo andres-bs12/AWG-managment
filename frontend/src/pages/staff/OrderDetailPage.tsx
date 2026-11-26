@@ -103,6 +103,7 @@ function OrderDetail({ id }: { id: string }) {
   const onlyReadyMade = items.length > 0 && items.every(item => item.kind === 'finished')
   const formWaiting = items.some(item => item.kind === 'custom' && !item.formComplete)
   const stallSale = order.source !== 'web' && !order.checkoutStatus
+  const walkInSale = stallSale && onlyReadyMade
   const hasForm = items.some(item => item.kind === 'custom')
   const postItem = items.find(item => item.delivery.kind === 'post')
   const viennaItem = items.find(item => item.delivery.kind === 'vienna')
@@ -310,19 +311,21 @@ function OrderDetail({ id }: { id: string }) {
           {order.handedOver ? null : paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || !allFinished} onClick={() => { void handover.request(id, true, undefined, undefined, postItem ? trimmedTracking : undefined) }}>{postItem ? 'Handed to Post' : deliveryItem ? 'Mark delivered' : 'Mark picked up'}</Button>}
         </section>}
         <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method, amount) => runAction(() => api.payments.setPaymentState(id, state, method, amount), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} />
-        <details className={styles.panel}>
+        {/* A walk-in sale with no phone or e-mail has no contact to show. */}
+        {walkInSale && !customer.phone && !customer.email ? null : <details className={styles.panel}>
           <summary>Customer contact</summary>
           <dl className={styles.contacts}>
             <div><dt>Name</dt><dd>{customer.name || 'Waiting for form'}</dd></div>
             <div><dt>Phone</dt><dd>{customer.phone ? <a href={`tel:${customer.phone}`}>{customer.phone}</a> : 'Waiting for form'}</dd></div>
             <div><dt>Email</dt><dd>{customer.email ? <a href={`mailto:${customer.email}`}>{customer.email}</a> : 'Waiting for form'}</dd></div>
           </dl>
-        </details>
+        </details>}
         {/* The form link and QR only matter until the order is handed over. */}
         {hasForm && !formWaiting && !order.handedOver ? <details className={styles.panel}><summary>Customer form <span className={styles.muted}>Completed</span></summary>{formContent}</details> : null}
         {/* No «Order info» disclosure (owner, 2026-11-26): where it was sold is in the summary, how it was paid in Payment. */}
         {createdText ? <p className={styles.muted}>{createdText}</p> : null}
-        <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
+        {/* A ready-made stall sale is taken away on the spot: the customer has nothing to track. */}
+        {walkInSale && order.handedOver ? null : <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>}
         {/* Handed over: undo is only for mistakes, so it sits once at the bottom, quiet and red, where Cancel would be.
             It opens the usual confirmation. A handed-over order cannot be cancelled, so no dead Cancel button. */}
         {order.handedOver ? <div className={styles.dangerZone}>

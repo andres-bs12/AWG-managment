@@ -121,6 +121,9 @@ test('a ready-made sale shows no painting controls and can move to another marke
   // How it was paid sits with the payment state; no «Stall order» line (the Sold at cell already says where).
   await expect(page.getByRole('region', { name: 'Payment' })).toContainText('Paid · Cash')
   await expect(page.getByText(/Stall order/)).toHaveCount(0)
+  // Taken away on the spot: nothing for the customer to track, and no contact panel without contact data.
+  await expect(page.getByRole('link', { name: /View customer tracking/ })).toHaveCount(0)
+  await expect(page.getByText('Customer contact', { exact: true })).toHaveCount(0)
   await expect(page.locator('summary', { hasText: 'Sold at' })).toHaveCount(0)
   // Sold at: move the sale to the other stall open that day.
   await page.getByRole('button', { name: 'Change market', exact: true }).click()
