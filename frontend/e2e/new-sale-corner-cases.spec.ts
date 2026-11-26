@@ -602,6 +602,7 @@ test('Restored legacy Vienna draft migrates to Post with kept address and submit
       items: [{
         id: 'draft-legacy-1',
         kind: 'custom',
+        size: 'big',
         withName: false,
         color: 'red',
         finish: 'shiny',
@@ -632,6 +633,27 @@ test('Restored legacy Vienna draft migrates to Post with kept address and submit
   await expect.poll(() => sales.length).toBe(1)
   expect(sales[0].items[0].deliveryKind).toBe('post')
   expect(sales[0].items[0].address).toEqual({ line1: 'Neubaugasse 12', postalCode: '1070', city: 'Wien' })
+})
+
+test('Restored draft from before sizes explains why Create is disabled', async ({ page }) => {
+  await setupCalendarWorld(page, '2026-11-28T13:00:00Z')
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('no-size-seeded')) return
+    sessionStorage.setItem('no-size-seeded', '1')
+    sessionStorage.setItem('awg-sale-draft', JSON.stringify({
+      differentPickups: false,
+      phase: 'delivery',
+      items: [{
+        id: 'draft-no-size', kind: 'custom', withName: false, color: 'red', finish: 'shiny',
+        durationMinutes: 60, durationPreset: '60', paintDate: '2026-11-30', paintStart: 10, paintEnd: 11,
+        fromCalendar: false, slotLocked: true,
+        delivery: { mode: 'post', address: { line1: 'Neubaugasse 12', postalCode: '1070', city: 'Wien' } },
+      }],
+    }))
+  })
+  await page.goto('/staff/sales/new')
+  await expect(page.getByRole('alert').filter({ hasText: 'Choose Big or Medium for each personalised ornament' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Create order & show QR', exact: true })).toBeDisabled()
 })
 
 test('Make room today is hidden when Gaby is painting at another market', async ({ page }) => {

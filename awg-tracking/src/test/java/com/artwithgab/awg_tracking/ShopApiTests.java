@@ -331,10 +331,14 @@ class ShopApiTests extends ApiTestSupport {
     }
 
     @Test
-    void checkoutWithoutASizeIsRejected() throws Exception {
+    void checkoutFromAPageWithoutSizesSellsABigOrnament() throws Exception {
+        // A shop tab opened before sizes existed sends no size and shows the big price: sell a big one.
         MvcResult res = checkoutSized("1070", "2026-12-04", 1, "eva@example.com", freshIp(), "luna", null);
-        assertThat(res.getResponse().getStatus()).isEqualTo(400);
-        assertThat((String) read(res, "$.field")).isEqualTo("items[0].size");
+        assertThat(res.getResponse().getStatus()).as(res.getResponse().getContentAsString()).isEqualTo(200);
+        var order = orderRepository.findByCodeIgnoreCase(read(res, "$.orderCode")).orElseThrow();
+        assertThat(order.getOrderItems().getFirst().getOrnamentSize()).isEqualTo(com.artwithgab.awg_tracking.enums.OrnamentSize.BIG);
+        // 50.00 big + 12.99 name + 5.00 Post.
+        assertThat(order.getTotal()).isEqualByComparingTo("67.99");
     }
 
     @Test

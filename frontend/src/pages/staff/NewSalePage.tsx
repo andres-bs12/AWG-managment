@@ -380,7 +380,9 @@ export function NewSalePage() {
   const order = draft.order
   const listTotal = prices ? draftTotal(draft.items, prices) : null
   // A discount only counts while it is below the list price (items can change after Back).
-  const discounted = listTotal != null && draft.chargedTotal != null && draft.chargedTotal < listTotal
+  const discountStale = listTotal != null && draft.chargedTotal != null && draft.chargedForList != null && draft.chargedForList !== listTotal
+  const discounted = listTotal != null && draft.chargedTotal != null && Number.isFinite(draft.chargedTotal) && draft.chargedTotal < listTotal && !discountStale
+  const missingSize = draft.items.some(item => item.kind === 'custom' && !item.size)
   const saleTotal = discounted ? draft.chargedTotal! : listTotal
   const formUrl = order ? `${window.location.origin}/form/${order.formToken}` : ''
   const formStatus = useOrderFormStatus(order?.id, hasCustom && ['qr', 'payment', 'done'].includes(phase))
@@ -1348,7 +1350,8 @@ export function NewSalePage() {
                 <SalePriceCard
                   listTotal={listTotal}
                   value={draft.chargedTotal}
-                  onChange={(chargedTotal) => setDraft(current => ({ ...current, chargedTotal }))}
+                  stale={discountStale}
+                  onChange={(chargedTotal) => setDraft(current => ({ ...current, chargedTotal, chargedForList: chargedTotal == null ? undefined : listTotal }))}
                 />
               ) : null}
 
@@ -1361,11 +1364,12 @@ export function NewSalePage() {
               ) : null}
 
               {onlyFinished && payState !== 'unpaid' && !payMethod ? <p>Choose cash or card before saving.</p> : null}
+              {missingSize && !order ? <p role="alert">Choose Big or Medium for each personalised ornament: go Back to items.</p> : null}
               <StaffActions className={styles.actions} total={order?.total ?? saleTotal} totalLabel={discounted ? 'Total · discounted' : 'Total'}>
                 <Button
                   tone="staff"
                   size="lg"
-                  disabled={busy || !prices || Boolean(configError) || !draft.items.length || (hasPost && postQuote?.available === false) || draft.items.some(item => item.kind === 'custom' && (item.paintStart == null || (item.delivery.mode === 'market' && (!item.delivery.marketDayId || item.delivery.pickupHour == null)) || !paintFitsHandoff(item, item.delivery) || Boolean(paintingAtOtherMarket(item, agendaDays)))) || draft.items.some(item => isPickupInPast(item.delivery, currentDate, nowHour)) || (onlyFinished && payState !== 'unpaid' && !payMethod) || (onlyFinished && payState === 'deposit' && !validDeposit(depositAmount, saleTotal ?? 0)) || (draft.chargedTotal != null && !discounted && !order)}
+                  disabled={busy || !prices || Boolean(configError) || !draft.items.length || (hasPost && postQuote?.available === false) || draft.items.some(item => item.kind === 'custom' && (item.paintStart == null || (item.delivery.mode === 'market' && (!item.delivery.marketDayId || item.delivery.pickupHour == null)) || !paintFitsHandoff(item, item.delivery) || Boolean(paintingAtOtherMarket(item, agendaDays)))) || draft.items.some(item => isPickupInPast(item.delivery, currentDate, nowHour)) || (onlyFinished && payState !== 'unpaid' && !payMethod) || (onlyFinished && payState === 'deposit' && !validDeposit(depositAmount, saleTotal ?? 0)) || (draft.chargedTotal != null && !discounted && !order) || missingSize}
                   onClick={() => void continueFromDelivery()}
                 >
                   {busy ? 'Saving…' : onlyFinished ? 'Done' : 'Create order & show QR'}
@@ -2457,17 +2461,18 @@ function pickupHint(hour: number | null, preview: HourPreview | null, count: num
 }
 
 /** Gaby can agree a lower price at the stall (e.g. 3 × 35 € for 90 €). The list price stays visible. */
-function SalePriceCard({ listTotal, value, onChange }: { listTotal: number; value: number | undefined; onChange: (value: number | undefined) => void }) {
+function SalePriceCard({ listTotal, value, stale, onChange }: { listTotal: number; value: number | undefined; stale: boolean; onChange: (value: number | undefined) => void }) {
   const [open, setOpen] = useState(value != null)
   const [text, setText] = useState(value != null ? String(value).replace('.', ',') : '')
   const parsed = text.trim() ? Number(text.trim().replace(',', '.')) : NaN
-  const valid = Number.isFinite(parsed) && parsed >= 0 && parsed < listTotal
-  const error = !text.trim() ? undefined : !Number.isFinite(parsed) || parsed < 0 ? 'Enter a price in euros.' : parsed >= listTotal ? `Enter less than the list price (${formatEur(listTotal, 'en')}).` : undefined
+  const valid = Number.isFinite(parsed) && parsed >= 0 && parsed < listTotal && !stale
+  const error = !text.trim() ? undefined : !Number.isFinite(parsed) || parsed < 0 ? 'Enter a price in euros.' : parsed >= listTotal ? `Enter less than the list price (${formatEur(listTotal, 'en')}).` : stale ? `The order changed: the list price is now ${formatEur(listTotal, 'en')}. Enter the sale price again.` : undefined
   function update(next: string) {
     setText(next)
     const amount = next.trim() ? Number(next.trim().replace(',', '.')) : NaN
     // Keep invalid input in the draft too, so "Create order" stays disabled until it is fixed.
-    onChange(next.trim() ? (Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) / 100 : listTotal) : undefined)
+    // NaN (not the list price) so a later price change can never turn a typo into a discount.
+    onChange(next.trim() ? (Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) / 100 : Number.NaN) : undefined)
   }
   if (!open) {
     return <div className={`${styles.card} ${styles.priceCard}`}>
