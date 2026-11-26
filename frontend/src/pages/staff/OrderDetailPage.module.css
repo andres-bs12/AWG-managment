@@ -8,7 +8,8 @@
 .overview > div { display: grid; align-content: start; gap: var(--space-1); padding: var(--space-4); min-width: 0; }
 .overview > div + div { border-left: var(--border-thin) solid var(--staff-line); }
 .overview[data-sold='true'] { grid-template-columns: minmax(0,2fr) minmax(0,1fr) minmax(0,1fr); }
-.overview > div > button { justify-self: start; }
+.cellRow { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-1) var(--space-3); min-width: 0; }
+.cellRow { min-height: var(--touch); }
 .overview span { color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
 .overview strong { overflow-wrap: anywhere; }
 .handoffActions { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
@@ -72,10 +73,9 @@ p.muted { margin: 0 0 var(--space-4); }
  .hero > div { min-width: 0; }
  .status { max-width: var(--size-staff-handoff); }
  .overview { grid-template-columns: minmax(0,1.4fr) minmax(0,1fr); }
- .overview[data-sold='true'] { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
- .overview[data-sold='true'] > div:first-child { grid-column: 1 / -1; }
- .overview[data-sold='true'] > div + div { border-top: var(--border-thin) solid var(--staff-line); }
- .overview[data-sold='true'] > div:nth-child(2) { border-left: 0; }
+ /* Phone: one cell per row, so every value keeps its «Change» on the right of the same line. */
+ .overview[data-sold='true'] { grid-template-columns: 1fr; }
+ .overview[data-sold='true'] > div + div { border-left: 0; border-top: var(--border-thin) solid var(--staff-line); }
  .overview[data-delivery='true'] { grid-template-columns: 1fr; }
  .overview[data-delivery='true'] > div + div { border-left: 0; border-top: var(--border-thin) solid var(--staff-line); }
  .support { grid-template-columns: 1fr; }

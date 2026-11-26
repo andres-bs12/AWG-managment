@@ -10,6 +10,7 @@ import { useItemStatus } from '../../components/staff/useItemStatus'
 import { useHandover } from '../../components/staff/useHandover'
 import { InsetNote } from '../../components/public/PublicForm'
 import { OrderItemCard } from '../../components/staff/OrderItemCard'
+import { ChangePriceDialog } from '../../components/staff/ChangePriceDialog'
 import { OrderPaymentPanel } from '../../components/staff/OrderPaymentPanel'
 import { QrCode } from '../../components/staff/QrCode'
 import { StaffBackLink } from '../../components/staff/StaffBackLink'
@@ -48,6 +49,7 @@ function OrderDetail({ id }: { id: string }) {
   useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(''), 5000); return () => window.clearTimeout(timer) }, [notice])
   const [busy, setBusy] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [priceOpen, setPriceOpen] = useState(false)
   const actionLock = useRef(false)
   const [copied, setCopied] = useState(false)
   const [addressCopied, setAddressCopied] = useState(false)
@@ -197,7 +199,7 @@ function OrderDetail({ id }: { id: string }) {
     {order.needsReview ? <InsetNote tone="warning"><p role="status">New web order, paid online. Check the photos and the pickup or Post details.</p><Button tone="staff" disabled={busy} onClick={() => void runAction(() => api.orders.markReviewed(order.id), 'Marked as reviewed.')}>Mark reviewed</Button></InsetNote> : null}
     {order.paymentReview ? <InsetNote tone="warning"><p role="alert">Stripe reported a payment that does not match this order. Check it in Stripe, then record it as paid or deposit (or cancel the order). It remains held on the agenda until resolved.</p></InsetNote> : null}
     <div className={styles.overview} data-delivery={Boolean(deliveryItem)} data-sold={stallSale || undefined}>
-      <div><span>{order.handedOver ? (postItem ? 'Handed to Post' : deliveryItem ? 'Delivered' : 'Picked up') : postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</span><strong><StaffText>{handoffs.join(' / ') || 'Not scheduled'}</StaffText></strong>
+      <div><span>{order.handedOver ? (postItem ? 'Handed to Post' : deliveryItem ? 'Delivered' : 'Picked up') : postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</span><div className={styles.cellRow}><strong><StaffText>{handoffs.join(' / ') || 'Not scheduled'}</StaffText></strong></div>
         {arrivalText ? <span className={styles.arrivalLine}>{arrivalText}</span> : null}
         {deliveryItem ? <div className={styles.handoffActions}>
           {addressText ? (
@@ -219,7 +221,12 @@ function OrderDetail({ id }: { id: string }) {
       {/* Stall sales: the market the sale counts for is its own cell of the summary, changed from here (no panel below). */}
       {stallSale ? <SoldAtCell order={order} days={days} markets={markets} busy={busy}
         onSave={marketDayId => runAction(() => api.orders.setSaleMarket(id, marketDayId), 'Market changed.')} /> : null}
-      <div><span>{remaining > 0 ? 'Balance due' : 'Total · paid'}</span><a href="#payment-heading">{formatEur(remaining > 0 ? remaining : order.total, 'en')}</a></div>
+      <div><span>{remaining > 0 ? 'Balance due' : 'Total · paid'}</span>
+        {/* Value on the left, its «Change» on the right: the same row in every cell of the summary. */}
+        <div className={styles.cellRow}><a href="#payment-heading">{formatEur(remaining > 0 ? remaining : order.total, 'en')}</a>
+          {stallSale ? <button type="button" className={styles.inlineCopy} aria-label="Change price" disabled={busy} onClick={() => setPriceOpen(true)}>Change</button> : null}</div>
+        {priceOpen ? <ChangePriceDialog order={order} busy={busy} onClose={() => setPriceOpen(false)} onSetPrice={chargedTotal => runAction(() => api.payments.setPrice(id, chargedTotal), 'Price changed.')} /> : null}
+      </div>
     </div>
     {loadError || actionError ? <p className={styles.error} role="alert">{actionError || loadError}</p> : null}
     {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
@@ -290,7 +297,7 @@ function OrderDetail({ id }: { id: string }) {
           ) : null}
           {order.handedOver ? null : paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || !allFinished} onClick={() => { void handover.request(id, true, undefined, undefined, postItem ? trimmedTracking : undefined) }}>{postItem ? 'Handed to Post' : deliveryItem ? 'Mark delivered' : 'Mark picked up'}</Button>}
         </section>}
-        <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method, amount) => runAction(() => api.payments.setPaymentState(id, state, method, amount), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} onSetPrice={(chargedTotal) => runAction(() => api.payments.setPrice(id, chargedTotal), 'Price changed.')} />
+        <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method, amount) => runAction(() => api.payments.setPaymentState(id, state, method, amount), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} />
         <details className={styles.panel}>
           <summary>Customer contact</summary>
           <dl className={styles.contacts}>
@@ -330,8 +337,8 @@ function SoldAtCell({ order, days, markets, busy, onSave }: { order: Bundle['ord
   const selected = choice || order.soldOnMarketDayId || ''
   return <div>
     <span>Sold at</span>
-    <strong><StaffText>{order.soldAtMarketName ?? 'No market'}</StaffText></strong>
-    <button type="button" className={styles.inlineCopy} onClick={() => setOpen(true)}>Change market</button>
+    <div className={styles.cellRow}><strong><StaffText>{order.soldAtMarketName ?? 'No market'}</StaffText></strong>
+      <button type="button" className={styles.inlineCopy} aria-label="Change market" onClick={() => setOpen(true)}>Change</button></div>
     {open ? <StaffDialog title="Sold at" busy={busy} onClose={() => { setOpen(false); setChoice('') }}>
       {choices.length ? <>
         <Field label={`Market open on ${formatDateLabel(saleDate)}`} htmlFor="sold-at-market">
