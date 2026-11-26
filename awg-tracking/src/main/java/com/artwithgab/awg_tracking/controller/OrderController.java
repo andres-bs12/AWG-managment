@@ -98,6 +98,14 @@ public class OrderController {
             @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.DecimalMin(value = "0.00", message = "The price can't be negative")
             @jakarta.validation.constraints.Digits(integer = 8, fraction = 2) java.math.BigDecimal chargedTotal) {}
 
+    /** Move a stall sale to the market it happened at; body {@code {"marketDayId": "..."}}. */
+    @PatchMapping("/{id}/market")
+    public OrderDto setMarket(@PathVariable UUID id, @Valid @RequestBody MarketRequest body) {
+        return orderService.changeSaleMarket(id, body.marketDayId());
+    }
+
+    public record MarketRequest(@jakarta.validation.constraints.NotNull UUID marketDayId) {}
+
     @PatchMapping("/{id}/payment-state")
     public OrderDto setPaymentState(@PathVariable UUID id, @Valid @RequestBody PaymentStateRequest body) {
         return orderService.updatePaymentState(id, body.state(), body.method(), body.amountPaid());

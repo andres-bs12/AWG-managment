@@ -123,6 +123,9 @@ export type Order = {
   total: number
   /** Staff discount already taken off `total`; list price = total + discount. */
   discount?: number
+  /** Stall market day the sale is counted for (stall sales only). */
+  soldOnMarketDayId?: string | null
+  soldAtMarketName?: string | null
   amountPaid?: number
   createdAt: string
   itemIds: string[]

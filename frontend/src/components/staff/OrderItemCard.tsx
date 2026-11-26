@@ -71,7 +71,8 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
         {item.withName ? <div><dt>Name to paint</dt><dd className={styles.name}>{item.backName || 'Waiting for form'}</dd></div> : null}
       </dl>
       {item.note ? <div className={styles.note}><strong>Painter’s note</strong><p>{item.note}</p></div> : null}
-      <section className={styles.production} aria-label="Production"><h4>Production</h4>
+      {/* Ready-made pieces are already painted: no reference photo, no painting, no production status. */}
+      {item.kind === 'custom' ? <section className={styles.production} aria-label="Production"><h4>Production</h4>
       <div className={styles.actions}>
         {held ? <span className={styles.waiting}>Painting starts once the online payment is confirmed</span> : photo ? <ButtonLink to={paintTo} state={navigationState} tone="staff" variant={item.productionStatus === 'finished' || held ? 'secondary' : 'primary'}>{item.productionStatus === 'finished' ? 'View reference' : 'Open painting'}</ButtonLink> : <span className={styles.waiting}>{item.kind === 'custom' ? 'Waiting for reference photos' : 'No reference photo'}</span>}
         {block ? <Link className={styles.schedule} to={agendaSlotPath(block, days)}><StaffText>{paintSlotLabel(block, days)}</StaffText></Link> : null}
@@ -82,7 +83,7 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
           {([{value:'not_started',label:'To paint'}, {value:'in_progress',label:'Painting'}, {value:'finished',label:'Ready'}] as const).map(option => <Button key={option.value} tone="staff" variant="secondary" selected={item.productionStatus === option.value} disabled={busy} onClick={() => onStatus(option.value)}>{option.label}</Button>)}
         </div>
       </details>
-      </section>
+      </section> : null}
       <section className={styles.handover} aria-label="Handover">
         <div>
           <h4>Handover</h4>

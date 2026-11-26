@@ -38,6 +38,9 @@ public record OrderDto(
         boolean needsReview,
         String reviewedAt,
         /** Staff discount already taken off {@code total}; list price = total + discount. */
-        BigDecimal discount
+        BigDecimal discount,
+        /** Stall market day the sale is counted for; null for web orders or when no stall was open. */
+        String soldOnMarketDayId,
+        String soldAtMarketName
 ) {
 }
