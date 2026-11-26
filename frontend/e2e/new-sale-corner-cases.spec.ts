@@ -17,6 +17,8 @@ async function setupCalendarWorld(page: Page, initialIso = '2026-11-28T13:00:00Z
   postWindowOverride?: (readyOn: string) => ShippingQuote
   makeRoomHandler?: (body: { date: string; minutes: number; marketDayId?: string }, key: string) => { status: number; json: unknown }
   saturdaySlots?: AgendaDay['slots']
+  /** Production on 26 Nov 2026: only the home market exists, no stall market loaded. */
+  onlyHome?: boolean
 }) {
   await page.clock.install({ time: new Date(initialIso) })
   await page.addInitScript((marketId) => {
@@ -91,9 +93,9 @@ async function setupCalendarWorld(page: Page, initialIso = '2026-11-28T13:00:00Z
     if (pathName === '/api/photos/pet-post') return route.fulfill({ contentType: 'image/svg+xml', body: PET_SVG })
     if (pathName === '/api/market-stock') return route.fulfill({ json: marketPieces })
     if (pathName === '/api/inventory') return route.fulfill({ json: inventory })
-    if (pathName === '/api/markets') return route.fulfill({ json: markets })
+    if (pathName === '/api/markets') return route.fulfill({ json: options?.onlyHome ? markets.filter(m => m.kind === 'home') : markets })
     if (pathName === '/api/market-days') {
-      return route.fulfill({ json: marketDays })
+      return route.fulfill({ json: options?.onlyHome ? marketDays.filter(d => d.marketId === 'mkt-casa') : marketDays })
     }
     if (pathName === '/api/painting-days') return route.fulfill({ json: paintingDays })
     if (pathName === '/api/agenda/days') {
@@ -367,6 +369,30 @@ test('Rule 8: full today explains why and offers next valid market day without d
   await expect(page.getByRole('radio', { name: 'Today · full', exact: true })).toBeDisabled()
   await expect(page.getByRole('status').filter({ hasText: /Today is full \(6\/6 paintings booked\)/ })).toBeVisible()
   await expect(page.locator('input[name^="day-"][value="md-sun-r"]')).toBeVisible()
+})
+
+test('No stall market set up: Market day explains what to do instead of a silent dead end', async ({ page }) => {
+  await setupCalendarWorld(page, '2026-11-28T13:00:00Z', { onlyHome: true })
+  await page.goto('/staff/sales/new')
+  await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await chooseSizes(page)
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+
+  await page.getByRole('radio', { name: 'Market day', exact: true }).locator('..').click()
+  await expect(page.getByText('No market days are set up yet. Add the market and its days in Markets, or choose Post.').first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Create order & show QR' })).toBeDisabled()
+})
+
+test('Market day without a chosen day offers the day picker instead of only asking for an hour', async ({ page }) => {
+  await setupCalendarWorld(page, '2026-11-28T13:00:00Z')
+  await page.goto('/staff/sales/new')
+  await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await chooseSizes(page)
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+
+  await page.getByRole('radio', { name: 'Market day', exact: true }).locator('..').click()
+  await page.locator('input[name^="day-"][value="md-sun-r"]').locator('..').click()
+  await expect(page.getByText('Pickup hour', { exact: true })).toBeVisible()
 })
 
 test('Post shipping in New sale: server range, finished-with-custom rule, address validation, single €5 fee and cutoff', async ({ page }, testInfo) => {
