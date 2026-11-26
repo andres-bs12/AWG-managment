@@ -46,7 +46,8 @@ export function OrderPaymentPanel({ order, busy, onSetState }: Props) {
   const methodField = <SegmentedControl legend="Method" name="payment-method" value={method} onChange={setMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} />
   const depositField = (id: string) => <Field label="Deposit received (€)" htmlFor={id}><input id={id} inputMode="decimal" value={deposit} disabled={busy} onChange={event => { setDeposit(event.target.value); setError('') }} /></Field>
   return <section className={styles.panel} aria-labelledby="payment-heading">
-    <div className={styles.heading}><h2 id="payment-heading">Payment</h2><span>{remaining === 0 ? 'Paid' : order.paymentState === 'deposit' ? 'Deposit' : 'Unpaid'}</span></div>
+    <div className={styles.heading}><h2 id="payment-heading">Payment</h2>{/* The state and how it was paid, together (owner, 2026-11-26): no separate «Paid by» line elsewhere. */}
+      <span>{[remaining === 0 ? 'Paid' : order.paymentState === 'deposit' ? 'Deposit' : 'Unpaid', order.paymentState !== 'unpaid' && order.paymentMethod ? (order.paymentMethod === 'cash' ? 'Cash' : 'Card') : null].filter(Boolean).join(' · ')}</span></div>
     <dl className={styles.totals}>{discount > 0 && <><div><dt>List price</dt><dd>{formatEur(listPrice, 'en')}</dd></div><div><dt>Discount</dt><dd>−{formatEur(discount, 'en')}</dd></div></>}<div><dt>Total</dt><dd>{formatEur(order.total, 'en')}</dd></div><div><dt>Received</dt><dd>{formatEur(paid, 'en')}</dd></div>{remaining > 0 && <div className={styles.balance}><dt>Remaining</dt><dd>{formatEur(remaining, 'en')}</dd></div>}</dl>
     {pending ? <InsetNote><p>Waiting for online payment. Check Stripe; staff cannot record a payment while Checkout is pending.</p></InsetNote> : <>
       {remaining > 0 && <div className={styles.collect}>

@@ -130,7 +130,7 @@ function OrderDetail({ id }: { id: string }) {
   const createdAt = new Date(order.createdAt.endsWith('Z') || /[+-]\d\d:\d\d$/.test(order.createdAt) ? order.createdAt : `${order.createdAt}Z`)
   // Sold and handed over in the same minute (a ready-made stall sale): the summary already says when, so the line below does not repeat it.
   const createdShown = !handedOverAt || Math.abs(handedOverAt.getTime() - createdAt.getTime()) >= 60000
-  const orderFacts = [order.source === 'web' || order.checkoutStatus ? 'Web order' : 'Stall order', createdShown ? `Created ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(createdAt)} (Vienna)` : null, order.paymentMethod ? `Paid by ${order.paymentMethod}` : null].filter(Boolean).join(' · ')
+  const createdText = createdShown ? `Created ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(createdAt)} (Vienna)` : null
   const formUrl = `${window.location.origin}/form/${order.formToken}`
   // Unconfirmed online payments hold their slot but are not ready for painting or delivery yet.
   const paymentHeld = !order.handedOver && (order.checkoutStatus === 'pending' || order.checkoutStatus === 'review' || Boolean(order.paymentReview))
@@ -209,7 +209,7 @@ function OrderDetail({ id }: { id: string }) {
     </header>
     {order.needsReview ? <InsetNote tone="warning"><p role="status">New web order, paid online. Check the photos and the pickup or Post details.</p><Button tone="staff" disabled={busy} onClick={() => void runAction(() => api.orders.markReviewed(order.id), 'Marked as reviewed.')}>Mark reviewed</Button></InsetNote> : null}
     {order.paymentReview ? <InsetNote tone="warning"><p role="alert">Stripe reported a payment that does not match this order. Check it in Stripe, then record it as paid or deposit (or cancel the order). It remains held on the agenda until resolved.</p></InsetNote> : null}
-    <div className={styles.overview} data-delivery={Boolean(deliveryItem)} data-sold={stallSale || undefined}>
+    <div className={styles.overview} data-delivery={Boolean(deliveryItem)} data-sold="true">
       <div><span>{order.handedOver ? (postItem ? 'Handed to Post' : deliveryItem ? 'Delivered' : 'Picked up') : postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</span><div className={styles.cellRow}><strong><StaffText>{handedOverText ?? (handoffs.join(' / ') || 'Not scheduled')}</StaffText></strong></div>
         {arrivalText ? <span className={styles.arrivalLine}>{arrivalText}</span> : null}
         {deliveryItem ? <div className={styles.handoffActions}>
@@ -231,7 +231,8 @@ function OrderDetail({ id }: { id: string }) {
       </div>
       {/* Stall sales: the market the sale counts for is its own cell of the summary, changed from here (no panel below). */}
       {stallSale ? <SoldAtCell order={order} days={days} markets={markets} busy={busy}
-        onSave={marketDayId => runAction(() => api.orders.setSaleMarket(id, marketDayId), 'Market changed.')} /> : null}
+        onSave={marketDayId => runAction(() => api.orders.setSaleMarket(id, marketDayId), 'Market changed.')} />
+      : <div><span>Sold at</span><div className={styles.cellRow}><strong>Web shop</strong></div></div>}
       <div><span>{remaining > 0 ? 'Balance due' : 'Total · paid'}</span>
         {/* Value on the left, its «Change» on the right: the same row in every cell of the summary. */}
         <div className={styles.cellRow}><a href="#payment-heading">{formatEur(remaining > 0 ? remaining : order.total, 'en')}</a>
@@ -319,8 +320,8 @@ function OrderDetail({ id }: { id: string }) {
         </details>
         {/* The form link and QR only matter until the order is handed over. */}
         {hasForm && !formWaiting && !order.handedOver ? <details className={styles.panel}><summary>Customer form <span className={styles.muted}>Completed</span></summary>{formContent}</details> : null}
-        {/* The facts of the order as one quiet line: no «Order info» disclosure to open (owner, 2026-11-26). */}
-        <p className={styles.muted}><StaffText>{orderFacts}</StaffText></p>
+        {/* No «Order info» disclosure (owner, 2026-11-26): where it was sold is in the summary, how it was paid in Payment. */}
+        {createdText ? <p className={styles.muted}>{createdText}</p> : null}
         <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
         {/* Handed over: undo is only for mistakes, so it sits once at the bottom, quiet and red, where Cancel would be.
             It opens the usual confirmation. A handed-over order cannot be cancelled, so no dead Cancel button. */}
