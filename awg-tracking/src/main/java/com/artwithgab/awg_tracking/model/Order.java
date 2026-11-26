@@ -42,6 +42,10 @@ public class Order {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
+    /** Staff discount at the stall: list price minus what was charged. {@code total} is already net of it. */
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal discount = BigDecimal.ZERO;
+
     /** Money received so far: 0 unpaid, the deposit amount (50 % by default), or the total. */
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amountPaid = BigDecimal.ZERO;

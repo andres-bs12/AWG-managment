@@ -114,6 +114,8 @@ export type PaymentService = {
     method?: PaymentMethod | null,
     amountPaid?: number,
   ) => Promise<Order>
+  /** Change what a stall sale costs (discount); never above the list price. Payments follow the new total. */
+  setPrice: (orderId: string, chargedTotal: number) => Promise<Order>
 }
 
 export type TrackingService = {

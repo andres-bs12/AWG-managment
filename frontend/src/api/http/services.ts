@@ -278,6 +278,7 @@ export const httpApi: Api = {
       ),
   },
   payments: {
+    setPrice: (orderId, chargedTotal) => request(`/api/orders/${enc(orderId)}/price`, jsonInit('PATCH', { chargedTotal }), staff),
     setPaymentState: (orderId, state, method, amountPaid) =>
       request(
         `/api/orders/${enc(orderId)}/payment-state`,

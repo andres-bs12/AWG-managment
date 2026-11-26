@@ -93,7 +93,8 @@ public class ViewMapper {
                 List.of(),
                 o.getCheckoutStatus() == null ? null : o.getCheckoutStatus().name().toLowerCase(java.util.Locale.ROOT),
                 o.getSource(), o.getTrackingNumber(), AustrianPost.trackingUrl(o.getTrackingNumber()),
-                o.needsReview(), o.getReviewedAt() == null ? null : o.getReviewedAt().toString());
+                o.needsReview(), o.getReviewedAt() == null ? null : o.getReviewedAt().toString(),
+                o.getDiscount() == null ? java.math.BigDecimal.ZERO : o.getDiscount());
     }
 
     /** Day the item is handed off, resolved against the calendar. */

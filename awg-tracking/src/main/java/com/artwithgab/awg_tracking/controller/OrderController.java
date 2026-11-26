@@ -88,6 +88,16 @@ public class OrderController {
 
     public record CancelRequest(String reason) {}
 
+    /** Change the price of a stall sale (discount); body {@code {"chargedTotal": 90}}. */
+    @PatchMapping("/{id}/price")
+    public OrderDto setPrice(@PathVariable UUID id, @Valid @RequestBody PriceRequest body) {
+        return orderService.updateChargedTotal(id, body.chargedTotal());
+    }
+
+    public record PriceRequest(
+            @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.DecimalMin(value = "0.00", message = "The price can't be negative")
+            @jakarta.validation.constraints.Digits(integer = 8, fraction = 2) java.math.BigDecimal chargedTotal) {}
+
     @PatchMapping("/{id}/payment-state")
     public OrderDto setPaymentState(@PathVariable UUID id, @Valid @RequestBody PaymentStateRequest body) {
         return orderService.updatePaymentState(id, body.state(), body.method(), body.amountPaid());

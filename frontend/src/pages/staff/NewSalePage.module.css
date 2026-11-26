@@ -714,3 +714,25 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* List price with a one-tap discount: the price Gaby agreed at the stall. */
+.priceCard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.priceCard > p {
+  margin: 0;
+}
+
+.priceCard[data-open] {
+  align-items: flex-end;
+}
+
+.priceCard[data-open] > :first-child {
+  flex: 1 1 256px;
+  margin-bottom: 0;
+}

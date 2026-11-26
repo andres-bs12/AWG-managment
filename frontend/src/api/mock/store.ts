@@ -1525,6 +1525,10 @@ function createSaleOrder(input: CreateSaleInput, orderId: string, code: string):
     if (postDay) state.marketDays.push(postDay)
   }
   const deliveryFee = hasPost ? prices.shippingFee : 0
+  const listTotal = Math.round((createdItems.reduce((sum, item) => sum + item.cost, 0) + deliveryFee) * 100) / 100
+  if (input.chargedTotal != null && (!(input.chargedTotal >= 0) || input.chargedTotal > listTotal)) {
+    throw new Error('The sale price can\'t be higher than the list price.')
+  }
   const order: Order = {
     id: orderId,
     customerId: customer.id,
@@ -1535,7 +1539,8 @@ function createSaleOrder(input: CreateSaleInput, orderId: string, code: string):
     paymentMethod: null,
     amountPaid: 0,
     deliveryFee,
-    total: Math.round((createdItems.reduce((sum, item) => sum + item.cost, 0) + deliveryFee) * 100) / 100,
+    total: input.chargedTotal != null ? Math.round(input.chargedTotal * 100) / 100 : listTotal,
+    discount: input.chargedTotal != null ? Math.round((listTotal - input.chargedTotal) * 100) / 100 : 0,
     createdAt: new Date().toISOString(),
     itemIds: createdItems.map((item) => item.id),
     handedOver: false,
@@ -1566,6 +1571,20 @@ export function setPaymentState(orderId: string, paymentState: PaymentState, met
   order.amountPaid = amount
   order.paymentState = paymentState
   if (method !== undefined) order.paymentMethod = method
+  emit()
+  return order
+}
+
+export function setOrderPrice(orderId: string, chargedTotal: number) {
+  const order = requireOrder(orderId)
+  if (order.status === 'CANCELLED') throw new Error('This order is cancelled.')
+  if (order.source === 'web') throw new Error('Web shop orders were paid online; their price can\'t be changed here.')
+  const list = Math.round((order.total + (order.discount ?? 0)) * 100) / 100
+  const charged = Math.round(chargedTotal * 100) / 100
+  if (!Number.isFinite(charged) || charged < 0 || charged > list) throw new Error('The sale price can\'t be higher than the list price.')
+  order.discount = Math.round((list - charged) * 100) / 100
+  order.total = charged
+  if (order.paymentState === 'paid' || (order.paymentState === 'deposit' && (order.amountPaid ?? 0) >= charged)) { order.paymentState = 'paid'; order.amountPaid = charged }
   emit()
   return order
 }
