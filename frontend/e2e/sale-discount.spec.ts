@@ -56,7 +56,7 @@ test('staff changes the price of a past sale after confirming', async ({ page })
   await page.getByRole('link', { name: 'Open order', exact: true }).click()
 
   const payment = page.getByRole('region', { name: 'Payment' })
-  await payment.locator('summary', { hasText: 'Change price' }).click()
+  await payment.getByRole('button', { name: 'Change price', exact: true }).click()
   await payment.getByLabel('New total (€)').fill('60')
   await payment.getByRole('button', { name: /Change price to/ }).click()
   const dialog = page.getByRole('dialog', { name: 'Change price?' })
@@ -86,6 +86,9 @@ test('a ready-made sale shows no painting controls and can move to another marke
   // Handed over at the sale: one undo, at the bottom.
   await expect(page.getByRole('button', { name: 'Undo handover', exact: true })).toHaveCount(1)
 
+  // The top summary says it at a glance: picked up, and the market the sale counts for.
+  await expect(page.getByText('Picked up', { exact: true })).toBeVisible()
+  await expect(page.getByText(/^Sold at · .*Rathausplatz/).first()).toBeVisible()
   // Sold at: move the sale to the other stall open that day.
   const soldAt = page.locator('summary', { hasText: 'Sold at' })
   await expect(soldAt).toContainText('Rathausplatz')

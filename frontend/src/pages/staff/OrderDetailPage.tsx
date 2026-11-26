@@ -198,6 +198,8 @@ function OrderDetail({ id }: { id: string }) {
     <div className={styles.overview} data-delivery={Boolean(deliveryItem)}>
       <div><span>{order.handedOver ? (postItem ? 'Handed to Post' : deliveryItem ? 'Delivered' : 'Picked up') : postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</span><strong><StaffText>{handoffs.join(' / ') || 'Not scheduled'}</StaffText></strong>
         {arrivalText ? <span className={styles.arrivalLine}>{arrivalText}</span> : null}
+        {/* Stall sales: the market the sale counts for, readable at a glance (it is changed in the Sold at panel). */}
+        {order.source !== 'web' && !order.checkoutStatus && order.soldAtMarketName ? <span className={styles.arrivalLine}><StaffText>{`Sold at · ${order.soldAtMarketName}`}</StaffText></span> : null}
         {deliveryItem ? <div className={styles.handoffActions}>
           {addressText ? (
             postItem ? (
@@ -297,8 +299,10 @@ function OrderDetail({ id }: { id: string }) {
             <div><dt>Email</dt><dd>{customer.email ? <a href={`mailto:${customer.email}`}>{customer.email}</a> : 'Waiting for form'}</dd></div>
           </dl>
         </details>
-        {hasForm && !formWaiting ? <details className={styles.panel}><summary>Customer form <span className={styles.muted}>Completed</span></summary>{formContent}</details> : null}
-        <details className={styles.panel}><summary>Order info</summary><p>{order.source === 'web' || order.checkoutStatus ? 'Web order' : 'Stall order'} · Created {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(new Date(order.createdAt.endsWith('Z') || /[+-]\d\d:\d\d$/.test(order.createdAt) ? order.createdAt : `${order.createdAt}Z`))} (Vienna)</p><p>Payment method: {order.paymentMethod ?? 'Not recorded'}</p></details>
+        {/* The form link and QR only matter until the order is handed over. */}
+        {hasForm && !formWaiting && !order.handedOver ? <details className={styles.panel}><summary>Customer form <span className={styles.muted}>Completed</span></summary>{formContent}</details> : null}
+        {/* The facts of the order as one quiet line: no «Order info» disclosure to open (owner, 2026-11-26). */}
+        <p className={styles.muted}>{order.source === 'web' || order.checkoutStatus ? 'Web order' : 'Stall order'} · Created {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(new Date(order.createdAt.endsWith('Z') || /[+-]\d\d:\d\d$/.test(order.createdAt) ? order.createdAt : `${order.createdAt}Z`))} (Vienna){order.paymentMethod ? ` · Paid by ${order.paymentMethod}` : ''}</p>
         <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
         {/* Handed over: undo is only for mistakes, so it sits once at the bottom, quiet and red, where Cancel would be.
             It opens the usual confirmation. A handed-over order cannot be cancelled, so no dead Cancel button. */}

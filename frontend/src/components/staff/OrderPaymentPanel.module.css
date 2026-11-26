@@ -15,3 +15,6 @@
 .amount input { width: 100%; min-width: 0; min-height: var(--touch); border: 0; background: transparent; color: inherit; font: inherit; padding: var(--space-2); }
 .error { font-size: var(--type-staff-meta-size); color: var(--staff-danger); }
 @media (max-width: 639px) { .panel { padding: var(--space-4); } }
+.corrections { display: flex; flex-wrap: wrap; gap: var(--space-3); padding-top: var(--space-4); border-top: var(--border-thin) solid var(--staff-line); }
+.corrections > button { flex: 1 1 0; }
+.correctionForm { display: grid; gap: var(--space-3); padding-top: var(--space-4); }

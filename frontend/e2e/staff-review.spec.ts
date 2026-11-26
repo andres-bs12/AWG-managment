@@ -572,7 +572,7 @@ test('payment corrections are disclosed explicitly and retain a precise server e
   const fixture = await httpFixture(page, { finished: true })
   await signedIn(page, `/staff/orders/${fixture.original.id}`)
   await expect(page.getByRole('button', { name: /^Correct to/ })).toBeHidden()
-  await page.locator('summary').filter({ hasText: /^Correct payment/ }).click()
+  await page.getByRole('button', { name: 'Correct payment', exact: true }).click()
   await page.getByRole('group', { name: 'Corrected payment state', exact: true }).getByRole('radio', { name: 'Unpaid', exact: true }).locator('..').click()
   const unpaid = page.getByRole('button', { name: 'Correct to unpaid', exact: true })
   await expect(unpaid).toBeVisible()
