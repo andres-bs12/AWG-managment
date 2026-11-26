@@ -94,3 +94,28 @@ test('staff changes the price of a past sale after confirming', async ({ page })
   await expect(payment.locator('dl')).toContainText('€60.00')
   if (process.env.PW_DISCOUNT_SHOTS) await page.screenshot({ path: `${process.env.PW_DISCOUNT_SHOTS}/changed-price-${test.info().project.name}.png`, animations: 'disabled', fullPage: true })
 })
+
+test('a ready-made sale shows no painting controls and can move to another market', async ({ page }) => {
+  await signIn(page)
+  await pick(page, 1, 'RM01')
+  await pick(page, 2, 'RM02')
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  await page.getByRole('radio', { name: 'Cash', exact: true }).locator('..').click()
+  await page.getByRole('button', { name: 'Done', exact: true }).click()
+  await page.getByRole('link', { name: 'Open order', exact: true }).click()
+
+  // Ready-made pieces: no Production section and no per-piece handover; the Pickup panel owns the one button.
+  await expect(page.getByRole('region', { name: 'Production' })).toHaveCount(0)
+  await expect(page.getByText('No reference photo')).toHaveCount(0)
+  await expect(page.getByRole('article', { name: /RM01/ }).getByRole('button')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Undo handover', exact: true })).toHaveCount(1)
+
+  // Sold at: move the sale to the other stall open that day.
+  const soldAt = page.locator('summary', { hasText: 'Sold at' })
+  await expect(soldAt).toContainText('Rathausplatz')
+  await soldAt.click()
+  await page.getByLabel(/Market open on/).selectOption({ label: 'Christkindlmarkt Spittelberg' })
+  await page.getByRole('button', { name: 'Save market', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Market changed.' })).toBeVisible()
+  await expect(soldAt).toContainText('Christkindlmarkt Spittelberg')
+})

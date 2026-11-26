@@ -94,7 +94,14 @@ public class ViewMapper {
                 o.getCheckoutStatus() == null ? null : o.getCheckoutStatus().name().toLowerCase(java.util.Locale.ROOT),
                 o.getSource(), o.getTrackingNumber(), AustrianPost.trackingUrl(o.getTrackingNumber()),
                 o.needsReview(), o.getReviewedAt() == null ? null : o.getReviewedAt().toString(),
-                o.getDiscount() == null ? java.math.BigDecimal.ZERO : o.getDiscount());
+                o.getDiscount() == null ? java.math.BigDecimal.ZERO : o.getDiscount(),
+                soldOn(o).map(d -> d.getId().toString()).orElse(null),
+                soldOn(o).map(d -> d.getMarket().getName()).orElse(null));
+    }
+
+    private static Optional<MarketDay> soldOn(Order o) {
+        return o.getOrderItems().stream().map(com.artwithgab.awg_tracking.model.OrderItem::getSoldOnDay)
+                .filter(java.util.Objects::nonNull).findFirst();
     }
 
     /** Day the item is handed off, resolved against the calendar. */

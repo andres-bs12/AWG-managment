@@ -17,7 +17,9 @@ import { Button } from '../../components/ui/Button'
 import { ButtonLink } from '../../components/ui/ButtonLink'
 import { Field } from '../../components/ui/Field'
 import { marketOrnamentLabel } from '../../domain/marketStock'
-import type { MarketDay } from '../../domain/types'
+import type { Market, MarketDay } from '../../domain/types'
+import { viennaDate } from '../../lib/sales'
+import { formatDateLabel } from '../../lib/time'
 import { handoffArrivalLabel, handoffLabel } from '../../lib/handoff'
 import { formatEur } from '../../lib/money'
 import { paymentSummary } from '../../lib/paymentSummary'
@@ -38,6 +40,7 @@ function OrderDetail({ id }: { id: string }) {
   const navigationState = location.state as { from?: string; itemId?: string } | undefined
   const [bundle, setBundle] = useState<Bundle | null>(null)
   const [days, setDays] = useState<MarketDay[]>([])
+  const [markets, setMarkets] = useState<Market[]>([])
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
   const [notice, setNotice] = useState('')
@@ -53,11 +56,12 @@ function OrderDetail({ id }: { id: string }) {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([api.orders.getOrderBundle(id), api.markets.listMarketDays()])
-      .then(([next, marketDays]) => {
+    Promise.all([api.orders.getOrderBundle(id), api.markets.listMarketDays(), api.markets.listMarkets()])
+      .then(([next, marketDays, marketList]) => {
         if (cancelled) return
         setBundle(next)
         setDays(marketDays)
+        setMarkets(marketList)
         setLoadError('')
       })
       .catch((err: Error) => { if (!cancelled) setLoadError(err.message) })
@@ -94,6 +98,7 @@ function OrderDetail({ id }: { id: string }) {
   const { remaining } = paymentSummary(order)
   const finishedCount = items.filter(item => item.productionStatus === 'finished').length
   const allFinished = items.length > 0 && finishedCount === items.length
+  const onlyReadyMade = items.length > 0 && items.every(item => item.kind === 'finished')
   const formWaiting = items.some(item => item.kind === 'custom' && !item.formComplete)
   const hasForm = items.some(item => item.kind === 'custom')
   const postItem = items.find(item => item.delivery.kind === 'post')
@@ -226,7 +231,8 @@ function OrderDetail({ id }: { id: string }) {
       <section aria-labelledby="order-items" className={styles.items}>
         {items.map(item => {
           const allPostOrder = postItems.length > 0 && postItems.length === items.length
-          const canItemHandover = items.length > 1 && !(allPostOrder && !(item.handedOver ?? order.handedOver))
+          // Ready-made pieces all go together at the stall: the order panel's one handover button is enough.
+          const canItemHandover = items.length > 1 && !onlyReadyMade && !(allPostOrder && !(item.handedOver ?? order.handedOver))
           return <OrderItemCard key={item.id} item={{ ...item, handedOver: item.handedOver ?? order.handedOver }} onHandover={canItemHandover ? () => { void handover.request(id, !(item.handedOver ?? order.handedOver), item.id) } : undefined} block={blocks.find(block => block.orderItemId === item.id)} days={days} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />
         })}
       </section>
@@ -279,6 +285,8 @@ function OrderDetail({ id }: { id: string }) {
           ) : null}
           {paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished && !order.handedOver ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || (!order.handedOver && !allFinished)} onClick={() => { void handover.request(id, !order.handedOver, undefined, undefined, postItem ? trimmedTracking : undefined) }}>{order.handedOver ? 'Undo handover' : (postItem ? 'Handed to Post' : deliveryItem ? 'Mark delivered' : 'Mark picked up')}</Button>}
         </section>
+        {order.source !== 'web' && !order.checkoutStatus ? <SoldAtPanel order={order} days={days} markets={markets} busy={busy}
+          onSave={marketDayId => runAction(() => api.orders.setSaleMarket(id, marketDayId), 'Market changed.')} /> : null}
         <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method, amount) => runAction(() => api.payments.setPaymentState(id, state, method, amount), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} onSetPrice={(chargedTotal) => runAction(() => api.payments.setPrice(id, chargedTotal), 'Price changed.')} />
         <details className={styles.panel}>
           <summary>Customer contact</summary>
@@ -299,6 +307,28 @@ function OrderDetail({ id }: { id: string }) {
     {cancelOpen && <CancelOrderDialog busy={busy} order={order} items={items} onClose={() => setCancelOpen(false)} onConfirm={(reason) => { void cancelOrder(reason) }} />}
     {itemStatus.dialog}{handover.dialog}
   </article>
+}
+
+/** Which stall the sale counts for (stats, sales list). Fixable when the market was loaded after the sale. */
+function SoldAtPanel({ order, days, markets, busy, onSave }: { order: Bundle['order']; days: MarketDay[]; markets: Market[]; busy: boolean; onSave: (marketDayId: string) => Promise<boolean> }) {
+  const saleDate = viennaDate(order.createdAt)
+  const stallIds = new Set(markets.filter(market => market.kind === 'market').map(market => market.id))
+  const choices = days.filter(day => day.date === saleDate && stallIds.has(day.marketId))
+  const [choice, setChoice] = useState('')
+  const name = (id: string) => markets.find(market => market.id === id)?.name ?? 'Market'
+  const selected = choice || order.soldOnMarketDayId || ''
+  return <details className={styles.panel}>
+    <summary>Sold at · <StaffText>{order.soldAtMarketName ?? 'No market'}</StaffText></summary>
+    {choices.length ? <>
+      <Field label={`Market open on ${formatDateLabel(saleDate)}`} htmlFor="sold-at-market">
+        <select id="sold-at-market" value={selected} disabled={busy} onChange={event => setChoice(event.target.value)}>
+          {!order.soldOnMarketDayId ? <option value="">Choose a market</option> : null}
+          {choices.map(day => <option key={day.id} value={day.id}>{name(day.marketId)}</option>)}
+        </select>
+      </Field>
+      <Button tone="staff" variant="secondary" disabled={busy || !selected || selected === order.soldOnMarketDayId} onClick={() => { void onSave(selected).then(ok => { if (ok) setChoice('') }) }}>Save market</Button>
+    </> : <p className={styles.muted}>No stall market was open on {formatDateLabel(saleDate)}. Add the market and that day in Markets first.</p>}
+  </details>
 }
 
 function CancelOrderDialog({ busy, order, items, onClose, onConfirm }: { busy: boolean; order: Bundle['order']; items: Bundle['items']; onClose: () => void; onConfirm: (reason: string) => void }) {

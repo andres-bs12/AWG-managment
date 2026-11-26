@@ -270,6 +270,7 @@ export const httpApi: Api = {
         jsonInit('PATCH', { status }),
         staff,
       ),
+    setSaleMarket: (orderId, marketDayId) => request(`/api/orders/${enc(orderId)}/market`, jsonInit('PATCH', { marketDayId }), staff),
     setHandedOver: (orderId, handedOver, itemIds, trackingNumber, collectMethod) =>
       request(
         `/api/orders/${enc(orderId)}/handed-over`,

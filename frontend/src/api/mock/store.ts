@@ -1,5 +1,5 @@
 import { paymentSummary } from '../../lib/paymentSummary'
-import { filterSales } from '../../lib/sales'
+import { filterSales, viennaDate } from '../../lib/sales'
 import { readFormToken, rememberFormToken } from '../formTokens'
 import type {
   Prices, PricesUpdate,
@@ -1553,7 +1553,11 @@ function createSaleOrder(input: CreateSaleInput, orderId: string, code: string):
     moving.endHour = move.to.endHour
   }
   state.customers.push(customer)
-  if (soldOn) (state.soldOnMarketDays ??= {})[order.id] = soldOn.id
+  if (soldOn) {
+    (state.soldOnMarketDays ??= {})[order.id] = soldOn.id
+    order.soldOnMarketDayId = soldOn.id
+    order.soldAtMarketName = state.markets.find(market => market.id === soldOn.marketId)?.name ?? null
+  }
   state.orders.push(order)
   state.items.push(...createdItems)
   state.blocks.push(...createdBlocks)
@@ -1591,6 +1595,23 @@ export function setOrderPrice(orderId: string, chargedTotal: number) {
     else if (received > 0) order.paymentState = 'deposit'
     else { order.paymentState = 'unpaid'; order.amountPaid = 0 }
   }
+  emit()
+  return order
+}
+
+export function setSaleMarket(orderId: string, marketDayId: string) {
+  const order = requireOrder(orderId)
+  if (order.status === 'CANCELLED') throw new Error('This order is cancelled.')
+  if (order.source === 'web') throw new Error('Web shop orders are not sold at a stall.')
+  const day = state.marketDays.find(row => row.id === marketDayId)
+  const market = day ? state.markets.find(row => row.id === day.marketId) : undefined
+  if (!day || !market) throw invalidField('Choose a market day.', 'marketDayId')
+  if (market.kind !== 'market') throw invalidField('Choose a stall market, not a home day.', 'marketDayId')
+  const saleDate = viennaDate(order.createdAt)
+  if (day.date !== saleDate) throw invalidField(`Choose a market that was open on the day of the sale (${saleDate}).`, 'marketDayId')
+  ;(state.soldOnMarketDays ??= {})[order.id] = day.id
+  order.soldOnMarketDayId = day.id
+  order.soldAtMarketName = market.name
   emit()
   return order
 }

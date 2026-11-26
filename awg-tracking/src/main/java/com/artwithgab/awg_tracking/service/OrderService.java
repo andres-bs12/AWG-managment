@@ -407,6 +407,40 @@ public class OrderService {
         return mapper.order(order);
     }
 
+    /**
+     * Staff move a stall sale to the market it really happened at (e.g. the market was loaded after the sale).
+     * Only a market open on the sale's own day can be chosen; finished pieces handed over at the sale move with it.
+     * Custom pickups and painting are not touched.
+     */
+    @Transactional
+    public OrderDto changeSaleMarket(UUID orderId, UUID marketDayId) {
+        Order order = findOrderOrThrow(orderId);
+        requireActive(order);
+        if (order.getSource() == com.artwithgab.awg_tracking.enums.OrderSource.WEB) {
+            throw new ConflictException("Web shop orders are not sold at a stall.").code("WEB_ORDER_MARKET");
+        }
+        CalendarIndex index = calendarService.snapshot();
+        MarketDay target = index.byId(marketDayId)
+                .orElseThrow(() -> new BadRequestException("Choose a market day.").code("VALIDATION").field("marketDayId"));
+        if (target.getMarket().getKind() != MarketKind.MARKET) {
+            throw new BadRequestException("Choose a stall market, not a home day.").code("VALIDATION").field("marketDayId");
+        }
+        LocalDate saleDate = order.getCreatedAt().atZone(java.time.ZoneId.of("Europe/Vienna")).toLocalDate();
+        if (!target.getDate().equals(saleDate)) {
+            throw new BadRequestException("Choose a market that was open on the day of the sale (" + saleDate + ").")
+                    .code("VALIDATION").field("marketDayId");
+        }
+        for (OrderItem item : order.getOrderItems()) {
+            MarketDay previous = item.getSoldOnDay();
+            item.setSoldOnDay(target);
+            boolean handedOverAtSale = item.getItemKind() != ItemKind.CUSTOM && item.getDeliveryKind() == DeliveryKind.MARKET
+                    && saleDate.equals(item.getHandoffDate())
+                    && (item.getHandoffDay() == null || item.getHandoffDay().equals(previous));
+            if (handedOverAtSale) item.setHandoffDay(target);
+        }
+        return mapper.order(order);
+    }
+
     /** Sets the payment fields; returns whether the state or amount changed. Publishes nothing. */
     private boolean applyPayment(Order order, PaymentState state, PaymentMethod method, BigDecimal amountPaid) {
         BigDecimal total = order.getTotal();

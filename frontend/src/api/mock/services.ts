@@ -37,6 +37,7 @@ import {
   setHandedOver,
   setPaymentState,
   setOrderPrice,
+  setSaleMarket,
   submitForm,
 } from './store'
 
@@ -175,6 +176,7 @@ export const mockApi: Api = {
       later(() => {
         setItemStatus(orderId, itemId, status)
       }),
+    setSaleMarket: (orderId, marketDayId) => later(() => setSaleMarket(orderId, marketDayId)),
     setHandedOver: (orderId, handedOver, itemIds, trackingNumber, collectMethod) =>
       later(() => {
         // Hand-over validates first, so a refused hand-over leaves the payment untouched.
