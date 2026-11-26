@@ -36,6 +36,7 @@ import {
   setItemStatus,
   setHandedOver,
   setPaymentState,
+  setOrderPrice,
   submitForm,
 } from './store'
 
@@ -183,6 +184,7 @@ export const mockApi: Api = {
   },
   payments: {
     setPaymentState: (orderId, state, method, amountPaid) => later(() => setPaymentState(orderId, state, method, amountPaid)),
+    setPrice: (orderId, chargedTotal) => later(() => setOrderPrice(orderId, chargedTotal)),
   },
   tracking: {
     getByCode: (code) => later(() => getTrackByCode(code), 420),

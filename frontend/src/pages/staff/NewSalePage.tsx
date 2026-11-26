@@ -371,6 +371,10 @@ export function NewSalePage() {
   ))
   const phase = draft.phase
   const order = draft.order
+  const listTotal = prices ? draftTotal(draft.items, prices) : null
+  // A discount only counts while it is below the list price (items can change after Back).
+  const discounted = listTotal != null && draft.chargedTotal != null && draft.chargedTotal < listTotal
+  const saleTotal = discounted ? draft.chargedTotal! : listTotal
   const formUrl = order ? `${window.location.origin}/form/${order.formToken}` : ''
   const formStatus = useOrderFormStatus(order?.id, hasCustom && ['qr', 'payment', 'done'].includes(phase))
 
@@ -915,6 +919,7 @@ export function NewSalePage() {
     const created = await api.orders.createSale({
       soldOnMarketDayId,
       items: toCreateItems(draft.items, days, today, draft.postAddress),
+      ...(discounted ? { chargedTotal: draft.chargedTotal } : {}),
     }, saleKey.current)
     const ref = { id: created.id, code: created.code, formToken: created.formToken, total: created.total }
     setDraft((current) => ({ ...current, order: ref }))
@@ -1183,7 +1188,7 @@ export function NewSalePage() {
         {error && <p role="alert">{error}</p>}
       </StaffDialog>}
       {finishedHandoff && <StaffDialog title="Balance due" busy={busy} onClose={() => setFinishedHandoff(false)}>
-        <p>Collect the remaining balance before handing over the whole order. {prices ? formatEur((order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices, item.size), 0)) - (payState === 'deposit' ? depositValue(depositAmount, order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices, item.size), 0)) : 0), 'en') : ''} is still due.</p>
+        <p>Collect the remaining balance before handing over the whole order. {prices ? formatEur((order?.total ?? saleTotal ?? 0) - (payState === 'deposit' ? depositValue(depositAmount, order?.total ?? saleTotal ?? 0) : 0), 'en') : ''} is still due.</p>
         <SegmentedControl legend="Collection method" name="finished-handover-method" value={payMethod} onChange={setPayMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} />
         <Button tone="staff" disabled={busy || !payMethod} onClick={() => void finishFinishedSale('paid')}>Mark paid &amp; hand over</Button>
         <Button tone="staff" variant="secondary" disabled={busy} onClick={() => void finishFinishedSale(payState, false)}>Save without handover</Button>
@@ -1332,20 +1337,28 @@ export function NewSalePage() {
                 />
               ) : null}
 
+              {!order && listTotal != null ? (
+                <SalePriceCard
+                  listTotal={listTotal}
+                  value={draft.chargedTotal}
+                  onChange={(chargedTotal) => setDraft(current => ({ ...current, chargedTotal }))}
+                />
+              ) : null}
+
               {onlyFinished ? (
                 <div className={`${styles.card} ${styles.payCard}`}>
                   <InsetNote><p>No customer form is needed for ready-made ornaments.</p></InsetNote>
-                  <SalePaymentFields state={payState} onState={setPayState} method={payMethod} onMethod={setPayMethod} deposit={depositAmount} onDeposit={setDepositAmount} total={order?.total ?? (prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices, item.size), 0) : 0)} />
+                  <SalePaymentFields state={payState} onState={setPayState} method={payMethod} onMethod={setPayMethod} deposit={depositAmount} onDeposit={setDepositAmount} total={order?.total ?? saleTotal ?? 0} />
 
                 </div>
               ) : null}
 
               {onlyFinished && payState !== 'unpaid' && !payMethod ? <p>Choose cash or card before saving.</p> : null}
-              <StaffActions className={styles.actions} total={order?.total ?? (prices ? draftTotal(draft.items, prices) : null)}>
+              <StaffActions className={styles.actions} total={order?.total ?? saleTotal} totalLabel={discounted ? 'Total · discounted' : 'Total'}>
                 <Button
                   tone="staff"
                   size="lg"
-                  disabled={busy || !prices || Boolean(configError) || !draft.items.length || (hasPost && postQuote?.available === false) || draft.items.some(item => item.kind === 'custom' && (item.paintStart == null || (item.delivery.mode === 'market' && (!item.delivery.marketDayId || item.delivery.pickupHour == null)) || !paintFitsHandoff(item, item.delivery) || Boolean(paintingAtOtherMarket(item, agendaDays)))) || draft.items.some(item => isPickupInPast(item.delivery, currentDate, nowHour)) || (onlyFinished && payState !== 'unpaid' && !payMethod) || (onlyFinished && payState === 'deposit' && !validDeposit(depositAmount, prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices, item.size), 0) : 0))}
+                  disabled={busy || !prices || Boolean(configError) || !draft.items.length || (hasPost && postQuote?.available === false) || draft.items.some(item => item.kind === 'custom' && (item.paintStart == null || (item.delivery.mode === 'market' && (!item.delivery.marketDayId || item.delivery.pickupHour == null)) || !paintFitsHandoff(item, item.delivery) || Boolean(paintingAtOtherMarket(item, agendaDays)))) || draft.items.some(item => isPickupInPast(item.delivery, currentDate, nowHour)) || (onlyFinished && payState !== 'unpaid' && !payMethod) || (onlyFinished && payState === 'deposit' && !validDeposit(depositAmount, saleTotal ?? 0)) || (draft.chargedTotal != null && !discounted && !order)}
                   onClick={() => void continueFromDelivery()}
                 >
                   {busy ? 'Saving…' : onlyFinished ? 'Done' : 'Create order & show QR'}
@@ -2424,6 +2437,33 @@ function pickupHint(hour: number | null, preview: HourPreview | null, count: num
   if (hour == null || !plan) return 'Grey hours leave no time to paint before pickup.'
   if (!plan.ok) return `Pickup ${formatHour(hour)} · no painting time left before it.`
   return `Pickup ${formatHour(hour)} · paint ${paintSlotsLabel(plan.slots, pickupDate)}`
+}
+
+/** Gaby can agree a lower price at the stall (e.g. 3 × 35 € for 90 €). The list price stays visible. */
+function SalePriceCard({ listTotal, value, onChange }: { listTotal: number; value: number | undefined; onChange: (value: number | undefined) => void }) {
+  const [open, setOpen] = useState(value != null)
+  const [text, setText] = useState(value != null ? String(value).replace('.', ',') : '')
+  const parsed = text.trim() ? Number(text.trim().replace(',', '.')) : NaN
+  const valid = Number.isFinite(parsed) && parsed >= 0 && parsed < listTotal
+  const error = !text.trim() ? undefined : !Number.isFinite(parsed) || parsed < 0 ? 'Enter a price in euros.' : parsed >= listTotal ? `Enter less than the list price (${formatEur(listTotal, 'en')}).` : undefined
+  function update(next: string) {
+    setText(next)
+    const amount = next.trim() ? Number(next.trim().replace(',', '.')) : NaN
+    // Keep invalid input in the draft too, so "Create order" stays disabled until it is fixed.
+    onChange(next.trim() ? (Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) / 100 : listTotal) : undefined)
+  }
+  if (!open) {
+    return <div className={`${styles.card} ${styles.priceCard}`}>
+      <p>List price <strong>{formatEur(listTotal, 'en')}</strong></p>
+      <Button tone="staff" variant="secondary" onClick={() => setOpen(true)}>Give a discount</Button>
+    </div>
+  }
+  return <div className={`${styles.card} ${styles.priceCard}`} data-open>
+    <Field label="Sale price for the whole order (€)" htmlFor="sale-charged-total" hint={valid ? `List price ${formatEur(listTotal, 'en')} · discount ${formatEur(Math.round((listTotal - parsed) * 100) / 100, 'en')}` : `List price ${formatEur(listTotal, 'en')}`} error={error}>
+      <input id="sale-charged-total" inputMode="decimal" autoFocus placeholder={String(listTotal).replace('.', ',')} value={text} onChange={event => update(event.target.value)} />
+    </Field>
+    <Button tone="staff" variant="ghost" onClick={() => { setOpen(false); setText(''); onChange(undefined) }}>No discount</Button>
+  </div>
 }
 
 function depositValue(text: string, total: number) { return text.trim() ? Number(text.replace(',', '.')) : Math.round(total * 50) / 100 }

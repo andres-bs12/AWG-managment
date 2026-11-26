@@ -121,6 +121,8 @@ export type Order = {
   paymentState: PaymentState
   paymentMethod: PaymentMethod | null
   total: number
+  /** Staff discount already taken off `total`; list price = total + discount. */
+  discount?: number
   amountPaid?: number
   createdAt: string
   itemIds: string[]
@@ -362,6 +364,8 @@ export type CreateSaleInput = {
   email?: string
   items: CreateSaleItemInput[]
   movedAnotherSell?: boolean
+  /** Discounted total actually charged; must not exceed the list price. Omit to charge the list price. */
+  chargedTotal?: number
 }
 
 export type CapacityResult = {

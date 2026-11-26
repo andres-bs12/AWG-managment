@@ -279,7 +279,7 @@ function OrderDetail({ id }: { id: string }) {
           ) : null}
           {paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished && !order.handedOver ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || (!order.handedOver && !allFinished)} onClick={() => { void handover.request(id, !order.handedOver, undefined, undefined, postItem ? trimmedTracking : undefined) }}>{order.handedOver ? 'Undo handover' : (postItem ? 'Handed to Post' : deliveryItem ? 'Mark delivered' : 'Mark picked up')}</Button>}
         </section>
-        <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method, amount) => runAction(() => api.payments.setPaymentState(id, state, method, amount), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} />
+        <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method, amount) => runAction(() => api.payments.setPaymentState(id, state, method, amount), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} onSetPrice={(chargedTotal) => runAction(() => api.payments.setPrice(id, chargedTotal), 'Price changed.')} />
         <details className={styles.panel}>
           <summary>Customer contact</summary>
           <dl className={styles.contacts}>

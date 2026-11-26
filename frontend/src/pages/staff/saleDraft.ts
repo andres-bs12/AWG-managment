@@ -54,6 +54,8 @@ export type SaleDraft = {
   differentPickups: boolean
   phase: SalePhase
   postAddress?: Address
+  /** Discounted total Gaby agreed with the customer; unset charges the list price. */
+  chargedTotal?: number
   order?: CreatedSaleRef
   idempotencyKey?: string
   placingItemId?: string

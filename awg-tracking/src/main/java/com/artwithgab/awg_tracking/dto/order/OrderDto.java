@@ -36,6 +36,8 @@ public record OrderDto(
         String trackingUrl,
         /** A paid web order staff has not marked as reviewed yet. */
         boolean needsReview,
-        String reviewedAt
+        String reviewedAt,
+        /** Staff discount already taken off {@code total}; list price = total + discount. */
+        BigDecimal discount
 ) {
 }

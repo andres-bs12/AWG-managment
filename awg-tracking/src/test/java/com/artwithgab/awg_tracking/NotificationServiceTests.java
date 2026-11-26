@@ -52,7 +52,7 @@ class NotificationServiceTests {
         piece.setStatus("painted");
         marketStock.saveAndFlush(piece);
         var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null, piece.getId());
-        var order = orders.createSale(new CreateSaleRequest(null, "<b>Customer</b>", "", "customer@example.com", List.of(item), null));
+        var order = orders.createSale(new CreateSaleRequest(null, "<b>Customer</b>", "", "customer@example.com", List.of(item), null, null));
         UUID id = UUID.fromString(order.id());
         try {
             orders.updatePaymentState(id, PaymentState.PAID, PaymentMethod.CASH, null);
@@ -107,7 +107,7 @@ class NotificationServiceTests {
                 paintDate, 10.0, 11.0, DeliveryKind.POST, null, null, null, address, null);
         var pickup = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, null,
                 DeliveryKind.MARKET, null, null, null, null, readyMarketPiece());
-        var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(pickup, finishedPost, customPost), null));
+        var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(pickup, finishedPost, customPost), null, null));
         UUID id = UUID.fromString(order.id());
         String subject = "Deine Bestellung ist unterwegs · " + order.code();
         var firstPost = List.of(UUID.fromString(order.itemIds().get(1)));
@@ -142,7 +142,7 @@ class NotificationServiceTests {
         long before = invoices.count();
         long numberBefore = counters.findById(1L).orElseThrow().getLastNumber();
         transactions.executeWithoutResult(status -> {
-            var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(item), null));
+            var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(item), null, null));
             orders.updatePaymentState(UUID.fromString(order.id()), PaymentState.DEPOSIT, PaymentMethod.CASH, null);
             assertEquals(before + 1, invoices.count());
             status.setRollbackOnly();
@@ -181,7 +181,7 @@ class NotificationServiceTests {
     @Test void collectingTheRestAtHandoverSendsOnlyTheThankYou() {
         var piece = readyMarketPiece();
         var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null, piece);
-        var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(item), null));
+        var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(item), null, null));
         UUID id = UUID.fromString(order.id());
         orders.setHandedOver(id, true, null, null, PaymentMethod.CASH);
         var subjects = customerMails(2).stream().map(NotificationServiceTests::subjectOf).toList();

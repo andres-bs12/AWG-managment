@@ -303,6 +303,15 @@ public class OrderService {
             item.setOrder(order);
             order.getOrderItems().add(item);
         }
+        if (req.chargedTotal() != null) {
+            BigDecimal charged = req.chargedTotal().setScale(2, java.math.RoundingMode.HALF_UP);
+            if (charged.compareTo(total) > 0) {
+                throw new BadRequestException("The sale price can't be higher than the list price.")
+                        .code("VALIDATION").field("chargedTotal");
+            }
+            order.setDiscount(total.subtract(charged));
+            total = charged;
+        }
         order.setTotal(total);
 
         if (moving != null) {
@@ -358,6 +367,34 @@ public class OrderService {
         }
         boolean changed = applyPayment(order, state, method, amountPaid);
         if (changed) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.PAYMENT_CHANGED));
+        return mapper.order(order);
+    }
+
+    /**
+     * Staff changes what a stall sale costs after the fact (a discount given at the stall, or undoing one).
+     * The list price (total + discount) never changes; payments follow the new total so revenue stays right.
+     */
+    @Transactional
+    public OrderDto updateChargedTotal(UUID orderId, BigDecimal chargedTotal) {
+        Order order = findOrderOrThrow(orderId);
+        requireActive(order);
+        if (order.getSource() == com.artwithgab.awg_tracking.enums.OrderSource.WEB) {
+            throw new ConflictException("Web shop orders were paid online; their price can't be changed here.").code("WEB_ORDER_PRICE");
+        }
+        BigDecimal discount = order.getDiscount() == null ? BigDecimal.ZERO : order.getDiscount();
+        BigDecimal list = order.getTotal().add(discount);
+        BigDecimal charged = chargedTotal.setScale(2, java.math.RoundingMode.HALF_UP);
+        if (charged.signum() < 0 || charged.compareTo(list) > 0) {
+            throw new BadRequestException("The sale price can't be higher than the list price.").code("VALIDATION").field("chargedTotal");
+        }
+        order.setDiscount(list.subtract(charged));
+        order.setTotal(charged);
+        // Keep received money consistent with the new total.
+        if (order.getPaymentState() == PaymentState.PAID
+                || (order.getPaymentState() == PaymentState.DEPOSIT && order.getAmountPaid().compareTo(charged) >= 0)) {
+            order.setPaymentState(PaymentState.PAID);
+            order.setAmountPaid(charged);
+        }
         return mapper.order(order);
     }
 

@@ -447,7 +447,7 @@ public class McpTools {
         var item = new com.artwithgab.awg_tracking.dto.order.CreateSaleItemRequest(
                 com.artwithgab.awg_tracking.enums.ItemKind.GENERIC, false, null, null, null, null, null, null,
                 com.artwithgab.awg_tracking.enums.DeliveryKind.MARKET, marketId, dayId, null, null, ornamentId);
-        var request = new com.artwithgab.awg_tracking.dto.order.CreateSaleRequest(null, null, null, null, List.of(item), dayId);
+        var request = new com.artwithgab.awg_tracking.dto.order.CreateSaleRequest(null, null, null, null, List.of(item), dayId, null);
         // All or nothing: never a sale without its payment, or a payment without the handover.
         OrderDto sold = transactions.execute(status -> {
             // No idempotency key: a retry finds the piece already sold (the service refuses MARKET_STOCK_SOLD),

@@ -47,6 +47,62 @@ class SaleApiTests extends ApiTestSupport {
     }
 
     @Test
+    void staffDiscountChargesLessAndKeepsListPrice() throws Exception {
+        String token = login();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("items", java.util.List.of(customItem(true, TUE, 10.0, 11.25, "market", dayId(token, SAT), 14.0), finishedItem()));
+        body.put("chargedTotal", 90);
+        MvcResult res = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/orders")
+                .header("Authorization", bearer(token)).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(json(body))).andReturn();
+        assertEquals(201, res.getResponse().getStatus(), res.getResponse().getContentAsString());
+        assertEquals(0, new BigDecimal("90").compareTo(new BigDecimal(this.<Object>read(res, "$.total").toString())));
+        assertEquals(0, new BigDecimal("7.99").compareTo(new BigDecimal(this.<Object>read(res, "$.discount").toString())));
+        String id = read(res, "$.id");
+        mvc.perform(patch("/api/orders/" + id + "/payment-state").header("Authorization", bearer(token))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(Map.of("state", "paid", "method", "cash"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.amountPaid").value(90.0));
+    }
+
+    @Test
+    void staffPriceAboveListPriceIs400() throws Exception {
+        String token = login();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("items", java.util.List.of(finishedItem()));
+        body.put("chargedTotal", 1000);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/orders")
+                        .header("Authorization", bearer(token)).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("The sale price can't be higher than the list price."));
+    }
+
+    @Test
+    void staffCanChangeThePriceOfAPastSale() throws Exception {
+        String token = login();
+        String id = saleOk(token, finishedItem());
+        mvc.perform(patch("/api/orders/" + id + "/payment-state").header("Authorization", bearer(token))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(Map.of("state", "paid", "method", "cash"))))
+                .andExpect(status().isOk());
+        mvc.perform(patch("/api/orders/" + id + "/price").header("Authorization", bearer(token))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(Map.of("chargedTotal", 30))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(30.0))
+                .andExpect(jsonPath("$.discount").value(5.0))
+                .andExpect(jsonPath("$.amountPaid").value(30.0))
+                .andExpect(jsonPath("$.paymentState").value("paid"));
+        // Undo the discount: back to the list price, never above it.
+        mvc.perform(patch("/api/orders/" + id + "/price").header("Authorization", bearer(token))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(Map.of("chargedTotal", 35))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.discount").value(0.0));
+        mvc.perform(patch("/api/orders/" + id + "/price").header("Authorization", bearer(token))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(Map.of("chargedTotal", 36))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void paintSlotClashIs409() throws Exception {
         String token = login();
         String sat = dayId(token, SAT);

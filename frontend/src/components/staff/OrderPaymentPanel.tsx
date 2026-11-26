@@ -9,8 +9,8 @@ import { formatEur } from '../../lib/money'
 import { paymentSummary } from '../../lib/paymentSummary'
 import styles from './OrderPaymentPanel.module.css'
 
-type Props = { order: Order; busy: boolean; onSetState: (state: PaymentState, method: PaymentMethod | null, amountPaid?: number) => Promise<boolean> }
-export function OrderPaymentPanel({ order, busy, onSetState }: Props) {
+type Props = { order: Order; busy: boolean; onSetState: (state: PaymentState, method: PaymentMethod | null, amountPaid?: number) => Promise<boolean>; onSetPrice?: (chargedTotal: number) => Promise<boolean> }
+export function OrderPaymentPanel({ order, busy, onSetState, onSetPrice }: Props) {
   const { paid, remaining } = paymentSummary(order)
   const [methodDraft, setMethod] = useState<PaymentMethod | null | undefined>(undefined)
   const method = methodDraft === undefined ? order.paymentMethod : methodDraft
@@ -25,6 +25,13 @@ export function OrderPaymentPanel({ order, busy, onSetState }: Props) {
   const correction: PaymentState = chosenCorrection ?? order.paymentState
   const [error, setError] = useState('')
   const [confirming, setConfirming] = useState<PaymentState | null>(null)
+  const discount = order.discount ?? 0
+  const listPrice = Math.round((order.total + discount) * 100) / 100
+  const [priceDraft, setPriceDraft] = useState('')
+  const [confirmPrice, setConfirmPrice] = useState(false)
+  const newPrice = priceDraft.trim() ? Number(priceDraft.trim().replace(',', '.')) : NaN
+  const priceError = !priceDraft.trim() ? '' : !Number.isFinite(newPrice) || newPrice < 0 ? 'Enter a price in euros.' : newPrice > listPrice ? `Enter at most the list price (${formatEur(listPrice, 'en')}).` : ''
+  const priceValid = priceDraft.trim() !== '' && !priceError && Math.round(newPrice * 100) / 100 !== order.total
   const pending = order.checkoutStatus === 'pending'
   const amount = Number(deposit.replace(',', '.'))
   const unchanged = correction === order.paymentState && method === order.paymentMethod && (correction !== 'deposit' || amount === paid)
@@ -43,7 +50,7 @@ export function OrderPaymentPanel({ order, busy, onSetState }: Props) {
   const depositField = (id: string) => <Field label="Deposit received (€)" htmlFor={id}><input id={id} inputMode="decimal" value={deposit} disabled={busy} onChange={event => { setDeposit(event.target.value); setError('') }} /></Field>
   return <section className={styles.panel} aria-labelledby="payment-heading">
     <div className={styles.heading}><h2 id="payment-heading">Payment</h2><span>{remaining === 0 ? 'Paid' : order.paymentState === 'deposit' ? 'Deposit' : 'Unpaid'}</span></div>
-    <dl className={styles.totals}><div><dt>Total</dt><dd>{formatEur(order.total, 'en')}</dd></div><div><dt>Received</dt><dd>{formatEur(paid, 'en')}</dd></div>{remaining > 0 && <div className={styles.balance}><dt>Remaining</dt><dd>{formatEur(remaining, 'en')}</dd></div>}</dl>
+    <dl className={styles.totals}>{discount > 0 && <><div><dt>List price</dt><dd>{formatEur(listPrice, 'en')}</dd></div><div><dt>Discount</dt><dd>−{formatEur(discount, 'en')}</dd></div></>}<div><dt>Total</dt><dd>{formatEur(order.total, 'en')}</dd></div><div><dt>Received</dt><dd>{formatEur(paid, 'en')}</dd></div>{remaining > 0 && <div className={styles.balance}><dt>Remaining</dt><dd>{formatEur(remaining, 'en')}</dd></div>}</dl>
     {pending ? <InsetNote><p>Waiting for online payment. Check Stripe; staff cannot record a payment while Checkout is pending.</p></InsetNote> : <>
       {remaining > 0 && <div className={styles.collect}>
         <p>Record payment after checking the money arrived.</p>
@@ -58,8 +65,17 @@ export function OrderPaymentPanel({ order, busy, onSetState }: Props) {
         {remaining === 0 && methodField}{correction === 'deposit' && depositField('correction-deposit')}
         <Button tone="staff" variant="secondary" disabled={busy || unchanged} onClick={() => update(correction, true)}>Correct to {correction}{correction === 'deposit' && Number.isFinite(amount) ? ` · ${formatEur(amount, 'en')}` : ''}</Button>
       </details>
+      {onSetPrice && order.source !== 'web' && <details className={styles.collect}><summary>Change price</summary>
+        <p>For a discount agreed with the customer. Revenue, stats and the received amount follow the new price.</p>
+        <Field label="New total (€)" htmlFor="order-new-price" hint={`List price ${formatEur(listPrice, 'en')}`} error={priceError || undefined}><input id="order-new-price" inputMode="decimal" placeholder={String(order.total).replace('.', ',')} value={priceDraft} disabled={busy} onChange={event => setPriceDraft(event.target.value)} /></Field>
+        <Button tone="staff" variant="secondary" disabled={busy || !priceValid} onClick={() => setConfirmPrice(true)}>{priceValid ? `Change price to ${formatEur(newPrice, 'en')}` : 'Change price'}</Button>
+      </details>}
     </>}
     {error && <p role="alert">{error}</p>}
+    {confirmPrice && onSetPrice && <StaffDialog title="Change price?" busy={busy} onClose={() => setConfirmPrice(false)}>
+      <p>Change the total of {order.code} from <strong>{formatEur(order.total, 'en')}</strong> to <strong>{formatEur(newPrice, 'en')}</strong>{newPrice < listPrice ? ` (discount ${formatEur(Math.round((listPrice - newPrice) * 100) / 100, 'en')})` : ''}. {order.paymentState !== 'unpaid' ? 'The received amount is updated too; give back any difference in cash.' : ''}</p>
+      <Button tone="staff" disabled={busy} onClick={() => { setConfirmPrice(false); void onSetPrice(Math.round(newPrice * 100) / 100).then(ok => { if (ok) setPriceDraft('') }) }}>Change price</Button>
+    </StaffDialog>}
     {confirming && <StaffDialog title="Correct payment?" busy={busy} onClose={() => setConfirming(null)}>
       <p>Change the recorded payment of {order.code} to <strong>{confirming}{confirming === 'deposit' ? ` · ${formatEur(amount, 'en')}` : ''}</strong>. This replaces the recorded amount.</p>
       <Button tone="staff" disabled={busy} onClick={confirmCorrection}>Correct to {confirming}</Button>

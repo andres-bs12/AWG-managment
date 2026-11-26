@@ -100,6 +100,9 @@ public class InvoiceRenderer {
         } else if (!receipt || fee.signum() > 0) {
             line(b, en ? "Delivery fee" : "Lieferkosten", money(fee, en));
         }
+        if (order.getDiscount() != null && order.getDiscount().signum() > 0) {
+            line(b, en ? "Discount" : "Rabatt", "−" + money(order.getDiscount(), en));
+        }
         line(b, en ? "Total" : "Gesamt", money(total, en));
         line(b, en ? "Paid" : "Bezahlt", money(paid, en));
         line(b, en ? "Balance due" : "Offener Betrag", money(balance, en));
