@@ -56,6 +56,8 @@ export type SaleDraft = {
   postAddress?: Address
   /** Discounted total Gaby agreed with the customer; unset charges the list price. */
   chargedTotal?: number
+  /** List total when the discount was entered; a discount never silently carries over to a changed order. */
+  chargedForList?: number
   order?: CreatedSaleRef
   idempotencyKey?: string
   placingItemId?: string

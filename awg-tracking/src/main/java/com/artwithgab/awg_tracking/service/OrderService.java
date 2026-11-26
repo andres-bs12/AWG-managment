@@ -387,14 +387,23 @@ public class OrderService {
         if (charged.signum() < 0 || charged.compareTo(list) > 0) {
             throw new BadRequestException("The sale price can't be higher than the list price.").code("VALIDATION").field("chargedTotal");
         }
+        BigDecimal oldTotal = order.getTotal();
+        PaymentState oldState = order.getPaymentState();
+        BigDecimal received = order.getAmountPaid() == null ? BigDecimal.ZERO : order.getAmountPaid();
         order.setDiscount(list.subtract(charged));
         order.setTotal(charged);
-        // Keep received money consistent with the new total.
-        if (order.getPaymentState() == PaymentState.PAID
-                || (order.getPaymentState() == PaymentState.DEPOSIT && order.getAmountPaid().compareTo(charged) >= 0)) {
+        // Keep received money consistent with the new total, but never record money that was not received:
+        // raising the price on a paid order leaves the rest open as a deposit.
+        if (received.compareTo(charged) >= 0 && (oldState == PaymentState.PAID || oldState == PaymentState.DEPOSIT)) {
             order.setPaymentState(PaymentState.PAID);
             order.setAmountPaid(charged);
+        } else if (oldState == PaymentState.PAID) {
+            order.setPaymentState(received.signum() > 0 ? PaymentState.DEPOSIT : PaymentState.UNPAID);
         }
+        boolean changed = oldTotal.compareTo(charged) != 0 || oldState != order.getPaymentState()
+                || received.compareTo(order.getAmountPaid() == null ? BigDecimal.ZERO : order.getAmountPaid()) != 0;
+        // Same event as a payment change, so the invoice and the customer's payment mail follow the new price.
+        if (changed && oldState != PaymentState.UNPAID) events.publishEvent(OrderNotification.from(order, OrderNotification.Kind.PAYMENT_CHANGED));
         return mapper.order(order);
     }
 
