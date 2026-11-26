@@ -484,9 +484,10 @@ test('handover with balance due requires confirmation and can mark paid before h
   await page.getByRole('button', { name: 'Mark picked up', exact: true }).click()
   await dialog.getByRole('radio', { name: 'Cash', exact: true }).locator('..').click()
   await collect.click()
-  // Finished order: the undo is folded away under one quiet disclosure.
-  await expect(page.getByText('Handed over by mistake?', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Undo handover', exact: true })).toBeHidden()
+  // Finished order: the top summary says it was picked up, and one quiet undo sits at the bottom.
+  await expect(page.getByText('Picked up', { exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Pickup' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Undo handover', exact: true })).toHaveCount(1)
   await expect(page.getByRole('button', { name: 'Undo pickup', exact: true })).toHaveCount(0)
   // One call records the payment and the handover together, so the customer gets a single e-mail.
   expect(fixture.mutations.some(entry => entry.path.endsWith('/payment-state'))).toBe(false)
@@ -540,10 +541,8 @@ test('item handover and undo allow selecting other ornaments', async ({ page }) 
     await expect(card.getByRole('region', { name: 'Production' })).toHaveCount(0)
     await expect(card.getByText('Handed over', { exact: true })).toBeVisible()
   }
-  const pickup = page.getByRole('region', { name: 'Pickup' })
-  await pickup.getByText('Handed over by mistake?', { exact: true }).click()
   await expect(page.getByRole('button', { name: 'Undo handover', exact: true })).toHaveCount(1)
-  await pickup.getByRole('button', { name: 'Undo handover', exact: true }).click()
+  await page.getByRole('button', { name: 'Undo handover', exact: true }).click()
   const undo = page.getByRole('dialog', { name: 'Undo handover', exact: true })
   await expect(undo.getByRole('checkbox', { name: 'Luna' })).toBeChecked()
   await expect(undo.getByRole('checkbox', { name: 'Milo' })).toBeChecked()

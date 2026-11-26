@@ -195,9 +195,8 @@ function OrderDetail({ id }: { id: string }) {
     </header>
     {order.needsReview ? <InsetNote tone="warning"><p role="status">New web order, paid online. Check the photos and the pickup or Post details.</p><Button tone="staff" disabled={busy} onClick={() => void runAction(() => api.orders.markReviewed(order.id), 'Marked as reviewed.')}>Mark reviewed</Button></InsetNote> : null}
     {order.paymentReview ? <InsetNote tone="warning"><p role="alert">Stripe reported a payment that does not match this order. Check it in Stripe, then record it as paid or deposit (or cancel the order). It remains held on the agenda until resolved.</p></InsetNote> : null}
-    <details className={styles.panel}><summary>Order info</summary><p>{order.source === 'web' || order.checkoutStatus ? 'Web order' : 'Stall order'} · Created {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(new Date(order.createdAt.endsWith('Z') || /[+-]\d\d:\d\d$/.test(order.createdAt) ? order.createdAt : `${order.createdAt}Z`))} (Vienna)</p><p>Payment method: {order.paymentMethod ?? 'Not recorded'}</p></details>
     <div className={styles.overview} data-delivery={Boolean(deliveryItem)}>
-      <div><span>{postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</span><strong><StaffText>{handoffs.join(' / ') || 'Not scheduled'}</StaffText></strong>
+      <div><span>{order.handedOver ? (postItem ? 'Handed to Post' : deliveryItem ? 'Delivered' : 'Picked up') : postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</span><strong><StaffText>{handoffs.join(' / ') || 'Not scheduled'}</StaffText></strong>
         {arrivalText ? <span className={styles.arrivalLine}>{arrivalText}</span> : null}
         {deliveryItem ? <div className={styles.handoffActions}>
           {addressText ? (
@@ -238,7 +237,8 @@ function OrderDetail({ id }: { id: string }) {
         })}
       </section>
       <aside className={styles.support} aria-label="Order management">
-        <section className={styles.panel} aria-labelledby="handoff-heading">
+        {/* Handed over: the summary at the top already says where and when, so only a Post parcel keeps this panel (tracking). */}
+        {order.handedOver && !postItem ? null : <section className={styles.panel} aria-labelledby="handoff-heading">
           <h2 id="handoff-heading">{postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</h2>
           {arrivalText ? <p className={styles.arrivalMeta}>{arrivalText}</p> : null}
           {order.handedOver ? <p className={styles.muted}>{postItem ? 'Handed to Austrian Post.' : deliveryItem ? 'Delivered to the customer.' : 'Picked up at the stall.'}</p> : <p className={styles.muted}>{allFinished ? (postItem ? 'Ready to hand to Post.' : deliveryItem ? 'Ready to deliver.' : 'Ready for pickup.') : `${items.filter(item => item.productionStatus !== 'finished').length} still to finish.`}</p>}
@@ -284,15 +284,8 @@ function OrderDetail({ id }: { id: string }) {
               </div>
             </div>
           ) : null}
-          {order.handedOver ? (
-            // Finished order: undo is only for mistakes, so it stays folded away and appears once on the page.
-            <details className={styles.undoMistake}>
-              <summary>Handed over by mistake?</summary>
-              <p className={styles.muted}>Undo it first to change the ornaments or cancel the order.</p>
-              <Button tone="staff" variant="secondary" fullWidth disabled={busy || handover.busy || itemStatus.unconfirmed} onClick={() => { void handover.request(id, false) }}>Undo handover</Button>
-            </details>
-          ) : paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || !allFinished} onClick={() => { void handover.request(id, true, undefined, undefined, postItem ? trimmedTracking : undefined) }}>{postItem ? 'Handed to Post' : deliveryItem ? 'Mark delivered' : 'Mark picked up'}</Button>}
-        </section>
+          {order.handedOver ? null : paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || !allFinished} onClick={() => { void handover.request(id, true, undefined, undefined, postItem ? trimmedTracking : undefined) }}>{postItem ? 'Handed to Post' : deliveryItem ? 'Mark delivered' : 'Mark picked up'}</Button>}
+        </section>}
         {order.source !== 'web' && !order.checkoutStatus ? <SoldAtPanel order={order} days={days} markets={markets} busy={busy}
           onSave={marketDayId => runAction(() => api.orders.setSaleMarket(id, marketDayId), 'Market changed.')} /> : null}
         <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method, amount) => runAction(() => api.payments.setPaymentState(id, state, method, amount), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} onSetPrice={(chargedTotal) => runAction(() => api.payments.setPrice(id, chargedTotal), 'Price changed.')} />
@@ -305,9 +298,13 @@ function OrderDetail({ id }: { id: string }) {
           </dl>
         </details>
         {hasForm && !formWaiting ? <details className={styles.panel}><summary>Customer form <span className={styles.muted}>Completed</span></summary>{formContent}</details> : null}
+        <details className={styles.panel}><summary>Order info</summary><p>{order.source === 'web' || order.checkoutStatus ? 'Web order' : 'Stall order'} · Created {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(new Date(order.createdAt.endsWith('Z') || /[+-]\d\d:\d\d$/.test(order.createdAt) ? order.createdAt : `${order.createdAt}Z`))} (Vienna)</p><p>Payment method: {order.paymentMethod ?? 'Not recorded'}</p></details>
         <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
-        {/* A handed-over order cannot be cancelled; the undo above explains the way back, so no dead button here. */}
-        {order.handedOver ? null : <div className={styles.dangerZone}>
+        {/* Handed over: undo is only for mistakes, so it sits once at the bottom, quiet and red, where Cancel would be.
+            It opens the usual confirmation. A handed-over order cannot be cancelled, so no dead Cancel button. */}
+        {order.handedOver ? <div className={styles.dangerZone}>
+          <Button tone="staff" variant="ghost" className={styles.cancelBtn} disabled={busy || handover.busy || itemStatus.unconfirmed} onClick={() => { void handover.request(id, false) }}>Undo handover</Button>
+        </div> : <div className={styles.dangerZone}>
           <Button tone="staff" variant="ghost" className={styles.cancelBtn} disabled={busy || items.some(item => item.handedOver)} onClick={() => setCancelOpen(true)}>Cancel order</Button>
           {items.some(item => item.handedOver) && <p className={styles.muted}>An order with handed-over items cannot be cancelled. Undo handover first.</p>}
         </div>}

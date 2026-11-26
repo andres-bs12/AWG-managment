@@ -155,8 +155,3 @@ p.muted { margin: 0 0 var(--space-4); }
 .trackingRow > :first-child {
   margin: 0;
 }
-
-/* Finished order: undoing a handover is only for mistakes, so it sits folded under the status line. */
-.undoMistake { display: grid; gap: var(--space-2); border-top: var(--border-thin) solid var(--staff-line); }
-.undoMistake > summary { cursor: pointer; min-height: var(--touch); padding: var(--space-3) 0; color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
-.undoMistake[open] { padding-bottom: var(--space-2); }
