@@ -103,6 +103,55 @@ class SaleApiTests extends ApiTestSupport {
     }
 
     @Test
+    void raisingThePriceOfAPaidSaleNeverBooksMoneyNotReceived() throws Exception {
+        String token = login();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("items", java.util.List.of(finishedItem()));
+        body.put("chargedTotal", 30);
+        MvcResult res = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/orders")
+                .header("Authorization", bearer(token)).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(json(body))).andReturn();
+        assertEquals(201, res.getResponse().getStatus(), res.getResponse().getContentAsString());
+        String id = read(res, "$.id");
+        mvc.perform(patch("/api/orders/" + id + "/payment-state").header("Authorization", bearer(token))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(Map.of("state", "paid", "method", "cash"))))
+                .andExpect(jsonPath("$.amountPaid").value(30.0));
+        // Undo the discount: 30 was received, so 5 is still owed.
+        mvc.perform(patch("/api/orders/" + id + "/price").header("Authorization", bearer(token))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(Map.of("chargedTotal", 35))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(35.0))
+                .andExpect(jsonPath("$.amountPaid").value(30.0))
+                .andExpect(jsonPath("$.paymentState").value("deposit"));
+        // Back down to what was received: paid again.
+        mvc.perform(patch("/api/orders/" + id + "/price").header("Authorization", bearer(token))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(Map.of("chargedTotal", 30))))
+                .andExpect(jsonPath("$.amountPaid").value(30.0))
+                .andExpect(jsonPath("$.paymentState").value("paid"));
+    }
+
+    @Test
+    void raisingThePriceOfAFreePaidSaleMakesItUnpaid() throws Exception {
+        String token = login();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("items", java.util.List.of(finishedItem()));
+        body.put("chargedTotal", 0);
+        MvcResult res = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/orders")
+                .header("Authorization", bearer(token)).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(json(body))).andReturn();
+        assertEquals(201, res.getResponse().getStatus(), res.getResponse().getContentAsString());
+        String id = read(res, "$.id");
+        mvc.perform(patch("/api/orders/" + id + "/payment-state").header("Authorization", bearer(token))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(Map.of("state", "paid", "method", "cash"))))
+                .andExpect(status().isOk());
+        mvc.perform(patch("/api/orders/" + id + "/price").header("Authorization", bearer(token))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(Map.of("chargedTotal", 35))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.amountPaid").value(0.0))
+                .andExpect(jsonPath("$.paymentState").value("unpaid"));
+    }
+
+    @Test
     void paintSlotClashIs409() throws Exception {
         String token = login();
         String sat = dayId(token, SAT);

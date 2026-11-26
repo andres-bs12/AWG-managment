@@ -371,7 +371,7 @@ public class ShopService {
             if (item.withName()) {
                 pricingService.requireBackName(item.backName(), null, "items[" + n + "].backName");
             }
-            PricingService.requireSize(ItemKind.CUSTOM, item.size(), "items[" + n + "].size");
+            // A missing size (page loaded before sizes existed) is sold as big; see PricingService.requireSize.
             if (item.finish() == null) {
                 throw new BadRequestException("Choose shiny or matte for each ornament.").code("VALIDATION").field("items[" + n + "].finish");
             }
@@ -446,7 +446,7 @@ public class ShopService {
             item.setWithName(withName);
             item.setCustomColor(custom ? row.color() : null);
             item.setCustomFinish(custom ? row.finish() : null);
-            item.setOrnamentSize(custom ? row.size() : null);
+            item.setOrnamentSize(PricingService.requireSize(row.kind(), row.size(), "items[" + position + "].size"));
             item.setCost(pricingService.itemCost(row.kind(), item.getOrnamentSize(), withName));
             item.setNameExtra(pricingService.nameExtraFor(row.kind(), withName));
             item.setProductionStatus(custom ? ProductionStatus.NOT_STARTED : ProductionStatus.FINISHED);
