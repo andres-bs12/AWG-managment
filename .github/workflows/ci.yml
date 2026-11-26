@@ -24,6 +24,15 @@ jobs:
       # Includes PostgresSchemaTests: PostgreSQL 17 in Docker (preinstalled on the runner), every Flyway
       # migration and Hibernate validate, so a migration that would stop the server fails here first.
       - run: docker info --format '{{.ServerVersion}}'
+      # The wrapper downloads Maven on every run and repo.maven.apache.org sometimes refuses the runner
+      # (three red builds on 2026-11-26 with no test run). Keep the download in the cache and retry it.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2/wrapper
+          key: maven-wrapper-${{ hashFiles('awg-tracking/.mvn/wrapper/maven-wrapper.properties') }}
+      - name: Download Maven (retry)
+        run: |
+          for attempt in 1 2 3 4 5; do ./mvnw -q -v && exit 0; sleep $((attempt * 15)); done; exit 1
       - run: ./mvnw -q -B test
       - name: Postgres schema test ran (not skipped)
         # Block scalar: the pattern contains ": ", which plain YAML reads as a mapping and GitHub then rejects the whole file.
