@@ -1,5 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { choose, chooseFirstDate, next, open, photo } from './helpers'
+import { DEFAULT_BACK_NAME_MAX } from '../src/lib/paintedName'
 
 // Scroll-geometry checks are timing-sensitive: this file runs its tests in order even with
 // fullyParallel, so sibling pages do not compete for the CPU while scroll positions settle.
@@ -154,7 +155,7 @@ for (const locale of ['de', 'en'] as const) {
     await expect(page.locator('input[id^="pet-"]')).toHaveCount(0)
     await nameOption(page).check()
     const name = page.locator('input[id^="back-"]')
-    await expect(name).toHaveAttribute('maxlength', '6')
+    await expect(name).toHaveAttribute('maxlength', String(DEFAULT_BACK_NAME_MAX))
     await name.fill('L')
     await name.press('Backspace')
     await expect(name).toHaveValue('')
