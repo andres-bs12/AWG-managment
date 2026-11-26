@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { sizeShort } from '../../lib/ornamentSize'
 import { StaffText } from './StaffText'
 import { Link } from 'react-router-dom'
 import { Button } from '../ui/Button'
@@ -94,7 +95,7 @@ export function DeliveryOrderCard({ row, from, routeMode, busy, activeIds, hideD
         <div className={styles.identity}>
           <strong>{ornamentLabel(item)}</strong>
           <span className={styles.facts}>
-            <span><StaffText>{`Production: ${[item.kind === 'custom' && item.color ? `${item.color} ${item.finish ?? ''}`.trim() : null, productionLabel(item)].filter(Boolean).join(' · ')}`}</StaffText></span>
+            <span><StaffText>{`Production: ${[item.kind === 'custom' && item.color ? [item.size ? sizeShort(item.size) : '', item.color, item.finish ?? ''].filter(Boolean).join(' ') : null, productionLabel(item)].filter(Boolean).join(' · ')}`}</StaffText></span>
             <span data-blocked={Boolean(handoverBlocker(item)) || undefined}><StaffText>{`Handover: ${handoverBlocker(item) ? `not yet · ${handoverBlocker(item)}` : deliveryStatusLabel(item)}`}</StaffText></span>
           </span>
           {dueDates.length > 1 && <span className={styles.due}><StaffText>{itemDue(item)}</StaffText></span>}

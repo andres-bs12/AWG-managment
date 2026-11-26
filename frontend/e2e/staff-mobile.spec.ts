@@ -1,6 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { axe } from './helpers'
-import { httpFixture, signedIn, navigation, today, spareMarket } from './staff-fixture'
+import { httpFixture, signedIn, navigation, today, spareMarket, chooseSizes } from './staff-fixture'
 
 async function openFilters(page: Page) {
   const button = page.getByRole('button', { name: /^Filters \(/ })
@@ -285,6 +285,7 @@ test('a calendar sale appears in the calendar and opens its order from a legacy 
   const continueButton = page.getByRole('button', { name: 'Continue', exact: true })
   await clearAction(continueButton)
   await expect(continueButton).toHaveJSProperty('disabled', false)
+  await chooseSizes(page)
   await continueButton.click()
   await expect(page.getByRole('heading', { name: 'Painting plan', exact: true })).toBeVisible()
   await expect(page.getByText(/^Fri,? 6 Nov · 13:00–14:00$/, { exact: true }).first()).toBeVisible()

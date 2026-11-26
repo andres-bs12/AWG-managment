@@ -27,7 +27,7 @@ class InvoiceApiTests extends ApiTestSupport {
         orders.updatePaymentState(id, PaymentState.DEPOSIT, PaymentMethod.CASH, new BigDecimal("10.0"));
         var deposit = invoices.findByOrderIdOrderByNumberAsc(id);
         assertThat(deposit).hasSize(1);
-        assertThat(deposit.getFirst().getBody()).contains("Gesamt: 39,99 EUR", "Bezahlt: 10,00 EUR", "Offener Betrag: 29,99 EUR");
+        assertThat(deposit.getFirst().getBody()).contains("Gesamt: 35,00 EUR", "Bezahlt: 10,00 EUR", "Offener Betrag: 25,00 EUR");
         orders.updatePaymentState(id, PaymentState.PAID, PaymentMethod.CASH, null);
         orders.updatePaymentState(id, PaymentState.PAID, PaymentMethod.CASH, null);
         orders.setHandedOver(id, true, null);
@@ -38,7 +38,7 @@ class InvoiceApiTests extends ApiTestSupport {
         assertThat(issued.get(2).getNumber()).isEqualTo(issued.get(1).getNumber() + 1);
         assertThat(issued.get(1).getBody()).contains("Offener Betrag: 0,00 EUR", "Ersetzt Rechnung: " + issued.getFirst().getNumber());
         assertThat(issued.get(2).getBody()).contains("Übergeben: Ja", "Offener Betrag: 0,00 EUR");
-        assertThat(deposit.getFirst().getBody()).contains("Offener Betrag: 29,99 EUR");
+        assertThat(deposit.getFirst().getBody()).contains("Offener Betrag: 25,00 EUR");
     }
 
     @Test void partialHandoverIssuesTheFinalSnapshotOnlyWhenEveryItemIsHandedOver() throws Exception {
@@ -56,22 +56,22 @@ class InvoiceApiTests extends ApiTestSupport {
         UUID id = UUID.fromString(saleOk(login(), finishedItem()));
         orders.updatePaymentState(id, PaymentState.DEPOSIT, PaymentMethod.CASH, new BigDecimal("5.00"));
         orders.setHandedOver(id, true, null);
-        assertThat(invoices.findByOrderIdOrderByNumberAsc(id).getLast().getBody()).contains("Offener Betrag: 34,99 EUR", "Übergeben: Ja");
+        assertThat(invoices.findByOrderIdOrderByNumberAsc(id).getLast().getBody()).contains("Offener Betrag: 30,00 EUR", "Übergeben: Ja");
     }
 
     @Test void invoiceListsCustomPriceNameAndMarketPickup() throws Exception {
         String staff = login();
         UUID id = UUID.fromString(saleOk(staff, customItem(true, TUE, 10.0, 11.25, "market", dayId(staff, SAT), 14.5)));
         orders.updatePaymentState(id, PaymentState.DEPOSIT, PaymentMethod.CARD, null);
-        assertThat(invoices.findByOrderIdOrderByNumberAsc(id).getFirst().getBody()).contains("Personalisierte Christbaumkugel", "rot", "glänzend", "49,99 EUR", "12,99 EUR", "Rathausplatz", "28.11.2026", "14:30", "Test Seller", "/track/", "31,49 EUR");
+        assertThat(invoices.findByOrderIdOrderByNumberAsc(id).getFirst().getBody()).contains("Personalisierte Christbaumkugel", "rot", "glänzend", "50,00 EUR", "12,99 EUR", "Rathausplatz", "28.11.2026", "14:30", "Test Seller", "/track/", "31,50 EUR");
     }
 
     @Test void rendererSupportsEnglishWithoutAssumingATaxExemption() throws Exception {
         UUID id = UUID.fromString(saleOk(login(), finishedItem()));
         var order = orderRepository.findById(id).orElseThrow();
         String text = renderer.render(order, 123L, null, order.getCreatedAt(), calendar.snapshot(), "en");
-        assertThat(text).contains("Invoice: 123", "Finished ornament", "Total: 39.99 EUR", "Paid: 0.00 EUR",
-                "Balance due: 39.99 EUR", "Payment state: Unpaid", "Test Seller", "ATU00000000");
+        assertThat(text).contains("Invoice: 123", "Finished ornament", "Total: 35.00 EUR", "Paid: 0.00 EUR",
+                "Balance due: 35.00 EUR", "Payment state: Unpaid", "Test Seller", "ATU00000000");
     }
 
     @Test void qrEmailCompletesAllPendingSnapshotsWithoutIssuingAnotherInvoice() throws Exception {
@@ -128,7 +128,7 @@ class InvoiceApiTests extends ApiTestSupport {
         orders.updatePaymentState(id, PaymentState.DEPOSIT, PaymentMethod.CARD, new BigDecimal("20.00"));
         var order = orderRepository.findById(id).orElseThrow();
         String text = renderer.render(order, 7L, 6L, order.getCreatedAt(), calendar.snapshot(), "de", true);
-        assertThat(text).contains("Zahlungsbestätigung", "Bestätigung deiner Anzahlung", "Bezahlt: 20,00 EUR", "Offener Betrag: 42,98 EUR",
+        assertThat(text).contains("Zahlungsbestätigung", "Bestätigung deiner Anzahlung", "Bezahlt: 20,00 EUR", "Offener Betrag: 42,99 EUR",
                 "Rathausplatz", "14:30", "Liebe Grüße");
         assertThat(text).doesNotContain("Rechnung", "Test Seller", "UID", "Steuerhinweis", "Ersetzt");
         java.nio.file.Files.writeString(java.nio.file.Path.of("target", "zahlungsbestaetigung-sample.txt"), text);

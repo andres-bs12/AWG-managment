@@ -3,7 +3,10 @@ import { open, choose, pet, next, mobile, chooseFirstDate, photo, review } from 
 
 test('validation, focus and associated errors across steps', async ({ page }) => {
   await open(page); await next(page).click()
-  await expect(page.locator('fieldset[id^="color-"]')).toBeFocused()
+  // Size is asked first, so its error takes the focus; colour is flagged too.
+  await expect(page.locator('fieldset[id^="size-"]')).toBeFocused()
+  await expect(page.locator('[id^="size-"][id$="-error"]')).toHaveText('Wähle eine Größe.')
+  await expect(page.locator('fieldset[id^="size-"]')).toHaveAttribute('aria-describedby', /size-.*-error/)
   await expect(page.locator('[id^="color-"][id$="-error"]')).toBeVisible()
   await choose(page)
   await next(page).click()

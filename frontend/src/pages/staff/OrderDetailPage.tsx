@@ -1,4 +1,5 @@
 import { StaffText } from '../../components/staff/StaffText'
+import { sizeLabel } from '../../lib/ornamentSize'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
@@ -155,7 +156,7 @@ function OrderDetail({ id }: { id: string }) {
       <p>{items.length} {items.length === 1 ? 'ornament' : 'ornaments'}</p>
       {items.map(item => {
         const piece = item.kind === 'finished' && item.marketOrnamentId ? marketOrnamentLabel(item.marketOrnamentId) : null
-        const facts = [item.kind, !piece && item.color, !piece && item.finish, item.productionStatus.replaceAll('_', ' '), formatEur(item.cost, 'en')]
+        const facts = [item.kind, !piece && item.size && sizeLabel(item.size), !piece && item.color, !piece && item.finish, item.productionStatus.replaceAll('_', ' '), formatEur(item.cost, 'en')]
         return <div key={item.id}>
           <h3><StaffText>{piece || item.petName || 'Ornament'}</StaffText></h3>
           <p><StaffText>{facts.filter(Boolean).join(' · ')}</StaffText></p>

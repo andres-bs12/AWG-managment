@@ -2,11 +2,12 @@ import { useId } from 'react'
 import { useLocale } from '../../i18n/LocaleContext'
 import type { BuyItem } from '../../lib/buyDraft'
 import { colorKeys } from '../../lib/ornamentPresentation'
+import { sizeKey } from '../../lib/ornamentSize'
 import { formatEur } from '../../lib/money'
 import { OrnamentPreview } from './OrnamentPreview'
 import styles from './OrnamentOverview.module.css'
 
-type OverviewItem = Pick<BuyItem, 'uid' | 'petName' | 'color' | 'finish' | 'withName' | 'backName'> & { price: number; editable?: boolean }
+type OverviewItem = Pick<BuyItem, 'uid' | 'petName' | 'color' | 'finish' | 'withName' | 'backName'> & Partial<Pick<BuyItem, 'size'>> & { price: number; editable?: boolean }
 
 type Props = {
   items: OverviewItem[]
@@ -35,6 +36,7 @@ export function OrnamentOverview({ items, activeUid, onEdit, onRemove, onAdd, ma
         const name = item.petName.trim() || t('ornamentN', { n: index + 1 })
         const label = `${t('ornamentN', { n: index + 1 })}${item.petName.trim() ? ` – ${item.petName.trim()}` : ''}`
         const summary = [
+          ...(item.size ? [t(sizeKey(item.size))] : []),
           item.color ? t(colorKeys[item.color]) : t('previewNoColor'),
           item.finish ? t(item.finish === 'shiny' ? 'finishShiny' : 'finishMatte') : t('previewNoFinish'),
           item.withName ? item.backName.trim() ? t('multiNameValue', { name: item.backName }) : t('multiNamePending') : t('multiNoName'),

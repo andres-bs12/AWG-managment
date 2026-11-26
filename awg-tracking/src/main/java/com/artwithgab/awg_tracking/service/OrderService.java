@@ -215,7 +215,8 @@ public class OrderService {
             item.setWithName(withName);
             item.setCustomColor(custom ? (row.color() == null ? CustomColor.RED : row.color()) : null);
             item.setCustomFinish(custom ? (row.finish() == null ? com.artwithgab.awg_tracking.enums.CustomFinish.SHINY : row.finish()) : null);
-            item.setCost(pricingService.itemCost(row.kind(), withName));
+            item.setOrnamentSize(PricingService.requireSize(row.kind(), row.size(), "items[" + (position) + "].size"));
+            item.setCost(pricingService.itemCost(row.kind(), item.getOrnamentSize(), withName));
             item.setNameExtra(pricingService.nameExtraFor(row.kind(), withName));
             item.setProductionStatus(custom ? ProductionStatus.NOT_STARTED : ProductionStatus.FINISHED);
             item.setSoldOnDay(soldOn);

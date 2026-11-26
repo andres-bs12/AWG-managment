@@ -4,6 +4,7 @@ import com.artwithgab.awg_tracking.config.AwgProperties;
 import com.artwithgab.awg_tracking.dto.pricing.PricesDto;
 import com.artwithgab.awg_tracking.dto.pricing.UpdatePricesRequest;
 import com.artwithgab.awg_tracking.enums.ItemKind;
+import com.artwithgab.awg_tracking.enums.OrnamentSize;
 import com.artwithgab.awg_tracking.exception.BadRequestException;
 import com.artwithgab.awg_tracking.exception.ConflictException;
 import com.artwithgab.awg_tracking.model.PriceSetting;
@@ -49,9 +50,10 @@ public class PricingService {
                 ? props.post().collectionWeekdays().stream().map(DayOfWeek::name).toList()
                 : Arrays.asList(row.getPostCollectionDays().split(","));
         List<String> weekdays = days.stream().map(day -> day.toLowerCase(Locale.ROOT)).toList();
-        if (row == null) return new PricesDto(defaults.custom(), defaults.finished(), defaults.nameExtra(),
+        if (row == null) return new PricesDto(defaults.custom(), defaults.customMedium(), defaults.finished(), defaults.nameExtra(),
                 defaults.shipping(), weekdays, props.post().finishedWithCustom(), DEFAULT_BACK_NAME_MAX, 0);
-        return new PricesDto(row.getCustomPrice(), row.getFinishedPrice(), row.getNameExtra(),
+        return new PricesDto(row.getCustomPrice(),
+                row.getCustomMediumPrice() == null ? defaults.customMedium() : row.getCustomMediumPrice(), row.getFinishedPrice(), row.getNameExtra(),
                 row.getShippingFee() == null ? defaults.shipping() : row.getShippingFee(), weekdays,
                 props.post().finishedWithCustom(),
                 row.getBackNameMax() == null ? DEFAULT_BACK_NAME_MAX : row.getBackNameMax(), row.getRevision());
@@ -76,10 +78,20 @@ public class PricingService {
         return back;
     }
 
-    public BigDecimal itemCost(ItemKind kind, boolean withName) {
+    /** Price of one ornament; a custom one costs its size's price (null size = big, as before sizes) plus the name. */
+    public BigDecimal itemCost(ItemKind kind, OrnamentSize size, boolean withName) {
         PricesDto p = current();
         if (kind == ItemKind.GENERIC) return p.finishedPrice();
-        return withName ? p.customPrice().add(p.nameExtra()) : p.customPrice();
+        BigDecimal base = size == OrnamentSize.MEDIUM ? p.customMediumPrice() : p.customPrice();
+        return withName ? base.add(p.nameExtra()) : base;
+    }
+
+    /** A custom ornament must have a size; finished pieces never carry one. */
+    public static OrnamentSize requireSize(ItemKind kind, OrnamentSize size, String field) {
+        if (kind != ItemKind.CUSTOM) return null;
+        if (size == null) throw new BadRequestException("Choose Big (10 cm) or Medium (8 cm) for each personalised ornament.")
+                .code("VALIDATION").field(field);
+        return size;
     }
 
     /** The surcharge stored on a sold item, or null when it has no paid name. */
@@ -110,6 +122,7 @@ public class PricingService {
             return created;
         });
         row.setCustomPrice(body.customPrice());
+        row.setCustomMediumPrice(body.customMediumPrice());
         row.setFinishedPrice(body.finishedPrice());
         row.setNameExtra(body.nameExtra());
         row.setShippingFee(body.shippingFee());
@@ -119,8 +132,8 @@ public class PricingService {
         row.setUpdatedAt(clock.instant());
         repository.save(row);
         // Audit trail for price changes (no customer data): old -> new, revision.
-        log.info("Prices changed to revision {}: custom {} -> {}, finished {} -> {}, name {} -> {}, back-name max {} -> {}",
-                row.getRevision(), now.customPrice(), body.customPrice(), now.finishedPrice(), body.finishedPrice(),
+        log.info("Prices changed to revision {}: custom big {} -> {}, custom medium {} -> {}, finished {} -> {}, name {} -> {}, back-name max {} -> {}",
+                row.getRevision(), now.customPrice(), body.customPrice(), now.customMediumPrice(), body.customMediumPrice(), now.finishedPrice(), body.finishedPrice(),
                 now.nameExtra(), body.nameExtra(), now.backNameMax(), row.getBackNameMax() == null ? now.backNameMax() : row.getBackNameMax());
         return view(row);
     }

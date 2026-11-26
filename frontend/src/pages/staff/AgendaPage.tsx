@@ -1,4 +1,5 @@
 import { StaffText } from '../../components/staff/StaffText'
+import { sizeLabel, sizeShort } from '../../lib/ornamentSize'
 import { DayRow, LostSaves } from './PaintingDaysPage'
 import { agendaCapacitySummary, maxPaintingsFromHours } from './PaintingDaysHelpers'
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
@@ -795,7 +796,9 @@ export function AgendaPage() {
                     </div>
                   ) : null}
                   {boardSlots.map((slot) => {
-                    const title = slot.held ? 'Held by web checkout' : slot.order?.code || (slot.item?.kind === 'custom' ? 'Custom ornament' : 'Paint session')
+                    const baseTitle = slot.held ? 'Held by web checkout' : slot.order?.code || (slot.item?.kind === 'custom' ? 'Custom ornament' : 'Paint session')
+                    // Gaby picks the base from the board, so each custom session names its size.
+                    const title = !slot.held && slot.item?.kind === 'custom' && slot.item.size ? `${baseTitle} · ${sizeShort(slot.item.size)}` : baseTitle
                     const range = `${formatHour(slot.block.startHour)}–${formatHour(slot.block.endHour)}`
                     const handoffShort = !slot.held && slot.item ? compactHandoff(slot.item, marketDays) : null
                     const status = (slot.item?.handedOver ?? slot.order?.handedOver) ? 'delivered' : slot.block.status
@@ -827,7 +830,7 @@ export function AgendaPage() {
                           data-density={density}
                           data-selected={selectedBlockId === slot.block.id ? 'true' : 'false'}
                           aria-pressed={selectedBlockId === slot.block.id}
-                          aria-label={[title, customer, handoffShort, `paint ${range}`, slot.held ? holdUntil : STATUS_LABELS[status]].filter(Boolean).join(', ')}
+                          aria-label={[baseTitle, !slot.held && slot.item?.kind === 'custom' && slot.item.size ? sizeLabel(slot.item.size) : null, customer, handoffShort, `paint ${range}`, slot.held ? holdUntil : STATUS_LABELS[status]].filter(Boolean).join(', ')}
                           style={{
                             left: slotLeft,
                             width: `calc(${100 / lanes}% - var(--space-2))`,
@@ -859,7 +862,7 @@ export function AgendaPage() {
                             type="button"
                             className={styles.slotMove}
                             data-slot-move="true"
-                            aria-label={`Move ${title}`}
+                            aria-label={`Move ${baseTitle}`}
                             style={{ left: slotLeft, top: slotTop }}
                             onClick={() => openMoveDialog(slot)}
                           >

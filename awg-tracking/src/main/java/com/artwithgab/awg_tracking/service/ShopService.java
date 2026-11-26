@@ -85,7 +85,7 @@ public class ShopService {
                 .toList();
         LocalDate end = seasonEnd();
         LocalDate from = props.shop().deliveriesFrom();
-        return new ShopConfigDto(isOpen(), p.customPrice(), p.finishedPrice(), p.nameExtra(), p.backNameMax(), p.shippingFee(), MAX_ITEMS, colors,
+        return new ShopConfigDto(isOpen(), p.customPrice(), p.customMediumPrice(), p.finishedPrice(), p.nameExtra(), p.backNameMax(), p.shippingFee(), MAX_ITEMS, colors,
                 end.toString(), LocalDate.now(clock.withZone(java.time.ZoneId.of(props.zone()))).isAfter(end),
                 from == null ? null : from.toString(), props.shop().deliveryWindowStart().toString(),
                 props.shop().deliveryWindowEnd().toString(), mailConfigured());
@@ -370,6 +370,7 @@ public class ShopService {
             if (item.withName()) {
                 pricingService.requireBackName(item.backName(), null, "items[" + n + "].backName");
             }
+            PricingService.requireSize(ItemKind.CUSTOM, item.size(), "items[" + n + "].size");
             if (item.finish() == null) {
                 throw new BadRequestException("Choose shiny or matte for each ornament.").code("VALIDATION").field("items[" + n + "].finish");
             }
@@ -444,7 +445,8 @@ public class ShopService {
             item.setWithName(withName);
             item.setCustomColor(custom ? row.color() : null);
             item.setCustomFinish(custom ? row.finish() : null);
-            item.setCost(pricingService.itemCost(row.kind(), withName));
+            item.setOrnamentSize(custom ? row.size() : null);
+            item.setCost(pricingService.itemCost(row.kind(), item.getOrnamentSize(), withName));
             item.setNameExtra(pricingService.nameExtraFor(row.kind(), withName));
             item.setProductionStatus(custom ? ProductionStatus.NOT_STARTED : ProductionStatus.FINISHED);
             item.setPosition(position++);
@@ -496,7 +498,7 @@ public class ShopService {
 
             List<StripeClient.Line> lines = new ArrayList<>();
             for (OrderItem item : order.getOrderItems()) {
-                String name = "Custom pet ornament" + (item.getPetName().isBlank() ? "" : " · " + item.getPetName()) + (item.isWithName() ? " + name" : "");
+                String name = "Custom pet ornament" + (item.getOrnamentSize() == null ? "" : " " + item.getOrnamentSize().centimetres() + " cm") + (item.getPetName().isBlank() ? "" : " · " + item.getPetName()) + (item.isWithName() ? " + name" : "");
                 lines.add(new StripeClient.Line(name, item.getCost(), 1));
             }
             if (deliveryFee.signum() > 0) lines.add(new StripeClient.Line("Versand per Post", deliveryFee, 1));

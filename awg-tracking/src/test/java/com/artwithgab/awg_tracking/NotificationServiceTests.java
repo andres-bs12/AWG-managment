@@ -51,7 +51,7 @@ class NotificationServiceTests {
         piece.setId("RM" + UUID.randomUUID().toString().substring(0, 6));
         piece.setStatus("painted");
         marketStock.saveAndFlush(piece);
-        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null, piece.getId());
+        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null, piece.getId());
         var order = orders.createSale(new CreateSaleRequest(null, "<b>Customer</b>", "", "customer@example.com", List.of(item), null));
         UUID id = UUID.fromString(order.id());
         try {
@@ -99,13 +99,13 @@ class NotificationServiceTests {
     @org.junit.jupiter.params.provider.ValueSource(strings = "AT12345678")
     void customerGetsOneShippedMailAfterEveryPostItemIsHandedOver(String trackingNumber) {
         var address = new com.artwithgab.awg_tracking.dto.common.AddressDto("Hauptplatz 1", null, "Linz", "4020");
-        var finishedPost = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null,
+        var finishedPost = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, null,
                 DeliveryKind.POST, null, null, null, address, readyMarketPiece());
         // The shipped order is committed, so each invocation needs a different paint slot.
         LocalDate paintDate = LocalDate.of(2026, 11, trackingNumber == null ? 25 : 26);
-        var customPost = new CreateSaleItemRequest(ItemKind.CUSTOM, false, CustomColor.RED, CustomFinish.SHINY,
+        var customPost = new CreateSaleItemRequest(ItemKind.CUSTOM, false, CustomColor.RED, CustomFinish.SHINY, com.artwithgab.awg_tracking.enums.OrnamentSize.BIG,
                 paintDate, 10.0, 11.0, DeliveryKind.POST, null, null, null, address, null);
-        var pickup = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null,
+        var pickup = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, null,
                 DeliveryKind.MARKET, null, null, null, null, readyMarketPiece());
         var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(pickup, finishedPost, customPost), null));
         UUID id = UUID.fromString(order.id());
@@ -138,7 +138,7 @@ class NotificationServiceTests {
         piece.setId("RM" + UUID.randomUUID().toString().substring(0, 6));
         piece.setStatus("painted");
         marketStock.saveAndFlush(piece);
-        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null, piece.getId());
+        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null, piece.getId());
         long before = invoices.count();
         long numberBefore = counters.findById(1L).orElseThrow().getLastNumber();
         transactions.executeWithoutResult(status -> {
@@ -180,7 +180,7 @@ class NotificationServiceTests {
 
     @Test void collectingTheRestAtHandoverSendsOnlyTheThankYou() {
         var piece = readyMarketPiece();
-        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null, piece);
+        var item = new CreateSaleItemRequest(ItemKind.GENERIC, false, null, null, null, null, null, null, DeliveryKind.MARKET, null, null, null, null, piece);
         var order = orders.createSale(new CreateSaleRequest(null, "Customer", "", "customer@example.com", List.of(item), null));
         UUID id = UUID.fromString(order.id());
         orders.setHandedOver(id, true, null, null, PaymentMethod.CASH);

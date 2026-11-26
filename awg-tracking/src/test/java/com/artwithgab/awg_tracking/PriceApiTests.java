@@ -27,7 +27,7 @@ class PriceApiTests extends ApiTestSupport {
 
     private MvcResult putPrices(String token, String custom, String finished, String name, long revision) throws Exception {
         return mvc.perform(put("/api/prices").header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON)
-                .content(json(Map.of("customPrice", new BigDecimal(custom), "finishedPrice", new BigDecimal(finished),
+                .content(json(Map.of("customPrice", new BigDecimal(custom), "customMediumPrice", new BigDecimal("44.00"), "finishedPrice", new BigDecimal(finished),
                         "nameExtra", new BigDecimal(name), "expectedRevision", revision,
                         "shippingFee", new BigDecimal("6.25"), "postCollectionDays", java.util.List.of("monday", "thursday"))))).andReturn();
     }
@@ -35,8 +35,9 @@ class PriceApiTests extends ApiTestSupport {
     @Test void defaultsApplyUntilTheFirstSave() throws Exception {
         mvc.perform(get("/api/prices").header("Authorization", bearer(login())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.customPrice").value(49.99))
-                .andExpect(jsonPath("$.finishedPrice").value(39.99))
+                .andExpect(jsonPath("$.customPrice").value(50.0))
+                .andExpect(jsonPath("$.customMediumPrice").value(45.0))
+                .andExpect(jsonPath("$.finishedPrice").value(35.0))
                 .andExpect(jsonPath("$.nameExtra").value(12.99))
                 .andExpect(jsonPath("$.shippingFee").value(5.0))
                 .andExpect(jsonPath("$.postCollectionDays[0]").value("tuesday"))
@@ -59,12 +60,13 @@ class PriceApiTests extends ApiTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.revision").value(7))
                 .andExpect(jsonPath("$.customPrice").value(51))
+                .andExpect(jsonPath("$.customMediumPrice").value(45.0))
                 .andExpect(jsonPath("$.shippingFee").value(5))
                 .andExpect(jsonPath("$.postCollectionDays[0]").value("tuesday"));
     }
 
     private MvcResult putBackNameMax(String token, Object max, long revision) throws Exception {
-        Map<String, Object> body = new java.util.HashMap<>(Map.of("customPrice", new BigDecimal("49.99"),
+        Map<String, Object> body = new java.util.HashMap<>(Map.of("customPrice", new BigDecimal("49.99"), "customMediumPrice", new BigDecimal("45.00"),
                 "finishedPrice", new BigDecimal("39.99"), "nameExtra", new BigDecimal("12.99"), "expectedRevision", revision,
                 "shippingFee", new BigDecimal("5.00"), "postCollectionDays", java.util.List.of("tuesday", "friday")));
         body.put("backNameMax", max);
@@ -102,6 +104,7 @@ class PriceApiTests extends ApiTestSupport {
 
         mvc.perform(withIp(get("/api/shop/config")))
                 .andExpect(jsonPath("$.customPrice").value(55.0))
+                .andExpect(jsonPath("$.customMediumPrice").value(44.0))
                 .andExpect(jsonPath("$.finishedPrice").value(35.5))
                 .andExpect(jsonPath("$.nameExtra").value(15.0))
                 .andExpect(jsonPath("$.deliveryFee").value(6.25));
@@ -115,6 +118,22 @@ class PriceApiTests extends ApiTestSupport {
         MvcResult sale = sale(token, customItem(true, TUE, 10.0, 11.25, "market", dayId(token, SAT), 14.0), finishedItem());
         assertEquals(201, sale.getResponse().getStatus(), sale.getResponse().getContentAsString());
         assertEquals(0, new BigDecimal("105.50").compareTo(new BigDecimal(this.<Object>read(sale, "$.total").toString())));
+
+        // A medium personalised ornament costs the medium price (plus the name when painted).
+        var medium = customItem(false, TUE, 11.5, 12.5, "market", dayId(token, SAT), 14.0);
+        medium.put("size", "medium");
+        MvcResult mediumSale = sale(token, medium);
+        assertEquals(201, mediumSale.getResponse().getStatus(), mediumSale.getResponse().getContentAsString());
+        assertEquals(0, new BigDecimal("44.00").compareTo(new BigDecimal(this.<Object>read(mediumSale, "$.total").toString())));
+    }
+
+    @Test void customOrnamentsNeedASize() throws Exception {
+        String token = login();
+        var item = customItem(false, TUE, 10.0, 11.0, "market", dayId(token, SAT), 14.0);
+        item.remove("size");
+        MvcResult res = sale(token, item);
+        assertEquals(400, res.getResponse().getStatus());
+        assertEquals("items[0].size", this.<String>read(res, "$.field"));
     }
 
     @Test void staleRevisionIsAConflict() throws Exception {
@@ -136,7 +155,7 @@ class PriceApiTests extends ApiTestSupport {
     @Test void invalidShippingSettingsAreRejected() throws Exception {
         String token = login();
         var body = new java.util.HashMap<String, Object>(Map.of(
-                "customPrice", 50, "finishedPrice", 40, "nameExtra", 13, "expectedRevision", 0,
+                "customPrice", 50, "customMediumPrice", 45, "finishedPrice", 40, "nameExtra", 13, "expectedRevision", 0,
                 "shippingFee", 5, "postCollectionDays", java.util.List.of("monday", "monday")));
         for (var days : java.util.List.of(java.util.List.of("monday", "monday"), java.util.List.of("saturday"), java.util.List.of())) {
             body.put("postCollectionDays", days);
@@ -155,6 +174,6 @@ class PriceApiTests extends ApiTestSupport {
         // A later price change must not rewrite what this customer was charged.
         assertEquals(200, putPrices(token, "70.00", "40.00", "20.00", 0).getResponse().getStatus());
         orders.updatePaymentState(id, PaymentState.DEPOSIT, PaymentMethod.CARD, null);
-        assertThat(invoices.findByOrderIdOrderByNumberAsc(id).getFirst().getBody()).contains("49,99 EUR", "12,99 EUR").doesNotContain("20,00 EUR");
+        assertThat(invoices.findByOrderIdOrderByNumberAsc(id).getFirst().getBody()).contains("50,00 EUR", "12,99 EUR").doesNotContain("20,00 EUR");
     }
 }

@@ -11,7 +11,7 @@ export const market: Market = { id: 'market-review', name: 'Review Christmas Mar
 export const marketDay = { id: 'day-review', marketId: market.id, date: today, openHour: 10, closeHour: 20, isToday: true }
 export const spareMarket: Market = { ...market, id: 'market-spare', name: 'Unused market', startDate: '2026-12-04', finishDate: '2026-12-06' }
 export const spareDays = ['2026-12-04', '2026-12-05', '2026-12-06'].map((date, index) => ({ ...marketDay, id: `spare-${index}`, marketId: spareMarket.id, date, isToday: false }))
-export const config = { enabled: true, seasonOver: false, seasonEnd: '2026-12-24', deliveriesFrom: '2026-11-30', customPrice: 57, finishedPrice: 41, nameExtra: 14, deliveryFee: 0, maxItems: 8, colors: ['red', 'green', 'beige'].flatMap(color => ['shiny', 'matte'].map(finish => ({ color, finish, inStock: true }))) }
+export const config = { enabled: true, seasonOver: false, seasonEnd: '2026-12-24', deliveriesFrom: '2026-11-30', customPrice: 57, customMediumPrice: 52, finishedPrice: 41, nameExtra: 14, deliveryFee: 0, maxItems: 8, colors: ['red', 'green', 'beige'].flatMap(color => ['shiny', 'matte'].map(finish => ({ color, finish, inStock: true }))) }
 
 export function order(id = 'order-review', overrides: Partial<Order> = {}): Order {
   return { id, customerId: `customer-${id}`, code: id === 'order-review' ? 'AWGREVIEW' : `AWG${id.toUpperCase()}`, trackToken: `track-${id}`, formToken: `form-${id}`, paymentState: 'deposit', paymentMethod: 'cash', total: 57, amountPaid: 20, createdAt: `${today}T08:00:00`, itemIds: [`item-${id}`], handedOver: false, ...overrides }
@@ -61,6 +61,7 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
   let mutationError: { code: string; message: string } | null = null
   const prices: {
     customPrice: number
+    customMediumPrice: number
     finishedPrice: number
     nameExtra: number
     shippingFee: number
@@ -70,6 +71,7 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
     revision: number
   } = {
     customPrice: config.customPrice,
+    customMediumPrice: config.customMediumPrice,
     finishedPrice: config.finishedPrice,
     nameExtra: config.nameExtra,
     shippingFee: 5,
@@ -186,14 +188,14 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
       const unavailable = !previous && soldPieces.find(piece => piece.status !== 'painted')
       if (unavailable) return json(route, { code: unavailable.status === 'sold' ? 'MARKET_STOCK_SOLD' : 'MARKET_STOCK_NOT_READY', message: 'Piece unavailable.' }, 409)
       const hasPost = input.items.some(row => row.deliveryKind === 'post')
-      const baseTotal = input.items.reduce((sum, row) => sum + (row.kind === 'custom' ? config.customPrice + (row.withName ? config.nameExtra : 0) : config.finishedPrice), 0)
+      const baseTotal = input.items.reduce((sum, row) => sum + (row.kind === 'custom' ? (row.size === 'medium' ? config.customMediumPrice : config.customPrice) + (row.withName ? config.nameExtra : 0) : config.finishedPrice), 0)
       const created = previous ?? order(`sale-${createdByKey.size + 1}`, { total: Math.round((baseTotal + (hasPost ? prices.shippingFee : 0)) * 100) / 100, deliveryFee: hasPost ? prices.shippingFee : 0, paymentState: 'unpaid', paymentMethod: null, amountPaid: 0 })
       if (!previous) {
         for (const piece of soldPieces) Object.assign(piece, { status: 'sold', soldAt: new Date().toISOString(), orderId: created.id, orderCode: created.code, revision: piece.revision + 1 })
         records.set(created.id, created)
         const first = input.items[0]
         const win = first.deliveryKind === 'post' ? shippingWindowAfter(first.paintDate ?? today, { collectionDays: prices.postCollectionDays, overrides: collectionOverrides }) : null
-        items.set(created.id, item(created, { kind: first.kind, marketOrnamentId: first.marketOrnamentId ?? null, petName: '', formComplete: false, color: first.color, finish: first.finish, productionStatus: first.kind === 'finished' ? 'finished' : 'not_started', delivery: first.deliveryKind === 'post' ? { kind: 'post', deliveryDate: win?.collectionDate ?? undefined, arrivalFrom: win?.arrivalFrom ?? null, arrivalTo: win?.arrivalTo ?? null, address: first.address ?? null } : { kind: first.deliveryKind === 'vienna' ? 'vienna' : 'market', marketDayId: first.marketDayId ?? marketDay.id, marketId: market.id, pickupHour: first.pickupHour } }))
+        items.set(created.id, item(created, { kind: first.kind, marketOrnamentId: first.marketOrnamentId ?? null, petName: '', formComplete: false, color: first.color, finish: first.finish, size: first.size, productionStatus: first.kind === 'finished' ? 'finished' : 'not_started', delivery: first.deliveryKind === 'post' ? { kind: 'post', deliveryDate: win?.collectionDate ?? undefined, arrivalFrom: win?.arrivalFrom ?? null, arrivalTo: win?.arrivalTo ?? null, address: first.address ?? null } : { kind: first.deliveryKind === 'vienna' ? 'vienna' : 'market', marketDayId: first.marketDayId ?? marketDay.id, marketId: market.id, pickupHour: first.pickupHour } }))
         if (first.kind === 'custom' && first.paintStart != null && first.paintEnd != null) blocks.set(created.id, { id: `block-${created.id}`, marketDayId: allDays.find(day => day.date === first.paintDate)?.id ?? marketDay.id, orderItemId: created.itemIds[0], startHour: first.paintStart, endHour: first.paintEnd, status: 'not_started' })
         createdByKey.set(key, created)
       }
@@ -208,6 +210,7 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
         if (body.expectedRevision !== prices.revision) return json(route, { code: 'PRICES_CHANGED', message: 'Someone changed the prices meanwhile.' }, 409)
         Object.assign(prices, {
           customPrice: body.customPrice,
+          customMediumPrice: body.customMediumPrice ?? prices.customMediumPrice,
           finishedPrice: body.finishedPrice,
           nameExtra: body.nameExtra,
           shippingFee: body.shippingFee ?? prices.shippingFee,
@@ -283,6 +286,7 @@ export async function addFinishedPiece(page: Page, id = 'RM01') {
 
 export async function newFinishedSale(page: Page) {
   await addFinishedPiece(page)
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.getByRole('radio', { name: 'Paid', exact: true }).locator('..').click()
   await page.getByRole('radio', { name: 'Cash', exact: true }).locator('..').click()
@@ -290,3 +294,12 @@ export async function newFinishedSale(page: Page) {
   await expect(page.getByRole('link', { name: 'Open order', exact: true })).toBeVisible()
 }
 
+
+/** New sale: every personalised ornament needs a size before Continue (no default). */
+export async function chooseSizes(page: import('@playwright/test').Page, size: 'Big' | 'Medium' = 'Big') {
+  // Calendar and restored drafts render their cards after the first data load.
+  await page.locator('article h3').first().waitFor()
+  for (const radio of await page.getByRole('radio', { name: new RegExp(`^${size} \\d+ cm`) }).all()) {
+    if (!(await radio.isChecked())) await radio.locator('..').click()
+  }
+}

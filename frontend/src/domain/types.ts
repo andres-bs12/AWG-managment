@@ -6,6 +6,8 @@ export type PaymentState = 'unpaid' | 'deposit' | 'paid'
 export type PaymentMethod = 'cash' | 'card'
 export type OrnamentColor = 'red' | 'grey' | 'green' | 'white' | 'beige'
 export type CustomFinish = 'shiny' | 'matte'
+/** Personalised ornaments: big 10 cm or medium 8 cm. Finished market pieces have no size. */
+export type OrnamentSize = 'big' | 'medium'
 export type ItemKind = 'custom' | 'finished'
 export type ProductionStatus = 'not_started' | 'in_progress' | 'finished'
 export type DeliveryKind = 'market' | 'post' | 'vienna'
@@ -49,6 +51,7 @@ export type OrderItem = {
   withName: boolean
   color?: OrnamentColor
   finish?: CustomFinish
+  size?: OrnamentSize | null
   backName: string
   note: string
   cost: number
@@ -207,6 +210,7 @@ export type AgendaDelivery = {
   customerName?: string
   color?: OrnamentColor
   finish?: CustomFinish
+  size?: OrnamentSize | null
   backName?: string
   orderId: string
   orderCode: string
@@ -249,6 +253,7 @@ export type AgendaDay = {
 export type TrackItemView = {
   color?: OrnamentColor
   finish?: CustomFinish
+  size?: OrnamentSize | null
   cost?: number
   petName: string
   kind: ItemKind
@@ -336,6 +341,7 @@ export type CreateSaleItemInput = {
   withName: boolean
   color?: OrnamentColor
   finish?: CustomFinish
+  size?: OrnamentSize | null
   paintDate?: string
   paintStart?: number
   paintEnd?: number
@@ -377,7 +383,10 @@ export type MoveSuggestion = {
 export type InventoryItem = { id: string; kind: ItemKind; color: OrnamentColor | null; finish?: CustomFinish | null; quantity: number }
 /** Staff-editable prices in euros. `revision` 0 means the server defaults; it increments on every save. */
 export type Prices = {
+  /** Big (10 cm) personalised ornament. */
   customPrice: number
+  /** Medium (8 cm) personalised ornament. */
+  customMediumPrice: number
   finishedPrice: number
   nameExtra: number
   shippingFee: number
@@ -409,7 +418,10 @@ export type ShopConfig = {
   deliveriesFrom: string | null
   seasonOver: boolean
   enabled: boolean
+  /** Big (10 cm) personalised ornament. */
   customPrice: number
+  /** Medium (8 cm) personalised ornament. */
+  customMediumPrice: number
   finishedPrice: number
   nameExtra: number
   /** Letters allowed in the name painted on the back (staff setting). Optional with older servers (then 5). */
@@ -436,6 +448,7 @@ export type ShopItemInput = {
   withName: boolean
   color?: OrnamentColor
   finish?: CustomFinish
+  size?: OrnamentSize | null
   petName?: string
   backName?: string
   note?: string

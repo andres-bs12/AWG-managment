@@ -278,6 +278,22 @@
 .swatch[data-color='none'] { background-color: var(--color-surface); }
 .swatch[data-finish='shiny'] { background-image: radial-gradient(circle at 30% 30%, var(--ornament-swatch-highlight) 0 18%, transparent 45%); }
 
+/* Size chips: a small ornament (cap + ball) drawn to scale, 8 cm is 0.8 of 10 cm, in the swatch's 24px box.
+   Neutral fill and the swatch border, so it reads as a product icon and never as an empty radio. */
+.sizeGlyph {
+  flex: 0 0 var(--size-swatch);
+  width: var(--size-swatch);
+  height: var(--size-swatch);
+  fill: var(--ornament-cap);
+  stroke: var(--ornament-hook);
+  stroke-width: 1;
+}
+
+.sizeGlyph circle { fill: var(--color-surface); stroke: var(--ornament-swatch-border); stroke-width: 1.5; }
+.sizeGlyph[data-size='medium'] { transform: scale(0.8); transform-origin: 50% 60%; }
+
+.chipPrice { font-variant-numeric: tabular-nums; }
+
 /* Name on the back: a card with the option + price, a front/back preview and, when on, the field. */
 .nameCard {
   /* A plain field group like colour and finish (a bordered box inside the card read as a card in a card). */

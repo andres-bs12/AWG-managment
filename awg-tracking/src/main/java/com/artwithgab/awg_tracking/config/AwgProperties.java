@@ -24,7 +24,7 @@ public record AwgProperties(
         Invoice invoice,
         Post post
 ) {
-    public record Pricing(BigDecimal custom, BigDecimal finished, BigDecimal nameExtra, BigDecimal shipping) {
+    public record Pricing(BigDecimal custom, BigDecimal customMedium, BigDecimal finished, BigDecimal nameExtra, BigDecimal shipping) {
     }
 
     public record Cors(List<String> allowedOrigins) {

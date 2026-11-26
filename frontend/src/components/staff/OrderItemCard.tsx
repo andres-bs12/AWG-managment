@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { sizeLabel } from '../../lib/ornamentSize'
 import { StaffText } from './StaffText'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
@@ -62,7 +63,7 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
           ) : (
             <h3 title={title}><StaffText>{title}</StaffText></h3>
           )}
-          <p><StaffText>{`${item.kind === 'custom' ? 'Personalised' : 'Ready-made'} · ${formatEur(item.cost, 'en')}`}</StaffText></p>
+          <p><StaffText>{[item.kind === 'custom' ? 'Personalised' : 'Ready-made', item.kind === 'custom' && item.size ? sizeLabel(item.size) : null, formatEur(item.cost, 'en')].filter(Boolean).join(' · ')}</StaffText></p>
         </div>
       </div>
       <dl className={styles.specs}>

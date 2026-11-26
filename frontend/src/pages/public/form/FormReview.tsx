@@ -7,6 +7,7 @@ import { OrnamentPreview } from '../../../components/public/OrnamentPreview'
 import { InsetNote } from '../../../components/public/PublicForm'
 import { formatEur } from '../../../lib/money'
 import { colorKeys, previewItem } from '../../../lib/ornamentPresentation'
+import { sizeKey } from '../../../lib/ornamentSize'
 import styles from '../FormPage.module.css'
 
 export function FormReview({ view, draft, handoffs, edit }: { view: CustomerFormView; draft: FormDraft; handoffs: string[]; edit: (id: string) => void }) {
@@ -20,7 +21,7 @@ export function FormReview({ view, draft, handoffs, edit }: { view: CustomerForm
       const named = { kind: source.kind, backName: source.withName ? details.backName : '', petName: details.petName }
       const title = reviewTitle(named, index, items.length, t)
       // Colour and finish on one line; an order without either says so once, not twice.
-      const look = [source.color && `${t(colorKeys[source.color])}${source.color === 'grey' || source.color === 'white' ? ` (${t('legacyColour')})` : ''}`, source.finish && t(source.finish === 'shiny' ? 'finishShiny' : 'finishMatte')].filter(Boolean).join(' · ') || t('formFinishUnknown')
+      const look = [source.size && t(sizeKey(source.size)), source.color && `${t(colorKeys[source.color])}${source.color === 'grey' || source.color === 'white' ? ` (${t('legacyColour')})` : ''}`, source.finish && t(source.finish === 'shiny' ? 'finishShiny' : 'finishMatte')].filter(Boolean).join(' · ') || t('formFinishUnknown')
       // Same compact card as /buy: the name is the title only, the line below says whether it is painted on.
       return <ReviewCard key={source.id} title={title}
         action={item ? { label: editLabel, ariaLabel: t('editOrnamentNamed', { name: ornamentName(named) || title }), onClick: () => edit(source.withName ? `back-${source.id}` : `photos-${source.id}`) } : undefined}

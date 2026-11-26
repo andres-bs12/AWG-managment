@@ -145,6 +145,7 @@ public abstract class ApiTestSupport {
                                              String deliveryKind, String marketDayId, Double pickupHour) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("kind", "custom");
+        m.put("size", "big");
         m.put("withName", withName);
         m.put("color", "red");
         if (paintDate != null) m.put("paintDate", paintDate);

@@ -17,6 +17,8 @@ public record ShopItemRequest(
         boolean withName,
         CustomColor color,
         CustomFinish finish,
+        /** Required: big (10 cm) or medium (8 cm). */
+        com.artwithgab.awg_tracking.enums.OrnamentSize size,
         @Size(max = 60) String petName,
         @Size(max = PricingService.BACK_NAME_MAX_LIMIT) String backName,
         @Size(max = 1000) String note,

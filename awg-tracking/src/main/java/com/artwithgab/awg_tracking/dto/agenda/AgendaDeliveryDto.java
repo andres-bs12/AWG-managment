@@ -10,6 +10,8 @@ public record AgendaDeliveryDto(
         String customerName,
         CustomColor color,
         CustomFinish finish,
+        /** big / medium for custom ornaments, null for finished pieces. */
+        com.artwithgab.awg_tracking.enums.OrnamentSize size,
         String backName,
         String orderId,
         String orderCode,

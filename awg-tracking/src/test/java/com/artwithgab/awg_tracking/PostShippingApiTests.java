@@ -240,7 +240,7 @@ class PostShippingApiTests extends ApiTestSupport {
         var order = orders.findById(UUID.fromString(id)).orElseThrow();
         assertThat(order.getDeliveryAddress().getCity()).isEqualTo("Linz");
         assertThat(order.getDeliveryFee()).isEqualByComparingTo("5.00");
-        assertThat(order.getTotal()).isEqualByComparingTo("134.97");
+        assertThat(order.getTotal()).isEqualByComparingTo("125.00");
         assertThat(order.postItems()).hasSize(2).allSatisfy(item -> {
             assertThat(item.getHandoffDate()).isEqualTo(LocalDate.parse("2026-12-04"));
             assertThat(item.getArrivalTo()).isEqualTo(LocalDate.parse("2026-12-10"));

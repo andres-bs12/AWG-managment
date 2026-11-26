@@ -21,7 +21,7 @@ import { Field } from '../../components/ui/Field'
 import { ProgressSteps } from '../../components/ui/ProgressSteps'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { marketOrnamentLabel, marketOrnamentParts, type MarketOrnament } from '../../domain/marketStock'
-import type { Address, AgendaDay, CapacityResult, HourSpan, Market, MarketDay, OrnamentColor, PaymentMethod, PaymentState, InventoryItem, PaintingDay, ShippingQuote } from '../../domain/types'
+import type { Address, AgendaDay, CapacityResult, HourSpan, Market, MarketDay, OrnamentColor, OrnamentSize, PaymentMethod, PaymentState, InventoryItem, PaintingDay, ShippingQuote } from '../../domain/types'
 import { isMarketPickupWeekday, paintDatesToTry } from '../../lib/calendar'
 import {
   earliestPickupHourAfterPaint,
@@ -38,7 +38,8 @@ import {
 } from '../../lib/newSaleRules'
 import { AUSTRIAN_POSTAL_REGEX, formatStaffFeeTag, formatStaffPostWindow } from '../../lib/postShipping'
 import { addUtcDays, datesInRange, formatDateLabel, formatHour, hoursOverlap, minutesToHours } from '../../lib/time'
-import { formatEur, itemCost, type Pricing } from '../../lib/money'
+import { customBasePrice, formatEur, itemCost, type Pricing } from '../../lib/money'
+import { ORNAMENT_SIZES, sizeLabel } from '../../lib/ornamentSize'
 import { OrderSummaryPanel } from './OrderSummaryPanel'
 import { MarketOrnamentPicker, MarketPiecePhoto } from './MarketOrnamentPicker'
 import {
@@ -209,6 +210,7 @@ export function NewSalePage() {
   const [mixedHandedNote, setMixedHandedNote] = useState('')
   const [doneQrOpen, setDoneQrOpen] = useState(false)
   const [finishedHandoff, setFinishedHandoff] = useState(false)
+  const [sizeErrors, setSizeErrors] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
   // null = closed. The order is re-read first: a paid order must not be deleted, and a sent form means a cancellation e-mail.
@@ -258,9 +260,10 @@ export function NewSalePage() {
       api.prices.get().catch(() => null),
     ]).then(async ([m, d, agenda, config, stock, serverPrices]) => {
       if (!active) return
-      if (![config.customPrice, config.finishedPrice, config.nameExtra].every(Number.isFinite)) throw new Error('Server prices are unavailable. Retry before creating a sale.')
+      if (![config.customPrice, config.customMediumPrice, config.finishedPrice, config.nameExtra].every(Number.isFinite)) throw new Error('Server prices are unavailable. Retry before creating a sale.')
       setPrices({
         customPrice: config.customPrice,
+        customMediumPrice: config.customMediumPrice,
         finishedPrice: config.finishedPrice,
         nameExtra: config.nameExtra,
         shippingFee: serverPrices?.shippingFee ?? config.deliveryFee ?? 5,
@@ -1169,7 +1172,7 @@ export function NewSalePage() {
         {error && <p role="alert">{error}</p>}
       </StaffDialog>}
       {finishedHandoff && <StaffDialog title="Balance due" busy={busy} onClose={() => setFinishedHandoff(false)}>
-        <p>Collect the remaining balance before handing over the whole order. {prices ? formatEur((order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0)) - (payState === 'deposit' ? depositValue(depositAmount, order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0)) : 0), 'en') : ''} is still due.</p>
+        <p>Collect the remaining balance before handing over the whole order. {prices ? formatEur((order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices, item.size), 0)) - (payState === 'deposit' ? depositValue(depositAmount, order?.total ?? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices, item.size), 0)) : 0), 'en') : ''} is still due.</p>
         <SegmentedControl legend="Collection method" name="finished-handover-method" value={payMethod} onChange={setPayMethod} options={[{ value: 'cash', label: 'Cash' }, { value: 'card', label: 'Card' }]} />
         <Button tone="staff" disabled={busy || !payMethod} onClick={() => void finishFinishedSale('paid')}>Mark paid &amp; hand over</Button>
         <Button tone="staff" variant="secondary" disabled={busy} onClick={() => void finishFinishedSale(payState, false)}>Save without handover</Button>
@@ -1208,6 +1211,8 @@ export function NewSalePage() {
               onToggleName={toggleName}
               onColor={setColor}
               onFinish={(item, finish) => patchItem(item.id, { finish })}
+              onSize={(item, size) => patchItem(item.id, { size })}
+              showSizeErrors={sizeErrors}
               onDuration={setDuration}
               onContinue={() => {
                 if (!draft.items.length) return
@@ -1224,6 +1229,11 @@ export function NewSalePage() {
                 }
                 if (draft.items.some(item => item.kind === 'finished') && !stock?.rows) {
                   setError(stock?.error ? 'Could not check ready ornaments. Tap Try again in the piece list.' : 'Checking ready ornaments. Try again in a moment.')
+                  return
+                }
+                if (draft.items.some(item => item.kind === 'custom' && !item.size)) {
+                  setSizeErrors(true)
+                  setError('Choose Big 10 cm or Medium 8 cm for each custom ornament.')
                   return
                 }
                 const shortage = draft.items.find(item => item.kind === 'custom' &&
@@ -1314,7 +1324,7 @@ export function NewSalePage() {
               {onlyFinished ? (
                 <div className={`${styles.card} ${styles.payCard}`}>
                   <InsetNote><p>No customer form is needed for ready-made ornaments.</p></InsetNote>
-                  <SalePaymentFields state={payState} onState={setPayState} method={payMethod} onMethod={setPayMethod} deposit={depositAmount} onDeposit={setDepositAmount} total={order?.total ?? (prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0) : 0)} />
+                  <SalePaymentFields state={payState} onState={setPayState} method={payMethod} onMethod={setPayMethod} deposit={depositAmount} onDeposit={setDepositAmount} total={order?.total ?? (prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices, item.size), 0) : 0)} />
 
                 </div>
               ) : null}
@@ -1324,7 +1334,7 @@ export function NewSalePage() {
                 <Button
                   tone="staff"
                   size="lg"
-                  disabled={busy || !prices || Boolean(configError) || !draft.items.length || (hasPost && postQuote?.available === false) || draft.items.some(item => item.kind === 'custom' && (item.paintStart == null || (item.delivery.mode === 'market' && (!item.delivery.marketDayId || item.delivery.pickupHour == null)) || !paintFitsHandoff(item, item.delivery) || Boolean(paintingAtOtherMarket(item, agendaDays)))) || draft.items.some(item => isPickupInPast(item.delivery, currentDate, nowHour)) || (onlyFinished && payState !== 'unpaid' && !payMethod) || (onlyFinished && payState === 'deposit' && !validDeposit(depositAmount, prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices), 0) : 0))}
+                  disabled={busy || !prices || Boolean(configError) || !draft.items.length || (hasPost && postQuote?.available === false) || draft.items.some(item => item.kind === 'custom' && (item.paintStart == null || (item.delivery.mode === 'market' && (!item.delivery.marketDayId || item.delivery.pickupHour == null)) || !paintFitsHandoff(item, item.delivery) || Boolean(paintingAtOtherMarket(item, agendaDays)))) || draft.items.some(item => isPickupInPast(item.delivery, currentDate, nowHour)) || (onlyFinished && payState !== 'unpaid' && !payMethod) || (onlyFinished && payState === 'deposit' && !validDeposit(depositAmount, prices ? draft.items.reduce((sum, item) => sum + itemCost(item.kind, item.withName, prices, item.size), 0) : 0))}
                   onClick={() => void continueFromDelivery()}
                 >
                   {busy ? 'Saving…' : onlyFinished ? 'Done' : 'Create order & show QR'}
@@ -1499,6 +1509,8 @@ function ItemsStep({
   onToggleName,
   onColor,
   onFinish,
+  onSize,
+  showSizeErrors,
   onDuration,
   onContinue,
 }: {
@@ -1520,6 +1532,9 @@ function ItemsStep({
   onToggleName: (item: DraftItem) => void
   onColor: (item: DraftItem, color: OrnamentColor) => void
   onFinish: (item: DraftItem, finish: import('../../domain/types').CustomFinish) => void
+  onSize: (item: DraftItem, size: OrnamentSize) => void
+  /** After a Continue with a missing size, each custom card without one says so. */
+  showSizeErrors: boolean
   onDuration: (item: DraftItem, preset: DurationPreset, customMinutes?: number) => void
   onContinue: () => void
 }) {
@@ -1540,7 +1555,7 @@ function ItemsStep({
       ) : (
         <>
           {items.map((item, index) => {
-            const priceText = prices ? formatEur(itemCost(item.kind, item.withName, prices), 'en') : 'Price unavailable'
+            const priceText = !prices ? 'Price unavailable' : item.kind === 'custom' && !item.size ? 'Choose size' : formatEur(itemCost(item.kind, item.withName, prices, item.size), 'en')
             if (item.kind === 'finished' && item.marketOrnamentId) {
               const pieceId = item.marketOrnamentId
               const piece = marketPieces?.find(row => row.id === pieceId)
@@ -1601,6 +1616,15 @@ function ItemsStep({
                   const comboLeft = stockReady ? remainingStock(inventory, items, 'custom', item.color, item.finish, item.id) : 1
                   const soldOut = comboLeft === 0 && !firstAvailableCustom(inventory, items, item.id)
                   return <>
+                    {/* Size first: it sets the price. No default, so every personalised sale is a deliberate choice. */}
+                    <SegmentedControl
+                      legend="Size"
+                      name={`size-${item.id}`}
+                      value={item.size ?? null}
+                      onChange={(size) => onSize(item, size)}
+                      options={ORNAMENT_SIZES.map(size => ({ value: size, label: sizeLabel(size), hint: prices ? formatEur(customBasePrice(size, prices), 'en') : undefined }))}
+                    />
+                    {showSizeErrors && !item.size ? <p className={styles.soldOut} role="alert">Choose a size.</p> : null}
                     <label className={styles.check}>
                       <input type="checkbox" aria-describedby={`name-hint-${item.id}`} checked={item.withName} onChange={() => onToggleName(item)} />
                       {`Name on the back · +${prices ? formatEur(prices.nameExtra, 'en') : 'price unavailable'}`}
@@ -1646,7 +1670,7 @@ function ItemsStep({
               + Add finished
             </Button>
           </div>
-          <StaffActions className={styles.actions} total={prices ? draftTotal(items, prices) : null}>
+          <StaffActions className={styles.actions} total={!prices ? null : items.some(item => item.kind === 'custom' && !item.size) ? 'choose-size' : draftTotal(items, prices)}>
             <Button tone="staff" size="lg" onClick={onContinue}>
               Continue
             </Button>

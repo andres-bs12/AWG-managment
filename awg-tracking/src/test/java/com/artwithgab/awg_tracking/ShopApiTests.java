@@ -75,11 +75,18 @@ class ShopApiTests extends ApiTestSupport {
     }
 
     private MvcResult checkoutNamed(String postal, String date, int customs, String email, String ip, String backName) throws Exception {
+        return checkoutSized(postal, date, customs, email, ip, backName, "big");
+    }
+
+    /** size null leaves the field out, like an outdated client. */
+    private MvcResult checkoutSized(String postal, String date, int customs, String email, String ip, String backName, String size) throws Exception {
         List<Map<String, Object>> items = new ArrayList<>();
         var req = multipart("/api/shop/checkout");
         for (int i = 0; i < customs; i++) {
-            items.add(Map.of("kind", "custom", "withName", i == 0, "color", "red", "finish", "shiny", "petName", "Luna" + i,
+            var item = new java.util.HashMap<String, Object>(Map.of("kind", "custom", "withName", i == 0, "color", "red", "finish", "shiny", "petName", "Luna" + i,
                     "backName", backName, "photos", List.of(Map.of("id", "p" + i, "name", "luna.jpg"))));
+            if (size != null) item.put("size", size);
+            items.add(item);
             req.file(new MockMultipartFile("photo-p" + i, "luna.jpg", "image/jpeg", JPEG));
         }
         Map<String, Object> payload = Map.of("customerName", "Eva Gruber", "email", email, "phone", "+43 1 234",
@@ -154,7 +161,7 @@ class ShopApiTests extends ApiTestSupport {
     private MvcResult pickupCheckout(String marketDayId, String pickupTime) throws Exception {
         var payload = new HashMap<>(Map.of("customerName", "Eva Gruber", "email", "eva@example.com", "phone", "+43 1 234",
                 "deliveryKind", "market", "deliveryDate", PICKUP_SATURDAY, "pickupTime", pickupTime, "acceptTerms", true,
-                "items", List.of(Map.of("kind", "custom", "color", "red", "finish", "shiny", "withName", false,
+                "items", List.of(Map.of("kind", "custom", "size", "big", "color", "red", "finish", "shiny", "withName", false,
                         "photos", List.of(Map.of("id", "p0", "name", "luna.jpg"))))));
         if (marketDayId != null) payload.put("marketDayId", marketDayId);
         return mvc.perform(withIp(multipart("/api/shop/checkout")
@@ -190,7 +197,7 @@ class ShopApiTests extends ApiTestSupport {
     void configIsPublicAndOpen() throws Exception {
         mvc.perform(get("/api/shop/config")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(true))
-                .andExpect(jsonPath("$.customPrice").value(49.99));
+                .andExpect(jsonPath("$.customPrice").value(50.0));
     }
 
     @Test
@@ -281,6 +288,25 @@ class ShopApiTests extends ApiTestSupport {
     }
 
     @Test
+    void mediumOrnamentsChargeTheMediumPrice() throws Exception {
+        MvcResult res = checkoutSized("1070", "2026-12-04", 1, "eva@example.com", freshIp(), "luna", "medium");
+        assertThat(res.getResponse().getStatus()).as(res.getResponse().getContentAsString()).isEqualTo(200);
+        var order = orderRepository.findByCodeIgnoreCase(read(res, "$.orderCode")).orElseThrow();
+        // 45.00 medium + 12.99 name + 5.00 Post.
+        assertThat(order.getTotal()).isEqualByComparingTo("62.99");
+        assertThat(order.getOrderItems().getFirst().getOrnamentSize()).isEqualTo(com.artwithgab.awg_tracking.enums.OrnamentSize.MEDIUM);
+        org.mockito.Mockito.verify(stripe).createCheckoutSession(anyString(), anyString(), anyString(),
+                argThat(lines -> lines.getFirst().name().contains("8 cm")), any());
+    }
+
+    @Test
+    void checkoutWithoutASizeIsRejected() throws Exception {
+        MvcResult res = checkoutSized("1070", "2026-12-04", 1, "eva@example.com", freshIp(), "luna", null);
+        assertThat(res.getResponse().getStatus()).isEqualTo(400);
+        assertThat((String) read(res, "$.field")).isEqualTo("items[0].size");
+    }
+
+    @Test
     void paidCheckoutAppearsInAgendaAndDeliveries() throws Exception {
         int stockBefore = inventoryRepository.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, com.artwithgab.awg_tracking.enums.CustomFinish.SHINY).orElseThrow().getQuantity();
         MvcResult res = checkout("1070", "2026-12-04", 2);
@@ -301,7 +327,7 @@ class ShopApiTests extends ApiTestSupport {
                 .isEqualTo(stockBefore - 2);
 
         assertThat(order.getDeliveryFee()).isEqualByComparingTo("5.00");
-        assertThat(order.getTotal()).isEqualByComparingTo("117.97");
+        assertThat(order.getTotal()).isEqualByComparingTo("117.99");
         org.mockito.Mockito.verify(stripe).createCheckoutSession(anyString(), anyString(), anyString(),
                 argThat(lines -> lines.size() == 3 && lines.getLast().equals(
                         new StripeClient.Line("Versand per Post", new java.math.BigDecimal("5.00"), 1))), any());
@@ -417,7 +443,7 @@ class ShopApiTests extends ApiTestSupport {
     void configListsColorsWithStock() throws Exception {
         mvc.perform(get("/api/shop/config")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.colors[?(@.color=='red')].inStock").value(org.hamcrest.Matchers.hasItem(true)))
-                .andExpect(jsonPath("$.finishedPrice").value(39.99));
+                .andExpect(jsonPath("$.finishedPrice").value(35.0));
     }
 
     @Test

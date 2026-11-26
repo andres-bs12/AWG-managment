@@ -7,7 +7,8 @@ import styles from '../BuyPage.module.css'
 import type { BuyStepProps } from './shared'
 import { BackNameField } from '../../../components/public/BackNameField'
 import { DEFAULT_BACK_NAME_MAX } from '../../../lib/paintedName'
-import { formatEur } from '../../../lib/money'
+import { customBasePrice, formatEur } from '../../../lib/money'
+import { ORNAMENT_SIZES } from '../../../lib/ornamentSize'
 import { colorKeys } from './shared'
 
 /** Hover previews only for a real mouse: touch emulates mouseenter and would leave a stale preview after taps and scrolls. */
@@ -20,7 +21,11 @@ export function BuyItemsStep({ t, draft, config, patchItem, err, described, acti
   const soldOut = (['red', 'green', 'beige'] as const).some(color => !config.colors.some(option => option.color === color && option.inStock)) || (!!active?.color && (['shiny', 'matte'] as const).some(finish => !config.colors.some(option => option.color === active.color && option.finish === finish && option.inStock)))
   return <>
     {draft.items.map(item => item.uid !== activeUid ? null : <div className={styles.itemSection} key={item.uid}>
-      <div className={styles.choiceGroup}><fieldset id={`color-${item.uid}`} tabIndex={-1} className={styles.chips} aria-describedby={described(`color-${item.uid}`)}><legend>{t('shopColour')}</legend>
+      <div className={styles.choiceGroup}><fieldset id={`size-${item.uid}`} tabIndex={-1} className={styles.chips} aria-describedby={described(`size-${item.uid}`)}><legend>{t('shopSize')}</legend>
+        {/* Size sets the price, so it is asked first and each option shows what it costs. */}
+        <div className={styles.chipRow}>{ORNAMENT_SIZES.map(size => { const label = t(size === 'big' ? 'sizeBig' : 'sizeMedium'); const price = formatEur(customBasePrice(size, config), locale); return <label key={size} className={styles.chip} data-selected={item.size === size}><input className={styles.choiceInput} type="radio" name={`size-${item.uid}`} value={size} checked={item.size === size} onChange={() => patchItem(item.uid, { size })} /><svg className={styles.sizeGlyph} data-size={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="9.5" y="1.5" width="5" height="4" rx="1" /><circle cx="12" cy="14.5" r="8.5" /></svg><span data-label={`${label} · ${price}`}>{label}<small className={styles.chipPrice}>{price}</small></span></label> })}</div>
+      </fieldset>{err(`size-${item.uid}`) && <p className={styles.error} id={`size-${item.uid}-error`} role="alert">{err(`size-${item.uid}`)}</p>}
+      <fieldset id={`color-${item.uid}`} tabIndex={-1} className={styles.chips} aria-describedby={described(`color-${item.uid}`)}><legend>{t('shopColour')}</legend>
         <div className={styles.chipRow}>{(['red', 'green', 'beige'] as const).map(color => { const available = config.colors.some(option => option.color === color && option.inStock); return <label key={color} className={styles.chip} data-selected={item.color === color} data-disabled={!available} onMouseEnter={() => { if (available && finePointer()) preview({ color }) }} onMouseLeave={() => preview(null)} onFocus={() => { if (available) preview({ color }) }} onBlur={() => preview(null)}><input className={styles.choiceInput} type="radio" name={`color-${item.uid}`} value={color} checked={item.color === color} disabled={!available} onChange={() => patchItem(item.uid, { color, finish: config.colors.some(option => option.color === color && option.finish === item.finish && option.inStock) ? item.finish : '' })} /><span className={styles.swatch} data-color={color} aria-hidden="true" /><span data-label={t(colorKeys[color])}>{t(colorKeys[color])}{!available && <small>{t('shopSoldOut')}</small>}</span></label> })}</div>
       </fieldset>{err(`color-${item.uid}`) && <p className={styles.error} id={`color-${item.uid}-error`} role="alert">{err(`color-${item.uid}`)}</p>}
       <fieldset id={`finish-${item.uid}`} tabIndex={-1} className={styles.chips} aria-describedby={described(`finish-${item.uid}`)}><legend>{t('shopFinish')} <HelpTip label={t('explainFinishes')}><span className={styles.finishLine}>{t('finishExplanationShiny')}</span><span className={styles.finishLine}>{t('finishExplanationMatte')}</span></HelpTip></legend>

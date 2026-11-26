@@ -229,7 +229,7 @@ public class AgendaService {
             Market pickupMarket = pickupDay == null ? null : pickupDay.getMarket();
             Double hour = market && item.getPickUpTime() != null ? Hours.of(item.getPickUpTime()) : null;
             rows.add(new AgendaDeliveryDto(
-                    customer.getName(), item.getCustomColor(), item.getCustomFinish(), ViewMapper.nz(item.getNameInOrnament()),
+                    customer.getName(), item.getCustomColor(), item.getCustomFinish(), item.getOrnamentSize(), ViewMapper.nz(item.getNameInOrnament()),
                     order.getId().toString(), order.getCode(), item.getId().toString(), title,
                     item.getProductionStatus(), item.isHandedOver(), item.getDeliveryKind(), hour,
                     switch (item.getDeliveryKind()) {

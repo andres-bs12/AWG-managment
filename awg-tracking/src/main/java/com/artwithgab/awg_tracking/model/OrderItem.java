@@ -136,6 +136,11 @@ public class OrderItem {
     @Enumerated(EnumType.STRING)
     private CustomFinish customFinish;
 
+    /** Big 10 cm or Medium 8 cm; required for CUSTOM items, null for GENERIC ones. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ornament_size", length = 16)
+    private com.artwithgab.awg_tracking.enums.OrnamentSize ornamentSize;
+
     /** Reference photos ({@link StoredPhoto}), in display order. */
     @ElementCollection
     @CollectionTable(name = "order_item_photos", joinColumns = @JoinColumn(name = "order_item_id"))

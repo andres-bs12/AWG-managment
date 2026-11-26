@@ -172,6 +172,7 @@ public class CustomerMailComposer {
 
     private static String detail(OrderItem item, boolean en) {
         List<String> parts = new ArrayList<>();
+        if (item.getOrnamentSize() != null) parts.add(com.artwithgab.awg_tracking.service.OrnamentSizeLabels.label(item.getOrnamentSize(), en));
         if (item.getCustomColor() != null) parts.add(color(item.getCustomColor(), en));
         if (item.getCustomFinish() != null) parts.add(item.getCustomFinish() == CustomFinish.SHINY ? (en ? "Shiny" : "Glänzend") : (en ? "Matte" : "Matt"));
         if (item.isWithName()) {

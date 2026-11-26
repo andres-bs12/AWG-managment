@@ -54,7 +54,7 @@ class ShopPickupTests extends ApiTestSupport {
         var req = multipart("/api/shop/checkout");
         Map<String, Object> payload = new HashMap<>(Map.of("customerName", "Eva Gruber", "email", "eva@example.com", "phone", "+43 1 234",
                 "deliveryDate", date, "deliveryKind", "market", "acceptTerms", true,
-                "items", List.of(Map.of("kind", "custom", "withName", false, "color", "red", "finish", "shiny", "petName", "Luna",
+                "items", List.of(Map.of("kind", "custom", "size", "big", "withName", false, "color", "red", "finish", "shiny", "petName", "Luna",
                         "photos", List.of(Map.of("id", "p0", "name", "luna.jpg"))))));
         if (time != null) payload.put("pickupTime", time);
         if (address != null) payload.put("address", address);
@@ -232,7 +232,7 @@ class ShopPickupTests extends ApiTestSupport {
             var req = multipart("/api/shop/checkout");
             Map<String, Object> payload = new HashMap<>(Map.of("customerName", "Eva Gruber", "email", "eva@example.com", "phone", "+43 1 234",
                     "deliveryDate", DEC_SAT, "deliveryKind", "market", "pickupTime", "14:00", "acceptTerms", true,
-                    "items", List.of(Map.of("kind", "custom", "withName", false, "color", "red", "finish", "shiny", "petName", "Luna",
+                    "items", List.of(Map.of("kind", "custom", "size", "big", "withName", false, "color", "red", "finish", "shiny", "petName", "Luna",
                             "photos", List.of(Map.of("id", "p0", "name", "luna.jpg"))))));
             if (marketDayId != null) payload.put("marketDayId", marketDayId);
             req.file(new MockMultipartFile("photo-p0", "luna.jpg", "image/jpeg", JPEG));
@@ -248,7 +248,7 @@ class ShopPickupTests extends ApiTestSupport {
         var req = multipart("/api/shop/checkout");
         Map<String, Object> payload = Map.of("customerName", "Eva Gruber", "email", "eva@example.com", "phone", "+43 1 234",
                 "expectedArrivalTo", "2026-12-04", "acceptTerms", true,
-                "items", List.of(Map.of("kind", "custom", "withName", false, "color", "red", "finish", "shiny", "petName", "Luna",
+                "items", List.of(Map.of("kind", "custom", "size", "big", "withName", false, "color", "red", "finish", "shiny", "petName", "Luna",
                         "photos", List.of(Map.of("id", "p0", "name", "luna.jpg")))));
         req.file(new MockMultipartFile("photo-p0", "luna.jpg", "image/jpeg", JPEG));
         req.file(new MockMultipartFile("payload", "", "application/json", json(payload).getBytes()));

@@ -15,12 +15,14 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
+ * customPrice is the big (10 cm) personalised ornament, customMediumPrice the medium (8 cm) one.
  * Ornament prices are at least €0.50 (Stripe's minimum charge); the name surcharge may be zero.
  * backNameMax is the letter limit for the name painted on the back; null keeps the current one.
  * expectedRevision is the revision the screen showed; a different one means someone else saved meanwhile.
  */
 public record UpdatePricesRequest(
         @NotNull @DecimalMin("0.50") @DecimalMax("999.99") @Digits(integer = 3, fraction = 2) BigDecimal customPrice,
+        @NotNull @DecimalMin("0.50") @DecimalMax("999.99") @Digits(integer = 3, fraction = 2) BigDecimal customMediumPrice,
         @NotNull @DecimalMin("0.50") @DecimalMax("999.99") @Digits(integer = 3, fraction = 2) BigDecimal finishedPrice,
         @NotNull @DecimalMin("0.00") @DecimalMax("999.99") @Digits(integer = 3, fraction = 2) BigDecimal nameExtra,
         @NotNull @DecimalMin("0.00") @DecimalMax("99.99") @Digits(integer = 2, fraction = 2) BigDecimal shippingFee,

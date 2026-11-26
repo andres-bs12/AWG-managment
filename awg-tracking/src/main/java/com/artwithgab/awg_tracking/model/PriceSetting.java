@@ -20,8 +20,12 @@ public class PriceSetting {
 
     @Id
     private Long id;
+    /** Big (10 cm) personalised ornament. */
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal customPrice;
+    /** Medium (8 cm) personalised ornament; null means the awg.pricing.custom-medium default. */
+    @Column(precision = 10, scale = 2)
+    private BigDecimal customMediumPrice;
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal finishedPrice;
     @Column(nullable = false, precision = 10, scale = 2)

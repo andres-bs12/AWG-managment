@@ -62,11 +62,12 @@ export function InventoryPage() {
   </section>
 }
 
-type PriceField = 'customPrice' | 'finishedPrice' | 'nameExtra' | 'shippingFee' | 'backNameMax'
+type PriceField = 'customPrice' | 'customMediumPrice' | 'finishedPrice' | 'nameExtra' | 'shippingFee' | 'backNameMax'
 type PriceDraft = Record<PriceField, string>
 
 const PRICE_FIELDS: { key: PriceField; label: string; id: string; unit: 'euro' | 'letters' }[] = [
-  { key: 'customPrice', label: 'Custom ornament', id: 'price-custom', unit: 'euro' },
+  { key: 'customPrice', label: 'Custom · Big 10 cm', id: 'price-custom', unit: 'euro' },
+  { key: 'customMediumPrice', label: 'Custom · Medium 8 cm', id: 'price-custom-medium', unit: 'euro' },
   { key: 'finishedPrice', label: 'Finished ornament', id: 'price-finished', unit: 'euro' },
   { key: 'nameExtra', label: 'Name on the back (extra)', id: 'price-name', unit: 'euro' },
   { key: 'backNameMax', label: 'Name on the back (max. letters)', id: 'price-name-max', unit: 'letters' },
@@ -98,6 +99,7 @@ function normalizeWeekdays(days?: PostCollectionWeekday[]): PostCollectionWeekda
 function draftFrom(prices: Prices): PriceDraft {
   return {
     customPrice: prices.customPrice.toFixed(2),
+    customMediumPrice: prices.customMediumPrice.toFixed(2),
     finishedPrice: prices.finishedPrice.toFixed(2),
     nameExtra: prices.nameExtra.toFixed(2),
     shippingFee: (prices.shippingFee ?? 5).toFixed(2),
@@ -111,6 +113,7 @@ function sameWeekdays(a: PostCollectionWeekday[], b: PostCollectionWeekday[]): b
 
 type QueuedPrices = {
   customPrice: number
+  customMediumPrice: number
   finishedPrice: number
   nameExtra: number
   shippingFee: number
@@ -146,13 +149,15 @@ function PricesCard({ initial, onSaved }: { initial: Prices; onSaved: () => void
       return allowSavedPriceFallback ? fallback : Number.NaN
     }
     const customPrice = resolve('customPrice', current.customPrice)
+    const customMediumPrice = resolve('customMediumPrice', current.customMediumPrice)
     const finishedPrice = resolve('finishedPrice', current.finishedPrice)
     const nameExtra = resolve('nameExtra', current.nameExtra)
     const shippingFee = resolve('shippingFee', current.shippingFee ?? 5)
     const backNameMax = resolve('backNameMax', current.backNameMax ?? DEFAULT_BACK_NAME_MAX)
-    if (![customPrice, finishedPrice, nameExtra, shippingFee, backNameMax].every(Number.isFinite)) return null
+    if (![customPrice, customMediumPrice, finishedPrice, nameExtra, shippingFee, backNameMax].every(Number.isFinite)) return null
     return {
       customPrice,
+      customMediumPrice,
       finishedPrice,
       nameExtra,
       shippingFee,
@@ -168,6 +173,7 @@ function PricesCard({ initial, onSaved }: { initial: Prices; onSaved: () => void
     const sameMoney = (a: number, b: number) => Math.round(a * 100) === Math.round(b * 100)
     return (
       !sameMoney(payload.customPrice, current.customPrice) ||
+      !sameMoney(payload.customMediumPrice, current.customMediumPrice) ||
       !sameMoney(payload.finishedPrice, current.finishedPrice) ||
       !sameMoney(payload.nameExtra, current.nameExtra) ||
       !sameMoney(payload.shippingFee, current.shippingFee ?? 5) ||
@@ -196,6 +202,7 @@ function PricesCard({ initial, onSaved }: { initial: Prices; onSaved: () => void
         try {
           const updated = await api.prices.update({
             customPrice: next.customPrice,
+            customMediumPrice: next.customMediumPrice,
             finishedPrice: next.finishedPrice,
             nameExtra: next.nameExtra,
             shippingFee: next.shippingFee,

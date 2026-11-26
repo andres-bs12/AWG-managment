@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test'
 import type { AgendaDay, CreateSaleInput, Market, MarketDay, PaintingDay, ShippingQuote } from '../src/domain/types'
 import { shippingWindowAfter } from '../src/lib/postShipping'
 import { axe } from './helpers'
-import { config, staffUser } from './staff-fixture'
+import { config, staffUser, chooseSizes } from './staff-fixture'
 
 const postShotsDir = path.resolve(process.cwd(), '../tasks/audit-results/post-shipping-staff-shots')
 const PET_SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" rx="12" fill="#e9d8c3"/><circle cx="48" cy="52" r="24" fill="#8b5a3c"/><circle cx="38" cy="48" r="4" fill="#152033"/><circle cx="58" cy="48" r="4" fill="#152033"/><ellipse cx="48" cy="57" rx="5" ry="3.5" fill="#152033"/></svg>')
@@ -64,6 +64,7 @@ async function setupCalendarWorld(page: Page, initialIso = '2026-11-28T13:00:00Z
       return route.fulfill({
         json: {
           customPrice: config.customPrice,
+          customMediumPrice: config.customMediumPrice,
           finishedPrice: config.finishedPrice,
           nameExtra: config.nameExtra,
           shippingFee: 5,
@@ -192,6 +193,7 @@ test('Rule 1: calendar hold Sunday 15:00 skips Today, offers Sunday >= 16:15 or 
   // Saturday 2026-11-28 14:00 Vienna; holding Sunday 15:00-16:00 on Agenda (even while staff is at Spittelberg).
   const { sales } = await setupCalendarWorld(page, '2026-11-28T13:00:00Z', { activeMarketId: 'mkt-spittelberg' })
   await page.goto('/staff/sales/new?date=2026-11-29&start=15&end=16')
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
   // Do not ask "Today?" when paint date is Sunday.
@@ -239,6 +241,7 @@ test('Rule 2 & 9: stale past paint slot is dropped with notice on open and never
 
   await expect(page.getByRole('status').filter({ hasText: /already passed/i })).toBeVisible()
   await expect(page.getByText('(from the board)')).toHaveCount(0)
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
   // Past hours (12:00, 13:00) do not appear; picking 17:00 plans a fresh future paint slot (15:00-16:00).
@@ -260,6 +263,7 @@ test('Rule 3: pickup-first checks capacity at least 15 min before pickup hour', 
   const { capacityCalls } = await setupCalendarWorld(page, '2026-11-28T13:00:00Z')
   await page.goto('/staff/sales/new')
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(page.getByRole('button', { name: '16:00', exact: true })).toBeDisabled()
   await page.getByRole('button', { name: '17:00', exact: true }).click()
@@ -272,6 +276,7 @@ test('Rule 7: mixed order shows Deliver now for finished while custom waits, and
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
   await page.getByRole('button', { name: /Add finished/ }).click()
   await page.getByRole('list', { name: 'Ready ornaments' }).getByRole('button', { name: /^RM01 ·/ }).click()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
   const summary = page.getByRole('complementary').filter({ has: page.getByRole('heading', { name: 'Order summary' }) })
@@ -296,6 +301,7 @@ test('Rule 10: sale opened at 23:50 and continued at 00:05 Vienna switches Today
   const { sales } = await setupCalendarWorld(page, '2026-11-28T22:50:00Z')
   await page.goto('/staff/sales/new')
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
   // At 23:50 Saturday, Today has no open hours left -> next market day is Sun 29 Nov.
@@ -324,6 +330,7 @@ test('Rule 6: finished-only order defaults to Deliver now with no painting step'
   await page.goto('/staff/sales/new')
   await page.getByRole('button', { name: /Add finished product/ }).click()
   await page.getByRole('list', { name: 'Ready ornaments' }).getByRole('button', { name: /^RM01 ·/ }).click()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
   await expect(page.getByRole('heading', { name: 'Painting plan' })).toHaveCount(0)
@@ -335,6 +342,7 @@ test('Rule 4 & 8: full today explains why and multi-custom shared pickup uses la
   const { sales } = await setupCalendarWorld(page, '2026-11-28T13:00:00Z', { saturdayFull: true })
   await page.goto('/staff/sales/new?date=2026-11-29&start=13&end=14')
   await page.getByRole('button', { name: /Add custom$/ }).click()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   // Locked 13:00-14:00 on Sun 29 Nov forces earliest same-day hour to 15:00 for the whole order.
   await expect(page.getByRole('button', { name: '14:00', exact: true })).toHaveCount(0)
@@ -353,6 +361,7 @@ test('Rule 8: full today explains why and offers next valid market day without d
   await setupCalendarWorld(page, '2026-11-28T13:00:00Z', { saturdayFull: true })
   await page.goto('/staff/sales/new')
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
   await expect(page.getByRole('radio', { name: 'Today · full', exact: true })).toBeDisabled()
@@ -366,6 +375,7 @@ test('Post shipping in New sale: server range, finished-with-custom rule, addres
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
   await page.getByRole('button', { name: /Add finished/ }).click()
   await page.getByRole('button', { name: /^RM01 ·/ }).click()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
   // Before the custom ornament uses Post, the finished ornament's Post radio is disabled.
@@ -411,6 +421,7 @@ test('Post shipping disabled after cutoff with clear notice', async ({ page }) =
   })
   await page.goto('/staff/sales/new')
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(page.getByRole('radio', { name: 'Post (+€5)', exact: true })).toBeDisabled()
   await expect(page.getByText('Arrives after 23 Dec — choose market pickup')).toBeVisible()
@@ -456,6 +467,7 @@ test('Make room today in New sale: idempotent move, confirmation popup, and SAME
 
   await page.goto('/staff/sales/new')
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
   // First test SAME_DAY_ONLY error shown plainly.
@@ -524,6 +536,7 @@ test('Make room today requests total minutes for multiple custom ornaments and h
   await page.getByRole('button', { name: '+ Add custom', exact: true }).click()
   // Second ornament gets a back name -> 75 min; first stays 60 min -> total 135 min.
   await page.getByRole('checkbox', { name: /Name on the back/ }).nth(1).check()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
   // 1. If the freed span only fits one ornament, "Your slot" must NOT appear.
@@ -540,6 +553,7 @@ test('Make room today requests total minutes for multiple custom ornaments and h
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
   await page.getByRole('button', { name: '+ Add custom', exact: true }).click()
   await page.getByRole('checkbox', { name: /Name on the back/ }).nth(1).check()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.getByRole('button', { name: 'Make room today', exact: true }).click()
   expect(requests[1]?.minutes).toBe(135)
@@ -598,6 +612,7 @@ test('Make room today is hidden when Gaby is painting at another market', async 
   await setupCalendarWorld(page, '2026-11-28T13:00:00Z', { activeMarketId: 'mkt-spittelberg', saturdayFull: true })
   await page.goto('/staff/sales/new')
   await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await chooseSizes(page)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(page.getByText('Gaby is painting at Rathausplatz today.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Make room today' })).toHaveCount(0)

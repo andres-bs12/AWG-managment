@@ -113,7 +113,7 @@ public class TrackingService {
                 order.getCode(),
                 status,
                 firstName,
-                items.stream().map(i -> new TrackItemDto(i.getCustomColor(), i.getCustomFinish(), i.getCost(),
+                items.stream().map(i -> new TrackItemDto(i.getCustomColor(), i.getCustomFinish(), i.getOrnamentSize(), i.getCost(),
                         personal ? ViewMapper.nz(i.getPetName()) : "", i.getItemKind(), i.getProductionStatus(), i.isWithName(),
                         personal ? ViewMapper.nz(i.getNameInOrnament()) : "", i.getDeliveryKind(),
                         i.getArrivalFrom(), i.getArrivalTo(), i.isHandedOver())).toList(),

@@ -72,6 +72,7 @@ class FormTrackApiTests extends ApiTestSupport {
         MvcResult prices = mvc.perform(get("/api/prices").header("Authorization", bearer(token))).andReturn();
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("customPrice", read(prices, "$.customPrice"));
+        body.put("customMediumPrice", read(prices, "$.customMediumPrice"));
         body.put("finishedPrice", read(prices, "$.finishedPrice"));
         body.put("nameExtra", read(prices, "$.nameExtra"));
         body.put("shippingFee", read(prices, "$.shippingFee"));

@@ -1,0 +1,21 @@
+import type { OrnamentSize } from '../domain/types'
+
+/** Personalised ornament sizes, biggest first (owner, 2026-11-26). Prices come from the server. */
+export const ORNAMENT_SIZES: readonly OrnamentSize[] = ['big', 'medium'] as const
+
+export const SIZE_CM: Record<OrnamentSize, number> = { big: 10, medium: 8 }
+
+/** Staff label: "Big 10 cm" / "Medium 8 cm". */
+export function sizeLabel(size: OrnamentSize): string {
+  return `${size === 'big' ? 'Big' : 'Medium'} ${SIZE_CM[size]} cm`
+}
+
+/** Short tag for tight staff cards: "10 cm" / "8 cm". */
+export function sizeShort(size: OrnamentSize): string {
+  return `${SIZE_CM[size]} cm`
+}
+
+/** i18n key for public pages ("Groß 10 cm" / "Big 10 cm"). */
+export function sizeKey(size: OrnamentSize): 'sizeBig' | 'sizeMedium' {
+  return size === 'big' ? 'sizeBig' : 'sizeMedium'
+}

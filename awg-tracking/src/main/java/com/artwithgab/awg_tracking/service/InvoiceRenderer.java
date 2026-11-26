@@ -68,6 +68,7 @@ public class InvoiceRenderer {
         for (OrderItem item : order.getOrderItems()) {
             b.append(++position).append(". 1 × ").append(item.getItemKind() == ItemKind.CUSTOM
                     ? (en ? "Custom ornament" : "Personalisierte Christbaumkugel") : (en ? "Finished ornament" : "Fertige Christbaumkugel"));
+            if (item.getOrnamentSize() != null) b.append(" · ").append(OrnamentSizeLabels.label(item.getOrnamentSize(), en));
             if (item.getCustomColor() != null) b.append(" · ").append(color(item.getCustomColor(), en));
             if (item.getCustomFinish() != null) b.append(" · ").append(item.getCustomFinish() == CustomFinish.SHINY
                     ? (en ? "shiny" : "glänzend") : (en ? "matte" : "matt"));

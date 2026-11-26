@@ -583,6 +583,7 @@ Use PageHeader/Field/Button inside a panel-radius modal, max `--layout-status-ma
 | Back | Rückseite; control: Hinten | Back | Name side |
 | Back name | Name auf der Rückseite | Name on the back | Paid option/field |
 | Colour | Farbe | Colour | Rot/Red, Grün/Green, Beige/Beige |
+| Size | Größe | Size | Groß 10 cm/Big 10 cm, Mittel 8 cm/Medium 8 cm (custom only, first choice in /buy because it sets the price; the chip shows the price) |
 | Finish | Oberfläche | Finish | Glänzend/Shiny, Matt/Matte |
 | Pet | Dein Tier | Your pet | Prefer inclusive Tier, not dog-only copy |
 | Reference photo | Referenzfoto | Reference photo | Uploaded source, not predicted painting |
