@@ -84,6 +84,13 @@ function clampPaintMinutes(value: number): number {
   return Math.min(MAX_PAINT_MINUTES, Math.max(MIN_PAINT_MINUTES, Math.round(value)))
 }
 
+/** Why no market pickup day can be offered, so staff are never left at a silent dead end. */
+function noMarketDaysMessage(hasAnyMarketDays: boolean, paintDateLocked: boolean): string {
+  if (!hasAnyMarketDays) return 'No market days are set up yet. Add the market and its days in Markets, or choose Post.'
+  if (paintDateLocked) return 'No market pickup days left after the chosen paint date. Choose Post instead or change the paint time.'
+  return 'No future market pickup days available. Add more days in Markets, or choose Post.'
+}
+
 function fillDayRefs(
   item: DraftItem,
   days: MarketDay[],
@@ -2167,6 +2174,18 @@ function DeliveryCard({
         </button>
       ) : null}
 
+      {item.delivery.mode === 'market' && !pickupDay && !datePickerOpen ? (
+        dayChoices.length ? (
+          <Button tone="staff" variant="secondary" onClick={() => setDatePickerOpen(true)}>
+            Choose market day
+          </Button>
+        ) : (
+          <p className={styles.emptyDates} role="alert">
+            {noMarketDaysMessage(marketDays.length > 0, Boolean(lockedDate))}
+          </p>
+        )
+      ) : null}
+
       {datePickerOpen ? (
         <div
           className={styles.datePicker}
@@ -2217,9 +2236,7 @@ function DeliveryCard({
             />
           ) : (
             <p className={styles.emptyDates}>
-              {lockedDate
-                ? 'No market pickup days left after the chosen paint date. Choose Post instead or change the paint time.'
-                : 'No future market pickup days available.'}
+              {noMarketDaysMessage(marketDays.length > 0, Boolean(lockedDate))}
             </p>
           )}
         </div>
@@ -2294,7 +2311,7 @@ function DeliveryCard({
               <button type="button" className={styles.textBtn} onClick={() => onChangeSlot(item)}>Change</button>
             </div>
           ) : item.delivery.mode === 'market' && item.delivery.pickupHour == null ? (
-            <p className={styles.planPrompt}>Choose the pickup hour to calculate a safe painting time.</p>
+            <p className={styles.planPrompt}>{pickupDay ? 'Choose the pickup hour to calculate a safe painting time.' : 'Choose the market day and pickup hour to calculate a safe painting time.'}</p>
           ) : paintItems.length > 1 ? (
             <>
               <ul className={styles.sessionList}>
