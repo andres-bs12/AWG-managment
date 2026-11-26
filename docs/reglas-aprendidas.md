@@ -120,7 +120,8 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 - **Tokens del formulario** se guardan solo tras éxito, con caducidad (45 días); el iPad del puesto (`?staff=1`) no guarda nada; logout de staff borra `awg-form-token:*`.
 - URL de checkout aceptada solo si es del mismo origen o `https://checkout.stripe.com`.
 - Fotos JPEG/PNG se decodifican completas antes de guardarse; truncadas se rechazan (`PHOTO_INVALID`).
-- **Migraciones Flyway:** nunca editar ni reutilizar números ya aplicados en producción (V1–V17). Un cambio de entidad necesita migración nueva. Backup antes de cada despliegue.
+- **Migraciones Flyway:** nunca editar ni reutilizar números ya aplicados en producción (V1–V17). Un cambio de entidad necesita migración nueva. Backup antes de cada despliegue. Para un campo Java `Integer` usa `INTEGER`, nunca `SMALLINT` (caída del 26 nov: Hibernate validate no arrancó). `PostgresSchemaTests` (CI) arranca contra PostgreSQL real con Flyway + validate: si falla, no se despliega.
+- **Clientes viejos abiertos:** un iPad o una pestaña cargada antes del despliegue sigue enviando el JSON antiguo. Un campo nuevo en una petición debe ser opcional en el backend con un valor seguro (p. ej. tamaño ausente = Big, precio ausente = se conserva el guardado), nunca un 400 que bloquee ventas.
 - Build de producción solo con `VITE_DATA_SOURCE=http`; `build:mock` nunca se despliega.
 - Tras desplegar algo que toca pagos: la compra de prueba 4242 sigue pendiente (ver `docs/checklist-lanzamiento.md`).
 - Al pasar valores por `ssh host comando args`, citarlos con `printf %q`: ssh une los argumentos y el shell remoto expande `$…`. Un hash bcrypt sin citar quedó guardado roto y bloqueó el login (2026-11-22, `deploy/reset-staff-password.sh`).
