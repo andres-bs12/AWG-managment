@@ -60,7 +60,7 @@ for (const locale of ['de', 'en'] as const) {
       })
       const found = await api.orders.getOrderByCode(created.orderCode)
       const bundle = await api.orders.getOrderBundle(found!.id)
-      return { id: found!.id, itemId: bundle.items[0].id, code: created.orderCode }
+      return { id: found!.id, itemId: bundle.items[0].id, code: created.orderCode, arrivalFrom: quote.arrivalFrom!, arrivalTo: quote.arrivalTo! }
     })
 
     await page.goto(`/track/${order.code}`)
@@ -68,7 +68,9 @@ for (const locale of ['de', 'en'] as const) {
     await expect(card.getByRole('heading', { level: 1 })).toBeVisible()
     await card.evaluate(node => Promise.all(node.getAnimations().map(animation => animation.finished)))
     await expect(card).toContainText(locale === 'de' ? 'Versand per Post' : 'Shipping by post')
-    await expect(card).toContainText(locale === 'de' ? 'Zustellung voraussichtlich 1.–2. Dezember' : 'Estimated delivery 1–2 December')
+    // The arrival range moves with today's date, so it comes from the quote the order was placed with.
+    const [from, to] = [order.arrivalFrom, order.arrivalTo].map(iso => Number(iso.slice(8, 10)))
+    await expect(card).toContainText(locale === 'de' ? `Zustellung voraussichtlich ${from}.–${to}.` : `Estimated delivery ${from}–${to}`)
     await expect(card.getByRole('link', { name: locale === 'de' ? 'Sendung verfolgen' : 'Track parcel' })).toHaveCount(0)
     await axe(page)
 
