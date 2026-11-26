@@ -1,3 +1,4 @@
+import { inStockFor } from '../../lib/ornamentSize'
 import { customBasePrice } from '../../lib/money'
 import { DEFAULT_BACK_NAME_MAX, paintedNameValid } from '../../lib/paintedName'
 import { PageHeader, PublicPage, PublicState, FormActions } from '../../components/public/PublicForm'
@@ -210,8 +211,8 @@ export function BuyPage() {
       if (!draft.items.length) found['buy-add'] = 'shopNeedItem'
       for (const item of draft.items) {
         if (!item.size) found[`size-${item.uid}`] = 'shopChooseSize'
-        if (!shopConfig.colors.some((option) => option.color === item.color && option.inStock)) found[`color-${item.uid}`] = 'shopChooseColor'
-        if (!item.finish || (item.color && !shopConfig.colors.some(option => option.color === item.color && option.finish === item.finish && option.inStock))) found[`finish-${item.uid}`] = 'shopChooseFinish'
+        if (!item.color || !inStockFor(shopConfig.colors, { size: item.size, color: item.color })) found[`color-${item.uid}`] = 'shopChooseColor'
+        if (!item.finish || (item.color && !inStockFor(shopConfig.colors, { size: item.size, color: item.color, finish: item.finish }))) found[`finish-${item.uid}`] = 'shopChooseFinish'
         if (item.withName && !paintedNameValid(item.backName, backNameMax)) found[`back-${item.uid}`] = item.backName ? 'paintedNameTooLong' : 'shopBackNameRequired'
       }
     }

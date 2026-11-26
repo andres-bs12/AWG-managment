@@ -300,6 +300,37 @@ class ShopApiTests extends ApiTestSupport {
     }
 
     @Test
+    void mediumCheckoutUsesTheMediumBasesAndStopsWhenTheyRunOut() throws Exception {
+        var size = com.artwithgab.awg_tracking.enums.OrnamentSize.MEDIUM;
+        var finish = com.artwithgab.awg_tracking.enums.CustomFinish.SHINY;
+        var medium = inventoryRepository.findByItemKindAndCustomColorAndCustomFinishAndOrnamentSize(ItemKind.CUSTOM, CustomColor.RED, finish, size).orElseThrow();
+        int bigBefore = inventoryRepository.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, finish).orElseThrow().getQuantity();
+        int mediumBefore = medium.getQuantity();
+        try {
+            medium.setQuantity(1);
+            inventoryRepository.save(medium);
+            MvcResult first = checkoutSized("1070", "2026-12-04", 1, "eva@example.com", freshIp(), "luna", "medium");
+            assertThat(first.getResponse().getStatus()).as(first.getResponse().getContentAsString()).isEqualTo(200);
+            assertThat(inventoryRepository.findById(medium.getId()).orElseThrow().getQuantity()).isZero();
+            assertThat(inventoryRepository.findByItemKindAndCustomColorAndCustomFinish(ItemKind.CUSTOM, CustomColor.RED, finish).orElseThrow().getQuantity())
+                    .isEqualTo(bigBefore);
+
+            // The shop marks red shiny medium as sold out while red shiny big stays available.
+            mvc.perform(get("/api/shop/config"))
+                    .andExpect(jsonPath("$.colors[?(@.color=='red' && @.finish=='shiny' && @.size=='medium')].inStock").value(false))
+                    .andExpect(jsonPath("$.colors[?(@.color=='red' && @.finish=='shiny' && @.size=='big')].inStock").value(true));
+
+            MvcResult second = checkoutSized("1070", "2026-12-04", 1, "eva@example.com", freshIp(), "luna", "medium");
+            assertThat(second.getResponse().getStatus()).isEqualTo(409);
+            assertThat((String) read(second, "$.code")).isEqualTo("OUT_OF_STOCK");
+        } finally {
+            var row = inventoryRepository.findById(medium.getId()).orElseThrow();
+            row.setQuantity(mediumBefore);
+            inventoryRepository.save(row);
+        }
+    }
+
+    @Test
     void checkoutWithoutASizeIsRejected() throws Exception {
         MvcResult res = checkoutSized("1070", "2026-12-04", 1, "eva@example.com", freshIp(), "luna", null);
         assertThat(res.getResponse().getStatus()).isEqualTo(400);

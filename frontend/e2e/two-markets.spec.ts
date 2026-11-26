@@ -91,7 +91,7 @@ async function setupOverlapHttp(page: Page) {
     { date: '2026-11-29', open: true, maxPaintings: 6, booked: 0, openHour: 12, closeHour: 18, paintingMarketId: 'mkt-rathaus', paintingMarketName: 'Rathausplatz' },
     { date: '2026-12-04', open: true, maxPaintings: 6, booked: 0, openHour: 12, closeHour: 18, paintingMarketId: 'mkt-rathaus', paintingMarketName: 'Rathausplatz' },
   ]
-  const inventory = config.colors.map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, quantity: 5 }))
+  const inventory = config.colors.filter(row => row.size === 'big').map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, size: row.size, quantity: 5 }))
   const sales: CreateSaleInput[] = []
 
   await page.route(url => url.pathname.startsWith('/api/'), async route => {

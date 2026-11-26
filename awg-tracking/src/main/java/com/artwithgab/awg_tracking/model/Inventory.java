@@ -11,7 +11,7 @@ import lombok.Setter;
 import java.util.UUID;
 
 /**
- * Stock. CUSTOM rows are tracked per raw color and finish; GENERIC (finished) stock is one global row
+ * Stock. CUSTOM rows are tracked per raw color, finish and size (Big 10 cm / Medium 8 cm); GENERIC (finished) stock is one global row
  * with a null color. See docs/contracts-and-dtos.md §4.
  */
 @Entity
@@ -26,6 +26,10 @@ public class Inventory {
     private CustomColor customColor;
     @Enumerated(EnumType.STRING)
     private CustomFinish customFinish;
+    /** CUSTOM bases are counted per size too (V22); null for the GENERIC row. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ornament_size", length = 16)
+    private com.artwithgab.awg_tracking.enums.OrnamentSize ornamentSize;
     private int quantity;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

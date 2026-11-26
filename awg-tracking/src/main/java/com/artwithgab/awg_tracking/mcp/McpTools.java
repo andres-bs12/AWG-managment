@@ -120,7 +120,7 @@ public class McpTools {
                                 "status", str("unpainted, painted or sold")), List.of()),
                         this::marketStock),
                 read("list_inventory", "Base inventory",
-                        "Unpainted bases for custom orders per colour and finish, and the unnumbered finished-ornament counter.",
+                        "Unpainted bases for custom orders per colour, finish and size (big 10 cm / medium 8 cm), and the unnumbered finished-ornament counter.",
                         schema(Map.of(), List.of()),
                         a -> inventoryService.list()),
                 read("list_markets", "Markets and days",

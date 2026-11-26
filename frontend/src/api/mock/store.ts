@@ -3,7 +3,7 @@ import { filterSales } from '../../lib/sales'
 import { readFormToken, rememberFormToken } from '../formTokens'
 import type {
   Prices, PricesUpdate,
-  InventoryItem, PaintingDay, ShopCheckoutInput, ShopItemInput, ShippingQuote,
+  InventoryItem, OrnamentSize, PaintingDay, ShopCheckoutInput, ShopItemInput, ShippingQuote,
   MakeRoomInput, MakeRoomMove, MakeRoomResult, PostCollectionDay,
   AgendaDay,
   AgendaDelivery,
@@ -399,16 +399,25 @@ export function getShippingQuote(items: Pick<ShopItemInput, 'kind' | 'withName'>
   return planMockPostShipping(items).quote
 }
 
+/** Stock row id of a custom base; big rows keep the ids they had before sizes existed. */
+function stockId(color: string, finish: string, size: OrnamentSize | null | undefined): string {
+  return size === 'medium' ? `custom-${color}-${finish}-medium` : `custom-${color}-${finish}`
+}
+
 export function listInventory(): InventoryItem[] {
   const rows = state.inventory ??= []
   for (const color of ['red', 'green', 'beige'] as const) for (const finish of ['shiny', 'matte'] as const) {
-    if (!rows.some(row => row.kind === 'custom' && row.color === color && row.finish === finish)) {
+    if (!rows.some(row => row.kind === 'custom' && row.color === color && row.finish === finish && (row.size ?? 'big') === 'big')) {
       const legacy = finish === 'shiny' ? rows.find(row => row.kind === 'custom' && row.color === color && !row.finish) : undefined
-      if (legacy) { legacy.finish = finish; legacy.id = `custom-${color}-${finish}` }
-      else rows.push({ id: `custom-${color}-${finish}`, kind: 'custom', color, finish, quantity: 3 })
+      if (legacy) { legacy.finish = finish; legacy.id = stockId(color, finish, 'big') }
+      else rows.push({ id: stockId(color, finish, 'big'), kind: 'custom', color, finish, size: 'big', quantity: 3 })
+    }
+    // Medium bases start at 0 until staff counts them on Stock, like production (V22).
+    if (!rows.some(row => row.kind === 'custom' && row.color === color && row.finish === finish && row.size === 'medium')) {
+      rows.push({ id: stockId(color, finish, 'medium'), kind: 'custom', color, finish, size: 'medium', quantity: 0 })
     }
   }
-  for (const row of rows) if (row.kind === 'custom' && !row.finish) row.finish = 'shiny'
+  for (const row of rows) if (row.kind === 'custom') { if (!row.finish) row.finish = 'shiny'; if (!row.size) row.size = 'big' }
   if (!rows.some(row => row.kind === 'finished')) rows.push({ id: 'finished', kind: 'finished', color: null, finish: null, quantity: 10 })
   return rows
 
@@ -615,7 +624,7 @@ export function createMockCheckout(input: ShopCheckoutInput) {
     if (item.size !== 'big' && item.size !== 'medium') throw Object.assign(new Error('Choose Big (10 cm) or Medium (8 cm) for each personalised ornament.'), { code: 'VALIDATION', field: `items[${input.items.indexOf(item)}].size` })
     if (!item.finish || !item.color || !['red', 'green', 'beige'].includes(item.color)) throw Object.assign(new Error('Choose a valid colour and finish.'), { code: 'VALIDATION', field: `items[${input.items.indexOf(item)}].${!item.finish ? 'finish' : 'color'}` })
     if (item.withName) requireBackName(item.backName, null, `items[${input.items.indexOf(item)}].backName`)
-    const id = `custom-${item.color}-${item.finish}`
+    const id = stockId(item.color, item.finish, item.size)
     counts.set(id, (counts.get(id) ?? 0) + 1)
   }
   for (const [id, count] of counts) {
@@ -1498,7 +1507,7 @@ function createSaleOrder(input: CreateSaleInput, orderId: string, code: string):
   const stockCounts = new Map<InventoryItem, number>()
   for (const item of createdItems) {
     if (item.kind !== 'custom') continue
-    const stock = listInventory().find(row => row.kind === 'custom' && row.color === item.color && row.finish === item.finish)
+    const stock = listInventory().find(row => row.id === stockId(item.color ?? '', item.finish ?? 'shiny', item.size))
     if (!stock) throw Object.assign(new Error('Out of stock.'), { code: 'OUT_OF_STOCK' })
     stockCounts.set(stock, (stockCounts.get(stock) ?? 0) + 1)
   }

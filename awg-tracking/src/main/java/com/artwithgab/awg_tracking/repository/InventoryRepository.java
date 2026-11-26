@@ -12,7 +12,14 @@ import java.util.UUID;
 
 public interface InventoryRepository extends JpaRepository<Inventory, UUID> {
 
-    Optional<Inventory> findByItemKindAndCustomColorAndCustomFinish(ItemKind itemKind, CustomColor customColor, CustomFinish customFinish);
+    Optional<Inventory> findByItemKindAndCustomColorAndCustomFinishAndOrnamentSize(ItemKind itemKind, CustomColor customColor,
+            CustomFinish customFinish, com.artwithgab.awg_tracking.enums.OrnamentSize ornamentSize);
+
+    /** The Big (10 cm) row of a colour and finish. */
+    default Optional<Inventory> findByItemKindAndCustomColorAndCustomFinish(ItemKind itemKind, CustomColor customColor, CustomFinish customFinish) {
+        return findByItemKindAndCustomColorAndCustomFinishAndOrnamentSize(itemKind, customColor, customFinish,
+                com.artwithgab.awg_tracking.enums.OrnamentSize.BIG);
+    }
 
     List<Inventory> findByItemKind(ItemKind itemKind);
 

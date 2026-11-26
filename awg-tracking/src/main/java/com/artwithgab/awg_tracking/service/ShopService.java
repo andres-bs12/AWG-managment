@@ -78,10 +78,11 @@ public class ShopService {
     public ShopConfigDto config() {
         var p = pricingService.current();
         List<ShopColorOptionDto> colors = inventoryRepository.findByItemKind(ItemKind.CUSTOM).stream()
-                .filter(inv -> inv.getCustomColor() != null && inv.getCustomColor().isOffered() && inv.getCustomFinish() != null)
-                .sorted(Comparator.comparing((Inventory inv) -> inv.getCustomColor().ordinal())
+                .filter(inv -> inv.getCustomColor() != null && inv.getCustomColor().isOffered() && inv.getCustomFinish() != null && inv.getOrnamentSize() != null)
+                .sorted(Comparator.comparing((Inventory inv) -> inv.getOrnamentSize().ordinal())
+                        .thenComparing(inv -> inv.getCustomColor().ordinal())
                         .thenComparing(inv -> inv.getCustomFinish().ordinal()))
-                .map(inv -> new ShopColorOptionDto(inv.getCustomColor(), inv.getCustomFinish(), inv.getQuantity() > 0))
+                .map(inv -> new ShopColorOptionDto(inv.getCustomColor(), inv.getCustomFinish(), inv.getOrnamentSize(), inv.getQuantity() > 0))
                 .toList();
         LocalDate end = seasonEnd();
         LocalDate from = props.shop().deliveriesFrom();

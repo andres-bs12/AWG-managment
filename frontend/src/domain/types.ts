@@ -380,7 +380,7 @@ export type MoveSuggestion = {
   freedSlot: { date: string; startHour: number; endHour: number }
 }
 
-export type InventoryItem = { id: string; kind: ItemKind; color: OrnamentColor | null; finish?: CustomFinish | null; quantity: number }
+export type InventoryItem = { id: string; kind: ItemKind; color: OrnamentColor | null; finish?: CustomFinish | null; size?: OrnamentSize | null; quantity: number }
 /** Staff-editable prices in euros. `revision` 0 means the server defaults; it increments on every save. */
 export type Prices = {
   /** Big (10 cm) personalised ornament. */
@@ -431,7 +431,7 @@ export type ShopConfig = {
   colors: ShopColorOption[]
 }
 
-export type ShopColorOption = { color: OrnamentColor; finish: CustomFinish; inStock: boolean }
+export type ShopColorOption = { color: OrnamentColor; finish: CustomFinish; size: OrnamentSize; inStock: boolean }
 
 export type ShippingQuote = {
   available: boolean

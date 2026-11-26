@@ -11,6 +11,7 @@ import { parseEuroAmount } from '../../lib/staffInput'
 import { BACK_NAME_MAX_LIMIT, DEFAULT_BACK_NAME_MAX } from '../../lib/paintedName'
 import { useStaffClock } from '../../lib/staffClock'
 import { addUtcDays } from '../../lib/time'
+import { ORNAMENT_SIZES, sizeLabel } from '../../lib/ornamentSize'
 import styles from './SettingsRows.module.css'
 
 const LOAD_ERROR = 'Could not load prices and stock. Check the connection and try again.'
@@ -35,7 +36,11 @@ export function InventoryPage() {
   const legacy = (color: InventoryItem['color']) => color === 'grey' || color === 'white'
   const colorCards = (old: boolean) => colors.filter(color => legacy(color) === old).map(color => <article key={color} className={styles.stockCard} aria-label={`${color} bases`}>
     <h2><span className={styles.swatch} style={{ background: `var(--ornament-${color})` }} role="img" aria-label={`${color}`} /></h2>
-    {custom.filter(row => row.color === color).map(row => <StockRow key={row.id} item={row} />)}
+    {/* Bases are counted per size: Big first, then Medium, each with its Shiny and Matte rows. */}
+    {ORNAMENT_SIZES.map(size => {
+      const sized = custom.filter(row => row.color === color && (row.size ?? 'big') === size)
+      return sized.length ? [<p key={size} className={styles.sizeLabel}>{sizeLabel(size)}</p>, ...sized.map(row => <StockRow key={row.id} item={row} />)] : null
+    })}
   </article>)
   useEffect(() => {
     let active = true
@@ -487,7 +492,7 @@ function StockRow({ item }: { item: InventoryItem }) {
   const [notice, setNotice] = useState('')
   const value = Number(quantity)
   const valid = quantity.trim() !== '' && Number.isInteger(value) && value >= 0 && value <= 10000
-  const name = `Custom · ${item.color} · ${item.finish ?? 'shiny'}`
+  const name = `Custom · ${item.color} · ${item.finish ?? 'shiny'} · ${sizeLabel(item.size ?? 'big')}`
   async function save() {
     if (busy) return
     if (!valid) { setError('Enter a whole number from 0 to 10000.'); return }

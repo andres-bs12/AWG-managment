@@ -65,7 +65,7 @@ import {
 import styles from './NewSalePage.module.css'
 import { uid } from '../../lib/uid'
 import { upcomingWindows } from '../../lib/dateWindows'
-import { finishForColor, firstAvailableCustom, remainingColor, remainingStock, stockLabel } from '../../lib/saleStock'
+import { finishForColor, firstAvailableCustom, remainingColor, remainingSize, remainingStock, stockLabel } from '../../lib/saleStock'
 import { apiError } from '../../lib/apiError'
 
 const MIN_PAINT_MINUTES = 15
@@ -331,8 +331,8 @@ export function NewSalePage() {
       let changed = false
       const items: DraftItem[] = []
       for (const item of current.items) {
-        if (item.kind === 'custom' && remainingStock(inventory, items, 'custom', item.color, item.finish) === 0) {
-          const combo = firstAvailableCustom(inventory, items)
+        if (item.kind === 'custom' && remainingStock(inventory, items, 'custom', item.color, item.finish, undefined, item.size) === 0) {
+          const combo = firstAvailableCustom(inventory, items, undefined, item.size)
           if (combo) { changed = true; items.push({ ...item, ...combo }); continue }
         }
         items.push(item)
@@ -709,8 +709,19 @@ export function NewSalePage() {
   }
 
   function setColor(item: DraftItem, color: OrnamentColor) {
-    const finish = finishForColor(inventory, draft.items, color, item.finish, item.id) as DraftItem['finish'] | null
+    const finish = finishForColor(inventory, draft.items, color, item.finish, item.id, item.size) as DraftItem['finish'] | null
     patchItem(item.id, { color, finish: finish ?? item.finish })
+  }
+
+  /** Bases are counted per size: when the chosen colour and finish have none in the new size, move to one that has. */
+  function setSize(item: DraftItem, size: OrnamentSize) {
+    if (item.kind !== 'custom' || remainingStock(inventory, draft.items, 'custom', item.color, item.finish, item.id, size) > 0) {
+      patchItem(item.id, { size })
+      return
+    }
+    const finish = item.color ? finishForColor(inventory, draft.items, item.color, item.finish, item.id, size) as DraftItem['finish'] | null : null
+    const combo = finish ? { color: item.color, finish } : firstAvailableCustom(inventory, draft.items, item.id, size)
+    patchItem(item.id, combo ? { size, ...combo } : { size })
   }
 
   function placeOnBoard(item: DraftItem) {
@@ -1211,7 +1222,7 @@ export function NewSalePage() {
               onToggleName={toggleName}
               onColor={setColor}
               onFinish={(item, finish) => patchItem(item.id, { finish })}
-              onSize={(item, size) => patchItem(item.id, { size })}
+              onSize={setSize}
               showSizeErrors={sizeErrors}
               onDuration={setDuration}
               onContinue={() => {
@@ -1237,9 +1248,9 @@ export function NewSalePage() {
                   return
                 }
                 const shortage = draft.items.find(item => item.kind === 'custom' &&
-                  draft.items.filter(other => other.kind === 'custom' && other.color === item.color && other.finish === item.finish).length >
-                    remainingStock(inventory, [], 'custom', item.color, item.finish))
-                if (shortage) { setError(`Out of stock: ${shortage.finish} ${shortage.color} ornaments. Reduce the quantity or choose another combination.`); return }
+                  draft.items.filter(other => other.kind === 'custom' && other.color === item.color && other.finish === item.finish && other.size === item.size).length >
+                    remainingStock(inventory, [], 'custom', item.color, item.finish, undefined, item.size))
+                if (shortage) { setError(`Out of stock: ${shortage.finish} ${shortage.color} ${sizeLabel(shortage.size ?? 'big')} ornaments. Reduce the quantity or choose another combination.`); return }
                 setPhase('delivery')
               }}
             />
@@ -1613,8 +1624,8 @@ function ItemsStep({
                 ) : null}
                 {item.kind === 'custom' ? (() => {
                   // Hints show what is left for this ornament after the other ornaments in the draft.
-                  const comboLeft = stockReady ? remainingStock(inventory, items, 'custom', item.color, item.finish, item.id) : 1
-                  const soldOut = comboLeft === 0 && !firstAvailableCustom(inventory, items, item.id)
+                  const comboLeft = stockReady ? remainingStock(inventory, items, 'custom', item.color, item.finish, item.id, item.size) : 1
+                  const soldOut = comboLeft === 0 && !firstAvailableCustom(inventory, items, item.id, item.size)
                   return <>
                     {/* Size first: it sets the price. No default, so every personalised sale is a deliberate choice. */}
                     <SegmentedControl
@@ -1622,7 +1633,12 @@ function ItemsStep({
                       name={`size-${item.id}`}
                       value={item.size ?? null}
                       onChange={(size) => onSize(item, size)}
-                      options={ORNAMENT_SIZES.map(size => ({ value: size, label: sizeLabel(size), hint: prices ? formatEur(customBasePrice(size, prices), 'en') : undefined }))}
+                      options={ORNAMENT_SIZES.map(size => {
+                        // Bases are counted per size: a size with no base left in any colour cannot be sold.
+                        const left = stockReady ? remainingSize(inventory, items, size, item.id) : 1
+                        const price = prices ? formatEur(customBasePrice(size, prices), 'en') : undefined
+                        return { value: size, label: sizeLabel(size), hint: left === 0 ? [price, 'Sold out'].filter(Boolean).join(' · ') : price, disabled: left === 0 }
+                      })}
                     />
                     {showSizeErrors && !item.size ? <p className={styles.soldOut} role="alert">Choose a size.</p> : null}
                     <label className={styles.check}>
@@ -1630,15 +1646,15 @@ function ItemsStep({
                       {`Name on the back · +${prices ? formatEur(prices.nameExtra, 'en') : 'price unavailable'}`}
                     </label>
                     <p className={styles.hint} id={`name-hint-${item.id}`}>The customer types the name in the form.</p>
-                    {soldOut ? <p className={styles.soldOut} role="status">Sold out: no unpainted bases left. Update Stock or remove this ornament.</p> : null}
+                    {soldOut ? <p className={styles.soldOut} role="status">{item.size ? `Sold out: no ${sizeLabel(item.size)} bases left. Choose the other size, update Stock or remove this ornament.` : 'Sold out: no unpainted bases left. Update Stock or remove this ornament.'}</p> : null}
                     <SegmentedControl
                       legend="Colour"
                       name={`colour-${item.id}`}
                       value={soldOut ? null : item.color}
                       onChange={(color) => onColor(item, color)}
-                      options={(['red', 'green', 'beige'] as const).map(color => { const left = remainingColor(inventory, items, color, item.id); return { value: color, color, label: color[0].toUpperCase() + color.slice(1), hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })}
+                      options={(['red', 'green', 'beige'] as const).map(color => { const left = remainingColor(inventory, items, color, item.id, item.size); return { value: color, color, label: color[0].toUpperCase() + color.slice(1), hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })}
                     />
-                    <SegmentedControl legend="Finish" help={<HelpTip label="Explain finishes">Shiny reflects light. Matte has no glossy reflection. Stock refers to unpainted bases.</HelpTip>} name={`finish-${item.id}`} value={soldOut ? null : item.finish ?? 'shiny'} onChange={finish => onFinish(item, finish)} options={(['shiny', 'matte'] as const).map(finish => { const left = remainingStock(inventory, items, 'custom', item.color, finish, item.id); return { value: finish, label: finish === 'shiny' ? 'Shiny' : 'Matte', hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })} />
+                    <SegmentedControl legend="Finish" help={<HelpTip label="Explain finishes">Shiny reflects light. Matte has no glossy reflection. Stock refers to unpainted bases.</HelpTip>} name={`finish-${item.id}`} value={soldOut ? null : item.finish ?? 'shiny'} onChange={finish => onFinish(item, finish)} options={(['shiny', 'matte'] as const).map(finish => { const left = remainingStock(inventory, items, 'custom', item.color, finish, item.id, item.size); return { value: finish, label: finish === 'shiny' ? 'Shiny' : 'Matte', hint: stockReady ? stockLabel(left) : undefined, disabled: stockReady && left === 0 } })} />
                     <SegmentedControl
                       legend="Paint time"
                       name={`duration-${item.id}`}

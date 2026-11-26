@@ -19,3 +19,16 @@ export function sizeShort(size: OrnamentSize): string {
 export function sizeKey(size: OrnamentSize): 'sizeBig' | 'sizeMedium' {
   return size === 'big' ? 'sizeBig' : 'sizeMedium'
 }
+
+type StockOption = { color: string; finish: string; size?: OrnamentSize | null; inStock: boolean }
+
+/**
+ * Whether the shop still has a base for this choice. Bases are counted per size, colour and finish;
+ * a part left empty (not chosen yet) matches any value. Options without a size are big ones.
+ */
+export function inStockFor(options: readonly StockOption[], choice: { size?: string | null; color?: string | null; finish?: string | null }): boolean {
+  return options.some(option => option.inStock
+    && (!choice.size || (option.size ?? 'big') === choice.size)
+    && (!choice.color || option.color === choice.color)
+    && (!choice.finish || option.finish === choice.finish))
+}

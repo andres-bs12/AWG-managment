@@ -11,7 +11,7 @@ export const market: Market = { id: 'market-review', name: 'Review Christmas Mar
 export const marketDay = { id: 'day-review', marketId: market.id, date: today, openHour: 10, closeHour: 20, isToday: true }
 export const spareMarket: Market = { ...market, id: 'market-spare', name: 'Unused market', startDate: '2026-12-04', finishDate: '2026-12-06' }
 export const spareDays = ['2026-12-04', '2026-12-05', '2026-12-06'].map((date, index) => ({ ...marketDay, id: `spare-${index}`, marketId: spareMarket.id, date, isToday: false }))
-export const config = { enabled: true, seasonOver: false, seasonEnd: '2026-12-24', deliveriesFrom: '2026-11-30', customPrice: 57, customMediumPrice: 52, finishedPrice: 41, nameExtra: 14, deliveryFee: 0, maxItems: 8, colors: ['red', 'green', 'beige'].flatMap(color => ['shiny', 'matte'].map(finish => ({ color, finish, inStock: true }))) }
+export const config = { enabled: true, seasonOver: false, seasonEnd: '2026-12-24', deliveriesFrom: '2026-11-30', customPrice: 57, customMediumPrice: 52, finishedPrice: 41, nameExtra: 14, deliveryFee: 0, maxItems: 8, colors: ['big', 'medium'].flatMap(size => ['red', 'green', 'beige'].flatMap(color => ['shiny', 'matte'].map(finish => ({ color, finish, size, inStock: true })))) }
 
 export function order(id = 'order-review', overrides: Partial<Order> = {}): Order {
   return { id, customerId: `customer-${id}`, code: id === 'order-review' ? 'AWGREVIEW' : `AWG${id.toUpperCase()}`, trackToken: `track-${id}`, formToken: `form-${id}`, paymentState: 'deposit', paymentMethod: 'cash', total: 57, amountPaid: 20, createdAt: `${today}T08:00:00`, itemIds: [`item-${id}`], handedOver: false, ...overrides }
@@ -81,7 +81,8 @@ export async function httpFixture(page: Page, options: FixtureOptions = {}) {
     revision: 0,
   }
   const collectionOverrides: Record<string, boolean> = {}
-  const inventory = [...config.colors.map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, quantity: 3 })), { id: 'stock-finished', kind: 'finished', color: null, finish: null, quantity: 0 }]
+  // Big bases start at 3 each; medium bases at 0, as after the V22 migration.
+  const inventory = [...config.colors.map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, size: row.size, quantity: row.size === 'big' ? 3 : 0 })), { id: 'stock-finished', kind: 'finished', color: null, finish: null, quantity: 0 }]
   const marketPieces: MarketOrnament[] = ['RM01', 'RM02'].map(id => ({
     id, status: 'painted', soldAt: null, revision: 0, hasUploadedPhoto: false, orderId: null, orderCode: null,
   }))

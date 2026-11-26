@@ -47,7 +47,7 @@ async function setupCalendarWorld(page: Page, initialIso = '2026-11-28T13:00:00Z
     { date: '2026-12-02', open: true, maxPaintings: 2, booked: 0, openHour: 10, closeHour: 12, paintingMarketId: null, paintingMarketName: null },
     { date: '2026-12-04', open: true, maxPaintings: 6, booked: 0, openHour: 12, closeHour: 19, paintingMarketId: 'mkt-rathaus', paintingMarketName: 'Rathausplatz' },
   ]
-  const inventory = config.colors.map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, quantity: 5 }))
+  const inventory = config.colors.filter(row => row.size === 'big').map((row, index) => ({ id: `stock-${index}`, kind: 'custom', color: row.color, finish: row.finish, size: row.size, quantity: 5 }))
   const marketPieces = [{ id: 'RM01', status: 'painted', soldAt: null, revision: 0, hasUploadedPhoto: false, orderId: null, orderCode: null }]
   const sales: CreateSaleInput[] = []
   const capacityCalls: Array<{ date: string; durationHours: number; beforeHour?: number; handoffMarketDayId?: string }> = []

@@ -77,8 +77,11 @@ class Sprint6ApiTests extends ApiTestSupport {
                 .andExpect(jsonPath("$.deliveriesFrom").value("2026-11-30")).andReturn();
         List<String> colors = read(res, "$.colors[*].color");
         List<String> finishes = read(res, "$.colors[*].finish");
-        assertThat(colors).containsExactly("red", "red", "green", "green", "beige", "beige");
-        assertThat(finishes).containsExactly("shiny", "matte", "shiny", "matte", "shiny", "matte");
+        List<String> sizes = read(res, "$.colors[*].size");
+        // Big first, then medium; each size in every offered colour and finish.
+        assertThat(colors).containsExactly("red", "red", "green", "green", "beige", "beige", "red", "red", "green", "green", "beige", "beige");
+        assertThat(finishes).containsExactly("shiny", "matte", "shiny", "matte", "shiny", "matte", "shiny", "matte", "shiny", "matte", "shiny", "matte");
+        assertThat(sizes).containsExactly("big", "big", "big", "big", "big", "big", "medium", "medium", "medium", "medium", "medium", "medium");
     }
 
     @Test

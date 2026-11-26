@@ -292,6 +292,9 @@ test('two ornaments keep fixed variants, independent details and the bought name
     const reference = (await api.forms.getForm('frm-abs103')).item.photos
     const choices = [{ kind: 'custom' as const, withName: true }, { kind: 'custom' as const, withName: false }]
     const quote = await api.shop.shippingQuote(choices)
+    // Bases are counted per size and medium starts at 0: stock the medium green matte first.
+    const medium = (await api.inventory.list()).find((row: { id: string }) => row.id === 'custom-green-matte-medium')!
+    await api.inventory.update(medium.id, 2, medium.quantity)
     const result = await api.shop.checkout({ customerName: 'Alex Example', email: 'alex@example.com', phone: '+43 660 1234567', deliveryKind: 'post', address: { line1: 'Street 1', postalCode: '1010', city: 'Wien' }, expectedArrivalTo: quote.arrivalTo, acceptTerms: true,
       items: [{ ...choices[0], size: 'big', color: 'red', finish: 'shiny', petName: 'Luna', backName: 'Luna', photos: reference }, { ...choices[1], size: 'medium', color: 'green', finish: 'matte', petName: 'Otto', photos: reference }],
     })
