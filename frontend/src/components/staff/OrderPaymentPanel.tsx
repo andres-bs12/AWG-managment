@@ -80,7 +80,7 @@ export function OrderPaymentPanel({ order, busy, onSetState, onSetPrice }: Props
     </>}
     {error && <p role="alert">{error}</p>}
     {confirmPrice && onSetPrice && <StaffDialog title="Change price?" busy={busy} onClose={() => setConfirmPrice(false)}>
-      <p>Change the total of {order.code} from <strong>{formatEur(order.total, 'en')}</strong> to <strong>{formatEur(newPrice, 'en')}</strong>{newPrice < listPrice ? ` (discount ${formatEur(Math.round((listPrice - newPrice) * 100) / 100, 'en')})` : ''}. {order.paymentState !== 'unpaid' ? 'The received amount is updated too; give back any difference in cash.' : ''}</p>
+      <p>Change the total of {order.code} from <strong>{formatEur(order.total, 'en')}</strong> to <strong>{formatEur(newPrice, 'en')}</strong>{newPrice < listPrice ? ` (discount ${formatEur(Math.round((listPrice - newPrice) * 100) / 100, 'en')})` : ''}. {order.paymentState !== 'unpaid' && newPrice < (order.amountPaid ?? 0) ? 'The received amount is updated too; give back the difference in cash.' : ''}{order.paymentState !== 'unpaid' && newPrice > (order.amountPaid ?? 0) ? `${formatEur(Math.round((newPrice - (order.amountPaid ?? 0)) * 100) / 100, 'en')} is still to collect.` : ''}</p>
       <Button tone="staff" disabled={busy} onClick={() => { setConfirmPrice(false); void onSetPrice(Math.round(newPrice * 100) / 100).then(ok => { if (ok) { setPriceDraft(''); setOpen(null) } }) }}>Change price</Button>
     </StaffDialog>}
     {confirming && <StaffDialog title="Correct payment?" busy={busy} onClose={() => setConfirming(null)}>

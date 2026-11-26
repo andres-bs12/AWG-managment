@@ -1588,7 +1588,13 @@ export function setOrderPrice(orderId: string, chargedTotal: number) {
   if (!Number.isFinite(charged) || charged < 0 || charged > list) throw new Error('The sale price can\'t be higher than the list price.')
   order.discount = Math.round((list - charged) * 100) / 100
   order.total = charged
-  if (order.paymentState === 'paid' || (order.paymentState === 'deposit' && (order.amountPaid ?? 0) >= charged)) { order.paymentState = 'paid'; order.amountPaid = charged }
+  // Same rule as the backend: a lower price gives change back; a higher one never books money not received.
+  const received = order.amountPaid ?? 0
+  if (order.paymentState !== 'unpaid') {
+    if (received >= charged) { order.paymentState = 'paid'; order.amountPaid = charged }
+    else if (received > 0) order.paymentState = 'deposit'
+    else { order.paymentState = 'unpaid'; order.amountPaid = 0 }
+  }
   emit()
   return order
 }

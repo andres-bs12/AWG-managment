@@ -68,10 +68,11 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
           <p><StaffText>{[item.kind === 'custom' ? 'Personalised' : 'Ready-made', item.kind === 'custom' && item.size ? sizeLabel(item.size) : null, formatEur(item.cost, 'en')].filter(Boolean).join(' · ')}</StaffText></p>
         </div>
       </div>
-      <dl className={styles.specs}>
+      {/* No empty block: a ready-made piece without a name has no specs, so nothing (and no gap) is rendered. */}
+      {item.kind === 'custom' || item.withName ? <dl className={styles.specs}>
         {item.kind === 'custom' ? <div><dt>Colour</dt><dd>{item.color ? <><i className={styles.swatch} data-color={item.color} role="img" aria-hidden="true" />{`${colorLabel(item.color)} · ${finishLabel(item.finish ?? 'shiny')}`}</> : 'Not recorded'}</dd></div> : null}
         {item.withName ? <div><dt>Name to paint</dt><dd className={styles.name}>{item.backName || 'Waiting for form'}</dd></div> : null}
-      </dl>
+      </dl> : null}
       {item.note ? <div className={styles.note}><strong>Painter’s note</strong><p>{item.note}</p></div> : null}
       {orderDone ? (
         // Finished order: production and handover are history. Only a personalised piece keeps a link to its reference.

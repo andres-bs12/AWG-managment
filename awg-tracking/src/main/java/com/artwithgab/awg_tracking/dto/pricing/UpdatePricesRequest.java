@@ -22,7 +22,8 @@ import java.util.List;
  */
 public record UpdatePricesRequest(
         @NotNull @DecimalMin("0.50") @DecimalMax("999.99") @Digits(integer = 3, fraction = 2) BigDecimal customPrice,
-        @NotNull @DecimalMin("0.50") @DecimalMax("999.99") @Digits(integer = 3, fraction = 2) BigDecimal customMediumPrice,
+        // Optional so a Stock screen loaded before the medium size existed can still save; null keeps the stored price.
+        @DecimalMin("0.50") @DecimalMax("999.99") @Digits(integer = 3, fraction = 2) BigDecimal customMediumPrice,
         @NotNull @DecimalMin("0.50") @DecimalMax("999.99") @Digits(integer = 3, fraction = 2) BigDecimal finishedPrice,
         @NotNull @DecimalMin("0.00") @DecimalMax("999.99") @Digits(integer = 3, fraction = 2) BigDecimal nameExtra,
         @NotNull @DecimalMin("0.00") @DecimalMax("99.99") @Digits(integer = 2, fraction = 2) BigDecimal shippingFee,

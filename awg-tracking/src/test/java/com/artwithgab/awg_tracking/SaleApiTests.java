@@ -92,11 +92,19 @@ class SaleApiTests extends ApiTestSupport {
                 .andExpect(jsonPath("$.discount").value(5.0))
                 .andExpect(jsonPath("$.amountPaid").value(30.0))
                 .andExpect(jsonPath("$.paymentState").value("paid"));
-        // Undo the discount: back to the list price, never above it.
+        // Undo the discount: back to the list price, never above it. The customer paid 30, so 5 stay open.
         mvc.perform(patch("/api/orders/" + id + "/price").header("Authorization", bearer(token))
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(Map.of("chargedTotal", 35))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.discount").value(0.0));
+                .andExpect(jsonPath("$.discount").value(0.0))
+                .andExpect(jsonPath("$.amountPaid").value(30.0))
+                .andExpect(jsonPath("$.paymentState").value("deposit"));
+        // Lowering it again to what was received settles the order.
+        mvc.perform(patch("/api/orders/" + id + "/price").header("Authorization", bearer(token))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(Map.of("chargedTotal", 30))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.amountPaid").value(30.0))
+                .andExpect(jsonPath("$.paymentState").value("paid"));
         mvc.perform(patch("/api/orders/" + id + "/price").header("Authorization", bearer(token))
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(json(Map.of("chargedTotal", 36))))
                 .andExpect(status().isBadRequest());

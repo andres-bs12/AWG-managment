@@ -17,6 +17,8 @@ async function setupCalendarWorld(page: Page, initialIso = '2026-11-28T13:00:00Z
   postWindowOverride?: (readyOn: string) => ShippingQuote
   makeRoomHandler?: (body: { date: string; minutes: number; marketDayId?: string }, key: string) => { status: number; json: unknown }
   saturdaySlots?: AgendaDay['slots']
+  /** Production on 26 Nov 2026: only the home market exists, no stall market loaded. */
+  onlyHome?: boolean
 }) {
   await page.clock.install({ time: new Date(initialIso) })
   await page.addInitScript((marketId) => {
@@ -91,9 +93,9 @@ async function setupCalendarWorld(page: Page, initialIso = '2026-11-28T13:00:00Z
     if (pathName === '/api/photos/pet-post') return route.fulfill({ contentType: 'image/svg+xml', body: PET_SVG })
     if (pathName === '/api/market-stock') return route.fulfill({ json: marketPieces })
     if (pathName === '/api/inventory') return route.fulfill({ json: inventory })
-    if (pathName === '/api/markets') return route.fulfill({ json: markets })
+    if (pathName === '/api/markets') return route.fulfill({ json: options?.onlyHome ? markets.filter(m => m.kind === 'home') : markets })
     if (pathName === '/api/market-days') {
-      return route.fulfill({ json: marketDays })
+      return route.fulfill({ json: options?.onlyHome ? marketDays.filter(d => d.marketId === 'mkt-casa') : marketDays })
     }
     if (pathName === '/api/painting-days') return route.fulfill({ json: paintingDays })
     if (pathName === '/api/agenda/days') {
@@ -369,6 +371,30 @@ test('Rule 8: full today explains why and offers next valid market day without d
   await expect(page.locator('input[name^="day-"][value="md-sun-r"]')).toBeVisible()
 })
 
+test('No stall market set up: Market day explains what to do instead of a silent dead end', async ({ page }) => {
+  await setupCalendarWorld(page, '2026-11-28T13:00:00Z', { onlyHome: true })
+  await page.goto('/staff/sales/new')
+  await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await chooseSizes(page)
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+
+  await page.getByRole('radio', { name: 'Market day', exact: true }).locator('..').click()
+  await expect(page.getByText('No market days are set up yet. Add the market and its days in Markets, or choose Post.').first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Create order & show QR' })).toBeDisabled()
+})
+
+test('Market day without a chosen day offers the day picker instead of only asking for an hour', async ({ page }) => {
+  await setupCalendarWorld(page, '2026-11-28T13:00:00Z')
+  await page.goto('/staff/sales/new')
+  await page.getByRole('button', { name: /Add custom ornament/ }).click()
+  await chooseSizes(page)
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+
+  await page.getByRole('radio', { name: 'Market day', exact: true }).locator('..').click()
+  await page.locator('input[name^="day-"][value="md-sun-r"]').locator('..').click()
+  await expect(page.getByText('Pickup hour', { exact: true })).toBeVisible()
+})
+
 test('Post shipping in New sale: server range, finished-with-custom rule, address validation, single €5 fee and cutoff', async ({ page }, testInfo) => {
   const { sales } = await setupCalendarWorld(page, '2026-11-28T13:00:00Z')
   await page.goto('/staff/sales/new')
@@ -576,6 +602,7 @@ test('Restored legacy Vienna draft migrates to Post with kept address and submit
       items: [{
         id: 'draft-legacy-1',
         kind: 'custom',
+        size: 'big',
         withName: false,
         color: 'red',
         finish: 'shiny',
@@ -606,6 +633,27 @@ test('Restored legacy Vienna draft migrates to Post with kept address and submit
   await expect.poll(() => sales.length).toBe(1)
   expect(sales[0].items[0].deliveryKind).toBe('post')
   expect(sales[0].items[0].address).toEqual({ line1: 'Neubaugasse 12', postalCode: '1070', city: 'Wien' })
+})
+
+test('Restored draft from before sizes explains why Create is disabled', async ({ page }) => {
+  await setupCalendarWorld(page, '2026-11-28T13:00:00Z')
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('no-size-seeded')) return
+    sessionStorage.setItem('no-size-seeded', '1')
+    sessionStorage.setItem('awg-sale-draft', JSON.stringify({
+      differentPickups: false,
+      phase: 'delivery',
+      items: [{
+        id: 'draft-no-size', kind: 'custom', withName: false, color: 'red', finish: 'shiny',
+        durationMinutes: 60, durationPreset: '60', paintDate: '2026-11-30', paintStart: 10, paintEnd: 11,
+        fromCalendar: false, slotLocked: true,
+        delivery: { mode: 'post', address: { line1: 'Neubaugasse 12', postalCode: '1070', city: 'Wien' } },
+      }],
+    }))
+  })
+  await page.goto('/staff/sales/new')
+  await expect(page.getByRole('alert').filter({ hasText: 'Choose Big or Medium for each personalised ornament' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Create order & show QR', exact: true })).toBeDisabled()
 })
 
 test('Make room today is hidden when Gaby is painting at another market', async ({ page }) => {

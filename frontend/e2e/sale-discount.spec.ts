@@ -46,6 +46,31 @@ test('staff sells three ready pieces for a discounted total', async ({ page }) =
   if (process.env.PW_DISCOUNT_SHOTS) await page.screenshot({ path: `${process.env.PW_DISCOUNT_SHOTS}/discount-done-${test.info().project.name}.png`, animations: 'disabled' })
 })
 
+test('a discount never carries over silently when the order changes', async ({ page }) => {
+  await signIn(page)
+  await pick(page, 1, 'RM01')
+  await pick(page, 2, 'RM02')
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  await page.getByRole('button', { name: 'Give a discount', exact: true }).click()
+  const price = page.getByLabel('Sale price for the whole order (€)')
+  // A typo keeps Done disabled.
+  await price.fill('6O')
+  await expect(page.getByText('Enter a price in euros.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeDisabled()
+  await price.fill('60')
+  await expect(page.locator('[data-staff-actions]')).toContainText('Total · discounted')
+
+  // Adding a piece changes the list price: the old sale price must be entered again.
+  await page.getByRole('button', { name: 'Back to items', exact: true }).click()
+  await pick(page, 3, 'RM03')
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  await expect(page.getByText(/The order changed: the list price is now/)).toBeVisible()
+  await expect(page.locator('[data-staff-actions]')).not.toContainText('discounted')
+  await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeDisabled()
+  await page.getByLabel('Sale price for the whole order (€)').fill('90')
+  await expect(page.locator('[data-staff-actions]')).toContainText('Total · discounted')
+})
+
 test('staff changes the price of a past sale after confirming', async ({ page }) => {
   await signIn(page)
   await pick(page, 1, 'RM01')
@@ -86,15 +111,16 @@ test('a ready-made sale shows no painting controls and can move to another marke
   // Handed over at the sale: one undo, at the bottom.
   await expect(page.getByRole('button', { name: 'Undo handover', exact: true })).toHaveCount(1)
 
-  // The top summary says it at a glance: picked up, and the market the sale counts for.
+  // The top summary says it at a glance: picked up, and the market the sale counts for, each in its own cell.
   await expect(page.getByText('Picked up', { exact: true })).toBeVisible()
-  await expect(page.getByText(/^Sold at · .*Rathausplatz/).first()).toBeVisible()
+  await expect(page.getByText('Sold at', { exact: true })).toHaveCount(1)
+  await expect(page.locator('summary', { hasText: 'Sold at' })).toHaveCount(0)
   // Sold at: move the sale to the other stall open that day.
-  const soldAt = page.locator('summary', { hasText: 'Sold at' })
-  await expect(soldAt).toContainText('Rathausplatz')
-  await soldAt.click()
-  await page.getByLabel(/Market open on/).selectOption({ label: 'Christkindlmarkt Spittelberg' })
-  await page.getByRole('button', { name: 'Save market', exact: true }).click()
+  await page.getByRole('button', { name: 'Change market', exact: true }).click()
+  const soldAt = page.getByRole('dialog', { name: 'Sold at', exact: true })
+  await soldAt.getByLabel(/Market open on/).selectOption({ label: 'Christkindlmarkt Spittelberg' })
+  await soldAt.getByRole('button', { name: 'Save market', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Market changed.' })).toBeVisible()
-  await expect(soldAt).toContainText('Christkindlmarkt Spittelberg')
+  await expect(soldAt).toHaveCount(0)
+  await expect(page.getByText('Christkindlmarkt Spittelberg', { exact: true })).toBeVisible()
 })

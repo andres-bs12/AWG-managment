@@ -11,6 +11,8 @@
 .status[data-status='in_progress'] { color: var(--staff-warn); }
 .status[data-status='finished'] { color: var(--staff-ok); }
 .specs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-4); margin: var(--space-5) 0; }
+/* The card's padding is the only space after its last block. */
+.specs:last-child, .note:last-child { margin-bottom: 0; }
 .specs > div:nth-child(3) { grid-column: 1 / -1; }
 .specs dt { font-size: var(--type-staff-meta-size); color: var(--staff-muted); margin-bottom: var(--space-1); }
 .specs dd { margin: 0; overflow-wrap: anywhere; font-weight: 600; }

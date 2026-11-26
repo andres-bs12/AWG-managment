@@ -86,12 +86,14 @@ public class PricingService {
         return withName ? base.add(p.nameExtra()) : base;
     }
 
-    /** A custom ornament must have a size; finished pieces never carry one. */
+    /**
+     * The size of a sold ornament; finished pieces never carry one. The current UI always sends a size.
+     * A page loaded before sizes existed (an iPad or a customer's tab left open across a deploy) sends
+     * none and shows the big price, so it sells a big one instead of failing the sale.
+     */
     public static OrnamentSize requireSize(ItemKind kind, OrnamentSize size, String field) {
         if (kind != ItemKind.CUSTOM) return null;
-        if (size == null) throw new BadRequestException("Choose Big (10 cm) or Medium (8 cm) for each personalised ornament.")
-                .code("VALIDATION").field(field);
-        return size;
+        return size == null ? OrnamentSize.BIG : size;
     }
 
     /** The surcharge stored on a sold item, or null when it has no paid name. */
@@ -122,7 +124,8 @@ public class PricingService {
             return created;
         });
         row.setCustomPrice(body.customPrice());
-        row.setCustomMediumPrice(body.customMediumPrice());
+        if (body.customMediumPrice() != null) row.setCustomMediumPrice(body.customMediumPrice());
+        else if (row.getCustomMediumPrice() == null) row.setCustomMediumPrice(now.customMediumPrice());
         row.setFinishedPrice(body.finishedPrice());
         row.setNameExtra(body.nameExtra());
         row.setShippingFee(body.shippingFee());
