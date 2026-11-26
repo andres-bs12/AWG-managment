@@ -46,6 +46,31 @@ test('staff sells three ready pieces for a discounted total', async ({ page }) =
   if (process.env.PW_DISCOUNT_SHOTS) await page.screenshot({ path: `${process.env.PW_DISCOUNT_SHOTS}/discount-done-${test.info().project.name}.png`, animations: 'disabled' })
 })
 
+test('a discount never carries over silently when the order changes', async ({ page }) => {
+  await signIn(page)
+  await pick(page, 1, 'RM01')
+  await pick(page, 2, 'RM02')
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  await page.getByRole('button', { name: 'Give a discount', exact: true }).click()
+  const price = page.getByLabel('Sale price for the whole order (€)')
+  // A typo keeps Done disabled.
+  await price.fill('6O')
+  await expect(page.getByText('Enter a price in euros.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeDisabled()
+  await price.fill('60')
+  await expect(page.locator('[data-staff-actions]')).toContainText('Total · discounted')
+
+  // Adding a piece changes the list price: the old sale price must be entered again.
+  await page.getByRole('button', { name: 'Back to items', exact: true }).click()
+  await pick(page, 3, 'RM03')
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
+  await expect(page.getByText(/The order changed: the list price is now/)).toBeVisible()
+  await expect(page.locator('[data-staff-actions]')).not.toContainText('discounted')
+  await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeDisabled()
+  await page.getByLabel('Sale price for the whole order (€)').fill('90')
+  await expect(page.locator('[data-staff-actions]')).toContainText('Total · discounted')
+})
+
 test('staff changes the price of a past sale after confirming', async ({ page }) => {
   await signIn(page)
   await pick(page, 1, 'RM01')
