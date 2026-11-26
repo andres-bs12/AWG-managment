@@ -115,6 +115,8 @@ test('a ready-made sale shows no painting controls and can move to another marke
 
   // The top summary says it at a glance: picked up, and the market the sale counts for, each in its own cell.
   await expect(page.getByText('Picked up', { exact: true })).toBeVisible()
+  // The handover shows its real day and time, never the market's opening hours.
+  await expect(page.getByText(/^Rathausplatz · \w{3},? \d{1,2} \w{3} · \d{2}:\d{2}$/)).toBeVisible()
   await expect(page.getByText('Sold at', { exact: true })).toHaveCount(1)
   await expect(page.locator('summary', { hasText: 'Sold at' })).toHaveCount(0)
   // Sold at: move the sale to the other stall open that day.

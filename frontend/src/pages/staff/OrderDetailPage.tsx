@@ -120,6 +120,17 @@ function OrderDetail({ id }: { id: string }) {
   const trackingInvalid = Boolean(trimmedTracking && !TRACKING_NUMBER_REGEX.test(trimmedTracking))
   const trackingDirty = trimmedTracking !== (order.trackingNumber ?? '')
   const handoffs = [...new Set(items.map(item => handoffLabel(item, days)))]
+  // Handed over: say where and when it actually happened (place · day · time), not the market's opening hours.
+  const handedOverAt = order.handedOver && order.handedOverAt ? new Date(order.handedOverAt) : null
+  const handedOverText = handedOverAt ? [
+    [...new Set(items.map(item => item.delivery.kind === 'post' ? 'Post' : item.delivery.kind === 'vienna' ? 'Vienna' : item.delivery.marketName ?? 'Market'))].join(' / '),
+    formatDateLabel(viennaDate(handedOverAt)),
+    new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' }).format(handedOverAt),
+  ].join(' · ') : null
+  const createdAt = new Date(order.createdAt.endsWith('Z') || /[+-]\d\d:\d\d$/.test(order.createdAt) ? order.createdAt : `${order.createdAt}Z`)
+  // Sold and handed over in the same minute (a ready-made stall sale): the summary already says when, so the line below does not repeat it.
+  const createdShown = !handedOverAt || Math.abs(handedOverAt.getTime() - createdAt.getTime()) >= 60000
+  const orderFacts = [order.source === 'web' || order.checkoutStatus ? 'Web order' : 'Stall order', createdShown ? `Created ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(createdAt)} (Vienna)` : null, order.paymentMethod ? `Paid by ${order.paymentMethod}` : null].filter(Boolean).join(' · ')
   const formUrl = `${window.location.origin}/form/${order.formToken}`
   // Unconfirmed online payments hold their slot but are not ready for painting or delivery yet.
   const paymentHeld = !order.handedOver && (order.checkoutStatus === 'pending' || order.checkoutStatus === 'review' || Boolean(order.paymentReview))
@@ -199,7 +210,7 @@ function OrderDetail({ id }: { id: string }) {
     {order.needsReview ? <InsetNote tone="warning"><p role="status">New web order, paid online. Check the photos and the pickup or Post details.</p><Button tone="staff" disabled={busy} onClick={() => void runAction(() => api.orders.markReviewed(order.id), 'Marked as reviewed.')}>Mark reviewed</Button></InsetNote> : null}
     {order.paymentReview ? <InsetNote tone="warning"><p role="alert">Stripe reported a payment that does not match this order. Check it in Stripe, then record it as paid or deposit (or cancel the order). It remains held on the agenda until resolved.</p></InsetNote> : null}
     <div className={styles.overview} data-delivery={Boolean(deliveryItem)} data-sold={stallSale || undefined}>
-      <div><span>{order.handedOver ? (postItem ? 'Handed to Post' : deliveryItem ? 'Delivered' : 'Picked up') : postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</span><div className={styles.cellRow}><strong><StaffText>{handoffs.join(' / ') || 'Not scheduled'}</StaffText></strong></div>
+      <div><span>{order.handedOver ? (postItem ? 'Handed to Post' : deliveryItem ? 'Delivered' : 'Picked up') : postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</span><div className={styles.cellRow}><strong><StaffText>{handedOverText ?? (handoffs.join(' / ') || 'Not scheduled')}</StaffText></strong></div>
         {arrivalText ? <span className={styles.arrivalLine}>{arrivalText}</span> : null}
         {deliveryItem ? <div className={styles.handoffActions}>
           {addressText ? (
@@ -309,7 +320,7 @@ function OrderDetail({ id }: { id: string }) {
         {/* The form link and QR only matter until the order is handed over. */}
         {hasForm && !formWaiting && !order.handedOver ? <details className={styles.panel}><summary>Customer form <span className={styles.muted}>Completed</span></summary>{formContent}</details> : null}
         {/* The facts of the order as one quiet line: no «Order info» disclosure to open (owner, 2026-11-26). */}
-        <p className={styles.muted}>{order.source === 'web' || order.checkoutStatus ? 'Web order' : 'Stall order'} · Created {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(new Date(order.createdAt.endsWith('Z') || /[+-]\d\d:\d\d$/.test(order.createdAt) ? order.createdAt : `${order.createdAt}Z`))} (Vienna){order.paymentMethod ? ` · Paid by ${order.paymentMethod}` : ''}</p>
+        <p className={styles.muted}><StaffText>{orderFacts}</StaffText></p>
         <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
         {/* Handed over: undo is only for mistakes, so it sits once at the bottom, quiet and red, where Cancel would be.
             It opens the usual confirmation. A handed-over order cannot be cancelled, so no dead Cancel button. */}
