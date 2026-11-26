@@ -733,6 +733,7 @@
 }
 
 .priceCard[data-open] > :first-child {
-  flex: 1 1 256px;
+  flex: 1 1 0;
+  min-width: 0;
   margin-bottom: 0;
 }
