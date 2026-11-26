@@ -484,14 +484,17 @@ test('handover with balance due requires confirmation and can mark paid before h
   await page.getByRole('button', { name: 'Mark picked up', exact: true }).click()
   await dialog.getByRole('radio', { name: 'Cash', exact: true }).locator('..').click()
   await collect.click()
-  await expect(page.getByRole('button', { name: 'Undo handover', exact: true })).toBeVisible()
+  // Finished order: the undo is folded away under one quiet disclosure.
+  await expect(page.getByText('Handed over by mistake?', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Undo handover', exact: true })).toBeHidden()
   await expect(page.getByRole('button', { name: 'Undo pickup', exact: true })).toHaveCount(0)
   // One call records the payment and the handover together, so the customer gets a single e-mail.
   expect(fixture.mutations.some(entry => entry.path.endsWith('/payment-state'))).toBe(false)
   const handover = fixture.mutations.filter(entry => entry.path.endsWith('/handed-over'))
   expect(handover).toHaveLength(1)
   expect(handover[0].body).toMatchObject({ handedOver: true, collectMethod: 'cash' })
-  await expect(page.getByRole('button', { name: 'Cancel order', exact: true })).toBeDisabled()
+  // A handed-over order shows no dead Cancel button; the undo disclosure is the way back.
+  await expect(page.getByRole('button', { name: 'Cancel order', exact: true })).toHaveCount(0)
 })
 
 test('order handover lets staff choose ornaments and leave the rest pending', async ({ page }) => {
@@ -529,7 +532,18 @@ test('item handover and undo allow selecting other ornaments', async ({ page }) 
   await page.getByRole('article', { name: 'Milo' }).getByRole('button', { name: 'Hand over this one', exact: true }).click()
   await page.getByRole('dialog', { name: 'Hand over', exact: true }).getByRole('button', { name: 'Hand over 1 ornament', exact: true }).click()
   await expect.poll(() => fixture.original.handedOver).toBe(true)
-  await page.getByRole('region', { name: 'Pickup' }).getByRole('button', { name: 'Undo handover', exact: true }).click()
+  // Finished order: no per-ornament undo, no production controls, one undo in the Pickup panel.
+  for (const name of ['Luna', 'Milo']) {
+    const card = page.getByRole('article', { name })
+    await expect(card.getByRole('button', { name: 'Undo handover' })).toHaveCount(0)
+    await expect(card.getByText('Adjust production status')).toHaveCount(0)
+    await expect(card.getByRole('region', { name: 'Production' })).toHaveCount(0)
+    await expect(card.getByText('Handed over', { exact: true })).toBeVisible()
+  }
+  const pickup = page.getByRole('region', { name: 'Pickup' })
+  await pickup.getByText('Handed over by mistake?', { exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Undo handover', exact: true })).toHaveCount(1)
+  await pickup.getByRole('button', { name: 'Undo handover', exact: true }).click()
   const undo = page.getByRole('dialog', { name: 'Undo handover', exact: true })
   await expect(undo.getByRole('checkbox', { name: 'Luna' })).toBeChecked()
   await expect(undo.getByRole('checkbox', { name: 'Milo' })).toBeChecked()

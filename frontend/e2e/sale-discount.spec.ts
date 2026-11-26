@@ -83,6 +83,8 @@ test('a ready-made sale shows no painting controls and can move to another marke
   await expect(page.getByRole('region', { name: 'Production' })).toHaveCount(0)
   await expect(page.getByText('No reference photo')).toHaveCount(0)
   await expect(page.getByRole('article', { name: /RM01/ }).getByRole('button')).toHaveCount(0)
+  // Handed over at the sale: the one undo is folded under «Handed over by mistake?».
+  await page.getByText('Handed over by mistake?', { exact: true }).click()
   await expect(page.getByRole('button', { name: 'Undo handover', exact: true })).toHaveCount(1)
 
   // Sold at: move the sale to the other stall open that day.

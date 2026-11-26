@@ -130,6 +130,7 @@ Este archivo destila lo que salió mal y lo que el dueño corrigió una y otra v
 - Inglés, formato de dinero inglés, botones grandes de 56 px, diálogos con una **X arriba a la derecha** (44 px), Escape y toque fuera para cerrar sin actuar; ya no hay botón «Not yet» (dueño, 2026-11-12: le hacía perder tiempo), sin texto repetido (fecha/subtítulo/colores junto a muestras).
 - Separadores (·) nunca empiezan una línea (`StaffText`). Hover solo en dispositivos con hover.
 - Lo que el staff guarda se guarda solo (autoguardado) y avisa de conflictos (`STOCK_CHANGED`, `@Version`).
+- **Pedido entregado = solo lo útil (dueño, 2026-11-26).** En el detalle de un pedido ya entregado (`order.handedOver`) no se muestran controles que ya no aplican: ni «Production», ni «No reference photo», ni «Adjust production status», ni el bloque «Handover» de cada adorno, ni «Cancel order» deshabilitado. Un personalizado conserva solo «View reference». **Una acción aparece una sola vez por pantalla:** «Undo handover» vive solo en el panel Pickup/Delivery/Post, plegado bajo «Handed over by mistake?», porque solo sirve para corregir errores.
 
 ## 8. Registro de correcciones nuevas
 
@@ -145,3 +146,4 @@ Añadir aquí, con fecha, cada corrección nueva del dueño hasta integrarla en 
 - 2026-11-20 (dueño): New sale muestra el progreso numerado y marca los pasos completados con ✓ cuando hay piezas en el borrador. Sales usa el buscador de cabecera y muestra el puesto de venta registrado, o «Web shop».
 - 2026-11-20 (dueño): Ready libera el resto de la sesión en la fecha de pintura, con fin redondeado hacia arriba a 15 minutos. Si se termina antes del inicio, quedan registrados los 15 minutos previos al fin redondeado. Al volver a To paint se conserva ese horario.
 - 2026-11-20 (dueño): el calendario de Agenda y sus entregas usan tarjetas neutras con etiquetas de estado y nombre de cliente. La línea de hora actual queda encima y deja pasar los toques. Los marcadores de sesiones Ready futuras dejan libre la cuadrícula. Mostrar el puesto automático efectivo en el engranaje y usar el mismo resumen de reservas activas en la vista normal, la tarjeta de Gaby y el engranaje.
+- 2026-11-26 (dueño): un pedido no personalizado y entregado mostraba «Undo handover» dos veces (panel Pickup y cada adorno) y «Production · No reference photo». Vista de pedido entregado simplificada (§7).

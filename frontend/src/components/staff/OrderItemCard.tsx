@@ -23,11 +23,13 @@ type Props = {
   busy: boolean
   /** Online payment not confirmed: painting is possible but not the next step. */
   held?: boolean
+  /** The whole order is handed over: show only what still matters (no production or handover controls). */
+  orderDone?: boolean
   onHandover?: () => void
   onStatus: (status: ProductionStatus) => void
 }
 
-export function OrderItemCard({ item, block, days, selected, navigationState, busy, held = false, onHandover, onStatus }: Props) {
+export function OrderItemCard({ item, block, days, selected, navigationState, busy, held = false, orderDone = false, onHandover, onStatus }: Props) {
   const marketId = item.kind === 'finished' ? item.marketOrnamentId : null
   const marketParts = marketId ? marketOrnamentParts(marketId) : null
   const title = marketId
@@ -37,7 +39,7 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
   const paintTo = `/staff/orders/${item.orderId}/paint/${item.id}`
   const blocker = handoverBlocker({ kind: item.kind, productionStatus: item.productionStatus, handedOver: Boolean(item.handedOver),
     waitingForCustomer: item.kind === 'custom' && (!item.photos.length || (item.withName && !item.backName)) })
-  const status = item.productionStatus === 'finished' ? 'Ready' : item.productionStatus === 'in_progress' ? 'Painting' : 'To paint'
+  const status = item.handedOver ? 'Handed over' : item.productionStatus === 'finished' ? 'Ready' : item.productionStatus === 'in_progress' ? 'Painting' : 'To paint'
   return (
     <article className={styles.card} data-selected={selected} aria-label={title}>
       <div className={styles.identity}>
@@ -71,18 +73,23 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
         {item.withName ? <div><dt>Name to paint</dt><dd className={styles.name}>{item.backName || 'Waiting for form'}</dd></div> : null}
       </dl>
       {item.note ? <div className={styles.note}><strong>Painter’s note</strong><p>{item.note}</p></div> : null}
+      {orderDone ? (
+        // Finished order: production and handover are history. Only a personalised piece keeps a link to its reference.
+        photo && !marketId ? <div className={styles.actions}><ButtonLink to={paintTo} state={navigationState} tone="staff" variant="secondary">View reference</ButtonLink></div> : null
+      ) : <>
       {/* Ready-made pieces are already painted: no reference photo, no painting, no production status. */}
       {item.kind === 'custom' ? <section className={styles.production} aria-label="Production"><h4>Production</h4>
       <div className={styles.actions}>
-        {held ? <span className={styles.waiting}>Painting starts once the online payment is confirmed</span> : photo ? <ButtonLink to={paintTo} state={navigationState} tone="staff" variant={item.productionStatus === 'finished' || held ? 'secondary' : 'primary'}>{item.productionStatus === 'finished' ? 'View reference' : 'Open painting'}</ButtonLink> : <span className={styles.waiting}>{item.kind === 'custom' ? 'Waiting for reference photos' : 'No reference photo'}</span>}
+        {held ? <span className={styles.waiting}>Painting starts once the online payment is confirmed</span> : photo ? <ButtonLink to={paintTo} state={navigationState} tone="staff" variant={item.productionStatus === 'finished' || held ? 'secondary' : 'primary'}>{item.productionStatus === 'finished' ? 'View reference' : 'Open painting'}</ButtonLink> : <span className={styles.waiting}>Waiting for reference photos</span>}
         {block ? <Link className={styles.schedule} to={agendaSlotPath(block, days)}><StaffText>{paintSlotLabel(block, days)}</StaffText></Link> : null}
       </div>
-      <details className={styles.adjust}>
+      {/* A handed-over ornament cannot go back to the workshop; undo the handover first. */}
+      {item.handedOver ? null : <details className={styles.adjust}>
         <summary>Adjust production status</summary>
         <div className={styles.statusOptions}>
           {([{value:'not_started',label:'To paint'}, {value:'in_progress',label:'Painting'}, {value:'finished',label:'Ready'}] as const).map(option => <Button key={option.value} tone="staff" variant="secondary" selected={item.productionStatus === option.value} disabled={busy} onClick={() => onStatus(option.value)}>{option.label}</Button>)}
         </div>
-      </details>
+      </details>}
       </section> : null}
       <section className={styles.handover} aria-label="Handover">
         <div>
@@ -90,9 +97,10 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
           <p><StaffText>{[handoffLabel(item, days), handoffArrivalLabel(item)].filter(Boolean).join(' · ')}</StaffText></p>
         </div>
         {!item.handedOver && blocker ? <p className={styles.blocked}>{`Can't hand over yet: ${blocker.toLowerCase()}.`}</p> : null}
-        {/* With one ornament the order panel owns the handover: one control, not two. */}
+        {/* With one ornament, or once the whole order is handed over, the order panel owns the handover: one control, not two. */}
         {onHandover ? <Button tone="staff" variant="secondary" disabled={busy || held || (!item.handedOver && item.productionStatus !== 'finished')} onClick={onHandover}>{item.handedOver ? 'Undo handover' : item.delivery.kind === 'post' ? 'Handed to Post' : 'Hand over this one'}</Button> : null}
       </section>
+      </>}
     </article>
   )
 }

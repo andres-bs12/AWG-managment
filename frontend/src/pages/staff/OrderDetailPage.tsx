@@ -231,9 +231,10 @@ function OrderDetail({ id }: { id: string }) {
       <section aria-labelledby="order-items" className={styles.items}>
         {items.map(item => {
           const allPostOrder = postItems.length > 0 && postItems.length === items.length
-          // Ready-made pieces all go together at the stall: the order panel's one handover button is enough.
-          const canItemHandover = items.length > 1 && !onlyReadyMade && !(allPostOrder && !(item.handedOver ?? order.handedOver))
-          return <OrderItemCard key={item.id} item={{ ...item, handedOver: item.handedOver ?? order.handedOver }} onHandover={canItemHandover ? () => { void handover.request(id, !(item.handedOver ?? order.handedOver), item.id) } : undefined} block={blocks.find(block => block.orderItemId === item.id)} days={days} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />
+          // Ready-made pieces all go together at the stall, and once the whole order is handed over the single undo
+          // lives in the order panel: in both cases the cards repeat no handover button.
+          const canItemHandover = items.length > 1 && !onlyReadyMade && !order.handedOver && !(allPostOrder && !(item.handedOver ?? order.handedOver))
+          return <OrderItemCard key={item.id} item={{ ...item, handedOver: item.handedOver ?? order.handedOver }} onHandover={canItemHandover ? () => { void handover.request(id, !(item.handedOver ?? order.handedOver), item.id) } : undefined} block={blocks.find(block => block.orderItemId === item.id)} days={days} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} orderDone={order.handedOver} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />
         })}
       </section>
       <aside className={styles.support} aria-label="Order management">
@@ -283,7 +284,14 @@ function OrderDetail({ id }: { id: string }) {
               </div>
             </div>
           ) : null}
-          {paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished && !order.handedOver ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || (!order.handedOver && !allFinished)} onClick={() => { void handover.request(id, !order.handedOver, undefined, undefined, postItem ? trimmedTracking : undefined) }}>{order.handedOver ? 'Undo handover' : (postItem ? 'Handed to Post' : deliveryItem ? 'Mark delivered' : 'Mark picked up')}</Button>}
+          {order.handedOver ? (
+            // Finished order: undo is only for mistakes, so it stays folded away and appears once on the page.
+            <details className={styles.undoMistake}>
+              <summary>Handed over by mistake?</summary>
+              <p className={styles.muted}>Undo it first to change the ornaments or cancel the order.</p>
+              <Button tone="staff" variant="secondary" fullWidth disabled={busy || handover.busy || itemStatus.unconfirmed} onClick={() => { void handover.request(id, false) }}>Undo handover</Button>
+            </details>
+          ) : paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || !allFinished} onClick={() => { void handover.request(id, true, undefined, undefined, postItem ? trimmedTracking : undefined) }}>{postItem ? 'Handed to Post' : deliveryItem ? 'Mark delivered' : 'Mark picked up'}</Button>}
         </section>
         {order.source !== 'web' && !order.checkoutStatus ? <SoldAtPanel order={order} days={days} markets={markets} busy={busy}
           onSave={marketDayId => runAction(() => api.orders.setSaleMarket(id, marketDayId), 'Market changed.')} /> : null}
@@ -298,10 +306,11 @@ function OrderDetail({ id }: { id: string }) {
         </details>
         {hasForm && !formWaiting ? <details className={styles.panel}><summary>Customer form <span className={styles.muted}>Completed</span></summary>{formContent}</details> : null}
         <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
-        <div className={styles.dangerZone}>
-          <Button tone="staff" variant="ghost" className={styles.cancelBtn} disabled={busy || order.handedOver || items.some(item => item.handedOver)} onClick={() => setCancelOpen(true)}>Cancel order</Button>
-          {(order.handedOver || items.some(item => item.handedOver)) && <p className={styles.muted}>An order with handed-over items cannot be cancelled. Undo handover first.</p>}
-        </div>
+        {/* A handed-over order cannot be cancelled; the undo above explains the way back, so no dead button here. */}
+        {order.handedOver ? null : <div className={styles.dangerZone}>
+          <Button tone="staff" variant="ghost" className={styles.cancelBtn} disabled={busy || items.some(item => item.handedOver)} onClick={() => setCancelOpen(true)}>Cancel order</Button>
+          {items.some(item => item.handedOver) && <p className={styles.muted}>An order with handed-over items cannot be cancelled. Undo handover first.</p>}
+        </div>}
       </aside>
     </div>
     {cancelOpen && <CancelOrderDialog busy={busy} order={order} items={items} onClose={() => setCancelOpen(false)} onConfirm={(reason) => { void cancelOrder(reason) }} />}
