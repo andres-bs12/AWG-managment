@@ -26,7 +26,9 @@ jobs:
       - run: docker info --format '{{.ServerVersion}}'
       - run: ./mvnw -q -B test
       - name: Postgres schema test ran (not skipped)
-        run: grep -q 'Tests run: [1-9][0-9]*, Failures: 0, Errors: 0, Skipped: 0' target/surefire-reports/com.artwithgab.awg_tracking.PostgresSchemaTests.txt
+        # Block scalar: the pattern contains ": ", which plain YAML reads as a mapping and GitHub then rejects the whole file.
+        run: |
+          grep -q 'Tests run: [1-9][0-9]*, Failures: 0, Errors: 0, Skipped: 0' target/surefire-reports/com.artwithgab.awg_tracking.PostgresSchemaTests.txt
 
   frontend:
     runs-on: ubuntu-24.04
