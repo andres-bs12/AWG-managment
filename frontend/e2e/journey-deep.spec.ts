@@ -154,7 +154,8 @@ test('two ornaments keep independent colour, finish, names, previews and totals 
   await namedDesign(page, /^(Grün|Green)$/, /^(Matt|Matte)$/, 'Max')
   const secondLabel = 'Grün, Matt, Name: Max · Hinten'
   await expect(preview(page)).toHaveAttribute('aria-label', secondLabel)
-  const twoTotal = 2 * (config.customPrice + config.nameExtra) + config.deliveryFee
+  // Step 1 shows only the ornaments; shipping is added on the delivery step.
+  const twoTotal = 2 * (config.customPrice + config.nameExtra)
   await expect(price(page)).toHaveText(money(twoTotal))
 
   for (const [color, finish, name, label] of [
@@ -174,7 +175,7 @@ test('two ornaments keep independent colour, finish, names, previews and totals 
   await page.getByRole('button', { name: 'Kugel 2 – Max entfernen', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Kugel 2 – Max entfernen', exact: true })).toHaveCount(0)
   await expect(preview(page)).toHaveAttribute('aria-label', firstLabel)
-  const remainingTotal = config.customPrice + config.nameExtra + config.deliveryFee
+  const remainingTotal = config.customPrice + config.nameExtra
   await expect(price(page)).toHaveText(money(remainingTotal))
   await expect(page.getByRole('img', { name: 'Foto 1 von Luna', exact: true })).toBeVisible()
   await fillDelivery(page)
@@ -187,7 +188,7 @@ test('name option adds exactly 12.99, turns to the scripted back and retains its
   const config = await prepare(page)
   expect(config.nameExtra).toBe(12.99)
   await choose(page)
-  const base = config.customPrice + config.deliveryFee
+  const base = config.customPrice
   await expect(price(page)).toHaveText(money(base))
   await nameOption(page).check()
   await expect(price(page)).toHaveText(money(base + 12.99))
@@ -258,20 +259,20 @@ test('configuration reacts in under 100ms (median of five colour clicks and five
   await nameOption(page).check()
   await page.locator('input[id^="back-"]').fill('LUNA')
   await nameOption(page, false).check()
-  await expect(price(page)).toHaveText(money(config.customPrice + config.deliveryFee))
+  await expect(price(page)).toHaveText(money(config.customPrice))
   const colourSamples: number[] = []
   for (const color of ['Grün', 'Rot', 'Grün', 'Rot', 'Grün']) {
     // Colour has the same price in the product contract: assert it stays correct
     // rather than inventing a colour surcharge just to force a price mutation.
     colourSamples.push(await measuredClick(page, page.getByRole('radio', { name: color, exact: true }).locator('..'),
-      `${color}, Glänzend, Name: kein Name · Vorne`, money(config.customPrice + config.deliveryFee), false))
+      `${color}, Glänzend, Name: kein Name · Vorne`, money(config.customPrice), false))
     await expect(page.getByRole('radio', { name: color, exact: true })).toBeChecked()
   }
   const priceSamples: number[] = []
   for (const withName of [true, false, true, false, true]) {
     priceSamples.push(await measuredClick(page, nameOption(page, withName),
       `Grün, Glänzend, Name: ${withName ? 'LUNA · Hinten' : 'kein Name · Vorne'}`,
-      money(config.customPrice + config.deliveryFee + (withName ? config.nameExtra : 0)), true))
+      money(config.customPrice + (withName ? config.nameExtra : 0)), true))
     await expect(nameOption(page)).toBeChecked({ checked: withName })
   }
   const median = (values: number[]) => [...values].sort((a, b) => a - b)[2]

@@ -5,8 +5,8 @@ test('back name retains value and changes the preview and price', async ({ page 
   await open(page); await choose(page);  const yes = page.getByRole('radio', { name: /^(Ja|Yes),/ })
   await yes.check(); await page.locator('input[id^="back-"]').fill('LUNA')
   await expect(page.getByRole('radio', { name: /^(Hinten|Back)$/ })).toBeChecked()
-  await expect(page.locator('[data-buy-total]:visible').first().locator('[aria-hidden="true"]')).toContainText('67,99')
-  await page.getByRole('radio', { name: /^(Nein|No)$/ }).check(); await expect(page.locator('[data-buy-total]:visible').first().locator('[aria-hidden="true"]')).toContainText('55,00')
+  await expect(page.locator('[data-buy-total]:visible').first().locator('[aria-hidden="true"]')).toContainText('62,99')
+  await page.getByRole('radio', { name: /^(Nein|No)$/ }).check(); await expect(page.locator('[data-buy-total]:visible').first().locator('[aria-hidden="true"]')).toContainText('50,00')
   await yes.check(); await expect(page.locator('input[id^="back-"]')).toHaveValue('LUNA')
 })
 

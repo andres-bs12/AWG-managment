@@ -194,7 +194,8 @@ export function BuyPage() {
   const backNameMax = shopConfig.backNameMax ?? DEFAULT_BACK_NAME_MAX
   const itemPrice = (item: BuyItem) => customBasePrice(item.size, shopConfig) + (item.withName ? shopConfig.nameExtra : 0)
   const itemsTotal = draft.items.reduce((sum, item) => sum + itemPrice(item), 0)
-  const deliveryFee = draft.deliveryKind === 'market' ? 0 : shopConfig.deliveryFee
+  // Step 1 shows only the ornaments: shipping is added once the customer picks a delivery (owner, 2026-11-27).
+  const deliveryFee = step === 0 || draft.deliveryKind === 'market' ? 0 : shopConfig.deliveryFee
   const total = draft.items.length ? itemsTotal + deliveryFee : 0
   const err = (key: string) => errors[key]?.startsWith('api:') ? apiError({ code: errors[key].slice(4) }, locale, t('shopCheckoutError')).text : errors[key] ? t(errors[key], { max: backNameMax }) : undefined
   const described = (key: string, hint = false) => [hint ? `${key}-hint` : '', err(key) ? `${key}-error` : ''].filter(Boolean).join(' ') || undefined

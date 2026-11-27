@@ -123,7 +123,7 @@ for (const locale of ['de', 'en'] as const) {
   })
 
   test(`with no market day to offer, market pickup is switched off up front instead of a dead end (${locale})`, async ({ page }) => {
-    // Production 27 Nov 2026: web pickups start on 30 Nov (SHOP_DELIVERIES_FROM) and no market day follows.
+    // E.g. production on 27 Nov 2026 before web pickups were opened: no market day to offer.
     await open(page, locale)
     await page.evaluate(async () => {
       const path = '/src/api/client.ts'; const { api } = await import(path)
