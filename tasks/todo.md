@@ -4,6 +4,7 @@
 
 Contexto y porqué en [AGENTS.md → Estado y siguientes tareas](../AGENTS.md#estado-y-siguientes-tareas).
 
+- [ ] **Dueño · Hoy, antes de abrir Baden (14:30):** Agenda → viernes 27, sábado 28 y domingo 29 → «Gaby paints at» = Weihnachtsquartier – FRANCIS. Así Baden no ofrece recogida el mismo día de personalizados y FRANCIS sí. Sin despliegue; por qué en AGENTS.md («Dos mercados con una sola pintora»).
 - [ ] **Dueño · PR #14:** aprobar y fusionar en `main` (detalle de pedido simplificado; sin backend ni migraciones; CI en verde).
 - [ ] **Dueño · Despliegue:** `deploy/deploy.sh` desde su Mac, fuera del horario del mercado. Un solo despliegue con todo `main` (V20–V24).
 - [ ] **Tras desplegar · Ventas del 26 nov:** AWG93Y5A7 y AWG8R9T2K → «Sold at» → Change → Weihnachtsmarkt Kurpark Baden. AWG93Y5A7 → Change junto al total → 90 €.
