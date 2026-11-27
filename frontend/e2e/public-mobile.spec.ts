@@ -261,7 +261,7 @@ test('five ornaments keep named tiles, active preview, totals, removal and cross
     if (index) await expect(tile(page, name)).toHaveAttribute('aria-current', 'true')
     else await expect(page.locator('[data-ornament]')).toHaveCount(0)
     await actions(page)
-    await expect(total(page)).toHaveText(money((index + 1) * (config.customPrice + config.nameExtra) + config.deliveryFee))
+    await expect(total(page)).toHaveText(money((index + 1) * (config.customPrice + config.nameExtra)))
   }
   await expect(page.locator('[data-ornament]')).toHaveCount(5)
   await expect(page.getByRole('tab')).toHaveCount(0)
@@ -291,7 +291,7 @@ test('five ornaments keep named tiles, active preview, totals, removal and cross
   await page.getByRole('button', { name: 'Change ornament Pip', exact: true }).click()
   await page.getByRole('button', { name: 'Remove Ornament 5 – Pip', exact: true }).click()
   await expect(page.locator('[data-ornament]')).toHaveCount(4)
-  await expect(total(page)).toHaveText(money(4 * (config.customPrice + config.nameExtra) + config.deliveryFee))
+  await expect(total(page)).toHaveText(money(4 * (config.customPrice + config.nameExtra)))
   await actions(page)
 })
 

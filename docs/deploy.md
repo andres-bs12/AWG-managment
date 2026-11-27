@@ -42,7 +42,7 @@ Consulta el estado con `docker compose --env-file .env ps` y los registros con `
 | `STAFF_GABY_PASSWORD` | Contraseña inicial para crear la cuenta de Gaby. |
 | `STAFF_ANDRES_PASSWORD` | Contraseña inicial para crear la cuenta de Andres. |
 | `SHOP_ENABLED` | `false` desactiva la tienda; usa `true` solo cuando Stripe y el dominio estén configurados. |
-| `SHOP_DELIVERIES_FROM` | Primer día de recogida web en mercado (por defecto `2026-11-30`). |
+| `SHOP_DELIVERIES_FROM` | Primer día de recogida web en mercado (vacío por defecto = desde mañana; antes `2026-11-30`, el dueño abrió la recogida web el 2026-11-27). Si el `.env` del servidor aún dice `2026-11-30`, vaciarlo. |
 | `SHOP_PRIMARY_PICKUP_MARKET_ID` | `awg.shop.primary-pickup-market-id`. UUID del mercado primario para recogida web en fechas solapadas y respaldo para el puesto efectivo de pintura. Vacío por defecto. |
 | `SHIPPING_FEE` | `awg.pricing.shipping`. 5,00 € por pedido por defecto. Stock puede sustituirlo. |
 | `POST_COLLECTION_WEEKDAYS` | `awg.post.collection-weekdays`. `TUESDAY,FRIDAY` por defecto. Stock puede sustituirlo. Los festivos se desplazan al siguiente día laborable. |

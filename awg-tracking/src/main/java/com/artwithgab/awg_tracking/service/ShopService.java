@@ -228,12 +228,16 @@ public class ShopService {
         if (last.isAfter(seasonEnd())) last = seasonEnd();
         List<PickupDayDto> out = new ArrayList<>();
         for (LocalDate d = first; !d.isAfter(last); d = d.plusDays(1)) {
-            Optional<MarketDay> stall = webPickupDay(s.index(), d);
-            if (stall.isEmpty() || !hasPickupWindow(stall.get())) continue;
+            List<MarketDay> stalls = webPickupStalls(s.index(), d).stream().filter(ShopService::hasPickupWindow)
+                    .sorted(Comparator.comparing((MarketDay day) -> day.getMarket().getName())).toList();
+            if (stalls.isEmpty()) continue;
+            // Painting is always on an earlier day, so every stall open that day can hand it over
+            // (owner, 2026-11-27: Gaby paints at FRANCIS and the piece is taken to Baden).
             if (plan(s, d, durations) == null) continue;
-            MarketDay day = stall.get();
-            out.add(new PickupDayDto(d.toString(), day.getId().toString(), d.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH).toLowerCase(Locale.ROOT),
-                    day.getMarket().getName(), day.getMarket().getStall(), day.getOpenTime().toString(), day.getCloseTime().toString()));
+            for (MarketDay day : stalls) {
+                out.add(new PickupDayDto(d.toString(), day.getId().toString(), d.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH).toLowerCase(Locale.ROOT),
+                        day.getMarket().getName(), day.getMarket().getStall(), day.getOpenTime().toString(), day.getCloseTime().toString()));
+            }
         }
         return out;
     }
@@ -244,12 +248,22 @@ public class ShopService {
         return from != null && from.isAfter(first) ? from : first;
     }
 
-    private Optional<MarketDay> webPickupDay(CalendarIndex index, LocalDate date) {
+    /**
+     * Stalls that take web pickups on a date. With two stalls open the customer picks one (each is
+     * listed with its own market day id); a configured primary market limits it to that market.
+     */
+    private List<MarketDay> webPickupStalls(CalendarIndex index, LocalDate date) {
         List<MarketDay> stalls = index.marketDaysOn(date);
-        if (stalls.size() <= 1) return stalls.stream().findFirst();
         var primary = props.shop().primaryPickupMarketId();
-        return primary == null ? Optional.empty()
-                : stalls.stream().filter(day -> day.getMarket().getId().equals(primary)).findFirst();
+        if (stalls.size() <= 1 || primary == null) return stalls;
+        return stalls.stream().filter(day -> day.getMarket().getId().equals(primary)).toList();
+    }
+
+    /** The stall chosen at checkout: by its market day id, or the only stall when the client sent none. */
+    private Optional<MarketDay> webPickupDay(CalendarIndex index, LocalDate date, UUID marketDayId) {
+        List<MarketDay> stalls = webPickupStalls(index, date);
+        if (marketDayId == null) return stalls.size() == 1 && index.marketDaysOn(date).size() == 1 ? stalls.stream().findFirst() : Optional.empty();
+        return stalls.stream().filter(day -> day.getId().equals(marketDayId)).findFirst();
     }
 
     private static boolean hasPickupWindow(MarketDay day) {
@@ -347,11 +361,8 @@ public class ShopService {
         LocalDate today = s.index().today();
         MarketDay pickupDay = null;
         if (pickup) {
-            pickupDay = webPickupDay(s.index(), req.deliveryDate()).orElse(null);
-            boolean wrongMarket = req.marketDayId() == null
-                    ? s.index().marketDaysOn(req.deliveryDate()).size() > 1
-                    : pickupDay == null || !pickupDay.getId().equals(req.marketDayId());
-            if (pickupDay == null || wrongMarket || req.deliveryDate().isBefore(firstWebPickupDay(today))
+            pickupDay = webPickupDay(s.index(), req.deliveryDate(), req.marketDayId()).orElse(null);
+            if (pickupDay == null || req.deliveryDate().isBefore(firstWebPickupDay(today))
                     || req.deliveryDate().isAfter(today.plusDays(props.shop().maxDaysAhead()))
                     || req.deliveryDate().isAfter(seasonEnd()) || !hasPickupWindow(pickupDay)) {
                 throw new BadRequestException("Choose one of the offered market days.").code("PICKUP_DAY_INVALID").field("deliveryDate");
