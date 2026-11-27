@@ -81,10 +81,12 @@ test('staff changes the price of a past sale after confirming', async ({ page })
   await page.getByRole('link', { name: 'Open order', exact: true }).click()
 
   const payment = page.getByRole('region', { name: 'Payment' })
-  await payment.locator('summary', { hasText: 'Change price' }).click()
-  await payment.getByLabel('New total (€)').fill('60')
-  await payment.getByRole('button', { name: /Change price to/ }).click()
+  // «Change» sits beside the total in the summary; the Payment panel does not repeat it.
+  await expect(payment.getByRole('button', { name: /Change price/ })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Change price', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Change price?' })
+  await expect(dialog.getByRole('button', { name: 'Change price', exact: true })).toBeDisabled()
+  await dialog.getByLabel('New total (€)').fill('60')
   await expect(dialog).toContainText('€70.00')
   await expect(dialog).toContainText('€60.00')
   if (process.env.PW_DISCOUNT_SHOTS) await page.screenshot({ path: `${process.env.PW_DISCOUNT_SHOTS}/change-price-${test.info().project.name}.png`, animations: 'disabled' })
@@ -108,14 +110,27 @@ test('a ready-made sale shows no painting controls and can move to another marke
   await expect(page.getByRole('region', { name: 'Production' })).toHaveCount(0)
   await expect(page.getByText('No reference photo')).toHaveCount(0)
   await expect(page.getByRole('article', { name: /RM01/ }).getByRole('button')).toHaveCount(0)
+  // Handed over at the sale: one undo, at the bottom.
   await expect(page.getByRole('button', { name: 'Undo handover', exact: true })).toHaveCount(1)
 
+  // The top summary says it at a glance: picked up, and the market the sale counts for, each in its own cell.
+  await expect(page.getByText('Picked up', { exact: true })).toBeVisible()
+  // The handover shows its real day and time, never the market's opening hours.
+  await expect(page.getByText(/^Rathausplatz · \w{3},? \d{1,2} \w{3} · \d{2}:\d{2}$/)).toBeVisible()
+  await expect(page.getByText('Sold at', { exact: true })).toHaveCount(1)
+  // How it was paid sits with the payment state; no «Stall order» line (the Sold at cell already says where).
+  await expect(page.getByRole('region', { name: 'Payment' })).toContainText('Paid · Cash')
+  await expect(page.getByText(/Stall order/)).toHaveCount(0)
+  // Taken away on the spot: nothing for the customer to track, and no contact panel without contact data.
+  await expect(page.getByRole('link', { name: /View customer tracking/ })).toHaveCount(0)
+  await expect(page.getByText('Customer contact', { exact: true })).toHaveCount(0)
+  await expect(page.locator('summary', { hasText: 'Sold at' })).toHaveCount(0)
   // Sold at: move the sale to the other stall open that day.
-  const soldAt = page.locator('summary', { hasText: 'Sold at' })
-  await expect(soldAt).toContainText('Rathausplatz')
-  await soldAt.click()
-  await page.getByLabel(/Market open on/).selectOption({ label: 'Christkindlmarkt Spittelberg' })
-  await page.getByRole('button', { name: 'Save market', exact: true }).click()
+  await page.getByRole('button', { name: 'Change market', exact: true }).click()
+  const soldAt = page.getByRole('dialog', { name: 'Sold at', exact: true })
+  await soldAt.getByLabel(/Market open on/).selectOption({ label: 'Christkindlmarkt Spittelberg' })
+  await soldAt.getByRole('button', { name: 'Save market', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Market changed.' })).toBeVisible()
-  await expect(soldAt).toContainText('Christkindlmarkt Spittelberg')
+  await expect(soldAt).toHaveCount(0)
+  await expect(page.getByText('Christkindlmarkt Spittelberg', { exact: true })).toBeVisible()
 })

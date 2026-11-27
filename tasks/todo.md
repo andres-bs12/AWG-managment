@@ -1,5 +1,16 @@
 # Tareas AWG
 
+## Traspaso 2026-11-27 (lo primero)
+
+Contexto y porqué en [AGENTS.md → Estado y siguientes tareas](../AGENTS.md#estado-y-siguientes-tareas).
+
+- [ ] **Dueño · PR #14:** aprobar y fusionar en `main` (detalle de pedido simplificado; sin backend ni migraciones; CI en verde).
+- [ ] **Dueño · Despliegue:** `deploy/deploy.sh` desde su Mac, fuera del horario del mercado. Un solo despliegue con todo `main` (V20–V24).
+- [ ] **Tras desplegar · Ventas del 26 nov:** AWG93Y5A7 y AWG8R9T2K → «Sold at» → Change → Weihnachtsmarkt Kurpark Baden. AWG93Y5A7 → Change junto al total → 90 €.
+- [ ] **Dueño · Stock Medium:** contar y cargar las bases Medium en Stock (empiezan en 0).
+- [ ] **Dueño · Foto de vista previa para Google:** revisar la propuesta pendiente.
+- [ ] **Agentes · UI:** pasar la «Lista de revisión de UI» de AGENTS.md sobre cada pantalla y captura antes de enseñarla (el dueño corrigió muchos errores simples el 26 nov).
+
 ## Pendientes tras v3.2.0 (2026-11-22)
 
 - [ ] **Asesor · Datenschutz:** ¿hay que nombrar a Anthropic? Con el conector MCP, Andrés y Gaby consultan pedidos (nombre, teléfono, dirección) desde claude.ai.

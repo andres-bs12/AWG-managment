@@ -10,6 +10,7 @@ import { useItemStatus } from '../../components/staff/useItemStatus'
 import { useHandover } from '../../components/staff/useHandover'
 import { InsetNote } from '../../components/public/PublicForm'
 import { OrderItemCard } from '../../components/staff/OrderItemCard'
+import { ChangePriceDialog } from '../../components/staff/ChangePriceDialog'
 import { OrderPaymentPanel } from '../../components/staff/OrderPaymentPanel'
 import { QrCode } from '../../components/staff/QrCode'
 import { StaffBackLink } from '../../components/staff/StaffBackLink'
@@ -48,6 +49,7 @@ function OrderDetail({ id }: { id: string }) {
   useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(''), 5000); return () => window.clearTimeout(timer) }, [notice])
   const [busy, setBusy] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [priceOpen, setPriceOpen] = useState(false)
   const actionLock = useRef(false)
   const [copied, setCopied] = useState(false)
   const [addressCopied, setAddressCopied] = useState(false)
@@ -100,6 +102,8 @@ function OrderDetail({ id }: { id: string }) {
   const allFinished = items.length > 0 && finishedCount === items.length
   const onlyReadyMade = items.length > 0 && items.every(item => item.kind === 'finished')
   const formWaiting = items.some(item => item.kind === 'custom' && !item.formComplete)
+  const stallSale = order.source !== 'web' && !order.checkoutStatus
+  const walkInSale = stallSale && onlyReadyMade
   const hasForm = items.some(item => item.kind === 'custom')
   const postItem = items.find(item => item.delivery.kind === 'post')
   const viennaItem = items.find(item => item.delivery.kind === 'vienna')
@@ -117,6 +121,17 @@ function OrderDetail({ id }: { id: string }) {
   const trackingInvalid = Boolean(trimmedTracking && !TRACKING_NUMBER_REGEX.test(trimmedTracking))
   const trackingDirty = trimmedTracking !== (order.trackingNumber ?? '')
   const handoffs = [...new Set(items.map(item => handoffLabel(item, days)))]
+  // Handed over: say where and when it actually happened (place · day · time), not the market's opening hours.
+  const handedOverAt = order.handedOver && order.handedOverAt ? new Date(order.handedOverAt) : null
+  const handedOverText = handedOverAt ? [
+    [...new Set(items.map(item => item.delivery.kind === 'post' ? 'Post' : item.delivery.kind === 'vienna' ? 'Vienna' : item.delivery.marketName ?? 'Market'))].join(' / '),
+    formatDateLabel(viennaDate(handedOverAt)),
+    new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' }).format(handedOverAt),
+  ].join(' · ') : null
+  const createdAt = new Date(order.createdAt.endsWith('Z') || /[+-]\d\d:\d\d$/.test(order.createdAt) ? order.createdAt : `${order.createdAt}Z`)
+  // Sold and handed over in the same minute (a ready-made stall sale): the summary already says when, so the line below does not repeat it.
+  const createdShown = !handedOverAt || Math.abs(handedOverAt.getTime() - createdAt.getTime()) >= 60000
+  const createdText = createdShown ? `Created ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(createdAt)} (Vienna)` : null
   const formUrl = `${window.location.origin}/form/${order.formToken}`
   // Unconfirmed online payments hold their slot but are not ready for painting or delivery yet.
   const paymentHeld = !order.handedOver && (order.checkoutStatus === 'pending' || order.checkoutStatus === 'review' || Boolean(order.paymentReview))
@@ -195,9 +210,8 @@ function OrderDetail({ id }: { id: string }) {
     </header>
     {order.needsReview ? <InsetNote tone="warning"><p role="status">New web order, paid online. Check the photos and the pickup or Post details.</p><Button tone="staff" disabled={busy} onClick={() => void runAction(() => api.orders.markReviewed(order.id), 'Marked as reviewed.')}>Mark reviewed</Button></InsetNote> : null}
     {order.paymentReview ? <InsetNote tone="warning"><p role="alert">Stripe reported a payment that does not match this order. Check it in Stripe, then record it as paid or deposit (or cancel the order). It remains held on the agenda until resolved.</p></InsetNote> : null}
-    <details className={styles.panel}><summary>Order info</summary><p>{order.source === 'web' || order.checkoutStatus ? 'Web order' : 'Stall order'} · Created {new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Vienna' }).format(new Date(order.createdAt.endsWith('Z') || /[+-]\d\d:\d\d$/.test(order.createdAt) ? order.createdAt : `${order.createdAt}Z`))} (Vienna)</p><p>Payment method: {order.paymentMethod ?? 'Not recorded'}</p></details>
-    <div className={styles.overview} data-delivery={Boolean(deliveryItem)}>
-      <div><span>{postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</span><strong><StaffText>{handoffs.join(' / ') || 'Not scheduled'}</StaffText></strong>
+    <div className={styles.overview} data-delivery={Boolean(deliveryItem)} data-sold="true">
+      <div><span>{order.handedOver ? (postItem ? 'Handed to Post' : deliveryItem ? 'Delivered' : 'Picked up') : postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</span><div className={styles.cellRow}><strong><StaffText>{handedOverText ?? (handoffs.join(' / ') || 'Not scheduled')}</StaffText></strong></div>
         {arrivalText ? <span className={styles.arrivalLine}>{arrivalText}</span> : null}
         {deliveryItem ? <div className={styles.handoffActions}>
           {addressText ? (
@@ -216,7 +230,16 @@ function OrderDetail({ id }: { id: string }) {
           {customer.phone ? <a href={`tel:${customer.phone}`}>{customer.phone}</a> : null}
         </div> : null}
       </div>
-      <div><span>{remaining > 0 ? 'Balance due' : 'Total · paid'}</span><a href="#payment-heading">{formatEur(remaining > 0 ? remaining : order.total, 'en')}</a></div>
+      {/* Stall sales: the market the sale counts for is its own cell of the summary, changed from here (no panel below). */}
+      {stallSale ? <SoldAtCell order={order} days={days} markets={markets} busy={busy}
+        onSave={marketDayId => runAction(() => api.orders.setSaleMarket(id, marketDayId), 'Market changed.')} />
+      : <div><span>Sold at</span><div className={styles.cellRow}><strong>Web shop</strong></div></div>}
+      <div><span>{remaining > 0 ? 'Balance due' : 'Total · paid'}</span>
+        {/* Value on the left, its «Change» on the right: the same row in every cell of the summary. */}
+        <div className={styles.cellRow}><a href="#payment-heading">{formatEur(remaining > 0 ? remaining : order.total, 'en')}</a>
+          {stallSale ? <button type="button" className={styles.inlineCopy} aria-label="Change price" disabled={busy} onClick={() => setPriceOpen(true)}>Change</button> : null}</div>
+        {priceOpen ? <ChangePriceDialog order={order} busy={busy} onClose={() => setPriceOpen(false)} onSetPrice={chargedTotal => runAction(() => api.payments.setPrice(id, chargedTotal), 'Price changed.')} /> : null}
+      </div>
     </div>
     {loadError || actionError ? <p className={styles.error} role="alert">{actionError || loadError}</p> : null}
     {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
@@ -231,16 +254,18 @@ function OrderDetail({ id }: { id: string }) {
       <section aria-labelledby="order-items" className={styles.items}>
         {items.map(item => {
           const allPostOrder = postItems.length > 0 && postItems.length === items.length
-          // Ready-made pieces all go together at the stall: the order panel's one handover button is enough.
-          const canItemHandover = items.length > 1 && !onlyReadyMade && !(allPostOrder && !(item.handedOver ?? order.handedOver))
-          return <OrderItemCard key={item.id} item={{ ...item, handedOver: item.handedOver ?? order.handedOver }} onHandover={canItemHandover ? () => { void handover.request(id, !(item.handedOver ?? order.handedOver), item.id) } : undefined} block={blocks.find(block => block.orderItemId === item.id)} days={days} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />
+          // Ready-made pieces all go together at the stall, and once the whole order is handed over the single undo
+          // lives in the order panel: in both cases the cards repeat no handover button.
+          const canItemHandover = items.length > 1 && !onlyReadyMade && !order.handedOver && !(allPostOrder && !(item.handedOver ?? order.handedOver))
+          return <OrderItemCard key={item.id} item={{ ...item, handedOver: item.handedOver ?? order.handedOver }} onHandover={canItemHandover ? () => { void handover.request(id, !(item.handedOver ?? order.handedOver), item.id) } : undefined} block={blocks.find(block => block.orderItemId === item.id)} days={days} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} orderDone={order.handedOver} sharedHandoff={handoffs.length === 1} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />
         })}
       </section>
       <aside className={styles.support} aria-label="Order management">
-        <section className={styles.panel} aria-labelledby="handoff-heading">
+        {/* Handed over: the summary at the top already says where and when, so only a Post parcel keeps this panel (tracking). */}
+        {order.handedOver && !postItem ? null : <section className={styles.panel} aria-labelledby="handoff-heading">
           <h2 id="handoff-heading">{postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</h2>
           {arrivalText ? <p className={styles.arrivalMeta}>{arrivalText}</p> : null}
-          {order.handedOver ? <p className={styles.muted}>{postItem ? 'Handed to Austrian Post.' : deliveryItem ? 'Delivered to the customer.' : 'Picked up at the stall.'}</p> : <p className={styles.muted}>{allFinished ? (postItem ? 'Ready to hand to Post.' : deliveryItem ? 'Ready to deliver.' : 'Ready for pickup.') : `${items.filter(item => item.productionStatus !== 'finished').length} still to finish.`}</p>}
+          {order.handedOver ? <p className={styles.muted}>{postItem ? 'Handed to Austrian Post.' : deliveryItem ? 'Delivered to the customer.' : 'Picked up at the stall.'}</p> : allFinished ? null : <p className={styles.muted}>{`${items.filter(item => item.productionStatus !== 'finished').length} still to finish.`}</p>}
           {postItem && !paymentHeld ? (
             <div className={styles.trackingBox}>
               {order.trackingUrl && order.trackingNumber ? (
@@ -283,25 +308,32 @@ function OrderDetail({ id }: { id: string }) {
               </div>
             </div>
           ) : null}
-          {paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished && !order.handedOver ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || (!order.handedOver && !allFinished)} onClick={() => { void handover.request(id, !order.handedOver, undefined, undefined, postItem ? trimmedTracking : undefined) }}>{order.handedOver ? 'Undo handover' : (postItem ? 'Handed to Post' : deliveryItem ? 'Mark delivered' : 'Mark picked up')}</Button>}
-        </section>
-        {order.source !== 'web' && !order.checkoutStatus ? <SoldAtPanel order={order} days={days} markets={markets} busy={busy}
-          onSave={marketDayId => runAction(() => api.orders.setSaleMarket(id, marketDayId), 'Market changed.')} /> : null}
-        <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method, amount) => runAction(() => api.payments.setPaymentState(id, state, method, amount), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} onSetPrice={(chargedTotal) => runAction(() => api.payments.setPrice(id, chargedTotal), 'Price changed.')} />
-        <details className={styles.panel}>
+          {order.handedOver ? null : paymentHeld ? <p className={styles.muted}>{order.checkoutStatus === 'pending' ? 'The customer has not finished paying online. It appears in deliveries once Stripe confirms the payment.' : 'Resolve the online payment below before delivery.'}</p> : <Button tone="staff" fullWidth variant={allFinished ? 'primary' : 'secondary'} disabled={busy || handover.busy || itemStatus.unconfirmed || !allFinished} onClick={() => { void handover.request(id, true, undefined, undefined, postItem ? trimmedTracking : undefined) }}>{postItem ? 'Handed to Post' : deliveryItem ? 'Mark delivered' : 'Mark picked up'}</Button>}
+        </section>}
+        <OrderPaymentPanel order={order} busy={busy} onSetState={(state, method, amount) => runAction(() => api.payments.setPaymentState(id, state, method, amount), state === 'paid' ? 'Marked as paid.' : 'Deposit recorded.')} />
+        {/* A walk-in sale with no phone or e-mail has no contact to show. */}
+        {walkInSale && !customer.phone && !customer.email ? null : <details className={styles.panel}>
           <summary>Customer contact</summary>
           <dl className={styles.contacts}>
             <div><dt>Name</dt><dd>{customer.name || 'Waiting for form'}</dd></div>
             <div><dt>Phone</dt><dd>{customer.phone ? <a href={`tel:${customer.phone}`}>{customer.phone}</a> : 'Waiting for form'}</dd></div>
             <div><dt>Email</dt><dd>{customer.email ? <a href={`mailto:${customer.email}`}>{customer.email}</a> : 'Waiting for form'}</dd></div>
           </dl>
-        </details>
-        {hasForm && !formWaiting ? <details className={styles.panel}><summary>Customer form <span className={styles.muted}>Completed</span></summary>{formContent}</details> : null}
-        <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>
-        <div className={styles.dangerZone}>
-          <Button tone="staff" variant="ghost" className={styles.cancelBtn} disabled={busy || order.handedOver || items.some(item => item.handedOver)} onClick={() => setCancelOpen(true)}>Cancel order</Button>
-          {(order.handedOver || items.some(item => item.handedOver)) && <p className={styles.muted}>An order with handed-over items cannot be cancelled. Undo handover first.</p>}
-        </div>
+        </details>}
+        {/* The form link and QR only matter until the order is handed over. */}
+        {hasForm && !formWaiting && !order.handedOver ? <details className={styles.panel}><summary>Customer form <span className={styles.muted}>Completed</span></summary>{formContent}</details> : null}
+        {/* No «Order info» disclosure (owner, 2026-11-26): where it was sold is in the summary, how it was paid in Payment. */}
+        {createdText ? <p className={styles.muted}>{createdText}</p> : null}
+        {/* A ready-made stall sale is taken away on the spot: the customer has nothing to track. */}
+        {walkInSale && order.handedOver ? null : <ButtonLink to={`/track/${order.code}`} tone="staff" variant="ghost">View customer tracking ↗</ButtonLink>}
+        {/* Handed over: undo is only for mistakes, so it sits once at the bottom, quiet and red, where Cancel would be.
+            It opens the usual confirmation. A handed-over order cannot be cancelled, so no dead Cancel button. */}
+        {order.handedOver ? <div className={styles.dangerZone}>
+          <Button tone="staff" variant="ghost" className={styles.cancelBtn} disabled={busy || handover.busy || itemStatus.unconfirmed} onClick={() => { void handover.request(id, false) }}>Undo handover</Button>
+        </div> : <div className={styles.dangerZone}>
+          <Button tone="staff" variant="ghost" className={styles.cancelBtn} disabled={busy || items.some(item => item.handedOver)} onClick={() => setCancelOpen(true)}>Cancel order</Button>
+          {items.some(item => item.handedOver) && <p className={styles.muted}>An order with handed-over items cannot be cancelled. Undo handover first.</p>}
+        </div>}
       </aside>
     </div>
     {cancelOpen && <CancelOrderDialog busy={busy} order={order} items={items} onClose={() => setCancelOpen(false)} onConfirm={(reason) => { void cancelOrder(reason) }} />}
@@ -310,25 +342,30 @@ function OrderDetail({ id }: { id: string }) {
 }
 
 /** Which stall the sale counts for (stats, sales list). Fixable when the market was loaded after the sale. */
-function SoldAtPanel({ order, days, markets, busy, onSave }: { order: Bundle['order']; days: MarketDay[]; markets: Market[]; busy: boolean; onSave: (marketDayId: string) => Promise<boolean> }) {
+function SoldAtCell({ order, days, markets, busy, onSave }: { order: Bundle['order']; days: MarketDay[]; markets: Market[]; busy: boolean; onSave: (marketDayId: string) => Promise<boolean> }) {
   const saleDate = viennaDate(order.createdAt)
   const stallIds = new Set(markets.filter(market => market.kind === 'market').map(market => market.id))
   const choices = days.filter(day => day.date === saleDate && stallIds.has(day.marketId))
+  const [open, setOpen] = useState(false)
   const [choice, setChoice] = useState('')
   const name = (id: string) => markets.find(market => market.id === id)?.name ?? 'Market'
   const selected = choice || order.soldOnMarketDayId || ''
-  return <details className={styles.panel}>
-    <summary>Sold at · <StaffText>{order.soldAtMarketName ?? 'No market'}</StaffText></summary>
-    {choices.length ? <>
-      <Field label={`Market open on ${formatDateLabel(saleDate)}`} htmlFor="sold-at-market">
-        <select id="sold-at-market" value={selected} disabled={busy} onChange={event => setChoice(event.target.value)}>
-          {!order.soldOnMarketDayId ? <option value="">Choose a market</option> : null}
-          {choices.map(day => <option key={day.id} value={day.id}>{name(day.marketId)}</option>)}
-        </select>
-      </Field>
-      <Button tone="staff" variant="secondary" disabled={busy || !selected || selected === order.soldOnMarketDayId} onClick={() => { void onSave(selected).then(ok => { if (ok) setChoice('') }) }}>Save market</Button>
-    </> : <p className={styles.muted}>No stall market was open on {formatDateLabel(saleDate)}. Add the market and that day in Markets first.</p>}
-  </details>
+  return <div>
+    <span>Sold at</span>
+    <div className={styles.cellRow}><strong><StaffText>{order.soldAtMarketName ?? 'No market'}</StaffText></strong>
+      <button type="button" className={styles.inlineCopy} aria-label="Change market" onClick={() => setOpen(true)}>Change</button></div>
+    {open ? <StaffDialog title="Sold at" busy={busy} onClose={() => { setOpen(false); setChoice('') }}>
+      {choices.length ? <>
+        <Field label={`Market open on ${formatDateLabel(saleDate)}`} htmlFor="sold-at-market">
+          <select id="sold-at-market" value={selected} disabled={busy} onChange={event => setChoice(event.target.value)}>
+            {!order.soldOnMarketDayId ? <option value="">Choose a market</option> : null}
+            {choices.map(day => <option key={day.id} value={day.id}>{name(day.marketId)}</option>)}
+          </select>
+        </Field>
+        <Button tone="staff" disabled={busy || !selected || selected === order.soldOnMarketDayId} onClick={() => { void onSave(selected).then(ok => { if (ok) { setChoice(''); setOpen(false) } }) }}>Save market</Button>
+      </> : <p className={styles.muted}>No stall market was open on {formatDateLabel(saleDate)}. Add the market and that day in Markets first.</p>}
+    </StaffDialog> : null}
+  </div>
 }
 
 function CancelOrderDialog({ busy, order, items, onClose, onConfirm }: { busy: boolean; order: Bundle['order']; items: Bundle['items']; onClose: () => void; onConfirm: (reason: string) => void }) {
