@@ -117,3 +117,5 @@ Invoices use `V12__invoices.sql`. They run entirely behind existing payment/hand
 ## Public form compatibility
 
 The current public UI remains the three-screen flow (Design → Delivery/contact → Review), with one page per ornament, tile picker, optional paid back name and no separate pet-name field or mobile design substeps. `petName` is optional; a paid back name also supplies it. The API retains existing legacy fields. Track consumes cancellation and per-item handover data while retaining the newer public layout. The public Track UI offers a lookup only. The legacy address PATCH is still in the backend with form-token authorization.
+
+`GET /api/track/{code}` adds `discount` (2026-11-27): the stall discount in euros (`0` when none). Item `cost` stays the list price and `total` is what was charged, so Track shows a «Rabatt» line. Optional in TypeScript for older servers.

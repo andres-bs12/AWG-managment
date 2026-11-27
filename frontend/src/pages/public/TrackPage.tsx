@@ -149,10 +149,13 @@ export function TrackPage() {
     if (whenLines.length === 0 && !marketWhen) whenLines.push(t('whenTbd'))
   }
 
-  // Track has no fee field: for Post orders the difference between total and ornaments is the shipping line.
+  // Track has no fee field: for Post orders the difference between the list total and ornaments is the shipping line.
+  // Item costs are list prices; a stall discount is its own line so the receipt adds up to the total.
+  const discount = view?.discount && view.discount > 0.005 ? view.discount : undefined
   const itemsSum = view ? view.items.reduce((sum, item) => sum + (item.cost ?? 0), 0) : 0
-  const shippingFee = view && isPost && view.total != null && view.items.every(item => item.cost != null) && view.total - itemsSum > 0.005
-    ? Math.round((view.total! - itemsSum) * 100) / 100 : undefined
+  const listTotal = view?.total != null ? view.total + (discount ?? 0) : undefined
+  const shippingFee = view && isPost && listTotal != null && view.items.every(item => item.cost != null) && listTotal - itemsSum > 0.005
+    ? Math.round((listTotal - itemsSum) * 100) / 100 : undefined
 
   // The form was saved even if loading the order fails: both cards confirm it, at the card's content width.
   const savedBanner = formSaved ? <p ref={savedNotice} tabIndex={-1} className={styles.savedBanner} role="status">{t('formSavedBanner')}</p> : null
@@ -206,7 +209,7 @@ export function TrackPage() {
               </div>}
             </dl>
 
-            <OrderReceipt items={view.items} total={view.total} paymentState={view.paymentState} shipping={shippingFee} />
+            <OrderReceipt items={view.items} total={view.total} paymentState={view.paymentState} shipping={shippingFee} discount={discount} />
 
             <div className={styles.contact}>
               <a className={styles.instagram} href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer">

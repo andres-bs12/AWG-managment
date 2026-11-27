@@ -1757,6 +1757,7 @@ export function getTrackByCode(code: string): TrackView {
     status: trackStatusFor(order, items),
     customerName: personal ? customer?.name.split(' ')[0] ?? '' : '',
     trackingUrl,
+    discount: order.discount ?? 0,
     items: items.map((i) => ({
       color: i.color,
       finish: i.finish,

@@ -308,6 +308,8 @@ export type TrackView = {
   when: TrackWhen
   /** Post parcel link built by the server; null without a parcel number. */
   trackingUrl?: string | null
+  /** Stall discount (list price minus what was charged). Item costs are list prices; total is net of it. */
+  discount?: number
 }
 
 export type CustomerFormView = {
