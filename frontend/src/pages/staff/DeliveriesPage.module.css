@@ -1,9 +1,10 @@
+/* Design system §4.2: PageHeader block → content 24px; h1 → its line below 8px. */
 .head {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
 .head h1 {
-  margin-bottom: var(--space-1);
+  margin-bottom: var(--space-2);
 }
 
 .hint {
@@ -57,8 +58,9 @@
 .past { display: flex; align-items: center; gap: var(--space-2); margin: 0; justify-self: start; }
 .past input { width: var(--size-check); height: var(--size-check); accent-color: var(--staff-btn); }
 /* Day first (what to hand over when), then one row that narrows it: Handoff → Pickup market → Production. */
-.dayBlock { display: grid; gap: var(--space-3); min-width: 0; }
-.refine { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-4) var(--space-5); border-top: var(--border-thin) solid var(--staff-line); padding-top: var(--space-4); min-width: 0; }
+/* Segmented control → following content 24px; field → field 24px; sections 32px with the divider centred (16 + line + 16). */
+.dayBlock { display: grid; gap: var(--space-5); min-width: 0; }
+.refine { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-5); border-top: var(--border-thin) solid var(--staff-line); padding-top: var(--space-4); min-width: 0; }
 .refine > * { min-width: 0; }
 .refine .market { flex: 1 1 var(--size-staff-name); max-width: calc(var(--size-staff-name) * 1.6); margin: 0; }
 .refine .market label { font-size: inherit; line-height: inherit; }
@@ -78,7 +80,7 @@
 .panel { display: grid; gap: var(--space-4); min-width: 0; background: transparent; border: 0; padding: 0; }
 /* The live-region line stays in the DOM while empty but must not take a gap slot. */
 .panel > p:empty { display: none; }
-.filters { grid-template-columns: minmax(0, 1fr); margin: 0; padding: var(--space-4); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius); background: var(--staff-surface); gap: var(--space-5); }
+.filters { grid-template-columns: minmax(0, 1fr); margin: 0; padding: var(--space-4); border: var(--border-thin) solid var(--staff-line); border-radius: var(--radius); background: var(--staff-surface); gap: var(--space-4); }
 .filters > * { min-width: 0; }
 .group { display: grid; gap: var(--space-3); margin-top: 0; }
 .group h2 { margin-bottom: var(--space-1); font-size: var(--type-staff-h2-size); }
@@ -88,8 +90,8 @@
 @media (min-width: 768px) { .quickDay { display: none; } }
 @media (max-width: 767px) {
   .dayFilters { display: none; }
-  .filters { gap: var(--space-3); }
-  .refine { border-top: 0; padding-top: 0; gap: var(--space-3); }
+  .filters { gap: var(--space-5); }
+  .refine { border-top: 0; padding-top: 0; }
   .refine .market { max-width: none; flex-basis: 100%; }
   .head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); justify-content: space-between; }
   .head h1 { margin: 0; }

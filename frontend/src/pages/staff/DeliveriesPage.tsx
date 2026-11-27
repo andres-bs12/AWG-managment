@@ -16,7 +16,7 @@ import { StaffText } from '../../components/staff/StaffText'
 import type { AgendaDay, DeliveryKind, ProductionStatus } from '../../domain/types'
 import { formatHour } from '../../lib/time'
 import { formatStaffShortDate } from '../../lib/postShipping'
-import { groupDeliveryOrders, remainingDeliveries, type DatedDelivery } from '../../lib/staffDeliveries'
+import { groupDeliveryOrders, isHandedOverAtSale, remainingDeliveries, type DatedDelivery } from '../../lib/staffDeliveries'
 import styles from './DeliveriesPage.module.css'
 
 
@@ -183,6 +183,7 @@ export function DeliveriesPage() {
   // Every filter except the day: the day chips are built from these rows, so a chip only exists
   // for a day that has something to hand over under the current Handoff/Market/Production choice.
   function matchesOtherFilters(row: DatedDelivery): boolean {
+    if (isHandedOverAtSale(row)) return false
     if (routeMode && row.deliveryKind !== 'vienna') return false
     if (effectiveKind !== 'all' && row.deliveryKind !== effectiveKind) return false
     if (!routeMode && effectiveKind !== 'vienna' && effectiveKind !== 'post' && marketFilter !== 'all' && row.marketId !== marketFilter) return false
