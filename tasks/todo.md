@@ -6,7 +6,7 @@ Contexto y porqué en [AGENTS.md → Estado y siguientes tareas](../AGENTS.md#es
 
 - [x] **Hecho 27 nov:** «Gaby paints at» = FRANCIS el 27, 28 y 29 en producción (Agenda).
 - [x] **Desplegado 27 nov ~02:10:** `main` 72eb858 (V20–V24), CI completo en verde; ver AGENTS.md.
-- [ ] **Dueño · Ventas del 26 nov:** AWG93Y5A7 y AWG8R9T2K → «Sold at» → Change → Weihnachtsmarkt Kurpark Baden. AWG93Y5A7 → Change junto al total → 90 €.
+- [x] **Hecho 2026-11-27 · Ventas del 26 nov** (por API del staff, sin tocar stock): AWG93Y5A7 y AWG8R9T2K → «Sold at» → Change → Weihnachtsmarkt Kurpark Baden. AWG93Y5A7 → Change junto al total → 90 €.
 - [ ] **Dueño · Stock Medium:** contar y cargar las bases Medium en Stock (empiezan en 0; hasta entonces Medium sale agotado). Revisar también Beige mate Big, que sale agotada.
 - [ ] **Dueño · Foto de vista previa para Google:** revisar la propuesta pendiente.
 - [ ] **Agentes · UI:** pasar la «Lista de revisión de UI» de AGENTS.md sobre cada pantalla y captura antes de enseñarla (el dueño corrigió muchos errores simples el 26 nov).
