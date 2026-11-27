@@ -162,6 +162,8 @@ Conector personalizado de claude.ai para manejar AWG por chat (plan Max, sin cos
 3. **Foto de vista previa para Google** (hilo «Update the Google preview photo»): pendiente de revisión del dueño.
 Prioridad absoluta: la tienda no puede caerse en temporada (Gaby vende en el puesto). Mercados reales en producción: Weihnachtsmarkt Kurpark Baden (25–29 nov) y Weihnachtsquartier – FRANCIS (27–29 nov). Para desplegar, `deploy/deploy.sh` requiere cambios rastreados limpios y CI completo en verde para el commit exacto. SSH usa el puerto 22 del grupo `awg-web`. El dueño ejecuta el script local `deploy/reset-staff-password.sh <email>` para restablecer una contraseña, enviando solo el hash bcrypt como credencial. Ver [operación y despliegue](docs/deploy.md).
 
+**Deliveries ordenado (2026-11-27, rama `claude/project-thread-ccm6yo`, sin desplegar; va en el próximo despliegue conjunto).** El selector Day ya no lista todos los días del calendario hasta enero: solo los días con entregas según los filtros Handoff, Pickup market y Production, cada uno con su número de pedidos («Fri 28 Nov · 3»), más «Upcoming · N». «Include past days» va justo debajo de los días y el resto de filtros en una sola línea: Handoff → Pickup market → Production. Solo frontend (`DeliveriesPage.tsx/.module.css`); detalle y porqué en [docs/design-system.md](docs/design-system.md) («Deliveries filters»), prueba en `frontend/e2e/deliveries-days.spec.ts`.
+
 Para la base de una rama, el trabajo en paralelo y la revisión cruzada, aplicar [las reglas aprendidas](docs/reglas-aprendidas.md) y [el reparto de agentes](docs/agent-routing.md).
 
 Las comprobaciones de pago y correo y las decisiones abiertas del dueño y el asesor están en [tasks/todo.md](tasks/todo.md).
