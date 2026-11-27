@@ -10,9 +10,10 @@ test('deliveries day chips list only days with deliveries and follow the other f
   const button = page.getByRole('button', { name: /^Filters \(/ })
   if (await button.isVisible()) await button.click()
   const mobile = (page.viewportSize()?.width ?? 1280) < 768
-  const labels = mobile
-    ? () => page.getByLabel('Delivery day', { exact: true }).locator('option').allTextContents()
-    : () => page.getByRole('group', { name: 'Day' }).locator('label').allTextContents()
+  // Chromium versions differ on the weekday comma ("Fri 6 Nov" vs "Fri, 6 Nov"), so compare without it.
+  const labels = async () => (await (mobile
+    ? page.getByLabel('Delivery day', { exact: true }).locator('option')
+    : page.getByRole('group', { name: 'Day' }).locator('label')).allTextContents()).map(text => text.replace(',', ''))
   // Spare market days (4–6 Dec) have no deliveries, so they get no chip.
   await expect.poll(labels).toEqual(['Upcoming · 1', 'Fri 6 Nov · 1', 'Wed 2 Dec · 1'])
   await testInfo.attach('deliveries-days', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
@@ -37,9 +38,10 @@ test('ready-made stall sales stay out of Agenda pickups and the Deliveries days'
   const button = page.getByRole('button', { name: /^Filters \(/ })
   if (await button.isVisible()) await button.click()
   const mobile = (page.viewportSize()?.width ?? 1280) < 768
-  const labels = mobile
-    ? () => page.getByLabel('Delivery day', { exact: true }).locator('option').allTextContents()
-    : () => page.getByRole('group', { name: 'Day' }).locator('label').allTextContents()
+  // Chromium versions differ on the weekday comma ("Fri 6 Nov" vs "Fri, 6 Nov"), so compare without it.
+  const labels = async () => (await (mobile
+    ? page.getByLabel('Delivery day', { exact: true }).locator('option')
+    : page.getByRole('group', { name: 'Day' }).locator('label')).allTextContents()).map(text => text.replace(',', ''))
   await expect.poll(labels).toEqual(['Upcoming · 1', 'Fri 6 Nov · 1', 'Wed 2 Dec · 1'])
   await expect(page.getByText('AWGWALKIN')).toHaveCount(0)
   await page.goto(`/staff/agenda?date=${spareDays[1].date}`)
