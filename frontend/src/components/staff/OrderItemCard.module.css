@@ -57,7 +57,10 @@
   border: var(--border-thin) solid var(--staff-line);
   border-radius: var(--radius-small);
   background: var(--staff-bg);
+  display: block;
 }
+.marketPhoto:hover { border-color: var(--staff-btn); }
+.marketPhoto:focus-visible { outline: var(--border-control) solid var(--color-focus); outline-offset: var(--border-control); }
 .marketPhoto img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .marketPlaceholder {
   display: grid;

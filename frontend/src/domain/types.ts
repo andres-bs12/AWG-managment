@@ -98,13 +98,18 @@ export type SaleItemPreview = {
 export type SalesFilters = {
   state?: PaymentState | 'pending' | 'review'
   source?: 'stall' | 'web'
+  /** Market id: stall sales whose ornaments were sold at that market. */
+  market?: string
   from?: string
   to?: string
   query?: string
   page?: number
   size?: number
 }
-export type SalesPage = { orders: OrderSummary[]; page: number; size: number; totalElements: number; totalPages: number }
+/** `received` sums money taken across every page of the filters (cancelled and unconfirmed web left out). */
+/** `due` is what is still to collect on those same sales. */
+export type SalesReceived = { card: number; cash: number; other: number; due: number }
+export type SalesPage = { orders: OrderSummary[]; page: number; size: number; totalElements: number; totalPages: number; received: SalesReceived }
 
 export type Order = {
   status?: 'ACTIVE' | 'CANCELLED'

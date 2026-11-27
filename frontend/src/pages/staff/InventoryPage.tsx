@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { InventoryItem, PostCollectionDay, PostCollectionWeekday, Prices } from '../../domain/types'
 import { Button } from '../../components/ui/Button'
@@ -25,6 +26,10 @@ const POST_WEEKDAYS: { value: PostCollectionWeekday; label: string; full: string
 ]
 
 export function InventoryPage() {
+  const [params] = useSearchParams()
+  const location = useLocation()
+  // A sale's ornament photo links here with the sale to return to (and that sale's own back target).
+  const sale = (location.state as { sale?: { to: string; from?: string } } | null)?.sale
   const [rows, setRows] = useState<InventoryItem[]>([])
   const [prices, setPrices] = useState<Prices | null>(null)
   const [pricesVersion, setPricesVersion] = useState(0)
@@ -52,8 +57,9 @@ export function InventoryPage() {
     return () => { active = false }
   }, [retry])
   return <section className={styles.page}>
-    <StaffBackLink to="/staff/agenda" label="Agenda" /><h1>Stock</h1>
-    <MarketStock />
+    {/* Opened from a sale's ornament photo: back returns to that sale instead of the Agenda. */}
+    {sale?.to.startsWith('/staff/orders/') ? <StaffBackLink to={sale.to} label="Sale" state={sale.from ? { from: sale.from } : null} /> : <StaffBackLink to="/staff/agenda" label="Agenda" />}<h1>Stock</h1>
+    <MarketStock openId={params.get('ornament') ?? undefined} />
     {loading && <p role="status">Loading prices and stock…</p>}
     {error && <div role="alert"><p>{error}</p><Button tone="staff" onClick={() => { setLoading(true); setError(''); setRetry(n => n + 1) }}>Try again</Button></div>}
     {!loading && !error && prices && !custom.length && <p>No custom stock configured.</p>}

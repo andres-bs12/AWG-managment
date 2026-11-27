@@ -36,6 +36,14 @@ for (const [width, height] of [[360, 640], [440, 741]]) {
     await page.getByLabel('Source', { exact: true }).selectOption('web')
     await expect(page.getByText('No sales match these filters.', { exact: true })).toBeVisible()
     await page.getByLabel('Source', { exact: true }).selectOption('stall')
+    // Market filter and the card/cash totals of everything the filters match.
+    const received = page.getByRole('definition').locator('xpath=ancestor::dl[1]')
+    await expect(received.locator('dt')).toHaveText(['Card', 'Cash', 'Due'])
+    await page.getByLabel('Market', { exact: true }).selectOption({ label: 'Rathausplatz' })
+    await expect(page).toHaveURL(/market=mkt-rathaus/)
+    await expect(results.getByRole('link')).toHaveCount(9)
+    await expect(received.locator('dd').first()).toHaveText(/^€\d+\.\d\d$/)
+    await page.getByLabel('Market', { exact: true }).selectOption('')
     await page.getByRole('radio', { name: 'Today', exact: true }).locator('..').click()
     await expect(results.getByRole('link')).toHaveCount(9)
     await page.getByRole('radio', { name: '7 days', exact: true }).locator('..').click()
@@ -62,6 +70,7 @@ for (const [width, height] of [[360, 640], [440, 741]]) {
     await page.goto('/staff/sales')
     const results = page.getByRole('list', { name: 'Sales results' })
     await expect(results.getByRole('link')).toHaveCount(20)
+    await expect(page.getByRole('definition')).toHaveText(['€120.00', '€85.50', '€40.00'])
     await expect(results.getByRole('link').first()).toContainText('Web shop')
     await expect(results.getByRole('link').first().getByRole('img', { name: 'red ornament' })).toBeVisible()
     await page.getByRole('button', { name: 'Next', exact: true }).click()
@@ -133,7 +142,7 @@ async function httpSales(page: Page) {
         source: 'web', status: 'ACTIVE', total: 49.99, items: 1, nextHandoffDate: '2026-11-13', handedOver: false,
         soldAtMarketName: null, saleItems: [{ id: `item-${index}`, kind: 'custom', color: 'red', photoUrl: null, marketOrnamentId: null }],
       }))
-      return route.fulfill({ json: { orders, page: pageNumber, size: 20, totalElements: reviewing ? 1 : 23, totalPages: reviewing ? 1 : 2 } })
+      return route.fulfill({ json: { orders, page: pageNumber, size: 20, totalElements: reviewing ? 1 : 23, totalPages: reviewing ? 1 : 2, received: { card: 120, cash: 85.5, other: 0, due: 40 } } })
     }
     return route.fulfill({ status: 404, json: { message: 'Unexpected test request.' } })
   })
