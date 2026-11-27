@@ -21,6 +21,7 @@ import { handoffLabel } from '../../lib/handoff'
 import { formatStaffShortDate } from '../../lib/postShipping'
 import { bookedPaintRange, hasPaintOverlap, paintElapsedUntil } from '../../lib/slots'
 import { formatDateLabel, formatHour, formatMinutes, parseHour, hourToY, weekdayShort, yToHour } from '../../lib/time'
+import { isHandedOverAtSale } from '../../lib/staffDeliveries'
 import styles from './AgendaPage.module.css'
 
 const HOLD_MS = 350
@@ -591,7 +592,7 @@ export function AgendaPage() {
   const height = (boardEnd - boardStart) * HOUR_H
   const shownPreview = preview ?? (newProposal ? { ...newProposal, problem: null } : null)
   const proposalMinutes = newProposal ? Math.round((newProposal.end - newProposal.start) * 60) : 0
-  const deliveries = day.deliveries ?? []
+  const deliveries = (day.deliveries ?? []).filter(row => !isHandedOverAtSale(row))
   const pickupKey = `${day.marketDay.date}:${activeMarketId ?? ''}`
   const pickupMarket = pickupFilter?.key === pickupKey && markets.some(market => market.id === pickupFilter.marketId)
     ? pickupFilter.marketId : stallToday?.id ?? markets[0]?.id

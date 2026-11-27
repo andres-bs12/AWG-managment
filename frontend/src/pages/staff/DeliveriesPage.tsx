@@ -16,7 +16,7 @@ import { StaffText } from '../../components/staff/StaffText'
 import type { AgendaDay, DeliveryKind, ProductionStatus } from '../../domain/types'
 import { formatHour } from '../../lib/time'
 import { formatStaffShortDate } from '../../lib/postShipping'
-import { groupDeliveryOrders, remainingDeliveries, type DatedDelivery } from '../../lib/staffDeliveries'
+import { groupDeliveryOrders, isHandedOverAtSale, remainingDeliveries, type DatedDelivery } from '../../lib/staffDeliveries'
 import styles from './DeliveriesPage.module.css'
 
 
@@ -180,14 +180,21 @@ export function DeliveriesPage() {
   ], [hasLegacyVienna])
   const effectiveKind: KindFilter = kindFilter === 'vienna' && !hasLegacyVienna ? 'all' : kindFilter
   const shipView = !routeMode && effectiveKind === 'post'
-  const filtered = dated.filter(row => {
-    if (!includePast && dayFilter === 'all' && row.date < todayDate) return false
+  // Every filter except the day: the day chips are built from these rows, so a chip only exists
+  // for a day that has something to hand over under the current Handoff/Market/Production choice.
+  function matchesOtherFilters(row: DatedDelivery): boolean {
+    if (isHandedOverAtSale(row)) return false
     if (routeMode && row.deliveryKind !== 'vienna') return false
-    if (dayFilter !== 'all' && row.date !== dayFilter) return false
     if (effectiveKind !== 'all' && row.deliveryKind !== effectiveKind) return false
     if (!routeMode && effectiveKind !== 'vienna' && effectiveKind !== 'post' && marketFilter !== 'all' && row.marketId !== marketFilter) return false
     if (statusFilter !== 'all' && row.productionStatus !== statusFilter) return false
     return true
+  }
+  const candidates = dated.filter(row => matchesOtherFilters(row) && (includePast || row.date >= todayDate))
+  const filtered = dated.filter(row => {
+    if (!matchesOtherFilters(row)) return false
+    if (dayFilter !== 'all') return row.date === dayFilter
+    return includePast || row.date >= todayDate
   })
 
   const grouped = groupDeliveryOrders(filtered, dated)
@@ -207,13 +214,18 @@ export function DeliveriesPage() {
   const activeIds = new Set(filtered.map(item => item.itemId))
   const remainingCount = remainingDeliveries(orders, routeMode, activeIds)
 
-  const dayOptions = useMemo(
-    () => [
-      { value: 'all', label: includePast ? 'All days' : 'Today & upcoming' },
-      ...days.filter(day => includePast || day.marketDay.date >= todayDate || day.marketDay.date === dayFilter).map((day) => ({ value: day.marketDay.date, label: dayChipLabel(day) })),
-    ],
-    [days, includePast, todayDate, dayFilter],
-  )
+  // Only days with deliveries get a chip, each with its order count; the chosen day stays even when
+  // a filter empties it, so the selection never disappears from under the finger.
+  const ordersByDate = new Map<string, Set<string>>()
+  for (const row of candidates) ordersByDate.set(row.date, (ordersByDate.get(row.date) ?? new Set()).add(row.orderId))
+  const totalOrders = new Set(candidates.map(row => row.orderId)).size
+  const dayOptions = [
+    { value: 'all', label: includePast ? 'All days' : 'Upcoming', hint: String(totalOrders) },
+    ...days
+      .filter(day => ordersByDate.has(day.marketDay.date) || day.marketDay.date === dayFilter)
+      .map(day => ({ value: day.marketDay.date, label: dayChipLabel(day), hint: String(ordersByDate.get(day.marketDay.date)?.size ?? 0) })),
+  ]
+  const quickDayOptions = dayOptions.map(option => ({ value: option.value, label: `${option.label} · ${option.hint}` }))
 
   const emptyMessage = (() => {
     if (shipView) return 'No Post parcels match these filters.'
@@ -250,20 +262,22 @@ export function DeliveriesPage() {
       </div>
 
       <div className={styles.panel}>
-        <StaffFilters mobileInline count={Number(dayFilter !== 'all') + Number(statusFilter !== 'all') + Number(effectiveKind !== 'all') + activeMarketFilterCount + Number(includePast)} inline={<label className={styles.quickDay}>Day<select aria-label="Delivery day" value={dayFilter} onChange={event => setDayFilter(event.target.value)}>{dayOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}>
+        <StaffFilters mobileInline count={Number(dayFilter !== 'all') + Number(statusFilter !== 'all') + Number(effectiveKind !== 'all') + activeMarketFilterCount + Number(includePast)} inline={<label className={styles.quickDay}>Day<select aria-label="Delivery day" value={dayFilter} onChange={event => setDayFilter(event.target.value)}>{quickDayOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}>
         <div className={styles.filters}>
-          <div className={styles.dayFilters}><SegmentedControl legend="Day" name="delivery-day" value={dayFilter} onChange={setDayFilter} options={dayOptions} /></div>
-          {!routeMode ? <>
-            <SegmentedControl legend="Production" name="delivery-status" value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
+          <div className={styles.dayBlock}>
+            <div className={styles.dayFilters}><SegmentedControl legend="Day" name="delivery-day" value={dayFilter} onChange={setDayFilter} options={dayOptions} /></div>
+            <label className={styles.past}><input type="checkbox" checked={includePast} onChange={event => setIncludePast(event.target.checked)} /> Include past days</label>
+          </div>
+          {!routeMode ? <div className={styles.refine}>
             <SegmentedControl legend="Handoff" name="delivery-kind" value={effectiveKind} onChange={setKindFilter} options={kindOptions} />
-            {marketOptions.length > 1 && effectiveKind !== 'vienna' && effectiveKind !== 'post' && <Field label="Pickup market" htmlFor="deliveries-market">
+            {marketOptions.length > 1 && effectiveKind !== 'vienna' && effectiveKind !== 'post' && <Field className={styles.market} label="Pickup market" htmlFor="deliveries-market">
               <select id="deliveries-market" value={marketFilter} onChange={event => setStallFilter({ activeId, value: event.target.value })}>
                 <option value="all">Any market</option>
                 {marketOptions.map(market => <option key={market.id} value={market.id}>{market.name}</option>)}
               </select>
             </Field>}
-          </> : <Button tone="staff" variant="secondary" onClick={() => { const next = new URLSearchParams(params); next.delete('mode'); setParams(next) }}>Exit delivery run</Button>}
-          <label className={styles.past}><input type="checkbox" checked={includePast} onChange={event => setIncludePast(event.target.checked)} /> Include past days</label>
+            <SegmentedControl legend="Production" name="delivery-status" value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
+          </div> : <Button tone="staff" variant="secondary" onClick={() => { const next = new URLSearchParams(params); next.delete('mode'); setParams(next) }}>Exit delivery run</Button>}
         </div>
         </StaffFilters>
         {handover.dialog}
