@@ -153,8 +153,11 @@ export function BuyPage() {
     return () => { active = false; window.clearTimeout(timer) }
   }, [signature, config?.enabled, config?.seasonOver, datesRetry])
   const pickup = draft.deliveryKind === 'market'
+  // Market days load on the delivery step even while Post is chosen, so «Abholung am Markt» can be
+  // switched off up front when there is no day to offer (instead of a dead end after choosing it).
+  const needPickupDays = pickup || step >= 1
   useEffect(() => {
-    if (!pickup || !config?.enabled || config.seasonOver) return
+    if (!needPickupDays || !config?.enabled || config.seasonOver) return
     let active = true
     const timer = window.setTimeout(() => setPickupState('loading'), 0)
     const items = signature ? signature.split(',').map((entry) => ({ kind: 'custom' as const, withName: entry.endsWith(':1') })) : [{ kind: 'custom' as const, withName: false }]
@@ -177,7 +180,7 @@ export function BuyPage() {
       setPickupState('error')
     })
     return () => { active = false; window.clearTimeout(timer) }
-  }, [pickup, signature, config?.enabled, config?.seasonOver, datesRetry])
+  }, [needPickupDays, signature, config?.enabled, config?.seasonOver, datesRetry])
 
   const dateFmt = useMemo(() => new Intl.DateTimeFormat(locale === 'de' ? 'de-AT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), [locale])
   const formatDate = (date: string) => dateFmt.format(new Date(`${date}T12:00:00`))

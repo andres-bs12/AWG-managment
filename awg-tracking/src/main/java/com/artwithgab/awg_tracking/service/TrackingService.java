@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /** Public Track page (by order code). Shows only harmless data: first name, pet names, handoff. */
@@ -118,6 +119,7 @@ public class TrackingService {
                         personal ? ViewMapper.nz(i.getNameInOrnament()) : "", i.getDeliveryKind(),
                         i.getArrivalFrom(), i.getArrivalTo(), i.isHandedOver())).toList(),
                 first == null ? null : withoutAddressUnless(mapper.delivery(first, index), owner),
-                when, personal ? AustrianPost.trackingUrl(order.getTrackingNumber()) : null);
+                when, personal ? AustrianPost.trackingUrl(order.getTrackingNumber()) : null,
+                order.getDiscount() == null ? BigDecimal.ZERO : order.getDiscount());
     }
 }

@@ -75,7 +75,7 @@ public class CustomerMailComposer {
             // Legacy Vienna deliveries have no Post data; confirm the saved address all the same.
             view = new CustomerMailTemplates.View(view.en(), view.code(), view.firstName(), view.lines(), view.shippingFee(), view.total(),
                     view.paid(), view.pickup(), new CustomerMailTemplates.Post(null, null, null, address(order.getDeliveryAddress())),
-                    view.paymentMethod(), view.today(), view.trackUrl(), view.contactEmail(), view.siteUrl());
+                    view.paymentMethod(), view.today(), view.trackUrl(), view.contactEmail(), view.siteUrl(), view.discount());
         }
         events.publishEvent(new CustomerMail(email.trim(), render(template, view)));
     }
@@ -139,7 +139,7 @@ public class CustomerMailComposer {
                 en ? today.getDayOfMonth() + " " + MONTHS_EN[today.getMonthValue() - 1] + " " + today.getYear()
                         : String.format("%02d.%02d.%d", today.getDayOfMonth(), today.getMonthValue(), today.getYear()),
                 site + "/track/" + URLEncoder.encode(order.getCode(), StandardCharsets.UTF_8),
-                props.mail().contactEmail(), site);
+                props.mail().contactEmail(), site, order.getDiscount());
     }
 
     private CustomerMailTemplates.Pickup pickup(OrderItem item, Order order, CalendarIndex calendar, boolean en) {

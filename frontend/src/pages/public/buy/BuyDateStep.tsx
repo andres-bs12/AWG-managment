@@ -22,11 +22,14 @@ export function pickupPlace(day: Pick<ShopPickupDay, 'marketName' | 'stall'>, t:
 }
 
 export function BuyDateStep(props: Props) {
-  const { t, draft, config, shippingQuote, shippingState, patch } = props
+  const { t, draft, config, shippingQuote, shippingState, pickupDays, pickupState, patch } = props
   const { locale } = useLocale()
   const postUnavailable = shippingState === 'ready' && !shippingQuote?.available
+  // Only when Post is still possible: with neither, the market card stays selectable and explains it below.
+  const noMarketDays = pickupState === 'ready' && pickupDays.length === 0 && !postUnavailable
   const choose = (kind: DeliveryKind) => {
     if (kind === 'post' && postUnavailable) return
+    if (kind === 'market' && noMarketDays) return
     if (kind !== draft.deliveryKind) patch({ deliveryKind: kind, deliveryDate: '', pickupMarketDayId: '', pickupTime: '' })
   }
   const fee = config.deliveryFee ? `+${formatEur(config.deliveryFee, locale)}` : t('shopFree')
@@ -37,7 +40,7 @@ export function BuyDateStep(props: Props) {
       detail: postUnavailable ? t('postUnavailable') : t('methodPostDetail', { fee }),
       disabled: postUnavailable,
     },
-    { kind: 'market', title: t('methodMarket'), detail: t('methodMarketDetail') },
+    { kind: 'market', title: t('methodMarket'), detail: noMarketDays ? t('pickupDaysNone') : t('methodMarketDetail'), disabled: noMarketDays },
   ]
   return <>
     <fieldset className={styles.methodGroup}><legend className={styles.groupLegend}>{t('deliveryMethod')}</legend>

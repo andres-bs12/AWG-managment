@@ -52,7 +52,13 @@ public final class CustomerMailTemplates {
     /** Everything a template may show. Optional parts are null. */
     public record View(boolean en, String code, String firstName, List<Line> lines, BigDecimal shippingFee,
                        BigDecimal total, BigDecimal paid, Pickup pickup, Post post, String paymentMethod,
-                       String today, String trackUrl, String contactEmail, String siteUrl) {
+                       String today, String trackUrl, String contactEmail, String siteUrl, BigDecimal discount) {
+        /** Without a stall discount. */
+        public View(boolean en, String code, String firstName, List<Line> lines, BigDecimal shippingFee,
+                    BigDecimal total, BigDecimal paid, Pickup pickup, Post post, String paymentMethod,
+                    String today, String trackUrl, String contactEmail, String siteUrl) {
+            this(en, code, firstName, lines, shippingFee, total, paid, pickup, post, paymentMethod, today, trackUrl, contactEmail, siteUrl, null);
+        }
         BigDecimal balance() { return total.subtract(paid).max(BigDecimal.ZERO); }
     }
 
@@ -368,6 +374,8 @@ public final class CustomerMailTemplates {
                         .append("<td align=\"right\" valign=\"top\" style=\"padding:6px 0;white-space:nowrap;font-weight:600;\">").append(esc(CustomerMailTemplates.money(line.price(), en))).append("</td></tr>");
             }
             if (v.shippingFee() != null && v.shippingFee().signum() > 0) rows.append(row(en ? "Shipping by post" : "Versand per Post", CustomerMailTemplates.money(v.shippingFee(), en), false, false));
+            // Item lines carry the list price; a stall discount makes the total lower, so say why (same as the invoice).
+            if (v.discount() != null && v.discount().signum() > 0) rows.append(row(en ? "Discount" : "Rabatt", "−" + CustomerMailTemplates.money(v.discount(), en), false, false));
             card(rows.toString());
         }
 

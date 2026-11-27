@@ -2,8 +2,8 @@ import { test, expect, type Locator, type Page } from '@playwright/test'
 import { axe, choose, expectActionClearance, mobile, next, open, pet } from './helpers'
 
 const copy = {
-  de: { market: 'Abholung am Markt', post: 'Versand per Post', time: 'Wähle, wann du kommst.', edit: 'Lieferung ändern', pickup: 'Abholung', unavailable: 'Vor Weihnachten ist kein Postversand mehr möglich.' },
-  en: { market: 'Pick up at the market', post: 'Shipping by post', time: 'Please choose when you will come.', edit: 'Change delivery', pickup: 'Pickup', unavailable: 'Post can no longer arrive before Christmas.' },
+  de: { market: 'Abholung am Markt', post: 'Versand per Post', time: 'Wähle, wann du kommst.', edit: 'Lieferung ändern', pickup: 'Abholung', unavailable: 'Vor Weihnachten ist kein Postversand mehr möglich.', noDays: 'Derzeit sind keine Markttage verfügbar.' },
+  en: { market: 'Pick up at the market', post: 'Shipping by post', time: 'Please choose when you will come.', edit: 'Change delivery', pickup: 'Pickup', unavailable: 'Post can no longer arrive before Christmas.', noDays: 'There are no market days available right now.' },
 } as const
 
 /** Record the checkout input the page hands to the API (photos reduced to a count). */
@@ -119,6 +119,24 @@ for (const locale of ['de', 'en'] as const) {
     await expect(postRadio.locator('..')).toContainText(copy[locale].unavailable)
     await expect(marketRadio).toBeEnabled()
     await expect(marketRadio).toBeChecked()
+    await axe(page)
+  })
+
+  test(`with no market day to offer, market pickup is switched off up front instead of a dead end (${locale})`, async ({ page }) => {
+    // Production 27 Nov 2026: web pickups start on 30 Nov (SHOP_DELIVERIES_FROM) and no market day follows.
+    await open(page, locale)
+    await page.evaluate(async () => {
+      const path = '/src/api/client.ts'; const { api } = await import(path)
+      api.shop.listPickupDays = async () => []
+    })
+    await choose(page); await pet(page); await next(page).click()
+    const postRadio = page.locator('input[name="delivery-kind"][value="post"]')
+    const marketRadio = page.locator('input[name="delivery-kind"][value="market"]')
+    await expect(marketRadio).toBeDisabled()
+    await expect(marketRadio.locator('..')).toContainText(copy[locale].noDays)
+    await expect(postRadio).toBeChecked()
+    await marketRadio.locator('..').click({ force: true })
+    await expect(postRadio).toBeChecked()
     await axe(page)
   })
 }

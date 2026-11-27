@@ -44,6 +44,16 @@ test('staff sells three ready pieces for a discounted total', async ({ page }) =
   await expect(done).toContainText('€90.00')
   await expect(done).toContainText('received · cash')
   if (process.env.PW_DISCOUNT_SHOTS) await page.screenshot({ path: `${process.env.PW_DISCOUNT_SHOTS}/discount-done-${test.info().project.name}.png`, animations: 'disabled' })
+
+  // The customer's Track page lists the pieces at list price, so the discount is its own line and the receipt adds up.
+  const code = (await done.textContent())!.match(/AWG[0-9A-Z]+/)![0]
+  await page.addInitScript(() => localStorage.setItem('awg-locale', 'de'))
+  await page.goto(`/track/${code}`)
+  const discount = page.locator('[data-receipt-discount]')
+  await expect(discount).toContainText('Rabatt')
+  await expect(discount).toContainText('−')
+  await expect(page.getByLabel('Diese Bestellung enthält')).toContainText('90,00')
+  if (process.env.PW_DISCOUNT_SHOTS) await page.getByLabel('Diese Bestellung enthält').screenshot({ path: `${process.env.PW_DISCOUNT_SHOTS}/discount-track-${test.info().project.name}.png`, animations: 'disabled' })
 })
 
 test('a discount never carries over silently when the order changes', async ({ page }) => {
