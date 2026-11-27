@@ -4,11 +4,10 @@
 
 Contexto y porqué en [AGENTS.md → Estado y siguientes tareas](../AGENTS.md#estado-y-siguientes-tareas).
 
-- [ ] **Dueño · Hoy, antes de abrir Baden (14:30):** Agenda → viernes 27, sábado 28 y domingo 29 → «Gaby paints at» = Weihnachtsquartier – FRANCIS. Así Baden no ofrece recogida el mismo día de personalizados y FRANCIS sí. Sin despliegue; por qué en AGENTS.md («Dos mercados con una sola pintora»).
-- [ ] **Dueño · PR #14:** aprobar y fusionar en `main` (detalle de pedido simplificado; sin backend ni migraciones; CI en verde).
-- [ ] **Dueño · Despliegue:** `deploy/deploy.sh` desde su Mac, fuera del horario del mercado. Un solo despliegue con todo `main` (V20–V24).
-- [ ] **Tras desplegar · Ventas del 26 nov:** AWG93Y5A7 y AWG8R9T2K → «Sold at» → Change → Weihnachtsmarkt Kurpark Baden. AWG93Y5A7 → Change junto al total → 90 €.
-- [ ] **Dueño · Stock Medium:** contar y cargar las bases Medium en Stock (empiezan en 0).
+- [x] **Hecho 27 nov:** «Gaby paints at» = FRANCIS el 27, 28 y 29 en producción (Agenda).
+- [x] **Desplegado 27 nov ~02:10:** `main` 72eb858 (V20–V24), CI completo en verde; ver AGENTS.md.
+- [ ] **Dueño · Ventas del 26 nov:** AWG93Y5A7 y AWG8R9T2K → «Sold at» → Change → Weihnachtsmarkt Kurpark Baden. AWG93Y5A7 → Change junto al total → 90 €.
+- [ ] **Dueño · Stock Medium:** contar y cargar las bases Medium en Stock (empiezan en 0; hasta entonces Medium sale agotado). Revisar también Beige mate Big, que sale agotada.
 - [ ] **Dueño · Foto de vista previa para Google:** revisar la propuesta pendiente.
 - [ ] **Agentes · UI:** pasar la «Lista de revisión de UI» de AGENTS.md sobre cada pantalla y captura antes de enseñarla (el dueño corrigió muchos errores simples el 26 nov).
 
