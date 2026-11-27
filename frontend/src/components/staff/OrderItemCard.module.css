@@ -25,9 +25,8 @@
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
 .schedule { display: inline-flex; align-items: center; min-height: var(--touch); color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
 .waiting { color: var(--staff-muted); }
-.adjust { border-top: var(--border-thin) solid var(--staff-line); }
-.adjust summary { cursor: pointer; min-height: var(--touch); padding: var(--space-3) 0; color: var(--staff-muted); font-size: var(--type-staff-meta-size); }
 .statusOptions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.actions:empty { display: none; }
 @media (max-width: 639px) {
  .card { padding: var(--space-4); }
  .photo, .placeholder { flex-basis: var(--size-choice-card); width: var(--size-choice-card); height: var(--size-choice-card); }

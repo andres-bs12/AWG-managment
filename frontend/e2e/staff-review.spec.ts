@@ -519,6 +519,14 @@ test('item handover and undo allow selecting other ornaments', async ({ page }) 
   const fixture = await httpFixture(page, { finished: true, multi: true })
   fixture.original.paymentState = 'paid'; fixture.original.amountPaid = fixture.original.total
   await signedIn(page, `/staff/orders/${fixture.original.id}`)
+  // In progress: the status is three plain buttons, the shared pickup is said once (in the summary), and a
+  // finished ornament no longer waits for photos.
+  const luna = page.getByRole('article', { name: 'Luna' })
+  await expect(luna.getByRole('group', { name: 'Production status' }).getByRole('button', { name: 'Ready', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(luna.getByText('Adjust production status')).toHaveCount(0)
+  await expect(luna.getByText('Waiting for reference photos')).toHaveCount(0)
+  await expect(luna.getByRole('heading', { name: 'Handover', exact: true })).toHaveCount(0)
+  await expect(page.getByText('Ready for pickup.', { exact: true })).toHaveCount(0)
   await page.getByRole('article', { name: 'Luna' }).getByRole('button', { name: 'Hand over this one', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Hand over', exact: true })
   await expect(dialog.getByRole('checkbox', { name: 'Luna' })).toBeChecked()
@@ -537,7 +545,7 @@ test('item handover and undo allow selecting other ornaments', async ({ page }) 
   for (const name of ['Luna', 'Milo']) {
     const card = page.getByRole('article', { name })
     await expect(card.getByRole('button', { name: 'Undo handover' })).toHaveCount(0)
-    await expect(card.getByText('Adjust production status')).toHaveCount(0)
+    await expect(card.getByRole('group', { name: 'Production status' })).toHaveCount(0)
     await expect(card.getByRole('region', { name: 'Production' })).toHaveCount(0)
     await expect(card.getByText('Handed over', { exact: true })).toBeVisible()
   }

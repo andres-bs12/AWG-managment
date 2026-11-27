@@ -257,7 +257,7 @@ function OrderDetail({ id }: { id: string }) {
           // Ready-made pieces all go together at the stall, and once the whole order is handed over the single undo
           // lives in the order panel: in both cases the cards repeat no handover button.
           const canItemHandover = items.length > 1 && !onlyReadyMade && !order.handedOver && !(allPostOrder && !(item.handedOver ?? order.handedOver))
-          return <OrderItemCard key={item.id} item={{ ...item, handedOver: item.handedOver ?? order.handedOver }} onHandover={canItemHandover ? () => { void handover.request(id, !(item.handedOver ?? order.handedOver), item.id) } : undefined} block={blocks.find(block => block.orderItemId === item.id)} days={days} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} orderDone={order.handedOver} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />
+          return <OrderItemCard key={item.id} item={{ ...item, handedOver: item.handedOver ?? order.handedOver }} onHandover={canItemHandover ? () => { void handover.request(id, !(item.handedOver ?? order.handedOver), item.id) } : undefined} block={blocks.find(block => block.orderItemId === item.id)} days={days} selected={item.id === navigationState?.itemId} navigationState={navigationState} busy={busy || itemStatus.unconfirmed} held={paymentHeld} orderDone={order.handedOver} sharedHandoff={handoffs.length === 1} onStatus={status => { void itemStatus.setStatus(item.id, status) }} />
         })}
       </section>
       <aside className={styles.support} aria-label="Order management">
@@ -265,7 +265,7 @@ function OrderDetail({ id }: { id: string }) {
         {order.handedOver && !postItem ? null : <section className={styles.panel} aria-labelledby="handoff-heading">
           <h2 id="handoff-heading">{postItem ? 'Post shipping' : deliveryItem ? 'Delivery' : 'Pickup'}</h2>
           {arrivalText ? <p className={styles.arrivalMeta}>{arrivalText}</p> : null}
-          {order.handedOver ? <p className={styles.muted}>{postItem ? 'Handed to Austrian Post.' : deliveryItem ? 'Delivered to the customer.' : 'Picked up at the stall.'}</p> : <p className={styles.muted}>{allFinished ? (postItem ? 'Ready to hand to Post.' : deliveryItem ? 'Ready to deliver.' : 'Ready for pickup.') : `${items.filter(item => item.productionStatus !== 'finished').length} still to finish.`}</p>}
+          {order.handedOver ? <p className={styles.muted}>{postItem ? 'Handed to Austrian Post.' : deliveryItem ? 'Delivered to the customer.' : 'Picked up at the stall.'}</p> : allFinished ? null : <p className={styles.muted}>{`${items.filter(item => item.productionStatus !== 'finished').length} still to finish.`}</p>}
           {postItem && !paymentHeld ? (
             <div className={styles.trackingBox}>
               {order.trackingUrl && order.trackingNumber ? (
