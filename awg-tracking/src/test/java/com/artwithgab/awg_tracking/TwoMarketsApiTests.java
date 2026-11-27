@@ -348,15 +348,22 @@ class TwoMarketsApiTests extends ApiTestSupport {
         orderRepository.findById(UUID.fromString(cancelled)).orElseThrow().setStatus("CANCELLED");
         orderRepository.flush();
         sell.apply(two.dayId(), PaymentMethod.CARD);
+        // A deposit at stall one: 20 of its total received in cash, the rest is due.
+        var deposit = orderRepository.findById(UUID.fromString(sell.apply(one.dayId(), PaymentMethod.CASH))).orElseThrow();
+        deposit.setPaymentState(PaymentState.DEPOSIT);
+        deposit.setAmountPaid(new java.math.BigDecimal("20.00"));
+        java.math.BigDecimal depositDue = deposit.getTotal().subtract(new java.math.BigDecimal("20.00"));
+        orderRepository.saveAndFlush(deposit);
 
         // Page size 1: the totals still cover all matching sales, not only the visible page.
         mvc.perform(get("/api/orders").param("market", one.marketId()).param("size", "1").header("Authorization", bearer(staff)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(4))
+                .andExpect(jsonPath("$.totalElements").value(5))
                 .andExpect(jsonPath("$.orders.length()").value(1))
                 .andExpect(jsonPath("$.received.card").value(35.0))
-                .andExpect(jsonPath("$.received.cash").value(70.0))
-                .andExpect(jsonPath("$.received.other").value(0));
+                .andExpect(jsonPath("$.received.cash").value(90.0))
+                .andExpect(jsonPath("$.received.other").value(0))
+                .andExpect(jsonPath("$.received.due").value(depositDue.doubleValue()));
         mvc.perform(get("/api/orders").param("market", two.marketId()).header("Authorization", bearer(staff)))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.orders[0].soldAtMarketName").value("Totals stall two"))

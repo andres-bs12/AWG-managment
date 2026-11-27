@@ -40,12 +40,14 @@ export function filterSales(rows: SalesRow[], filters: SalesFilters): SalesPage 
       || (digits.length >= 3 && order.phone.replace(/\D/g, '').includes(digits))
   }).sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
   // Like the server: money received over every page; cancelled and unconfirmed web checkouts do not count.
-  const received = { card: 0, cash: 0, other: 0 }
+  const received = { card: 0, cash: 0, other: 0, due: 0 }
   for (const order of filtered) {
     if (order.status === 'CANCELLED' || order.checkoutStatus === 'pending' || order.checkoutStatus === 'review') continue
-    received[order.paymentMethod ?? 'other'] += cents(order.amountPaid ?? 0)
+    const paid = cents(order.amountPaid ?? 0)
+    received[order.paymentMethod ?? 'other'] += paid
+    received.due += Math.max(0, cents(order.total) - paid)
   }
   const orders = filtered.slice(page * size, (page + 1) * size).map(({ soldAtMarketId: _market, paymentMethod: _method, ...order }) => order)
   return { orders, page, size, totalElements: filtered.length, totalPages: Math.ceil(filtered.length / size),
-    received: { card: received.card / 100, cash: received.cash / 100, other: received.other / 100 } }
+    received: { card: received.card / 100, cash: received.cash / 100, other: received.other / 100, due: received.due / 100 } }
 }

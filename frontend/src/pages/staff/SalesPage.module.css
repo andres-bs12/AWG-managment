@@ -19,6 +19,7 @@
 .received > div + div { border-left: var(--border-thin) solid var(--staff-line); }
 .received dt { font-size: var(--type-staff-meta-size); color: var(--staff-muted); }
 .received dd { margin: 0; font-weight: var(--type-staff-h2-weight); font-variant-numeric: tabular-nums; }
+.received dd[data-due] { color: var(--staff-warn); }
 .list, ul.items { list-style: none; margin: 0; padding: 0; }
 .list { display: grid; gap: var(--space-3); }
 .sale {

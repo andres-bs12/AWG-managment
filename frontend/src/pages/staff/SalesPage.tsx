@@ -104,6 +104,8 @@ export function SalesPage() {
         <div><dt>Card</dt><dd>{formatEur(result.received.card, 'en')}</dd></div>
         <div><dt>Cash</dt><dd>{formatEur(result.received.cash, 'en')}</dd></div>
         {result.received.other > 0 ? <div><dt>No method</dt><dd>{formatEur(result.received.other, 'en')}</dd></div> : null}
+        {/* Still to collect on the same sales (deposits and unpaid), kept apart from what came in (owner, 2026-11-27). */}
+        <div><dt>Due</dt><dd data-due={result.received.due > 0 || undefined}>{formatEur(result.received.due ?? 0, 'en')}</dd></div>
       </dl> : null}
       {!result.orders.length ? <p role="status">No sales match these filters.</p> : <ul className={styles.list} aria-label="Sales results">{result.orders.map(order => {
         const web = order.source === 'web'

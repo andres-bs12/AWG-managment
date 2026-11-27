@@ -11,6 +11,7 @@ public record SalesPageDto(List<OrderSummaryDto> orders, int page, int size, lon
     /**
      * Money actually received ({@code amountPaid}) by payment method. Cancelled orders and web checkouts
      * not yet confirmed by Stripe are left out. {@code other} holds old payments with no method recorded.
+     * {@code due} is what is still to collect on those same sales (total minus received, never negative).
      */
-    public record Received(BigDecimal card, BigDecimal cash, BigDecimal other) {}
+    public record Received(BigDecimal card, BigDecimal cash, BigDecimal other, BigDecimal due) {}
 }

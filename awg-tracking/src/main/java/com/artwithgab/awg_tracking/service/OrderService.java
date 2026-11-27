@@ -698,15 +698,18 @@ public class OrderService {
         var result = orderRepository.findAll(filters, org.springframework.data.domain.PageRequest.of(page, size,
                 org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt", "id")));
         // Totals cover every page of the filters, so Today + a market shows that day's card and cash takings.
-        BigDecimal card = BigDecimal.ZERO, cash = BigDecimal.ZERO, other = BigDecimal.ZERO;
+        BigDecimal card = BigDecimal.ZERO, cash = BigDecimal.ZERO, other = BigDecimal.ZERO, due = BigDecimal.ZERO;
         for (Order order : orderRepository.findAll(filters)) {
-            if (order.isCancelled() || order.isUnconfirmedWeb() || order.getAmountPaid() == null) continue;
-            if (order.getPaymentMethod() == PaymentMethod.CARD) card = card.add(order.getAmountPaid());
-            else if (order.getPaymentMethod() == PaymentMethod.CASH) cash = cash.add(order.getAmountPaid());
-            else other = other.add(order.getAmountPaid());
+            if (order.isCancelled() || order.isUnconfirmedWeb()) continue;
+            BigDecimal paid = order.getAmountPaid() == null ? BigDecimal.ZERO : order.getAmountPaid();
+            due = due.add(order.getTotal().subtract(paid).max(BigDecimal.ZERO));
+            if (paid.signum() == 0) continue;
+            if (order.getPaymentMethod() == PaymentMethod.CARD) card = card.add(paid);
+            else if (order.getPaymentMethod() == PaymentMethod.CASH) cash = cash.add(paid);
+            else other = other.add(paid);
         }
         return new SalesPageDto(result.getContent().stream().map(order -> summary(order, true)).toList(),
-                page, size, result.getTotalElements(), result.getTotalPages(), new SalesPageDto.Received(card, cash, other));
+                page, size, result.getTotalElements(), result.getTotalPages(), new SalesPageDto.Received(card, cash, other, due));
     }
 
     /** Web orders staff must look at: new paid orders to review, still waiting for Stripe, or paid with a mismatching amount. */

@@ -107,7 +107,8 @@ export type SalesFilters = {
   size?: number
 }
 /** `received` sums money taken across every page of the filters (cancelled and unconfirmed web left out). */
-export type SalesReceived = { card: number; cash: number; other: number }
+/** `due` is what is still to collect on those same sales. */
+export type SalesReceived = { card: number; cash: number; other: number; due: number }
 export type SalesPage = { orders: OrderSummary[]; page: number; size: number; totalElements: number; totalPages: number; received: SalesReceived }
 
 export type Order = {
