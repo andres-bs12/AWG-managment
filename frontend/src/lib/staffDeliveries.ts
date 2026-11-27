@@ -19,3 +19,12 @@ export function groupDeliveryOrders(matched: DatedDelivery[], all: DatedDelivery
 export function remainingDeliveries(orders: DatedDelivery[], viennaOnly = false, activeIds?: Set<string>): number {
   return orders.reduce((total, order) => total + (order.members ?? [order]).filter(item => !item.handedOver && (!activeIds || activeIds.has(item.itemId)) && (!viennaOnly || item.deliveryKind === 'vienna')).length, 0)
 }
+
+/**
+ * A ready-made (not personalised) ornament sold at the stall is handed over at the till, so it is a
+ * sale, not a pickup: Agenda and Deliveries leave it out (owner, 2026-11-27). A web order for a
+ * ready-made ornament is still a real pickup and stays.
+ */
+export function isHandedOverAtSale(row: AgendaDelivery): boolean {
+  return row.kind === 'finished' && row.handedOver && row.source !== 'web'
+}

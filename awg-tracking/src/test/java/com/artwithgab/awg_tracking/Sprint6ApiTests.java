@@ -74,7 +74,7 @@ class Sprint6ApiTests extends ApiTestSupport {
     @Test
     void shopOffersRedGreenBeigeInShinyAndMatte() throws Exception {
         MvcResult res = mvc.perform(get("/api/shop/config")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.deliveriesFrom").value("2026-11-30")).andReturn();
+                .andExpect(jsonPath("$.deliveriesFrom").doesNotExist()).andReturn();
         List<String> colors = read(res, "$.colors[*].color");
         List<String> finishes = read(res, "$.colors[*].finish");
         List<String> sizes = read(res, "$.colors[*].size");

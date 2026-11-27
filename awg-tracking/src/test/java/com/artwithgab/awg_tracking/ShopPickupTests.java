@@ -69,7 +69,8 @@ class ShopPickupTests extends ApiTestSupport {
         assertThat(res.getResponse().getStatus()).isEqualTo(200);
         List<String> dates = read(res, "$[*].date");
         assertThat(dates).isNotEmpty().contains("2026-12-04", "2026-12-05");
-        assertThat(dates).allSatisfy(d -> assertThat(LocalDate.parse(d)).isBetween(LocalDate.of(2026, 11, 30), LocalDate.of(2026, 12, 21)));
+        // No floor any more (owner, 2026-11-27): the first stall day after a painting day, up to the season end.
+        assertThat(dates).allSatisfy(d -> assertThat(LocalDate.parse(d)).isBetween(LocalDate.of(2026, 11, 26), LocalDate.of(2026, 12, 21)));
         List<String> names = read(res, "$[*].marketName");
         assertThat(names).allSatisfy(n -> assertThat(n).isNotBlank());
         List<String> open = read(res, "$[*].openTime");
@@ -77,20 +78,18 @@ class ShopPickupTests extends ApiTestSupport {
     }
 
     @Test
-    void openingWeekIsExcludedFromWebHandoffsAndPickupCheckout() throws Exception {
+    void openingWeekendTakesWebPickupsButNeverOnTheOrderDayOrTheFirstPaintingDay() throws Exception {
+        // Owner, 2026-11-27: web pickups open right away (the 30 Nov floor is gone). "Today" is Tue 24 Nov:
+        // painting starts tomorrow at the earliest and is always on a day before the pickup.
         String staff = login();
-        for (String date : List.of(WED, "2026-11-26")) {
-            mvc.perform(post("/api/markets").header("Authorization", bearer(staff)).contentType(MediaType.APPLICATION_JSON)
-                            .content(json(MarketApiTests.marketBody("Opening stall " + date, date, 12, 19))))
-                    .andExpect(status().isOk());
-        }
-        List<String> openingWeek = List.of(WED, "2026-11-26", "2026-11-27", SAT, SUN);
-        assertThat(this.<List<String>>read(pickupDays(), "$[*].date")).doesNotContainAnyElementsOf(openingWeek);
-        for (String date : openingWeek) {
-            var result = checkout(date, "15:30", null);
-            assertThat(result.getResponse().getStatus()).isEqualTo(400);
-            assertThat(this.<String>read(result, "$.code")).isEqualTo("PICKUP_DAY_INVALID");
-        }
+        mvc.perform(post("/api/markets").header("Authorization", bearer(staff)).contentType(MediaType.APPLICATION_JSON)
+                        .content(json(MarketApiTests.marketBody("Opening stall " + WED, WED, 12, 19))))
+                .andExpect(status().isOk());
+        List<String> offered = read(pickupDays(), "$[*].date");
+        assertThat(offered).contains("2026-11-27", SAT, SUN).doesNotContain("2026-11-24", WED);
+        var tooSoon = checkout(WED, "15:30", null);
+        assertThat(tooSoon.getResponse().getStatus()).isIn(400, 409);
+        assertThat(checkout(SAT, "15:30", null).getResponse().getStatus()).isEqualTo(200);
     }
 
     @Test
@@ -213,7 +212,7 @@ class ShopPickupTests extends ApiTestSupport {
     }
 
     @Test
-    void overlapWithNoPrimaryConfiguredFailsClosed() throws Exception {
+    void overlapWithNoPrimaryOffersEachStallAndCheckoutNeedsItsDay() throws Exception {
         String token = login();
         String rathausSatDay = dayId(token, DEC_SAT);
         var market = new HashMap<>(MarketApiTests.marketBody("Second stall", DEC_SAT, 13, 20));
@@ -225,10 +224,13 @@ class ShopPickupTests extends ApiTestSupport {
                 .andExpect(status().isOk()).andReturn();
         String secondSatDay = read(second, "$.days[0].id");
 
-        assertThat(this.<List<String>>read(pickupDays(), "$[*].date"))
-                .doesNotContain(DEC_SAT)
-                .contains("2026-12-04", "2026-12-06");
-        for (String marketDayId : Arrays.asList(rathausSatDay, secondSatDay, null)) {
+        // Both stalls are listed for that day, each with its own market day id (owner, 2026-11-27).
+        assertThat(this.<List<String>>read(pickupDays(), "$[?(@.date=='" + DEC_SAT + "')].marketDayId"))
+                .containsExactlyInAnyOrder(rathausSatDay, secondSatDay);
+        for (String marketDayId : Arrays.asList(null, rathausSatDay, secondSatDay)) {
+            // Each paid checkout needs its own Stripe session id.
+            when(stripe.createCheckoutSession(anyString(), anyString(), anyString(), anyList(), any()))
+                    .thenReturn(new StripeClient.Session("cs_test_" + marketDayId, "https://checkout.stripe.test/" + marketDayId));
             var req = multipart("/api/shop/checkout");
             Map<String, Object> payload = new HashMap<>(Map.of("customerName", "Eva Gruber", "email", "eva@example.com", "phone", "+43 1 234",
                     "deliveryDate", DEC_SAT, "deliveryKind", "market", "pickupTime", "14:00", "acceptTerms", true,
@@ -238,8 +240,15 @@ class ShopPickupTests extends ApiTestSupport {
             req.file(new MockMultipartFile("photo-p0", "luna.jpg", "image/jpeg", JPEG));
             req.file(new MockMultipartFile("payload", "", "application/json", json(payload).getBytes()));
             MvcResult res = mvc.perform(withIp(req)).andReturn();
-            assertThat(res.getResponse().getStatus()).isEqualTo(400);
-            assertThat(this.<String>read(res, "$.code")).isEqualTo("PICKUP_DAY_INVALID");
+            if (marketDayId == null) {
+                // Without the day id the stall would be a guess.
+                assertThat(res.getResponse().getStatus()).isEqualTo(400);
+                assertThat(this.<String>read(res, "$.code")).isEqualTo("PICKUP_DAY_INVALID");
+            } else {
+                assertThat(res.getResponse().getStatus()).as(marketDayId).isEqualTo(200);
+                var item = orderRepository.findByCodeIgnoreCase(read(res, "$.orderCode")).orElseThrow().getOrderItems().getFirst();
+                assertThat(item.getHandoffDay().getId().toString()).isEqualTo(marketDayId);
+            }
         }
     }
 

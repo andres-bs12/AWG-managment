@@ -645,6 +645,12 @@ public class OrderService {
     /** Staff sales use Vienna calendar dates and bounded, deterministic database pagination. */
     @Transactional(readOnly = true)
     public SalesPageDto listSales(String state, String source, LocalDate from, LocalDate to, int page, int size, String query) {
+        return listSales(state, source, from, to, page, size, query, null);
+    }
+
+    /** {@code market} keeps stall sales whose ornaments were sold on one of that market's days. */
+    @Transactional(readOnly = true)
+    public SalesPageDto listSales(String state, String source, LocalDate from, LocalDate to, int page, int size, String query, UUID market) {
         Set<String> states = Set.of("unpaid", "deposit", "paid", "pending", "review");
         if (state != null && !states.contains(state)) throw new BadRequestException("Choose a valid payment state.").code("VALIDATION").field("state");
         if (source != null && !Set.of("stall", "web").contains(source)) throw new BadRequestException("Choose a valid sale source.").code("VALIDATION").field("source");
@@ -665,6 +671,14 @@ public class OrderService {
             }
             if ("web".equals(source)) predicates.add(cb.equal(root.get("source"), OrderSource.WEB));
             if ("stall".equals(source)) predicates.add(cb.or(cb.isNull(root.get("source")), cb.equal(root.get("source"), OrderSource.STALL)));
+            if (market != null) {
+                // "Sold at" is per ornament (soldOnDay); an order belongs to a market if any ornament was sold there.
+                var sub = criteria.subquery(UUID.class);
+                var item = sub.from(OrderItem.class);
+                sub.select(item.get("id")).where(cb.equal(item.get("order"), root),
+                        cb.equal(item.join("soldOnDay").get("market").get("id"), market));
+                predicates.add(cb.exists(sub));
+            }
             var vienna = java.time.ZoneId.of("Europe/Vienna");
             if (from != null) predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), from.atStartOfDay(vienna).toInstant()));
             if (to != null) predicates.add(cb.lessThan(root.get("createdAt"), to.plusDays(1).atStartOfDay(vienna).toInstant()));
@@ -683,8 +697,19 @@ public class OrderService {
         };
         var result = orderRepository.findAll(filters, org.springframework.data.domain.PageRequest.of(page, size,
                 org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt", "id")));
+        // Totals cover every page of the filters, so Today + a market shows that day's card and cash takings.
+        BigDecimal card = BigDecimal.ZERO, cash = BigDecimal.ZERO, other = BigDecimal.ZERO, due = BigDecimal.ZERO;
+        for (Order order : orderRepository.findAll(filters)) {
+            if (order.isCancelled() || order.isUnconfirmedWeb()) continue;
+            BigDecimal paid = order.getAmountPaid() == null ? BigDecimal.ZERO : order.getAmountPaid();
+            due = due.add(order.getTotal().subtract(paid).max(BigDecimal.ZERO));
+            if (paid.signum() == 0) continue;
+            if (order.getPaymentMethod() == PaymentMethod.CARD) card = card.add(paid);
+            else if (order.getPaymentMethod() == PaymentMethod.CASH) cash = cash.add(paid);
+            else other = other.add(paid);
+        }
         return new SalesPageDto(result.getContent().stream().map(order -> summary(order, true)).toList(),
-                page, size, result.getTotalElements(), result.getTotalPages());
+                page, size, result.getTotalElements(), result.getTotalPages(), new SalesPageDto.Received(card, cash, other, due));
     }
 
     /** Web orders staff must look at: new paid orders to review, still waiting for Stripe, or paid with a mismatching amount. */

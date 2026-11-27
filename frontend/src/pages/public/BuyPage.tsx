@@ -153,8 +153,11 @@ export function BuyPage() {
     return () => { active = false; window.clearTimeout(timer) }
   }, [signature, config?.enabled, config?.seasonOver, datesRetry])
   const pickup = draft.deliveryKind === 'market'
+  // Market days load on the delivery step even while Post is chosen, so «Abholung am Markt» can be
+  // switched off up front when there is no day to offer (instead of a dead end after choosing it).
+  const needPickupDays = pickup || step >= 1
   useEffect(() => {
-    if (!pickup || !config?.enabled || config.seasonOver) return
+    if (!needPickupDays || !config?.enabled || config.seasonOver) return
     let active = true
     const timer = window.setTimeout(() => setPickupState('loading'), 0)
     const items = signature ? signature.split(',').map((entry) => ({ kind: 'custom' as const, withName: entry.endsWith(':1') })) : [{ kind: 'custom' as const, withName: false }]
@@ -177,7 +180,7 @@ export function BuyPage() {
       setPickupState('error')
     })
     return () => { active = false; window.clearTimeout(timer) }
-  }, [pickup, signature, config?.enabled, config?.seasonOver, datesRetry])
+  }, [needPickupDays, signature, config?.enabled, config?.seasonOver, datesRetry])
 
   const dateFmt = useMemo(() => new Intl.DateTimeFormat(locale === 'de' ? 'de-AT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), [locale])
   const formatDate = (date: string) => dateFmt.format(new Date(`${date}T12:00:00`))
@@ -191,7 +194,8 @@ export function BuyPage() {
   const backNameMax = shopConfig.backNameMax ?? DEFAULT_BACK_NAME_MAX
   const itemPrice = (item: BuyItem) => customBasePrice(item.size, shopConfig) + (item.withName ? shopConfig.nameExtra : 0)
   const itemsTotal = draft.items.reduce((sum, item) => sum + itemPrice(item), 0)
-  const deliveryFee = draft.deliveryKind === 'market' ? 0 : shopConfig.deliveryFee
+  // Step 1 shows only the ornaments: shipping is added once the customer picks a delivery (owner, 2026-11-27).
+  const deliveryFee = step === 0 || draft.deliveryKind === 'market' ? 0 : shopConfig.deliveryFee
   const total = draft.items.length ? itemsTotal + deliveryFee : 0
   const err = (key: string) => errors[key]?.startsWith('api:') ? apiError({ code: errors[key].slice(4) }, locale, t('shopCheckoutError')).text : errors[key] ? t(errors[key], { max: backNameMax }) : undefined
   const described = (key: string, hint = false) => [hint ? `${key}-hint` : '', err(key) ? `${key}-error` : ''].filter(Boolean).join(' ') || undefined

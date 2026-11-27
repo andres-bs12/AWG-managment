@@ -35,3 +35,22 @@ test('Vienna dates are inclusive through local midnight and DST, with legacy sta
   const rows = [sale('before', { createdAt: '2026-11-23T22:59:59Z' }), sale('first', { createdAt: '2026-11-23T23:00:00Z' }), sale('last', { createdAt: '2026-11-24T22:59:59Z' }), sale('after', { createdAt: '2026-11-24T23:00:00Z' })]
   assert.deepEqual(filterSales(rows, { from: '2026-11-24', to: '2026-11-24', source: 'stall' }).orders.map(row => row.id), ['last', 'first'])
 })
+
+test('market filter and card/cash totals cover every page, without cancelled or unconfirmed web sales', () => {
+  const rows = [
+    sale('a', { soldAtMarketId: 'baden', paymentMethod: 'card', amountPaid: 35 }),
+    sale('b', { soldAtMarketId: 'baden', paymentMethod: 'cash', amountPaid: 45.5 }),
+    sale('c', { soldAtMarketId: 'baden', paymentMethod: 'cash', amountPaid: 50, status: 'CANCELLED' }),
+    sale('d', { soldAtMarketId: 'francis', paymentMethod: 'cash', amountPaid: 50 }),
+    sale('e', { source: 'web', paymentMethod: 'card', amountPaid: 0.5, checkoutStatus: 'pending' }),
+    sale('f', { source: 'web', paymentMethod: 'card', amountPaid: 0.1 }),
+    sale('g', { soldAtMarketId: 'baden', paymentMethod: null, amountPaid: 0.2 }),
+  ]
+  const baden = filterSales(rows, { market: 'baden', size: 1 })
+  assert.equal(baden.totalElements, 4)
+  assert.equal(baden.orders.length, 1)
+  assert.deepEqual(baden.received, { card: 35, cash: 45.5, other: 0.2, due: 49.99 * 3 - 80.7 })
+  assert.equal('soldAtMarketId' in baden.orders[0], false)
+  assert.equal(filterSales(rows, {}).received.cash, 95.5)
+  assert.equal(filterSales(rows, {}).received.card, 35.1)
+})

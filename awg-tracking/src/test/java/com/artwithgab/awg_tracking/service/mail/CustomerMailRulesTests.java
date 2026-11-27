@@ -83,6 +83,19 @@ class CustomerMailRulesTests {
         assertFalse(CustomerMailTemplates.confirmed(local).html().contains("<img"), "no broken images without an absolute site URL");
     }
 
+    @Test void stallDiscountIsShownSoTheLinesAddUpToTheTotal() {
+        // Two ornaments at list price 105 €, sold for 90 € at the stall (owner, 2026-11-26).
+        var lines = List.of(new CustomerMailTemplates.Line("Personalisierte Kugel", "Groß 10 cm · Rot · Glänzend", new BigDecimal("55.00")),
+                new CustomerMailTemplates.Line("Personalisierte Kugel", "Groß 10 cm · Grün · Matt", new BigDecimal("50.00")));
+        var v = view(false, "Luna");
+        var discounted = new CustomerMailTemplates.View(false, v.code(), v.firstName(), lines, null, new BigDecimal("90.00"), new BigDecimal("90.00"),
+                v.pickup(), null, v.paymentMethod(), v.today(), v.trackUrl(), v.contactEmail(), v.siteUrl(), new BigDecimal("15.00"));
+        var mail = CustomerMailTemplates.confirmed(discounted);
+        assertTrue(mail.text().contains("Rabatt: −15,00 €"), mail.text());
+        assertTrue(mail.html().contains("Rabatt"));
+        assertFalse(CustomerMailTemplates.confirmed(v).html().contains("Rabatt"), "no discount row without a discount");
+    }
+
     @Test void everyTemplateEscapesCustomerTextAndShowsBothContacts() {
         var v = view(false, "<script>alert(1)</script>");
         var post = new CustomerMailTemplates.Post("1.–2. Dezember 2026", "RR123456785AT", "https://www.post.at/s/sendungsdetails?snr=RR123456785AT", "<b>Gasse</b> 1\n1010 Wien");

@@ -20,6 +20,8 @@ public record TrackViewDto(
         List<TrackItemDto> items,
         DeliveryDto delivery,
         TrackWhenDto when,
-        String trackingUrl
+        String trackingUrl,
+        /** Stall discount (list price minus what was charged); 0 when none. Items show list prices. */
+        BigDecimal discount
 ) {
 }
