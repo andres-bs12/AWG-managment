@@ -46,7 +46,7 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
     <article className={styles.card} data-selected={selected} aria-label={title}>
       <div className={styles.identity}>
         {marketId ? (
-          <MarketItemPhoto id={marketId} />
+          <MarketItemPhoto id={marketId} sale={{ to: `/staff/orders/${item.orderId}`, from: navigationState?.from }} />
         ) : photo ? (
           <Link to={paintTo} state={navigationState} className={styles.photo} aria-label={`View ${title} reference`}><img src={photo.dataUrl} alt="" /></Link>
         ) : (
@@ -107,8 +107,9 @@ export function OrderItemCard({ item, block, days, selected, navigationState, bu
   )
 }
 
-function MarketItemPhoto({ id }: { id: string }) {
-  const ref = useRef<HTMLDivElement>(null)
+/** The photo opens this ornament on Stock (owner, 2026-11-27); Stock's back link returns to the sale. */
+function MarketItemPhoto({ id, sale }: { id: string; sale: { to: string; from?: string } }) {
+  const ref = useRef<HTMLAnchorElement>(null)
   const [loaded, setLoaded] = useState<{ id: string; url: string | null } | null>(null)
   const seeded = seedMarketPhoto(id)
   const parts = marketOrnamentParts(id)
@@ -133,7 +134,7 @@ function MarketItemPhoto({ id }: { id: string }) {
   const src = uploaded ?? seeded
 
   return (
-    <div ref={ref} className={styles.marketPhoto}>
+    <Link ref={ref} className={styles.marketPhoto} to={`/staff/inventory?ornament=${encodeURIComponent(id)}`} state={{ sale }} aria-label={`Open ${id} in stock`}>
       {src ? (
         <img src={src} alt={`Ornament ${id}`} loading="lazy" />
       ) : (
@@ -142,6 +143,6 @@ function MarketItemPhoto({ id }: { id: string }) {
           <span className={styles.marketPlaceholderCode}>{id}</span>
         </div>
       )}
-    </div>
+    </Link>
   )
 }

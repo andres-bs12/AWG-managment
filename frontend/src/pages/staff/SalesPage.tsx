@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../../api/client'
-import type { SaleItemPreview, SalesFilters, SalesPage as SalesResult } from '../../domain/types'
+import type { Market, SaleItemPreview, SalesFilters, SalesPage as SalesResult } from '../../domain/types'
 import { marketOrnamentParts } from '../../domain/marketStock'
 import { Button } from '../../components/ui/Button'
 import { Field } from '../../components/ui/Field'
@@ -22,13 +22,15 @@ export function SalesPage() {
   const query = params.get('q') ?? ''
   const state = paymentStates.has(params.get('state') ?? '') ? params.get('state') as SalesFilters['state'] : undefined
   const source = params.get('source') === 'stall' || params.get('source') === 'web' ? params.get('source') as SalesFilters['source'] : undefined
+  const market = params.get('market') || undefined
   const period: Period = params.get('period') === 'today' ? 'today' : params.get('period') === 'week' ? 'week' : 'all'
   const page = Math.max(0, Number.parseInt(params.get('page') ?? '0', 10) || 0)
   const [response, setResponse] = useState<{ result: SalesResult | null; error: string; key: string }>({ result: null, error: '', key: '' })
   const [retry, setRetry] = useState(0)
+  const [markets, setMarkets] = useState<Market[]>([])
   const refresh = useStaffRefresh()
   const today = viennaDate(new Date())
-  const requestKey = JSON.stringify([query, state, source, period, page, today, refresh, retry])
+  const requestKey = JSON.stringify([query, state, source, market, period, page, today, refresh, retry])
   const busy = response.key !== requestKey
   const error = busy ? '' : response.error
   const result = response.result
@@ -41,20 +43,27 @@ export function SalesPage() {
     setParams(next)
   }
 
+  // The market list only fills the filter; without it the filter just offers "All markets".
+  useEffect(() => {
+    let active = true
+    api.markets.listMarkets().then(rows => { if (active) setMarkets([...rows].sort((a, b) => a.name.localeCompare(b.name))) }).catch(() => {})
+    return () => { active = false }
+  }, [])
+
   useEffect(() => {
     let active = true
     const start = new Date(`${today}T12:00:00Z`)
     start.setUTCDate(start.getUTCDate() - 6)
     const from = period === 'today' ? today : period === 'week' ? start.toISOString().slice(0, 10) : undefined
     const timer = window.setTimeout(() => {
-      void api.orders.listSales({ query, state, source, page, from, to: period === 'all' ? undefined : today }).then(next => {
+      void api.orders.listSales({ query, state, source, market, page, from, to: period === 'all' ? undefined : today }).then(next => {
         if (active) setResponse({ result: next, error: '', key: requestKey })
       }).catch(err => {
         if (active) setResponse({ result: null, error: err instanceof Error ? err.message : 'Could not load sales.', key: requestKey })
       })
     }, 0)
     return () => { active = false; window.clearTimeout(timer) }
-  }, [query, state, source, period, page, today, refresh, retry, requestKey])
+  }, [query, state, source, market, period, page, today, refresh, retry, requestKey])
 
   // A stale or hand-edited ?page= past the end jumps back to the last page instead of an empty list.
   const lastPage = result && !busy && result.totalPages > 0 && page >= result.totalPages ? result.totalPages - 1 : null
@@ -67,7 +76,7 @@ export function SalesPage() {
 
   return <section className={styles.page}>
     <h1>Sales</h1>
-    <StaffFilters count={Number(Boolean(state)) + Number(Boolean(source)) + Number(period !== 'all')} inline={
+    <StaffFilters count={Number(Boolean(state)) + Number(Boolean(source)) + Number(Boolean(market)) + Number(period !== 'all')} inline={
       <div className={styles.period}>
         <SegmentedControl legend="Sale date" hideLegend value={period} name="sales-period" onChange={value => update('period', value)} options={[{ value: 'today', label: 'Today' }, { value: 'week', label: '7 days' }, { value: 'all', label: 'All' }]} />
       </div>
@@ -79,11 +88,23 @@ export function SalesPage() {
         <Field label="Source" htmlFor="sales-source"><select id="sales-source" value={source ?? ''} onChange={event => update('source', event.target.value)}>
           <option value="">All sources</option><option value="stall">Stall</option><option value="web">Web</option>
         </select></Field>
+        <Field label="Market" htmlFor="sales-market"><select id="sales-market" value={market ?? ''} onChange={event => update('market', event.target.value)}>
+          <option value="">All markets</option>
+          {/* A market id from an old link that is no longer listed still shows as selected instead of silently "All". */}
+          {market && !markets.some(row => row.id === market) ? <option value={market}>Selected market</option> : null}
+          {markets.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}
+        </select></Field>
       </div>
     </StaffFilters>
     {busy && <p role="status">Loading sales…</p>}
     {error && <div role="alert"><p>{error}</p><Button tone="staff" onClick={() => setRetry(value => value + 1)}>Retry</Button></div>}
     {!busy && !error && result && <>
+      {/* Money taken over the whole range and filters (every page), by how it was paid (owner, 2026-11-27). */}
+      {result.received ? <dl className={styles.received} aria-label="Received">
+        <div><dt>Card</dt><dd>{formatEur(result.received.card, 'en')}</dd></div>
+        <div><dt>Cash</dt><dd>{formatEur(result.received.cash, 'en')}</dd></div>
+        {result.received.other > 0 ? <div><dt>No method</dt><dd>{formatEur(result.received.other, 'en')}</dd></div> : null}
+      </dl> : null}
       {!result.orders.length ? <p role="status">No sales match these filters.</p> : <ul className={styles.list} aria-label="Sales results">{result.orders.map(order => {
         const web = order.source === 'web'
         const market = web ? null : order.soldAtMarketName

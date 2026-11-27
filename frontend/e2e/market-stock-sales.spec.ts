@@ -151,6 +151,16 @@ for (const vp of viewports) {
       await expect.poll(() => detailPhoto.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
       await axe(page)
 
+      // The photo opens that piece on Stock; Stock's back link returns to this sale.
+      await detailCard.getByRole('link', { name: 'Open RM01 in stock' }).click()
+      await expect(page).toHaveURL(/\/staff\/inventory\?ornament=RM01$/)
+      const opened = page.getByRole('dialog', { name: 'RM01' })
+      await expect(opened.getByText(/^Sold \d/)).toBeVisible()
+      await page.keyboard.press('Escape')
+      await expect(opened).toHaveCount(0)
+      await page.getByRole('link', { name: '← Sale' }).click()
+      await expect(page.getByRole('heading', { name: code, exact: true })).toBeVisible()
+
       await page.getByRole('button', { name: 'Cancel order', exact: true }).click()
       await page.getByRole('dialog', { name: 'Cancel order?' }).getByRole('button', { name: 'Cancel order', exact: true }).click()
       await expect(page.getByRole('heading', { name: 'Cancelled order' })).toBeVisible()

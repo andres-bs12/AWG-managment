@@ -15,14 +15,15 @@ import styles from './MarketStock.module.css'
 
 const statusOptions = Object.entries(marketStatusLabels)
 
-export function MarketStock() {
+/** `openId` (from `?ornament=` on Stock) opens that ornament's dialog, e.g. when a sale's photo links here. */
+export function MarketStock({ openId }: { openId?: string } = {}) {
   const version = useStaffRefresh()
   const [ornaments, setOrnaments] = useState<MarketOrnament[] | null>(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(openId?.toUpperCase() ?? null)
 
   useEffect(() => {
     let active = true

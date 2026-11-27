@@ -1966,7 +1966,11 @@ export function statsSource(): { orders: Order[]; items: import('../../domain/ty
   return { orders: state.orders, items: state.items }
 }
 export function listSales(filters: import('../../domain/types').SalesFilters): import('../../domain/types').SalesPage {
-  const result = filterSales(state.orders.map(orderSummary), filters)
+  const result = filterSales(state.orders.map(order => {
+    const soldOn = order.source === 'web' ? undefined : state.soldOnMarketDays?.[order.id]
+    const soldAtMarketId = soldOn ? state.marketDays.find(day => day.id === soldOn)?.marketId ?? null : null
+    return { ...orderSummary(order), soldAtMarketId, paymentMethod: order.paymentMethod ?? null }
+  }), filters)
   for (const order of result.orders) {
     order.saleItems = state.items.filter(item => item.orderId === order.id).map(item => ({
       id: item.id, kind: item.kind, color: item.color ?? null,

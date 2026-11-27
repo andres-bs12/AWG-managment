@@ -24,8 +24,9 @@ public class OrderController {
                              @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
                              @RequestParam(defaultValue = "0") int page,
                              @RequestParam(defaultValue = "20") int size,
-                             @RequestParam(required = false) String query) {
-        return orderService.listSales(state, source, from, to, page, size, query);
+                             @RequestParam(required = false) String query,
+                             @RequestParam(required = false) java.util.UUID market) {
+        return orderService.listSales(state, source, from, to, page, size, query, market);
     }
 
     @GetMapping(params = "code")

@@ -323,4 +323,46 @@ class TwoMarketsApiTests extends ApiTestSupport {
         mvc.perform(get("/api/agenda/days/" + WED).header("Authorization", bearer(staff)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.paintingMarketId").isEmpty());
     }
+
+    @Test
+    void salesFilterByMarketAndTotalCardAndCashAcrossEveryPage() throws Exception {
+        String staff = login();
+        Stall one = openStall(staff, "Totals stall one", 12, 19);
+        Stall two = openStall(staff, "Totals stall two", 12, 21);
+        java.util.function.BiFunction<String, PaymentMethod, String> sell = (dayId, method) -> {
+            try {
+                var saved = mvc.perform(post("/api/orders").header("Authorization", bearer(staff)).contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("soldOnMarketDayId", dayId, "items", List.of(finishedItem()))))).andExpect(status().isCreated()).andReturn();
+                var order = orderRepository.findById(UUID.fromString(read(saved, "$.id"))).orElseThrow();
+                order.setPaymentState(PaymentState.PAID);
+                order.setAmountPaid(new java.math.BigDecimal("35.00"));
+                order.setPaymentMethod(method);
+                orderRepository.saveAndFlush(order);
+                return order.getId().toString();
+            } catch (Exception e) { throw new RuntimeException(e); }
+        };
+        sell.apply(one.dayId(), PaymentMethod.CARD);
+        sell.apply(one.dayId(), PaymentMethod.CASH);
+        sell.apply(one.dayId(), PaymentMethod.CASH);
+        String cancelled = sell.apply(one.dayId(), PaymentMethod.CARD);
+        orderRepository.findById(UUID.fromString(cancelled)).orElseThrow().setStatus("CANCELLED");
+        orderRepository.flush();
+        sell.apply(two.dayId(), PaymentMethod.CARD);
+
+        // Page size 1: the totals still cover all matching sales, not only the visible page.
+        mvc.perform(get("/api/orders").param("market", one.marketId()).param("size", "1").header("Authorization", bearer(staff)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(4))
+                .andExpect(jsonPath("$.orders.length()").value(1))
+                .andExpect(jsonPath("$.received.card").value(35.0))
+                .andExpect(jsonPath("$.received.cash").value(70.0))
+                .andExpect(jsonPath("$.received.other").value(0));
+        mvc.perform(get("/api/orders").param("market", two.marketId()).header("Authorization", bearer(staff)))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.orders[0].soldAtMarketName").value("Totals stall two"))
+                .andExpect(jsonPath("$.received.card").value(35.0))
+                .andExpect(jsonPath("$.received.cash").value(0));
+        mvc.perform(get("/api/orders").param("market", "not-a-uuid").header("Authorization", bearer(staff)))
+                .andExpect(status().isBadRequest());
+    }
 }
